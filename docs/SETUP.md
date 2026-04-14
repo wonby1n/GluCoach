@@ -12,12 +12,57 @@
 
 ### Android Studio Panda 3 (Frontend)
 
-- [Android Studio](https://developer.android.com/studio) 최신 버전 다운로드
-- 설치 후 SDK Manager에서 다음 설치:
-  - Android SDK Platform 36
-  - Android SDK Build-Tools
-  - Android Emulator
-- `ANDROID_HOME` 환경 변수 설정
+#### 설치
+
+1. [Android Studio 다운로드 페이지](https://developer.android.com/studio)에서 최신 버전 다운로드
+2. 설치 마법사 실행 → **Standard** 설치 선택 (기본 SDK 포함)
+3. 설치 완료 후 Android Studio 실행
+
+#### SDK 설정
+
+1. File > Settings > Languages & Frameworks > **Android SDK**
+2. **SDK Platforms** 탭:
+   - `Android 16.0 ("Baklava")` — API Level 36 체크
+3. **SDK Tools** 탭:
+   - Android SDK Build-Tools (최신)
+   - Android SDK Command-line Tools
+   - Android Emulator
+   - Android SDK Platform-Tools
+4. Apply 클릭하여 설치
+
+#### 환경 변수 설정 (Windows)
+
+1. Windows 검색 > "환경 변수" > 시스템 환경 변수 편집
+2. 시스템 변수에 추가:
+   - 변수명: `ANDROID_HOME`
+   - 값: `C:\Users\<사용자명>\AppData\Local\Android\Sdk`
+3. `Path` 변수에 다음 추가:
+   ```
+   %ANDROID_HOME%\platform-tools
+   %ANDROID_HOME%\tools
+   ```
+4. 확인:
+   ```bash
+   adb --version
+   # Android Debug Bridge version x.x.x
+   ```
+
+#### 에뮬레이터 생성
+
+1. Android Studio > Device Manager (우측 사이드바)
+2. **Create Virtual Device** 클릭
+3. 디바이스 선택: Pixel 8 (권장)
+4. 시스템 이미지: API 36 다운로드 후 선택
+5. Finish → 에뮬레이터 실행 확인
+
+#### 프로젝트 열기
+
+1. File > Open > `frontend/` 폴더 선택
+2. Gradle Sync가 자동 실행됨 (최초 시 수 분 소요)
+3. Sync 완료 후 상단 ▶ 버튼으로 앱 실행
+4. 에뮬레이터 또는 USB 연결된 실기기 선택
+
+> **참고**: 실기기 사용 시 개발자 옵션 > USB 디버깅 활성화 필요
 
 ### Python 3.12 (AI)
 
