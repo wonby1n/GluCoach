@@ -1,0 +1,30 @@
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+*.swp
+*.swo
+*~
+
+# 환경 변수
+.env
+.env.local
+.env.*.local
+
+# 로그
+*.log
+logs/
+
+# 임시 파일
+tmp/
+temp/
+
+# Claude 설정 파일
+.claude

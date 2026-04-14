@@ -1,0 +1,57 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_REGISTRY = 'your-registry.example.com'
+        EC2_HOST = 'your-ec2-host'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Backend') {
+            steps {
+                dir('backend') {
+                    sh 'chmod +x gradlew'
+                    sh './gradlew bootJar -x test'
+                }
+            }
+        }
+
+        stage('Build Frontend APK') {
+            steps {
+                dir('frontend') {
+                    sh 'chmod +x gradlew'
+                    sh './gradlew :app:assembleRelease'
+                }
+            }
+        }
+
+        stage('Build Docker Images') {
+            steps {
+                sh 'docker build -t s309-backend ./backend'
+                sh 'docker build -t s309-ai ./ai'
+            }
+        }
+
+        stage('Deploy to EC2') {
+            steps {
+                // TODO: SSH를 통한 EC2 배포 스크립트 작성
+                echo 'Deploy stage - configure SSH and docker-compose up'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline succeeded!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}
