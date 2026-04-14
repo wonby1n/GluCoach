@@ -10,23 +10,23 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf(csrf -> csrf.disable())
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(
-                    "/api/health",
-                    "/swagger-ui/**",
-                    "/swagger-ui.html",
-                    "/swagger-resources/**",
-                    "/api-docs/**",
-                    "/v3/api-docs/**",
-                    "/webjars/**"
-                ).permitAll()
-                .anyRequest().authenticated()
-            );
+  @Bean
+  public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    http.csrf(csrf -> csrf.disable())
+        .authorizeHttpRequests(
+            auth ->
+                auth.requestMatchers(
+                        "/api/health",
+                        "/swagger-ui/**",
+                        "/swagger-ui.html",
+                        "/swagger-resources/**",
+                        "/api-docs/**",
+                        "/v3/api-docs/**",
+                        "/webjars/**")
+                    .permitAll()
+                    .anyRequest()
+                    .authenticated());
 
-        return http.build();
-    }
+    return http.build();
+  }
 }

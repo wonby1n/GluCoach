@@ -196,13 +196,73 @@ docker compose up -d
 
 ## 3. IDE 설정
 
-### IntelliJ IDEA / Android Studio
+### IntelliJ IDEA (Backend)
 
 - File > Project Structure > SDK → JDK 21 선택
-- Lombok 플러그인 설치 (Backend 개발 시)
+- Lombok 플러그인 설치
 - Annotation Processor 활성화: Settings > Build > Compiler > Annotation Processors
+- 권장 플러그인:
+  - **Lombok** — 필수
+  - **Spring Boot Assistant** — 자동완성 지원
+  - **EditorConfig** — 코드 스타일 자동 적용
+  - **SonarQube for IDE** — 실시간 코드 품질 검사
 
-### VS Code (AI 개발 시)
+### Android Studio (Frontend)
 
-- Python 확장 설치
-- 인터프리터를 Python 3.12로 설정
+- 권장 플러그인:
+  - **ktlint** — Kotlin 코드 스타일 검사
+  - **Detekt** — 코드 품질 분석
+  - **EditorConfig** — 기본 내장
+  - **JSON To Kotlin Class** — API 응답을 data class로 변환
+
+### VS Code (AI)
+
+- 권장 확장:
+  - **Python** (ms-python) — 필수
+  - **Ruff** — Python 린터/포매터
+  - **EditorConfig for VS Code** — 코드 스타일 적용
+
+## 4. 코드 스타일 및 린트
+
+### Frontend (Kotlin)
+
+프로젝트에 ktlint와 detekt가 설정되어 있습니다.
+
+```bash
+cd frontend
+
+# 코드 스타일 검사
+./gradlew ktlintCheck
+
+# 코드 스타일 자동 수정
+./gradlew ktlintFormat
+
+# 코드 품질 검사 (복잡도, 잠재적 버그)
+./gradlew detekt
+```
+
+### Backend (Java)
+
+Spotless + Google Java Style이 설정되어 있습니다.
+
+```bash
+cd backend
+
+# 코드 스타일 검사
+./gradlew spotlessCheck
+
+# 코드 스타일 자동 수정
+./gradlew spotlessApply
+```
+
+### 커밋 전 확인 습관
+
+코드를 커밋하기 전에 린트를 실행하는 습관을 들여주세요.
+
+```bash
+# Frontend
+cd frontend && ./gradlew ktlintFormat && ./gradlew detekt
+
+# Backend
+cd backend && ./gradlew spotlessApply
+```

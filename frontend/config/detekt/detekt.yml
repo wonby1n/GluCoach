@@ -1,0 +1,28 @@
+# S309 팀 detekt 규칙 설정
+# 기본 규칙 위에 팀 커스텀 규칙 적용
+# 전체 규칙: ./gradlew detektGenerateConfig 로 생성 가능
+
+complexity:
+  LongMethod:
+    maxLines: 50
+  LongParameterList:
+    functionThreshold: 8
+    constructorThreshold: 10
+  ComplexCondition:
+    threshold: 5
+  TooManyFunctions:
+    thresholdInFiles: 20
+    thresholdInClasses: 15
+
+style:
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    maxLineLength: 120
+  WildcardImport:
+    active: true
+
+naming:
+  FunctionNaming:
+    # Compose 함수는 PascalCase 허용
+    excludes: ["**/ui/**", "**/composable/**", "**/screen/**"]
