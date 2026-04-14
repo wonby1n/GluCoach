@@ -220,7 +220,7 @@ docker compose up -d
 - 권장 확장:
   - **Python** (ms-python) — 필수
   - **Ruff** — Python 린터/포매터
-  - **EditorConfig for VS Code** — 코드 스타일 적용
+  - **EditorConfig** — 코드 스타일 적용
 
 ## 4. 코드 스타일 및 린트
 

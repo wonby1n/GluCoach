@@ -1,0 +1,108 @@
+#!/bin/bash
+# =============================================================
+# Pre-commit hook: 변경된 모듈의 린트를 자동 실행합니다.
+# 린트 실패 시 커밋이 차단됩니다.
+# =============================================================
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+
+# staged 파일 목록
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
+if [ -z "$STAGED_FILES" ]; then
+    exit 0
+fi
+
+BACKEND_CHANGED=false
+FRONTEND_CHANGED=false
+
+for file in $STAGED_FILES; do
+    case "$file" in
+        backend/*) BACKEND_CHANGED=true ;;
+        frontend/*) FRONTEND_CHANGED=true ;;
+    esac
+done
+
+EXIT_CODE=0
+
+# Backend: Spotless (Google Java Style) — 자동 수정 후 re-stage
+if [ "$BACKEND_CHANGED" = true ]; then
+    echo "🔧 [Backend] Spotless 자동 수정 중..."
+    cd "$ROOT_DIR/backend"
+
+    if [ -f "./gradlew" ]; then
+        ./gradlew spotlessApply --quiet 2>&1
+        if [ $? -ne 0 ]; then
+            echo ""
+            echo "❌ [Backend] Spotless 자동 수정 실패!"
+            echo "   확인: cd backend && ./gradlew spotlessApply"
+            echo ""
+            EXIT_CODE=1
+        else
+            # 수정된 backend 파일 re-stage
+            cd "$ROOT_DIR"
+            for file in $STAGED_FILES; do
+                case "$file" in
+                    backend/*.java) git add "$file" ;;
+                esac
+            done
+            echo "✅ [Backend] Spotless 자동 수정 완료"
+        fi
+    else
+        echo "⚠️  [Backend] gradlew 없음 — 린트 건너뜀"
+    fi
+
+    cd "$ROOT_DIR"
+fi
+
+# Frontend: ktlint 자동 수정 + detekt 검사
+if [ "$FRONTEND_CHANGED" = true ]; then
+    echo "🔧 [Frontend] ktlint 자동 수정 중..."
+    cd "$ROOT_DIR/frontend"
+
+    if [ -f "./gradlew" ]; then
+        ./gradlew ktlintFormat --quiet 2>&1
+        if [ $? -ne 0 ]; then
+            echo ""
+            echo "❌ [Frontend] ktlint 자동 수정 실패!"
+            echo "   확인: cd frontend && ./gradlew ktlintFormat"
+            echo ""
+            EXIT_CODE=1
+        else
+            # 수정된 frontend 파일 re-stage
+            cd "$ROOT_DIR"
+            for file in $STAGED_FILES; do
+                case "$file" in
+                    frontend/*.kt | frontend/*.kts) git add "$file" ;;
+                esac
+            done
+            echo "✅ [Frontend] ktlint 자동 수정 완료"
+        fi
+
+        cd "$ROOT_DIR/frontend"
+        echo "🔍 [Frontend] detekt 검사 중..."
+        ./gradlew detekt --quiet 2>&1
+        if [ $? -ne 0 ]; then
+            echo ""
+            echo "❌ [Frontend] detekt 품질 검사 실패!"
+            echo "   확인: cd frontend && ./gradlew detekt"
+            echo ""
+            EXIT_CODE=1
+        else
+            echo "✅ [Frontend] detekt 통과"
+        fi
+    else
+        echo "⚠️  [Frontend] gradlew 없음 — 린트 건너뜀"
+    fi
+
+    cd "$ROOT_DIR"
+fi
+
+if [ $EXIT_CODE -ne 0 ]; then
+    echo ""
+    echo "🚫 린트 실패로 커밋이 차단되었습니다."
+    echo "   위 안내에 따라 수정 후 다시 커밋하세요."
+    echo ""
+fi
+
+exit $EXIT_CODE
