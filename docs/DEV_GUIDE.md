@@ -196,10 +196,10 @@ backend/
 
 | 항목 | 버전 | 비고 |
 |------|------|------|
-| Android Studio | Panda 3 이상 | 최신 안정 버전 |
-| Kotlin | 2.1.10 | 프로젝트에 설정됨 |
-| Gradle | 8.14 | 프로젝트에 설정됨 |
-| compileSdk | 35 | build.gradle.kts에 설정됨 |
+| Android Studio | Otter 3 이상 | 최신 안정 버전 |
+| Kotlin | 2.2.10 | 프로젝트에 설정됨 |
+| Gradle | 9.3.1 | 프로젝트에 설정됨 |
+| compileSdk | 36 | build.gradle.kts에 설정됨 |
 
 ### Step 1. Android Studio 설치
 
