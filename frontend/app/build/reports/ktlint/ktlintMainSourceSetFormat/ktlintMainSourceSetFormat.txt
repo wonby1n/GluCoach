@@ -1,0 +1,8 @@
+[90mC:\Users\SSAFY\Desktop\dohyun\S14P31S309\frontend\app\src\main\java\com\ssafy\s309\[0mmainActivity.kt[90m:[0m1[90m:1:[0m File name 'mainActivity.kt' should conform PascalCase [90m(standard:filename)[0m
+[90mC:\Users\SSAFY\Desktop\dohyun\S14P31S309\frontend\app\src\main\java\com\ssafy\s309\[0mmainActivity.kt[90m:[0m42[90m:5:[0m Function name should start with a lowercase letter (except factory methods) and use camel case [90m(standard:function-naming)[0m
+[90mC:\Users\SSAFY\Desktop\dohyun\S14P31S309\frontend\app\src\main\java\com\ssafy\s309\[0mmainActivity.kt[90m:[0m56[90m:5:[0m Function name should start with a lowercase letter (except factory methods) and use camel case [90m(standard:function-naming)[0m
+[90mC:\Users\SSAFY\Desktop\dohyun\S14P31S309\frontend\app\src\main\java\com\ssafy\s309\ui\theme\[0mTheme.kt[90m:[0m28[90m:5:[0m Function name should start with a lowercase letter (except factory methods) and use camel case [90m(standard:function-naming)[0m
+
+Summary error count (descending) by rule:
+  standard:function-naming: 3
+  standard:filename: 1
