@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/s309
+    url: jdbc:postgresql://localhost:5432/s309
     username: ssafy
     password: ssafy
   jpa:

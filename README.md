@@ -17,7 +17,7 @@ SSAFY 14기 2학기 자율 프로젝트
 
 | 분류 | 기술 |
 |------|------|
-| Backend | Java 21, Spring Boot 3.5, Spring Data JPA, Spring Security, MySQL 8.4 |
+| Backend | Java 21, Spring Boot 3.5, Spring Data JPA, Spring Security, PostgreSQL 17 |
 | Frontend | Kotlin, Jetpack Compose, Hilt, Retrofit 2, Coil 3, Navigation Compose |
 | AI | Python 3.12, FastAPI, Uvicorn |
 | Infra | Docker, Nginx, Jenkins, AWS EC2 |

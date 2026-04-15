@@ -74,7 +74,7 @@ git push origin feature/기능명
 |------|------|------|
 | JDK | 21 (Eclipse Temurin) | `java -version`으로 확인 |
 | IDE | IntelliJ IDEA | Community 또는 Ultimate |
-| MySQL | 8.4 LTS | 로컬 설치 또는 Docker |
+| PostgreSQL | 17 | 로컬 설치 또는 Docker (Docker 권장) |
 
 ### Step 1. JDK 21 설치
 
@@ -91,28 +91,93 @@ java -version
 
 > 주의: 경로 끝에 `\bin`을 붙이면 안 됩니다.
 
-### Step 2. MySQL 설치 및 DB 생성
+### Step 2. PostgreSQL 설치 및 DB 생성
 
-**Windows**: [MySQL Installer](https://dev.mysql.com/downloads/installer/)에서 MySQL Server 8.4.x 설치
+> **권장: Docker 방식 (A안)** — 설치/삭제 간편, OS 무관, 팀 환경 통일  
+> 직접 설치(B안)는 Docker를 쓸 수 없는 경우에만 선택
 
-**WSL**: 
+---
+
+#### A안: Docker로 실행 (권장)
+
+**사전 조건**: Docker Desktop 설치 ([다운로드](https://www.docker.com/products/docker-desktop/))
+
+로컬 개발용으로 PostgreSQL 컨테이너만 단독 실행:
+
 ```bash
-sudo apt update && sudo apt install -y mysql-server
-sudo systemctl start mysql
+docker run -d \
+  --name s309-postgres \
+  -e POSTGRES_DB=s309 \
+  -e POSTGRES_USER=ssafy \
+  -e POSTGRES_PASSWORD=ssafy \
+  -p 5432:5432 \
+  -v s309-postgres-data:/var/lib/postgresql/data \
+  postgres:17-alpine
+```
+
+실행 확인:
+```bash
+docker ps
+# s309-postgres 컨테이너가 보이면 성공
+
+docker logs s309-postgres
+# "database system is ready to accept connections" 메시지 확인
+```
+
+접속 테스트 (선택):
+```bash
+docker exec -it s309-postgres psql -U ssafy -d s309
+# psql 프롬프트가 뜨면 \q 입력으로 종료
+```
+
+**컨테이너 제어:**
+```bash
+docker stop s309-postgres     # 중지
+docker start s309-postgres    # 재시작
+docker rm -f s309-postgres    # 완전 삭제 (볼륨 유지)
+docker volume rm s309-postgres-data  # 데이터까지 삭제
+```
+
+---
+
+#### B안: 직접 설치
+
+**Windows**: [PostgreSQL Installer](https://www.postgresql.org/download/windows/)에서 PostgreSQL 17 설치  
+- 설치 중 `postgres` 계정 비밀번호 설정 (기억해둘 것)
+- Port: `5432` (기본값)
+- Locale: `C` 또는 `Default locale`
+
+**WSL / Ubuntu**:
+```bash
+sudo apt update && sudo apt install -y postgresql-17 postgresql-client-17
+sudo systemctl start postgresql
+```
+
+**macOS (Homebrew)**:
+```bash
+brew install postgresql@17
+brew services start postgresql@17
 ```
 
 설치 후 DB와 계정을 생성합니다:
 
 ```bash
-mysql -u root -p
+# Windows: Start Menu > SQL Shell (psql)
+# WSL/Linux: sudo -u postgres psql
+# macOS: psql postgres
 ```
 
 ```sql
-CREATE DATABASE s309 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE s309;
 
-CREATE USER 'ssafy'@'localhost' IDENTIFIED BY 'ssafy';
-GRANT ALL PRIVILEGES ON s309.* TO 'ssafy'@'localhost';
-FLUSH PRIVILEGES;
+CREATE USER ssafy WITH PASSWORD 'ssafy';
+GRANT ALL PRIVILEGES ON DATABASE s309 TO ssafy;
+
+-- PostgreSQL 15+ 에서는 스키마 권한 추가 부여 필요
+\c s309
+GRANT ALL ON SCHEMA public TO ssafy;
+
+\q
 ```
 
 ### Step 3. .env 설정
@@ -124,7 +189,7 @@ cp backend/.env.example backend/.env
 `backend/.env`를 열어서 값을 채웁니다:
 
 ```env
-DB_URL=jdbc:mysql://localhost:3306/s309
+DB_URL=jdbc:postgresql://localhost:5432/s309
 DB_USERNAME=ssafy
 DB_PASSWORD=ssafy
 SPRING_PROFILES_ACTIVE=local
@@ -387,18 +452,17 @@ cp infra/.env.example infra/.env
 `infra/.env`를 열어서 값을 채웁니다:
 
 ```env
-MYSQL_ROOT_PASSWORD=원하는비밀번호
-MYSQL_DATABASE=s309
-MYSQL_USER=ssafy
-MYSQL_PASSWORD=ssafy
-DB_URL=jdbc:mysql://mysql:3306/s309
+POSTGRES_DB=s309
+POSTGRES_USER=ssafy
+POSTGRES_PASSWORD=ssafy
+DB_URL=jdbc:postgresql://postgres:5432/s309
 DB_USERNAME=ssafy
 DB_PASSWORD=ssafy
 SPRING_PROFILES_ACTIVE=local
 AI_DEBUG=false
 ```
 
-> **주의**: Docker 내에서는 DB 호스트가 `localhost`가 아니라 `mysql`입니다.
+> **주의**: Docker 내에서는 DB 호스트가 `localhost`가 아니라 `postgres`입니다.
 > (`docker-compose.yml`의 서비스 이름으로 접근)
 
 ### Step 3. 전체 서비스 실행
@@ -442,7 +506,7 @@ infra/
 ├── .env.example         ← 환경변수 템플릿
 ├── nginx/
 │   └── nginx.conf       ← 리버스 프록시 설정
-└── mysql/
+└── postgres/
     └── init/            ← DB 초기화 SQL (자동 실행)
 ```
 
@@ -450,7 +514,7 @@ infra/
 
 | 서비스 | 이미지 | 포트 | 역할 |
 |--------|--------|------|------|
-| mysql | mysql:8.4 | 3306 | 데이터베이스 |
+| postgres | postgres:17-alpine | 5432 | 데이터베이스 |
 | backend | 자체 빌드 | 8080 | Spring Boot API |
 | ai | 자체 빌드 | 8000 | FastAPI AI 서버 |
 | nginx | nginx:alpine | 80 | 리버스 프록시 |
@@ -595,9 +659,9 @@ config.py    ← 환경 설정 (pydantic-settings)
 | 항목 | 규칙 |
 |------|------|
 | 컨테이너 이름 | `s309-서비스명` (예: `s309-backend`) |
-| 이미지 태그 | 항상 버전 명시 (예: `mysql:8.4`, `nginx:alpine`) |
+| 이미지 태그 | 항상 버전 명시 (예: `postgres:17-alpine`, `nginx:alpine`) |
 | 환경변수 | `.env` 파일로 관리, docker-compose.yml에 직접 값 넣지 않기 |
-| 볼륨 | named volume 사용 (예: `mysql-data`) |
+| 볼륨 | named volume 사용 (예: `postgres-data`) |
 | 포트 | 호스트:컨테이너 형식 명시 |
 
 ---
@@ -608,7 +672,7 @@ config.py    ← 환경 설정 (pydantic-settings)
 |--------|------|-----|
 | Backend | 8080 | http://localhost:8080 |
 | AI | 8000 | http://localhost:8000 |
-| MySQL | 3306 | - |
+| PostgreSQL | 5432 | - |
 | Nginx | 80 | http://localhost |
 | Swagger (BE) | 8080 | http://localhost:8080/swagger-ui.html |
 | Swagger (AI) | 8000 | http://localhost:8000/docs |
@@ -623,7 +687,9 @@ config.py    ← 환경 설정 (pydantic-settings)
 |------|------|------|
 | `Access denied for user` | DB 계정 불일치 | `.env`의 DB_USERNAME/PASSWORD 확인 |
 | 로그인 화면 뜸 | Spring Security | `/api/health`, `/swagger-ui.html`은 인증 없이 접근 가능. 다른 API는 인증 필요 |
-| `Port 3306 already in use` | MySQL이 이미 실행 중 | `netstat -aon \| findstr 3306`으로 확인 후 중복 서비스 중지 |
+| `Port 5432 already in use` | PostgreSQL이 이미 실행 중 | `netstat -aon \| findstr 5432`으로 확인 후 중복 서비스 중지 |
+| `password authentication failed` | DB 비밀번호 불일치 | `.env`와 PostgreSQL 계정 비밀번호 일치 확인 |
+| `database "s309" does not exist` | DB 미생성 | Step 2의 `CREATE DATABASE` 실행 확인 |
 | Gradle JVM 오류 | JAVA_HOME 불일치 | `JAVA_HOME`이 JDK 21을 가리키는지 확인 (경로 끝에 `\bin` 없어야 함) |
 
 ### Frontend

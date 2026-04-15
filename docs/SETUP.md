@@ -77,82 +77,116 @@
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) 설치
 - 확인: `docker --version` && `docker compose version`
 
-### MySQL 8.4 LTS (로컬 개발용, Docker 미사용 시)
+### PostgreSQL 17 (로컬 개발용)
 
-#### Windows 설치
+> **권장: Docker 방식** — 아래 Docker 설치만 있으면 DB 별도 설치 불필요.  
+> 직접 설치는 Docker를 쓸 수 없는 환경에서만 선택합니다.
 
-1. [MySQL Installer](https://dev.mysql.com/downloads/installer/) 다운로드 (mysql-installer-community)
-2. 설치 유형: **Custom** 선택
-3. 설치 대상에서 **MySQL Server 8.4.x** 선택
-4. 설치 진행 후 Configuration 단계에서:
-   - Type: **Development Computer**
-   - Port: **3306** (기본값 유지)
-   - Root 비밀번호 설정 (기억해 둘 것)
-   - Windows Service로 등록 체크 (자동 시작)
-5. 설치 완료 후 환경 변수 설정:
-   - `Path`에 `C:\Program Files\MySQL\MySQL Server 8.4\bin` 추가
-6. 확인:
+#### Docker로 실행 (권장)
+
+```bash
+docker run -d \
+  --name s309-postgres \
+  -e POSTGRES_DB=s309 \
+  -e POSTGRES_USER=ssafy \
+  -e POSTGRES_PASSWORD=ssafy \
+  -p 5432:5432 \
+  -v s309-postgres-data:/var/lib/postgresql/data \
+  postgres:17-alpine
+```
+
+확인:
+```bash
+docker ps
+# s309-postgres 확인
+
+docker exec -it s309-postgres psql -U ssafy -d s309 -c "SELECT 1;"
+# 결과 1 나오면 성공
+```
+
+---
+
+#### Windows 직접 설치
+
+1. [PostgreSQL Installer](https://www.postgresql.org/download/windows/) 다운로드
+2. 설치 중 설정:
+   - Port: **5432** (기본값)
+   - Superuser (`postgres`) 비밀번호 설정
+   - Locale: `C` 또는 `Default locale`
+3. 설치 완료 후 환경 변수에 `C:\Program Files\PostgreSQL\17\bin` 추가
+4. 확인:
    ```bash
-   mysql --version
-   # mysql  Ver 8.4.x for Win64 on x86_64
+   psql --version
+   # psql (PostgreSQL) 17.x
    ```
 
-#### WSL 설치
+#### WSL / Ubuntu 직접 설치
 
 ```bash
 sudo apt update
-sudo apt install -y mysql-server-8.0
-# (Ubuntu 저장소 기준 — 8.4가 필요하면 MySQL APT Repository 추가)
-sudo systemctl start mysql
-sudo mysql_secure_installation
+sudo apt install -y postgresql-17 postgresql-client-17
+sudo systemctl start postgresql
 ```
 
-#### 데이터베이스 및 계정 설정
-
-MySQL 설치 후 아래 SQL을 실행하여 프로젝트 DB와 개발용 계정을 생성합니다.
+#### macOS 직접 설치
 
 ```bash
-mysql -u root -p
+brew install postgresql@17
+brew services start postgresql@17
+```
+
+#### 데이터베이스 및 계정 설정 (직접 설치 시)
+
+```bash
+# Windows: Start Menu > SQL Shell (psql) 실행
+# WSL/Linux: sudo -u postgres psql
+# macOS: psql postgres
 ```
 
 ```sql
 -- 데이터베이스 생성
-CREATE DATABASE s309 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE s309;
 
 -- 개발용 계정 생성 (application-local.yml의 기본값과 일치)
-CREATE USER 'ssafy'@'localhost' IDENTIFIED BY 'ssafy';
-GRANT ALL PRIVILEGES ON s309.* TO 'ssafy'@'localhost';
-FLUSH PRIVILEGES;
+CREATE USER ssafy WITH PASSWORD 'ssafy';
+GRANT ALL PRIVILEGES ON DATABASE s309 TO ssafy;
+
+-- PostgreSQL 15+ 에서는 스키마 권한 추가 부여 필요
+\c s309
+GRANT ALL ON SCHEMA public TO ssafy;
 
 -- 확인
-SHOW DATABASES;
-SELECT user, host FROM mysql.user WHERE user = 'ssafy';
+\l
+\du
+
+\q
 ```
 
 #### Spring Boot 연동 확인
 
-`backend/src/main/resources/application-local.yml`의 DB 설정이 위 계정과 일치하는지 확인합니다.
+`backend/src/main/resources/application-local.yml` 설정이 일치하는지 확인:
 
 ```yaml
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/s309
-    username: root      # 또는 ssafy
-    password: ssafy     # 설치 시 설정한 비밀번호로 변경
+    url: jdbc:postgresql://localhost:5432/s309
+    username: ssafy
+    password: ssafy
 ```
-
-비밀번호를 다르게 설정한 경우 `application-local.yml`을 수정하세요.
 
 #### 접속 테스트
 
 ```bash
-mysql -u ssafy -p -e "SELECT 1"
-# Enter password: ssafy
-# +---+
-# | 1 |
-# +---+
-# | 1 |
-# +---+
+# Docker 방식
+docker exec -it s309-postgres psql -U ssafy -d s309 -c "SELECT 1;"
+
+# 직접 설치
+psql -U ssafy -d s309 -c "SELECT 1;"
+# 결과:
+#  ?column?
+# ----------
+#         1
+# (1 row)
 ```
 
 이 명령이 성공하면 Backend에서 `./gradlew bootRun` 시 DB 연결 에러 없이 실행됩니다.
