@@ -101,4 +101,4 @@ docker compose up -d
 
 ## 환경 설정
 
-자세한 환경 셋업은 [docs/SETUP.md](docs/SETUP.md)를 참고하세요.
+자세한 환경 셋업, 코드 컨벤션, 트러블슈팅은 [docs/DEV_GUIDE.md](docs/DEV_GUIDE.md)를 참고하세요.
