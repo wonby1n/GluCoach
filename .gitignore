@@ -28,3 +28,7 @@ temp/
 
 # Claude 설정 파일
 .claude
+
+# tldr
+.tldr
+.tldrignore
