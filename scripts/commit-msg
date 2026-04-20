@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# 커밋 메시지의 단축 이슈 키를 풀 키(S14P31S309-###)로 자동 확장
+# - 주 입력 방식: [#131]
+# - 하위 호환: [S309-131]도 계속 지원
+# Jira-GitLab 자동 연동을 위해 필요
+
+COMMIT_MSG_FILE=$1
+ORIGINAL=$(cat "$COMMIT_MSG_FILE")
+
+# [#131] → [S14P31S309-131] 변환
+perl -i -pe 's/\[#(\d+)\]/[S14P31S309-$1]/g' "$COMMIT_MSG_FILE"
+
+UPDATED=$(cat "$COMMIT_MSG_FILE")
+
+if [ "$ORIGINAL" != "$UPDATED" ]; then
+  echo ""
+  echo "[commit-msg hook] 이슈 키가 자동 확장되었습니다"
+  echo "  변경 전: ${ORIGINAL%%$'\n'*}"
+  echo "  변경 후: ${UPDATED%%$'\n'*}"
+  echo ""
+fi
+
+exit 0
