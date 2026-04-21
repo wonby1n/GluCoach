@@ -72,38 +72,40 @@ docker compose up -d
 ## 브랜치 전략
 
 ```
-develop          ← 팀 자체 추가 기능 통합
-develop-client   ← 클라이언트 요구 기능 통합
-       ↓                ↓
-    release      ← 둘 다 합쳐 실서비스 검증
-          ↓
-        master   ← 최종 배포 (태그로 버전 관리)
+master          ← 최종 배포 (태그로 버전 관리)
+  ↑
+release         ← 배포 전 QA (전체 기능)
+  ↑
+develop         ← 전체 통합 (모든 기능이 모이는 곳)
+  ↑                    ↑
+develop-client         팀 자체 feature 브랜치
+  ↑
+클라이언트 요구 feature 브랜치
 ```
 
-| 브랜치                             | 역할                      | PR 대상                                  |
-| ---------------------------------- | ------------------------- | ---------------------------------------- |
-| `master`                           | 최종 배포                 | `release`에서 MR                         |
-| `release`                          | 전체 기능 통합 실서비스   | `develop` + `develop-client` 에서 MR     |
-| `develop-client`                   | 클라이언트 요구 기능 통합 | `release`                                |
-| `develop`                          | 팀 자체 추가 기능 통합    | `release`                                |
-| `{파트}/feature-{기능}-{이슈번호}` | 기능 개발                 | 유형에 따라 아래 참고                    |
-| `hotfix/{기능}-{이슈번호}`         | 긴급 수정                 | `release` + `develop` + `develop-client` |
+| 브랜치 | 역할 | PR 대상 |
+|--------|------|---------|
+| `master` | 최종 배포 | `release`에서 MR |
+| `release` | 전체 기능 QA | `develop`에서 MR |
+| `develop` | 전체 통합 | `release` |
+| `develop-client` | 클라이언트 요구 기능 현황 관리 | `develop` |
+| `{파트}/feature-{기능}-{이슈번호}` | 기능 개발 | 유형에 따라 아래 참고 |
+| `hotfix/{기능}-{이슈번호}` | 긴급 수정 | `release` + `develop` |
 
 ### 기능 유형별 PR 규칙
 
-| 기능 유형                | PR 대상                                  |
-| ------------------------ | ---------------------------------------- |
-| **클라이언트 요구 기능** | `develop-client` (+ 필요 시 `develop`도) |
-| **팀 자체 추가 기능**    | `develop`만                              |
+| 기능 유형 | PR 대상 |
+|-----------|---------|
+| **클라이언트 요구 기능** | `develop-client` → (자동으로) `develop` |
+| **팀 자체 추가 기능** | `develop` 바로 |
 
-> 하나의 feature 브랜치에서 MR을 여러 개 열 수 있습니다.  
-> 예: `fe/feature-login` → `develop-client` MR + `develop` MR 동시 오픈 가능
+> `develop-client`는 클라이언트 요구 기능이 어디까지 완성됐는지 한눈에 보기 위한 브랜치입니다.  
+> 배포 경로는 `develop → release → master` 하나로 통일됩니다.
 
 ### 배포 플로우
 
 ```
-1. develop + develop-client → release (통합 후 실서비스 검증)
-2. release → master → 태그 (v1.0.0)
+develop → release (QA) → master → 태그 (v1.0.0)
 ```
 
 - **파트**: `fe` / `be` / `ai` / `infra`
