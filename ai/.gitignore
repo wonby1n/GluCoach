@@ -1,0 +1,35 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# 가상환경
+.venv/
+venv/
+ENV/
+
+# 환경 변수
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 테스트
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 빌드
+dist/
+build/
+*.egg-info/
+
+# 모델 파일 (용량이 큰 파일)
+models/
+*.pt
+*.pth
+*.onnx
+*.bin

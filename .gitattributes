@@ -1,1 +1,18 @@
+# 줄바꿈 정규화 (LF 강제)
+* text=auto eol=lf
+
+# 바이너리 파일
+*.jar binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.apk binary
+*.keystore binary
+# 쉘 스크립트 (항상 LF)
+*.sh text eol=lf
+gradlew text eol=lf
+# 윈도우 배치 파일 (항상 CRLF)
+*.bat text eol=crlf
 frontend/app/src/main/assets/model-ko/graph/HCLr.fst filter=lfs diff=lfs merge=lfs -text

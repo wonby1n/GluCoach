@@ -1,95 +1,132 @@
-## Git 브랜치 전략
+# S309
 
-### 브랜치 구조
+SSAFY 14기 2학기 자율 프로젝트
+
+## 팀원
+
+| 이름 | 역할 | GitLab/Mattermost |
+|------|------|-------------------|
+| 조하원 | 팀장 | @godhw1018 |
+| 김정훈 | 팀원 | @kik1232198 |
+| 남윤주 | 팀원 | @skadbsnwk |
+| 박미영 | 팀원 | @a29279 |
+| 손효지 | 팀원 | @hyoji0284 |
+| 이도현 | 팀원 | @ehtm01 |
+
+## 기술 스택
+
+| 분류 | 기술 |
+|------|------|
+| Backend | Java 21, Spring Boot 3.5, Spring Data JPA, Spring Security, PostgreSQL 17 |
+| Frontend | Kotlin, Jetpack Compose, Hilt, Retrofit 2, Coil 3, Navigation Compose |
+| AI | Python 3.12, FastAPI, Uvicorn |
+| Infra | Docker, Nginx, Jenkins, AWS EC2 |
+
+## 디렉토리 구조
+
 ```
-master ──────────────────────────────────────► (배포)
-│
-└─► develop ───────────────────────────────► (개발 통합)
-│
-├─► fe/feature-login-S309-131
-├─► be/fix-auth-S309-045
-└─► ...
-
-master ─► hotfix/긴급수정-S309-### ─► master
-└─►develop
+S14P31S309/
+├── backend/       ← Spring Boot (Java) 서버
+├── frontend/      ← Android (Kotlin + Compose) 앱
+├── ai/            ← FastAPI AI 서버
+├── infra/         ← Docker Compose, Nginx, Jenkins
+├── docs/          ← 프로젝트 문서
+└── exec/          ← SSAFY 산출물 (포팅매뉴얼, 시연시나리오)
 ```
 
-### 브랜치 종류
+## 빠른 시작
 
-| 브랜치 | 역할 | 분기 기준 |
-|--------|------|-----------|
-| `master` | 배포용 | - |
-| `develop` | 개발 통합 (실질적인 main) | `master`에서 최초 1회 |
-| `{파트}/{유형}-{기능}-{이슈번호}` | 기능 개발 | `develop`에서 분기 |
-| `hotfix/{기능}-{이슈번호}` | 운영 긴급 수정 | `master`에서 분기 |
+### Backend
 
-### 브랜치 네이밍 규칙
-{파트}/{커밋 유형}-{기능}-{이슈번호}
+```bash
+cd backend
+./gradlew bootRun
+# http://localhost:8080/api/health → {"status":"UP"}
+# http://localhost:8080/swagger-ui.html → API 문서
+```
+
+### Frontend
+
+1. Android Studio Panda 3에서 `frontend/` 폴더 열기
+2. Gradle Sync 완료 대기
+3. 에뮬레이터 또는 실기기에서 Run
+
+### AI
+
+```bash
+cd ai
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+# http://localhost:8000/health → {"status":"UP"}
+# http://localhost:8000/docs → Swagger UI
+```
+
+### Docker Compose (전체)
+
+```bash
+cd infra
+cp .env.example .env
+docker compose up -d
+```
+
+## 브랜치 전략
+
+```
+develop          ← 팀 자체 추가 기능 통합
+develop-client   ← 클라이언트 요구 기능 통합
+       ↓                ↓
+          release       ← 둘 다 합쳐 실서비스 검증
+              ↓
+           master       ← 최종 배포 (태그로 버전 관리)
+```
+
+| 브랜치 | 역할 | PR 대상 |
+|--------|------|---------|
+| `master` | 최종 배포 | `release`에서 MR |
+| `release` | 전체 기능 통합 실서비스 | `develop` + `develop-client` 에서 MR |
+| `develop-client` | 클라이언트 요구 기능 통합 | `release` |
+| `develop` | 팀 자체 추가 기능 통합 | `release` |
+| `{파트}/feature-{기능}-{이슈번호}` | 기능 개발 | 유형에 따라 아래 참고 |
+| `hotfix/{기능}-{이슈번호}` | 긴급 수정 | `release` + `develop` + `develop-client` |
+
+### 기능 유형별 PR 규칙
+
+| 기능 유형 | PR 대상 |
+|-----------|---------|
+| **클라이언트 요구 기능** | `develop-client` (+ 필요 시 `develop`도) |
+| **팀 자체 추가 기능** | `develop`만 |
+
+> 하나의 feature 브랜치에서 MR을 여러 개 열 수 있습니다.  
+> 예: `fe/feature-login` → `develop-client` MR + `develop` MR 동시 오픈 가능
+
+### 배포 플로우
+
+```
+1. develop + develop-client → release (통합 후 실서비스 검증)
+2. release → master → 태그 (v1.0.0)
+```
+
 - **파트**: `fe` / `be` / `ai` / `infra`
-- **커밋 유형**: 아래 커밋 컨벤션 참고
-- **이슈번호**: `S14P31S309-###` → `S309-###` 로 축약
+- **이슈번호**: `S309-###` 형식
 - **예시**: `fe/feature-login-S309-131`
-
-### 브랜치 보호 규칙
-
-- `master`, `develop` 직접 push 금지 — MR을 통해서만 병합
-- MR 승인자 최소 1명 (팀장 또는 파트 리더)
-- MR 전 로컬에서 빌드 확인 필수
-
-### WorkFlow
-
-**일반 개발**
-
-1. develop 브랜치 로컬에 연결
-    - $ git switch -t origin/develop
-2. 기능 브랜치 생성
-    - (develop) $ git switch -c fe/feature-login-S309-131
-3. 개발 진행 및 커밋
-    - (fe/feature-login-S309-131) $ git commit ...
-4. develop 브랜치로 MR
-    - fe/feature-login-S309-131 → develop
-5. 스프린트 종료 시 master로 MR
-    - develop → master
-
-**긴급 수정 (HOTFIX)**
-
-1. master에서 hotfix 브랜치 생성
-    - (master) $ git switch -c hotfix/login-500-S309-###
-2. 수정 및 커밋
-3. master와 develop 양쪽으로 MR
-    - hotfix/... → master
-    - hotfix/... → develop
-
----
 
 ## 커밋 컨벤션
 
-### 커밋 단위 가이드
-
-- 한 커밋 = 한 논리적 변경 (기능 단위로 쪼개서 커밋)
-- 하루 작업 종료 시 최소 1회 push
-
-### 커밋 메시지 형식
-[{이슈번호}] {작업 유형}: {기능 설명}
-
-### 작업 유형
+```
+[S309-###] {유형}: {설명}
+```
 
 | 유형 | 설명 |
 |------|------|
 | `feature` | 새로운 기능 추가 |
 | `fix` | 버그 수정 |
 | `docs` | 문서 수정 |
-| `refactor` | 코드 리팩토링 (기능 변경 없음) |
-| `design` | CSS 등 UI 디자인 변경 |
-| `test` | 테스트 코드 작성/수정 |
-| `chore` | 패키지 설정, .gitignore 등 기타 |
-| `revert` | 이전 커밋 되돌리기 |
+| `refactor` | 코드 리팩토링 |
+| `design` | UI 디자인 변경 |
+| `test` | 테스트 코드 |
+| `chore` | 기타 설정 |
+| `revert` | 되돌리기 |
 
-### 작성 예시
+## 환경 설정
 
-```
-[S309-131] feature: login 컴포넌트 생성
-[S309-131] feature: login/logout API 연결
-[S309-131] fix: logout 시 인증 토큰 만료되게 수정
-[S309-045] revert: login 컴포넌트 롤백
-```
+자세한 환경 셋업, 코드 컨벤션, 트러블슈팅은 [docs/DEV_GUIDE.md](docs/DEV_GUIDE.md)를 참고하세요.

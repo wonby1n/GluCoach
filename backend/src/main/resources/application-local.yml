@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/s309
+    username: ssafy
+    password: ssafy1234
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+logging:
+  level:
+    com.ssafy.s309: DEBUG
+    org.hibernate.SQL: DEBUG
