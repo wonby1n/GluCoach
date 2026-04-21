@@ -32,6 +32,6 @@ chmod +x "$HOOKS_DIR/commit-msg"
 
 echo "✅ commit-msg hook 설치 완료"
 echo ""
-echo "이후부터 커밋 메시지에 [S309-131]로 쓰셔도"
+echo "이후부터 커밋 메시지에 [#131]로 쓰셔도"
 echo "자동으로 [S14P31S309-131]로 확장되어"
 echo "Jira 연동이 정상 동작합니다."
