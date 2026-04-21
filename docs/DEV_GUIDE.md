@@ -47,20 +47,23 @@ cp infra/.env.example infra/.env
 ### 4. 브랜치 전략
 
 ```
-develop          ← 팀 자체 추가 기능 통합
-develop-client   ← 클라이언트 요구 기능 통합
-       ↓                ↓
-          release       ← 둘 다 합쳐 실서비스 검증
-              ↓
-           master       ← 최종 배포 (태그로 버전 관리)
+master          ← 최종 배포 (태그로 버전 관리)
+  ↑
+release         ← 배포 전 QA (전체 기능)
+  ↑
+develop         ← 전체 통합 (모든 기능이 모이는 곳)
+  ↑                    ↑
+develop-client         팀 자체 feature 브랜치
+  ↑
+클라이언트 요구 feature 브랜치
 ```
 
 | 브랜치 | 용도 | 직접 push |
 |--------|------|-----------|
 | `master` | 최종 배포 | 금지 (MR만) |
-| `release` | 전체 통합 실서비스 검증 | 금지 (MR만) |
-| `develop-client` | 클라이언트 요구 기능 통합 | 금지 (MR만) |
-| `develop` | 팀 자체 추가 기능 통합 | 금지 (MR만) |
+| `release` | 전체 기능 QA | 금지 (MR만) |
+| `develop` | 전체 통합 | 금지 (MR만) |
+| `develop-client` | 클라이언트 요구 기능 현황 관리 | 금지 (MR만) |
 | `{파트}/feature-{기능}-{이슈번호}` | 기능 개발 | 허용 |
 | `hotfix/{기능}-{이슈번호}` | 운영 긴급 수정 | 허용 |
 
@@ -68,35 +71,35 @@ develop-client   ← 클라이언트 요구 기능 통합
 
 | 기능 유형 | MR 보낼 곳 |
 |-----------|-----------|
-| **클라이언트 요구 기능** | `develop-client` (필요 시 `develop`도 추가) |
-| **팀 자체 추가 기능** | `develop`만 |
+| **클라이언트 요구 기능** | `develop-client` → 이후 `develop-client`에서 `develop`으로 MR |
+| **팀 자체 추가 기능** | `develop` 바로 |
 
-> **하나의 feature 브랜치 → 여러 브랜치 동시 MR 가능**  
-> GitLab에서 같은 소스 브랜치로 target만 달리해서 MR을 여러 개 열면 됩니다.  
-> 예: `fe/feature-login` → `develop-client` MR 1개 + `develop` MR 1개
+> `develop-client`는 클라이언트 요구 기능 완성 현황을 추적하기 위한 브랜치입니다.  
+> 배포 경로는 `develop → release → master` 하나로 통일됩니다.
 
 #### 작업 흐름
 
 ```bash
-# 1. 브랜치 생성 (develop 또는 develop-client 기준)
-git checkout develop
-git pull origin develop
+# [클라이언트 요구 기능]
+git checkout develop-client && git pull origin develop-client
 git checkout -b fe/feature-login-S309-131
-
-# 2. 작업 후 push
+# ... 작업 ...
 git push origin fe/feature-login-S309-131
+# GitLab: fe/feature-login-S309-131 → develop-client MR
+# develop-client가 쌓이면: develop-client → develop MR
 
-# 3. GitLab에서 MR 생성
-#    클라이언트 기능: develop-client 대상 MR (+ 필요 시 develop도)
-#    팀 자체 기능:    develop 대상 MR만
+# [팀 자체 기능]
+git checkout develop && git pull origin develop
+git checkout -b fe/feature-myfeature-S309-200
+# ... 작업 ...
+git push origin fe/feature-myfeature-S309-200
+# GitLab: fe/feature-myfeature-S309-200 → develop MR
 ```
 
 #### 배포 플로우
 
 ```bash
-# Step 1. develop + develop-client → release (실서비스 검증)
-
-# Step 2. release → master → 태그
+# develop → release (QA) → master → 태그
 git tag v1.0.0
 git push origin v1.0.0
 ```
