@@ -50,9 +50,7 @@ notify-mr-open:
           else
             REVIEWER_MENTIONS="$REVIEWER_MENTIONS $gitlab_username"
           fi
-        done <<EOF
-$REVIEWER_USERNAMES
-EOF
+        done < <(echo "$REVIEWER_USERNAMES")
         REVIEWER_LINE="\n- 리뷰어:${REVIEWER_MENTIONS} 리뷰 부탁드립니다! 🙏"
       else
         REVIEWER_LINE="\n> ⚠️ 리뷰어가 지정되지 않았습니다."
