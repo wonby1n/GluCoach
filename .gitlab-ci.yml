@@ -43,14 +43,14 @@ notify-mr-open:
       REVIEWER_MENTIONS=""
 
       if [ -n "$REVIEWER_USERNAMES" ]; then
-        while IFS= read -r gitlab_username; do
+        for gitlab_username in $REVIEWER_USERNAMES; do
           mm_handle=$(get_mm_handle "$gitlab_username")
           if [ -n "$mm_handle" ]; then
             REVIEWER_MENTIONS="$REVIEWER_MENTIONS @${mm_handle}"
           else
             REVIEWER_MENTIONS="$REVIEWER_MENTIONS $gitlab_username"
           fi
-        done < <(echo "$REVIEWER_USERNAMES")
+        done
         REVIEWER_LINE="\n- 리뷰어:${REVIEWER_MENTIONS} 리뷰 부탁드립니다! 🙏"
       else
         REVIEWER_LINE="\n> ⚠️ 리뷰어가 지정되지 않았습니다."
