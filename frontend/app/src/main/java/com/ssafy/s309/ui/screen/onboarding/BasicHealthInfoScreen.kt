@@ -53,7 +53,7 @@ fun BasicHealthInfoScreen(
     var weight by remember { mutableStateOf("") }
     var isAgreed by remember { mutableStateOf(false) }
 
-    val isFormValid = birthDate.isNotEmpty() && height.isNotEmpty() && weight.isNotEmpty()
+    val isFormValid = birthDate.isNotEmpty() && height.isNotEmpty() && weight.isNotEmpty() && isAgreed
 
     Column(
         modifier =
@@ -74,7 +74,7 @@ fun BasicHealthInfoScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        ProgressIndicator(currentStep = 1)
+        ProgressIndicator(currentStep = 2, totalSteps = 7)
 
         Spacer(modifier = Modifier.height(32.dp))
 

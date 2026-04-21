@@ -78,7 +78,7 @@ fun TreatmentSelectionScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        ProgressIndicator(currentStep = 2)
+        ProgressIndicator(currentStep = 4, totalSteps = 7)
 
         Spacer(modifier = Modifier.height(32.dp))
 

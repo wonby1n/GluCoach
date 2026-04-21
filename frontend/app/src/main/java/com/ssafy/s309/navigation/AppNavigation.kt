@@ -1,5 +1,7 @@
 package com.ssafy.s309.navigation
 
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -77,7 +79,11 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 onBackClick = { navController.popBackStack() },
             )
         }
-        composable(Screen.SignUp.route) {
+        composable(
+            route = Screen.SignUp.route,
+            enterTransition = { fadeIn() },
+            exitTransition = { fadeOut() },
+        ) {
             SignUpScreen(
                 onSignUpClick = { _, _, _ ->
                     // TODO: 백엔드 연동 후 실제 회원가입 로직으로 교체

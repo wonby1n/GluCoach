@@ -84,7 +84,7 @@ fun BloodSugarRangeScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        ProgressIndicator(currentStep = 5)
+        ProgressIndicator(currentStep = 7, totalSteps = 7)
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -211,7 +211,7 @@ fun BloodSugarRangeDialog(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = "혈당 범위를 설정하면",
+                    text = "목표 혈당 범위가 있나요?",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF222222),
@@ -219,7 +219,7 @@ fun BloodSugarRangeDialog(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "성적표와 리포트를 통해 도와드릴게요.",
+                    text = "범위를 알려주시면 나만의 데이터로 도와드려요.",
                     fontSize = 14.sp,
                     color = Color(0xFF757575),
                     textAlign = TextAlign.Center,

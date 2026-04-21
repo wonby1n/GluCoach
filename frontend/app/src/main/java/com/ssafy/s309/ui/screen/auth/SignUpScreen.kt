@@ -47,6 +47,11 @@ fun SignUpScreen(
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
 
+    val isEmailValid = email.isNotEmpty() && android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
+    val isPasswordValid = password.isNotEmpty() && password.length >= 6
+    val isPasswordMatch = confirmPassword.isNotEmpty() && password == confirmPassword
+    val isFormValid = isEmailValid && isPasswordValid && isPasswordMatch
+
     Column(
         modifier =
             Modifier
@@ -163,7 +168,12 @@ fun SignUpScreen(
                         .fillMaxWidth()
                         .height(48.dp),
                 shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = Primary,
+                        disabledContainerColor = Color(0xFFCCCCCC),
+                    ),
+                enabled = isFormValid,
             ) {
                 Text(
                     text = "Sign Up",

@@ -67,7 +67,7 @@ fun TreatmentTimeScreen(
             ),
         )
 
-    var selectedTime by remember { mutableStateOf(0) }
+    var selectedTime by remember { mutableStateOf<Int?>(null) }
 
     Column(
         modifier =
@@ -88,7 +88,7 @@ fun TreatmentTimeScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        ProgressIndicator(currentStep = 3)
+        ProgressIndicator(currentStep = 5, totalSteps = 7)
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -116,7 +116,8 @@ fun TreatmentTimeScreen(
 
         OnboardingButton(
             text = "다음으로",
-            onClick = { onNextClick(selectedTime) },
+            onClick = { selectedTime?.let { onNextClick(it) } },
+            enabled = selectedTime != null,
         )
     }
 }

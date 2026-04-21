@@ -74,7 +74,7 @@ fun TreatmentPillsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        ProgressIndicator(currentStep = 4)
+        ProgressIndicator(currentStep = 6, totalSteps = 7)
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -116,6 +116,7 @@ fun TreatmentPillsScreen(
                 val selected = selectedMedications.map { medications[it] }
                 onNextClick(selected)
             },
+            enabled = selectedMedications.isNotEmpty(),
         )
     }
 }

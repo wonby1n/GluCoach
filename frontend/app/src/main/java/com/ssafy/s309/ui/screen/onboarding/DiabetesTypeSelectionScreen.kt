@@ -63,7 +63,7 @@ fun DiabetesTypeSelectionScreen(
             ),
         )
 
-    var selectedType by remember { mutableStateOf(0) }
+    var selectedType by remember { mutableStateOf<Int?>(null) }
 
     Column(
         modifier =
@@ -84,7 +84,7 @@ fun DiabetesTypeSelectionScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        ProgressIndicator(currentStep = 2)
+        ProgressIndicator(currentStep = 3, totalSteps = 7)
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -112,7 +112,8 @@ fun DiabetesTypeSelectionScreen(
 
         OnboardingButton(
             text = "다음으로",
-            onClick = { onNextClick(selectedType) },
+            onClick = { selectedType?.let { onNextClick(it) } },
+            enabled = selectedType != null,
         )
     }
 }

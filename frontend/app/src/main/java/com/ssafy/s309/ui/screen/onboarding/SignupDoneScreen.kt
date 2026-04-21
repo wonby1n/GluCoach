@@ -35,41 +35,46 @@ fun SignupDoneScreen(onNextClick: () -> Unit) {
             Modifier
                 .fillMaxSize()
                 .background(Color(0xFFF2F4F5))
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+                .padding(horizontal = 24.dp, vertical = 40.dp),
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.ic_glucoach_logo),
-            contentDescription = "Glucoach Logo",
-            modifier = Modifier.width(200.dp),
-        )
+        Spacer(modifier = Modifier.weight(1f))
 
-        Spacer(modifier = Modifier.height(80.dp))
-
-        Box(
-            modifier =
-                Modifier
-                    .size(120.dp)
-                    .background(Primary, CircleShape),
-            contentAlignment = Alignment.Center,
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = "완료",
-                modifier = Modifier.size(70.dp),
-                tint = Color.White,
+            Image(
+                painter = painterResource(id = R.drawable.ic_glucoach_logo),
+                contentDescription = "Glucoach Logo",
+                modifier = Modifier.width(200.dp),
+            )
+
+            Spacer(modifier = Modifier.height(48.dp))
+
+            Box(
+                modifier =
+                    Modifier
+                        .size(120.dp)
+                        .background(Primary, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "완료",
+                    modifier = Modifier.size(70.dp),
+                    tint = Color.White,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Text(
+                text = "회원가입이 완료됐어요!",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF222222),
             )
         }
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Text(
-            text = "회원가입이 완료됐어요!",
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF222222),
-        )
 
         Spacer(modifier = Modifier.weight(1f))
 
