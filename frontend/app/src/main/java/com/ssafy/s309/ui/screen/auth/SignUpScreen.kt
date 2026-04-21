@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
@@ -47,9 +48,9 @@ fun SignUpScreen(
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
 
-    val isEmailValid = email.isNotEmpty() && android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
-    val isPasswordValid = password.isNotEmpty() && password.length >= 6
-    val isPasswordMatch = confirmPassword.isNotEmpty() && password == confirmPassword
+    val isEmailValid = email.isNotEmpty() && email.contains("@")
+    val isPasswordValid = password.length >= 6
+    val isPasswordMatch = password.isNotEmpty() && confirmPassword.isNotEmpty() && password == confirmPassword
     val isFormValid = isEmailValid && isPasswordValid && isPasswordMatch
 
     Column(
@@ -87,11 +88,15 @@ fun SignUpScreen(
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
-                placeholder = { Text("Value", color = Color(0xFFBBBBBB)) },
+                placeholder = { Text("example@email.com", color = Color(0xFFBBBBBB)) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = KeyboardType.Email,
+                        imeAction = ImeAction.Next,
+                    ),
                 colors =
                     OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Primary,
@@ -111,12 +116,16 @@ fun SignUpScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                placeholder = { Text("Value", color = Color(0xFFBBBBBB)) },
+                placeholder = { Text("6자 이상", color = Color(0xFFBBBBBB)) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Next,
+                    ),
                 colors =
                     OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Primary,
@@ -136,12 +145,16 @@ fun SignUpScreen(
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
-                placeholder = { Text("Value", color = Color(0xFFBBBBBB)) },
+                placeholder = { Text("비밀번호 재입력", color = Color(0xFFBBBBBB)) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Done,
+                    ),
                 colors =
                     OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Primary,
