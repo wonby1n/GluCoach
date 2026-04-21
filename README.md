@@ -71,12 +71,40 @@ docker compose up -d
 
 ## 브랜치 전략
 
-| 브랜치 | 역할 | 분기 기준 |
-|--------|------|-----------|
-| `master` | 배포용 | - |
-| `develop` | 개발 통합 | `master`에서 최초 1회 |
-| `{파트}/{유형}-{기능}-{이슈번호}` | 기능 개발 | `develop`에서 분기 |
-| `hotfix/{기능}-{이슈번호}` | 운영 긴급 수정 | `master`에서 분기 |
+```
+develop          ← 팀 자체 추가 기능 통합
+develop-client   ← 클라이언트 요구 기능 통합
+       ↓                ↓
+          release       ← 둘 다 합쳐 실서비스 검증
+              ↓
+           master       ← 최종 배포 (태그로 버전 관리)
+```
+
+| 브랜치 | 역할 | PR 대상 |
+|--------|------|---------|
+| `master` | 최종 배포 | `release`에서 MR |
+| `release` | 전체 기능 통합 실서비스 | `develop` + `develop-client` 에서 MR |
+| `develop-client` | 클라이언트 요구 기능 통합 | `release` |
+| `develop` | 팀 자체 추가 기능 통합 | `release` |
+| `{파트}/feature-{기능}-{이슈번호}` | 기능 개발 | 유형에 따라 아래 참고 |
+| `hotfix/{기능}-{이슈번호}` | 긴급 수정 | `release` + `develop` + `develop-client` |
+
+### 기능 유형별 PR 규칙
+
+| 기능 유형 | PR 대상 |
+|-----------|---------|
+| **클라이언트 요구 기능** | `develop-client` (+ 필요 시 `develop`도) |
+| **팀 자체 추가 기능** | `develop`만 |
+
+> 하나의 feature 브랜치에서 MR을 여러 개 열 수 있습니다.  
+> 예: `fe/feature-login` → `develop-client` MR + `develop` MR 동시 오픈 가능
+
+### 배포 플로우
+
+```
+1. develop + develop-client → release (통합 후 실서비스 검증)
+2. release → master → 태그 (v1.0.0)
+```
 
 - **파트**: `fe` / `be` / `ai` / `infra`
 - **이슈번호**: `S309-###` 형식
