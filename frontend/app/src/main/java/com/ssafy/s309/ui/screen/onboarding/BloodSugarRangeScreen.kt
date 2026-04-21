@@ -1,0 +1,256 @@
+package com.ssafy.s309.ui.screen.onboarding
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RangeSlider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.ssafy.s309.R
+import com.ssafy.s309.ui.component.onboarding.OnboardingBackButton
+import com.ssafy.s309.ui.component.onboarding.OnboardingButton
+import com.ssafy.s309.ui.component.onboarding.OnboardingHeader
+import com.ssafy.s309.ui.component.onboarding.ProgressIndicator
+import com.ssafy.s309.ui.theme.Primary
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BloodSugarRangeScreen(
+    onNextClick: (Float, Float) -> Unit,
+    onSkipClick: () -> Unit,
+    onBackClick: () -> Unit,
+) {
+    var rangeStart by remember { mutableFloatStateOf(70f) }
+    var rangeEnd by remember { mutableFloatStateOf(180f) }
+    var showDialog by remember { mutableStateOf(true) }
+
+    if (showDialog) {
+        BloodSugarRangeDialog(
+            onDismiss = { showDialog = false },
+            onConfirm = { showDialog = false },
+        )
+    }
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(Color(0xFFF2F4F5))
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+    ) {
+        OnboardingBackButton(onClick = onBackClick)
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Image(
+            painter = painterResource(id = R.drawable.ic_glucoach_logo),
+            contentDescription = "Glucoach Logo",
+            modifier = Modifier.width(160.dp),
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        ProgressIndicator(currentStep = 5)
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        OnboardingHeader(
+            title = "목표 혈당 범위 설정",
+            subtitle = "관리하고 싶은 목표 혈당 범위가 있나요?",
+        )
+
+        Spacer(modifier = Modifier.height(48.dp))
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                RangeValueBox(value = rangeStart.toInt())
+                Spacer(modifier = Modifier.width(40.dp))
+                RangeValueBox(value = rangeEnd.toInt())
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            RangeSlider(
+                value = rangeStart..rangeEnd,
+                onValueChange = { range ->
+                    rangeStart = range.start
+                    rangeEnd = range.endInclusive
+                },
+                valueRange = 20f..220f,
+                steps = 39,
+                colors =
+                    SliderDefaults.colors(
+                        thumbColor = Primary,
+                        activeTrackColor = Primary,
+                        inactiveTrackColor = Color(0xFFD9D9D9),
+                    ),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                listOf(20, 60, 100, 140, 180, 220).forEach { value ->
+                    Text(
+                        text = value.toString(),
+                        fontSize = 12.sp,
+                        color = Color(0xFF999999),
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Text(
+            text = "나중에 할게요",
+            fontSize = 13.sp,
+            color = Color(0xFF555555),
+            textDecoration = TextDecoration.Underline,
+            modifier =
+                Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .clickable { onSkipClick() },
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        OnboardingButton(
+            text = "다음으로",
+            onClick = { onNextClick(rangeStart, rangeEnd) },
+        )
+    }
+}
+
+@Composable
+fun RangeValueBox(value: Int) {
+    Box(
+        modifier =
+            Modifier
+                .size(width = 70.dp, height = 50.dp)
+                .background(Primary, RoundedCornerShape(8.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = value.toString(),
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+        )
+    }
+}
+
+@Composable
+fun BloodSugarRangeDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "닫기",
+                        tint = Color(0xFF999999),
+                    )
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = "혈당 범위를 설정하면",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF222222),
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "성적표와 리포트를 통해 도와드릴게요.",
+                    fontSize = 14.sp,
+                    color = Color(0xFF757575),
+                    textAlign = TextAlign.Center,
+                )
+            }
+        },
+        confirmButton = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OnboardingButton(
+                    text = "알겠어요",
+                    onClick = onConfirm,
+                )
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text(
+                        text = "뒤로가기",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Primary,
+                    )
+                }
+            }
+        },
+    )
+}
