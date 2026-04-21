@@ -1,0 +1,67 @@
+notify-mr-open:
+  stage: .pre
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - |
+      get_mm_handle() {
+        case "$1" in
+          "godhw1018") echo "wonby1n" ;;
+          "kik1232198") echo "kik1232198" ;;
+          "skadbsnwk")  echo "skadbsnwk" ;;
+          "a29279")     echo "a29279" ;;
+          "hyoji0284")  echo "hyoji0284" ;;
+          "ehtm01")     echo "ehtm01" ;;
+          *) echo "" ;;
+        esac
+      }
+
+      # MR 정보 조회
+      MR_JSON=$(curl -s \
+        --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID")
+
+      # MR 생성 시에만 알림 (파이프라인 수로 판단)
+      PIPELINE_COUNT=$(curl -s \
+        --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/pipelines" \
+        | jq '. | length')
+
+      if [ "$PIPELINE_COUNT" -gt 1 ]; then
+        echo "기존 MR에 push된 경우 — 알림 스킵"
+        exit 0
+      fi
+
+      TITLE=$(echo "$MR_JSON" | jq -r '.title')
+      URL="$CI_PROJECT_URL/-/merge_requests/$CI_MERGE_REQUEST_IID"
+      SOURCE=$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME
+      TARGET=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+
+      # 리뷰어 멘션 생성
+      REVIEWER_USERNAMES=$(echo "$MR_JSON" | jq -r '.reviewers[].username // empty')
+      REVIEWER_MENTIONS=""
+
+      if [ -n "$REVIEWER_USERNAMES" ]; then
+        while IFS= read -r gitlab_username; do
+          mm_handle=$(get_mm_handle "$gitlab_username")
+          if [ -n "$mm_handle" ]; then
+            REVIEWER_MENTIONS="$REVIEWER_MENTIONS @${mm_handle}"
+          else
+            REVIEWER_MENTIONS="$REVIEWER_MENTIONS $gitlab_username"
+          fi
+        done <<EOF
+$REVIEWER_USERNAMES
+EOF
+        REVIEWER_LINE="\n- 리뷰어:${REVIEWER_MENTIONS} 리뷰 부탁드립니다! 🙏"
+      else
+        REVIEWER_LINE="\n> ⚠️ 리뷰어가 지정되지 않았습니다."
+      fi
+
+      curl -X POST "$MM_WEBHOOK_URL" \
+        -H 'Content-Type: application/json' \
+        -d "{
+          \"text\": \"## 🔀 MR 생성됨\n**${TITLE}**\n\n- 브랜치: \`${SOURCE}\` → \`${TARGET}\`\n- 링크: ${URL}${REVIEWER_LINE}\"
+        }"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
