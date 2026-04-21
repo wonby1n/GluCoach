@@ -4,23 +4,23 @@ SSAFY 14기 2학기 자율 프로젝트
 
 ## 팀원
 
-| 이름 | 역할 | GitLab/Mattermost |
-|------|------|-------------------|
-| 조하원 | 팀장 | @godhw1018 |
-| 김정훈 | 팀원 | @kik1232198 |
-| 남윤주 | 팀원 | @skadbsnwk |
-| 박미영 | 팀원 | @a29279 |
-| 손효지 | 팀원 | @hyoji0284 |
-| 이도현 | 팀원 | @ehtm01 |
+| 이름   | 역할 | GitLab/Mattermost |
+| ------ | ---- | ----------------- |
+| 조하원 | 팀장 | @godhw1018        |
+| 김정훈 | 팀원 | @kik1232198       |
+| 남윤주 | 팀원 | @skadbsnwk        |
+| 박미영 | 팀원 | @a29279           |
+| 손효지 | 팀원 | @hyoji0284        |
+| 이도현 | 팀원 | @ehtm01           |
 
 ## 기술 스택
 
-| 분류 | 기술 |
-|------|------|
-| Backend | Java 21, Spring Boot 3.5, Spring Data JPA, Spring Security, PostgreSQL 17 |
-| Frontend | Kotlin, Jetpack Compose, Hilt, Retrofit 2, Coil 3, Navigation Compose |
-| AI | Python 3.12, FastAPI, Uvicorn |
-| Infra | Docker, Nginx, Jenkins, AWS EC2 |
+| 분류     | 기술                                                                      |
+| -------- | ------------------------------------------------------------------------- |
+| Backend  | Java 21, Spring Boot 3.5, Spring Data JPA, Spring Security, PostgreSQL 17 |
+| Frontend | Kotlin, Jetpack Compose, Hilt, Retrofit 2, Coil 3, Navigation Compose     |
+| AI       | Python 3.12, FastAPI, Uvicorn                                             |
+| Infra    | Docker, Nginx, Jenkins, AWS EC2                                           |
 
 ## 디렉토리 구조
 
@@ -109,25 +109,25 @@ develop → release (QA) → master → 태그 (v1.0.0)
 ```
 
 - **파트**: `fe` / `be` / `ai` / `infra`
-- **이슈번호**: `S309-###` 형식
-- **예시**: `fe/feature-login-S309-131`
+- **이슈번호**: `S14P31S309-XXX` 형식
+- **예시**: `fe/feature-login-S14P31S309-131`
 
 ## 커밋 컨벤션
 
 ```
-[S309-###] {유형}: {설명}
+[#XXX] {유형}: {설명}
 ```
 
-| 유형 | 설명 |
-|------|------|
-| `feature` | 새로운 기능 추가 |
-| `fix` | 버그 수정 |
-| `docs` | 문서 수정 |
-| `refactor` | 코드 리팩토링 |
-| `design` | UI 디자인 변경 |
-| `test` | 테스트 코드 |
-| `chore` | 기타 설정 |
-| `revert` | 되돌리기 |
+| 유형       | 설명             |
+| ---------- | ---------------- |
+| `feature`  | 새로운 기능 추가 |
+| `fix`      | 버그 수정        |
+| `docs`     | 문서 수정        |
+| `refactor` | 코드 리팩토링    |
+| `design`   | UI 디자인 변경   |
+| `test`     | 테스트 코드      |
+| `chore`    | 기타 설정        |
+| `revert`   | 되돌리기         |
 
 ## 환경 설정
 
