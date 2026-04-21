@@ -8,7 +8,7 @@ import lombok.Getter;
 @Getter
 @Entity
 @Table(name = "guardians", indexes = @Index(name = "idx_guardian_user", columnList = "user_id"))
-@SuppressWarnings("FieldMayBeFinal") // JPA 엔티티 필드는 Hibernate 리플렉션 주입 대상
+@SuppressWarnings({"FieldMayBeFinal", "unused"}) // JPA 엔티티 필드는 Hibernate 리플렉션 주입 대상
 public class Guardian extends BaseEntity {
 
   @Id
