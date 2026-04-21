@@ -46,22 +46,59 @@ cp infra/.env.example infra/.env
 
 ### 4. 브랜치 전략
 
-| 브랜치 | 용도 |
-|--------|------|
-| `master` | 배포용 (직접 push 금지) |
-| `develop` | 개발 통합 브랜치 |
-| `feature/<기능명>` | 기능 개발 |
-| `fix/<이슈명>` | 버그 수정 |
+```
+develop          ← 팀 자체 추가 기능 통합
+develop-client   ← 클라이언트 요구 기능 통합
+       ↓                ↓
+          release       ← 둘 다 합쳐 실서비스 검증
+              ↓
+           master       ← 최종 배포 (태그로 버전 관리)
+```
+
+| 브랜치 | 용도 | 직접 push |
+|--------|------|-----------|
+| `master` | 최종 배포 | 금지 (MR만) |
+| `release` | 전체 통합 실서비스 검증 | 금지 (MR만) |
+| `develop-client` | 클라이언트 요구 기능 통합 | 금지 (MR만) |
+| `develop` | 팀 자체 추가 기능 통합 | 금지 (MR만) |
+| `{파트}/feature-{기능}-{이슈번호}` | 기능 개발 | 허용 |
+| `hotfix/{기능}-{이슈번호}` | 운영 긴급 수정 | 허용 |
+
+#### 기능 유형별 MR 대상
+
+| 기능 유형 | MR 보낼 곳 |
+|-----------|-----------|
+| **클라이언트 요구 기능** | `develop-client` (필요 시 `develop`도 추가) |
+| **팀 자체 추가 기능** | `develop`만 |
+
+> **하나의 feature 브랜치 → 여러 브랜치 동시 MR 가능**  
+> GitLab에서 같은 소스 브랜치로 target만 달리해서 MR을 여러 개 열면 됩니다.  
+> 예: `fe/feature-login` → `develop-client` MR 1개 + `develop` MR 1개
+
+#### 작업 흐름
 
 ```bash
-# 작업 시작
+# 1. 브랜치 생성 (develop 또는 develop-client 기준)
 git checkout develop
 git pull origin develop
-git checkout -b feature/기능명
+git checkout -b fe/feature-login-S309-131
 
-# 작업 완료 후
-git push origin feature/기능명
-# → GitLab에서 MR(Merge Request) 생성
+# 2. 작업 후 push
+git push origin fe/feature-login-S309-131
+
+# 3. GitLab에서 MR 생성
+#    클라이언트 기능: develop-client 대상 MR (+ 필요 시 develop도)
+#    팀 자체 기능:    develop 대상 MR만
+```
+
+#### 배포 플로우
+
+```bash
+# Step 1. develop + develop-client → release (실서비스 검증)
+
+# Step 2. release → master → 태그
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
 ---
@@ -109,7 +146,7 @@ docker run -d \
   --name s309-postgres \
   -e POSTGRES_DB=s309 \
   -e POSTGRES_USER=ssafy \
-  -e POSTGRES_PASSWORD=ssafy \
+  -e POSTGRES_PASSWORD=ssafy1234 \
   -p 5432:5432 \
   -v s309-postgres-data:/var/lib/postgresql/data \
   postgres:17-alpine
@@ -170,7 +207,7 @@ brew services start postgresql@17
 ```sql
 CREATE DATABASE s309;
 
-CREATE USER ssafy WITH PASSWORD 'ssafy';
+CREATE USER ssafy WITH PASSWORD 'ssafy1234';
 GRANT ALL PRIVILEGES ON DATABASE s309 TO ssafy;
 
 -- PostgreSQL 15+ 에서는 스키마 권한 추가 부여 필요
@@ -191,7 +228,7 @@ cp backend/.env.example backend/.env
 ```env
 DB_URL=jdbc:postgresql://localhost:5432/s309
 DB_USERNAME=ssafy
-DB_PASSWORD=ssafy
+DB_PASSWORD=ssafy1234
 SPRING_PROFILES_ACTIVE=local
 SERVER_PORT=8080
 JPA_DDL_AUTO=update
@@ -454,10 +491,10 @@ cp infra/.env.example infra/.env
 ```env
 POSTGRES_DB=s309
 POSTGRES_USER=ssafy
-POSTGRES_PASSWORD=ssafy
+POSTGRES_PASSWORD=ssafy1234
 DB_URL=jdbc:postgresql://postgres:5432/s309
 DB_USERNAME=ssafy
-DB_PASSWORD=ssafy
+DB_PASSWORD=ssafy1234
 SPRING_PROFILES_ACTIVE=local
 AI_DEBUG=false
 ```
