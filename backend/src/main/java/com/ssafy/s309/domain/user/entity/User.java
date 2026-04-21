@@ -15,6 +15,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity // "이 클래스는 DB 테이블이야"
 @Table(name = "users") // 테이블명 지정
+@SuppressWarnings("FieldMayBeFinal") // JPA 엔티티 필드는 Hibernate 리플렉션 주입 대상
 public class User extends BaseEntity {
 
   @Id // Primary Key
