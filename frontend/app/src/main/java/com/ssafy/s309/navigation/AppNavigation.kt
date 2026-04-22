@@ -2,16 +2,23 @@ package com.ssafy.s309.navigation
 
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.ssafy.s309.R
 import com.ssafy.s309.ui.screen.GraphScreen
 import com.ssafy.s309.ui.screen.auth.LandingScreen
 import com.ssafy.s309.ui.screen.auth.LoginScreen
 import com.ssafy.s309.ui.screen.auth.SignInScreen
 import com.ssafy.s309.ui.screen.auth.SignUpScreen
+import com.ssafy.s309.ui.screen.main.MainScreen
 import com.ssafy.s309.ui.screen.onboarding.BasicHealthInfoScreen
 import com.ssafy.s309.ui.screen.onboarding.BloodSugarRangeScreen
 import com.ssafy.s309.ui.screen.onboarding.DiabetesTypeSelectionScreen
@@ -43,6 +50,8 @@ sealed class Screen(val route: String) {
 
     object SignupDone : Screen("signup_done")
 
+    object Main : Screen("main")
+
     object Graph : Screen("graph")
 }
 
@@ -71,7 +80,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             SignInScreen(
                 onSignInClick = { _, _ ->
                     // TODO: 백엔드 연동 후 실제 인증 로직으로 교체
-                    navController.navigate(Screen.Graph.route) {
+                    navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 },
@@ -99,7 +108,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     navController.navigate(Screen.DiabetesTypeSelection.route)
                 },
                 onSkipClick = {
-                    navController.navigate(Screen.Graph.route) {
+                    navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 },
@@ -152,9 +161,21 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         composable(Screen.SignupDone.route) {
             SignupDoneScreen(
                 onNextClick = {
-                    navController.navigate(Screen.Graph.route) {
+                    navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
+                },
+            )
+        }
+        composable(Screen.Main.route) {
+            MainScreen(
+                mascotSlot = {
+                    Image(
+                        painter = painterResource(id = R.drawable.kiki_main),
+                        contentDescription = "키키 캐릭터",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                    )
                 },
             )
         }
