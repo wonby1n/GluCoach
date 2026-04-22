@@ -37,20 +37,6 @@ pipeline {
             }
         }
 
-        stage('Build AI') {
-            steps {
-                dir('ai') {
-                    sh 'docker build -t s309-ai .'
-                }
-            }
-        }
-
-        stage('Build Docker Images') {
-            steps {
-                sh 'docker build -t s309-backend ./backend'
-            }
-        }
-
         stage('Deploy to EC2') {
             steps {
                 sshagent(credentials: ['ec2-ssh-key']) {    // Jenkins Credentials ID
