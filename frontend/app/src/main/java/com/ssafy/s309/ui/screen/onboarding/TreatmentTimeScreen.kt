@@ -35,7 +35,12 @@ import com.ssafy.s309.ui.component.onboarding.OnboardingBackButton
 import com.ssafy.s309.ui.component.onboarding.OnboardingButton
 import com.ssafy.s309.ui.component.onboarding.OnboardingHeader
 import com.ssafy.s309.ui.component.onboarding.ProgressIndicator
+import com.ssafy.s309.ui.theme.Background
+import com.ssafy.s309.ui.theme.CardInactive
+import com.ssafy.s309.ui.theme.Disabled
 import com.ssafy.s309.ui.theme.Primary
+import com.ssafy.s309.ui.theme.TextPrimary
+import com.ssafy.s309.ui.theme.TextSecondary
 
 data class TreatmentTime(
     val title: String,
@@ -73,7 +78,7 @@ fun TreatmentTimeScreen(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF2F4F5))
+                .background(Background)
                 .padding(horizontal = 24.dp, vertical = 16.dp),
     ) {
         OnboardingBackButton(onClick = onBackClick)
@@ -135,7 +140,7 @@ fun TreatmentTimeCard(
                 .background(Color.White, RoundedCornerShape(12.dp))
                 .border(
                     width = if (isSelected) 2.dp else 1.dp,
-                    color = if (isSelected) Primary else Color(0xFFE0E0E0),
+                    color = if (isSelected) Primary else CardInactive,
                     shape = RoundedCornerShape(12.dp),
                 )
                 .clickable { onClick() }
@@ -147,13 +152,13 @@ fun TreatmentTimeCard(
                 text = time.title,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF222222),
+                color = TextPrimary,
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = time.description,
                 fontSize = 12.sp,
-                color = Color(0xFF757575),
+                color = TextSecondary,
             )
         }
 
@@ -173,7 +178,7 @@ fun TreatmentTimeCard(
                     Modifier
                         .size(20.dp)
                         .clip(CircleShape)
-                        .border(2.dp, Color(0xFFCCCCCC), CircleShape),
+                        .border(2.dp, Disabled, CircleShape),
             )
         }
     }

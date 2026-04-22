@@ -2,7 +2,6 @@ package com.ssafy.s309.ui.screen.onboarding
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -27,7 +26,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.s309.R
 import com.ssafy.s309.ui.component.onboarding.OnboardingButton
+import com.ssafy.s309.ui.theme.Background
 import com.ssafy.s309.ui.theme.Primary
+import com.ssafy.s309.ui.theme.TextPrimary
 
 @Composable
 fun SignupDoneScreen(onNextClick: () -> Unit) {
@@ -35,7 +36,7 @@ fun SignupDoneScreen(onNextClick: () -> Unit) {
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF2F4F5))
+                .background(Background)
                 .padding(horizontal = 24.dp, vertical = 40.dp),
     ) {
         Spacer(modifier = Modifier.weight(1f))
@@ -73,7 +74,7 @@ fun SignupDoneScreen(onNextClick: () -> Unit) {
                 text = "회원가입이 완료됐어요!",
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF222222),
+                color = TextPrimary,
             )
         }
 

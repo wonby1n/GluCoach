@@ -28,7 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.s309.R
@@ -36,7 +35,11 @@ import com.ssafy.s309.ui.component.onboarding.OnboardingBackButton
 import com.ssafy.s309.ui.component.onboarding.OnboardingButton
 import com.ssafy.s309.ui.component.onboarding.OnboardingHeader
 import com.ssafy.s309.ui.component.onboarding.ProgressIndicator
+import com.ssafy.s309.ui.theme.Background
+import com.ssafy.s309.ui.theme.CardInactive
+import com.ssafy.s309.ui.theme.Disabled
 import com.ssafy.s309.ui.theme.Primary
+import com.ssafy.s309.ui.theme.TextLabel
 
 @Composable
 fun TreatmentPillsScreen(
@@ -59,7 +62,7 @@ fun TreatmentPillsScreen(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF2F4F5))
+                .background(Background)
                 .padding(horizontal = 24.dp, vertical = 16.dp),
     ) {
         OnboardingBackButton(onClick = onBackClick)
@@ -134,7 +137,7 @@ fun MedicationCheckbox(
                 .background(Color.White, RoundedCornerShape(8.dp))
                 .border(
                     width = if (isChecked) 2.dp else 1.dp,
-                    color = if (isChecked) Primary else Color(0xFFE0E0E0),
+                    color = if (isChecked) Primary else CardInactive,
                     shape = RoundedCornerShape(8.dp),
                 )
                 .clickable { onCheckedChange() }
@@ -144,14 +147,14 @@ fun MedicationCheckbox(
         Text(
             text = medication,
             fontSize = 14.sp,
-            color = Color(0xFF444444),
+            color = TextLabel,
             modifier = Modifier.weight(1f),
         )
 
         Icon(
             imageVector = if (isChecked) Icons.Filled.CheckBox else Icons.Outlined.CheckBoxOutlineBlank,
             contentDescription = if (isChecked) "선택됨" else "선택 안 됨",
-            tint = if (isChecked) Primary else Color(0xFFCCCCCC),
+            tint = if (isChecked) Primary else Disabled,
         )
     }
 }

@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ssafy.s309.ui.theme.Disabled
 import com.ssafy.s309.ui.theme.Primary
 
 @Composable
@@ -31,7 +32,7 @@ fun OnboardingButton(
         colors =
             ButtonDefaults.buttonColors(
                 containerColor = Primary,
-                disabledContainerColor = Color(0xFFCCCCCC),
+                disabledContainerColor = Disabled,
             ),
         enabled = enabled,
     ) {

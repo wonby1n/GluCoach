@@ -36,7 +36,14 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.s309.R
+import com.ssafy.s309.ui.theme.AccentBorder
+import com.ssafy.s309.ui.theme.Background
+import com.ssafy.s309.ui.theme.BorderLight
+import com.ssafy.s309.ui.theme.Disabled
 import com.ssafy.s309.ui.theme.Primary
+import com.ssafy.s309.ui.theme.TextHint
+import com.ssafy.s309.ui.theme.TextLabel
+import com.ssafy.s309.ui.theme.TextPlaceholder
 
 @Composable
 fun SignUpScreen(
@@ -57,7 +64,7 @@ fun SignUpScreen(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF2F4F5))
+                .background(Background)
                 .padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -75,20 +82,20 @@ fun SignUpScreen(
                 Modifier
                     .fillMaxWidth()
                     .background(Color.White, RoundedCornerShape(12.dp))
-                    .border(1.dp, Color(0xFFB8E0E8), RoundedCornerShape(12.dp))
+                    .border(1.dp, AccentBorder, RoundedCornerShape(12.dp))
                     .padding(horizontal = 20.dp, vertical = 24.dp),
         ) {
             Text(
                 text = "이메일",
                 fontSize = 13.sp,
-                color = Color(0xFF444444),
+                color = TextLabel,
                 fontWeight = FontWeight.Medium,
             )
             Spacer(modifier = Modifier.height(6.dp))
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
-                placeholder = { Text("example@email.com", color = Color(0xFFBBBBBB)) },
+                placeholder = { Text("example@email.com", color = TextPlaceholder) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true,
@@ -100,7 +107,7 @@ fun SignUpScreen(
                 colors =
                     OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Primary,
-                        unfocusedBorderColor = Color(0xFFDDDDDD),
+                        unfocusedBorderColor = BorderLight,
                     ),
             )
 
@@ -109,14 +116,14 @@ fun SignUpScreen(
             Text(
                 text = "비밀번호",
                 fontSize = 13.sp,
-                color = Color(0xFF444444),
+                color = TextLabel,
                 fontWeight = FontWeight.Medium,
             )
             Spacer(modifier = Modifier.height(6.dp))
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                placeholder = { Text("6자 이상", color = Color(0xFFBBBBBB)) },
+                placeholder = { Text("6자 이상", color = TextPlaceholder) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true,
@@ -129,7 +136,7 @@ fun SignUpScreen(
                 colors =
                     OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Primary,
-                        unfocusedBorderColor = Color(0xFFDDDDDD),
+                        unfocusedBorderColor = BorderLight,
                     ),
             )
 
@@ -138,14 +145,14 @@ fun SignUpScreen(
             Text(
                 text = "비밀번호 확인",
                 fontSize = 13.sp,
-                color = Color(0xFF444444),
+                color = TextLabel,
                 fontWeight = FontWeight.Medium,
             )
             Spacer(modifier = Modifier.height(6.dp))
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
-                placeholder = { Text("비밀번호 재입력", color = Color(0xFFBBBBBB)) },
+                placeholder = { Text("비밀번호 재입력", color = TextPlaceholder) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true,
@@ -158,7 +165,7 @@ fun SignUpScreen(
                 colors =
                     OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Primary,
-                        unfocusedBorderColor = Color(0xFFDDDDDD),
+                        unfocusedBorderColor = BorderLight,
                     ),
             )
 
@@ -167,7 +174,7 @@ fun SignUpScreen(
             Text(
                 text = "이미 회원이세요?",
                 fontSize = 13.sp,
-                color = Color(0xFF555555),
+                color = TextHint,
                 textDecoration = TextDecoration.Underline,
                 modifier = Modifier.clickable { onAlreadyMemberClick() },
             )
@@ -184,7 +191,7 @@ fun SignUpScreen(
                 colors =
                     ButtonDefaults.buttonColors(
                         containerColor = Primary,
-                        disabledContainerColor = Color(0xFFCCCCCC),
+                        disabledContainerColor = Disabled,
                     ),
                 enabled = isFormValid,
             ) {

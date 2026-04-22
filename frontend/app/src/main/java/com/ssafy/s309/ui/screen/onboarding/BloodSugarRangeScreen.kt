@@ -45,7 +45,13 @@ import com.ssafy.s309.ui.component.onboarding.OnboardingBackButton
 import com.ssafy.s309.ui.component.onboarding.OnboardingButton
 import com.ssafy.s309.ui.component.onboarding.OnboardingHeader
 import com.ssafy.s309.ui.component.onboarding.ProgressIndicator
+import com.ssafy.s309.ui.theme.Background
+import com.ssafy.s309.ui.theme.Border
 import com.ssafy.s309.ui.theme.Primary
+import com.ssafy.s309.ui.theme.TextHint
+import com.ssafy.s309.ui.theme.TextMuted
+import com.ssafy.s309.ui.theme.TextPrimary
+import com.ssafy.s309.ui.theme.TextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,7 +75,7 @@ fun BloodSugarRangeScreen(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF2F4F5))
+                .background(Background)
                 .padding(horizontal = 24.dp, vertical = 16.dp),
     ) {
         OnboardingBackButton(onClick = onBackClick)
@@ -122,7 +128,7 @@ fun BloodSugarRangeScreen(
                     SliderDefaults.colors(
                         thumbColor = Primary,
                         activeTrackColor = Primary,
-                        inactiveTrackColor = Color(0xFFD9D9D9),
+                        inactiveTrackColor = Border,
                     ),
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -137,7 +143,7 @@ fun BloodSugarRangeScreen(
                     Text(
                         text = value.toString(),
                         fontSize = 12.sp,
-                        color = Color(0xFF999999),
+                        color = TextMuted,
                     )
                 }
             }
@@ -148,7 +154,7 @@ fun BloodSugarRangeScreen(
         Text(
             text = "나중에 할게요",
             fontSize = 13.sp,
-            color = Color(0xFF555555),
+            color = TextHint,
             textDecoration = TextDecoration.Underline,
             modifier =
                 Modifier
@@ -200,7 +206,7 @@ fun BloodSugarRangeDialog(
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "닫기",
-                        tint = Color(0xFF999999),
+                        tint = TextMuted,
                     )
                 }
             }
@@ -214,14 +220,14 @@ fun BloodSugarRangeDialog(
                     text = "목표 혈당 범위가 있나요?",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF222222),
+                    color = TextPrimary,
                     textAlign = TextAlign.Center,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "범위를 알려주시면 나만의 데이터로 도와드려요.",
                     fontSize = 14.sp,
-                    color = Color(0xFF757575),
+                    color = TextSecondary,
                     textAlign = TextAlign.Center,
                 )
             }

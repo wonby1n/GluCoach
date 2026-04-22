@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.ssafy.s309.ui.theme.TextLabel
 
 @Composable
 fun OnboardingBackButton(
@@ -32,7 +33,7 @@ fun OnboardingBackButton(
         Icon(
             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
             contentDescription = "뒤로 가기",
-            tint = Color(0xFF444444),
+            tint = TextLabel,
         )
     }
 }

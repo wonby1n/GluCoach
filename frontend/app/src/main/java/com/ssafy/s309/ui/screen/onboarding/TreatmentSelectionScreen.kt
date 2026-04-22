@@ -39,7 +39,11 @@ import com.ssafy.s309.ui.component.onboarding.OnboardingBackButton
 import com.ssafy.s309.ui.component.onboarding.OnboardingButton
 import com.ssafy.s309.ui.component.onboarding.OnboardingHeader
 import com.ssafy.s309.ui.component.onboarding.ProgressIndicator
+import com.ssafy.s309.ui.theme.Background
+import com.ssafy.s309.ui.theme.CardInactive
 import com.ssafy.s309.ui.theme.Primary
+import com.ssafy.s309.ui.theme.TextLabel
+import com.ssafy.s309.ui.theme.TextMuted
 
 data class TreatmentMethod(
     val title: String,
@@ -63,7 +67,7 @@ fun TreatmentSelectionScreen(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF2F4F5))
+                .background(Background)
                 .padding(horizontal = 24.dp, vertical = 16.dp),
     ) {
         OnboardingBackButton(onClick = onBackClick)
@@ -127,7 +131,7 @@ fun TreatmentMethodCard(
                 .background(Color.White, RoundedCornerShape(12.dp))
                 .border(
                     width = if (isSelected) 2.dp else 1.dp,
-                    color = if (isSelected) Primary else Color(0xFFE0E0E0),
+                    color = if (isSelected) Primary else CardInactive,
                     shape = RoundedCornerShape(12.dp),
                 )
                 .clickable { onClick() }
@@ -139,7 +143,7 @@ fun TreatmentMethodCard(
             imageVector = method.icon,
             contentDescription = method.title,
             modifier = Modifier.size(64.dp),
-            tint = if (isSelected) Primary else Color(0xFF999999),
+            tint = if (isSelected) Primary else TextMuted,
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -148,7 +152,7 @@ fun TreatmentMethodCard(
             text = method.title,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
-            color = Color(0xFF444444),
+            color = TextLabel,
             textAlign = TextAlign.Center,
         )
     }

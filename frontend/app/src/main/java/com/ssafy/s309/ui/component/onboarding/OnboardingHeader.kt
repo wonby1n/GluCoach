@@ -6,10 +6,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ssafy.s309.ui.theme.TextPrimary
+import com.ssafy.s309.ui.theme.TextSecondary
 
 @Composable
 fun OnboardingHeader(
@@ -22,13 +23,13 @@ fun OnboardingHeader(
             text = title,
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF222222),
+            color = TextPrimary,
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = subtitle,
             fontSize = 14.sp,
-            color = Color(0xFF757575),
+            color = TextSecondary,
         )
     }
 }

@@ -6,12 +6,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.ssafy.s309.ui.theme.Border
 import com.ssafy.s309.ui.theme.Primary
 
 @Composable
@@ -31,7 +30,7 @@ fun ProgressIndicator(
                         .weight(1f)
                         .height(6.dp)
                         .background(
-                            color = if (index < currentStep) Primary else Color(0xFFD9D9D9),
+                            color = if (index < currentStep) Primary else Border,
                             shape = RoundedCornerShape(3.dp),
                         ),
             )

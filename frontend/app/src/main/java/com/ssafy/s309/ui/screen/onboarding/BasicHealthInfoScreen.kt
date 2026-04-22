@@ -39,7 +39,14 @@ import com.ssafy.s309.ui.component.onboarding.OnboardingBackButton
 import com.ssafy.s309.ui.component.onboarding.OnboardingButton
 import com.ssafy.s309.ui.component.onboarding.OnboardingHeader
 import com.ssafy.s309.ui.component.onboarding.ProgressIndicator
+import com.ssafy.s309.ui.theme.Background
+import com.ssafy.s309.ui.theme.BorderLight
+import com.ssafy.s309.ui.theme.Disabled
 import com.ssafy.s309.ui.theme.Primary
+import com.ssafy.s309.ui.theme.TextHint
+import com.ssafy.s309.ui.theme.TextLabel
+import com.ssafy.s309.ui.theme.TextMuted
+import com.ssafy.s309.ui.theme.TextPlaceholder
 
 @Composable
 fun BasicHealthInfoScreen(
@@ -58,7 +65,7 @@ fun BasicHealthInfoScreen(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF2F4F5))
+                .background(Background)
                 .padding(horizontal = 24.dp, vertical = 16.dp),
     ) {
         OnboardingBackButton(onClick = onBackClick)
@@ -94,14 +101,14 @@ fun BasicHealthInfoScreen(
             Text(
                 text = "생년월일",
                 fontSize = 13.sp,
-                color = Color(0xFF444444),
+                color = TextLabel,
                 fontWeight = FontWeight.Medium,
             )
             Spacer(modifier = Modifier.height(6.dp))
             OutlinedTextField(
                 value = birthDate,
                 onValueChange = { birthDate = it },
-                placeholder = { Text("YYYY.MM.DD.", color = Color(0xFFBBBBBB)) },
+                placeholder = { Text("YYYY.MM.DD.", color = TextPlaceholder) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true,
@@ -109,7 +116,7 @@ fun BasicHealthInfoScreen(
                 colors =
                     OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Primary,
-                        unfocusedBorderColor = Color(0xFFDDDDDD),
+                        unfocusedBorderColor = BorderLight,
                     ),
             )
 
@@ -118,14 +125,14 @@ fun BasicHealthInfoScreen(
             Text(
                 text = "키(cm)",
                 fontSize = 13.sp,
-                color = Color(0xFF444444),
+                color = TextLabel,
                 fontWeight = FontWeight.Medium,
             )
             Spacer(modifier = Modifier.height(6.dp))
             OutlinedTextField(
                 value = height,
                 onValueChange = { height = it },
-                placeholder = { Text("Value", color = Color(0xFFBBBBBB)) },
+                placeholder = { Text("Value", color = TextPlaceholder) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true,
@@ -133,7 +140,7 @@ fun BasicHealthInfoScreen(
                 colors =
                     OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Primary,
-                        unfocusedBorderColor = Color(0xFFDDDDDD),
+                        unfocusedBorderColor = BorderLight,
                     ),
             )
 
@@ -142,14 +149,14 @@ fun BasicHealthInfoScreen(
             Text(
                 text = "현재 체중(kg)",
                 fontSize = 13.sp,
-                color = Color(0xFF444444),
+                color = TextLabel,
                 fontWeight = FontWeight.Medium,
             )
             Spacer(modifier = Modifier.height(6.dp))
             OutlinedTextField(
                 value = weight,
                 onValueChange = { weight = it },
-                placeholder = { Text("Value", color = Color(0xFFBBBBBB)) },
+                placeholder = { Text("Value", color = TextPlaceholder) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true,
@@ -157,7 +164,7 @@ fun BasicHealthInfoScreen(
                 colors =
                     OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Primary,
-                        unfocusedBorderColor = Color(0xFFDDDDDD),
+                        unfocusedBorderColor = BorderLight,
                     ),
             )
 
@@ -174,20 +181,20 @@ fun BasicHealthInfoScreen(
                 Icon(
                     imageVector = if (isAgreed) Icons.Filled.CheckBox else Icons.Outlined.CheckBoxOutlineBlank,
                     contentDescription = if (isAgreed) "동의함" else "동의 안 함",
-                    tint = if (isAgreed) Primary else Color(0xFFCCCCCC),
+                    tint = if (isAgreed) Primary else Disabled,
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(
                         text = "개인정보 수집에 동의해요.",
                         fontSize = 13.sp,
-                        color = Color(0xFF444444),
+                        color = TextLabel,
                         fontWeight = FontWeight.Medium,
                     )
                     Text(
                         text = "해당 정보는 혈당 예측 알고리즘을 개선하고 서비스를 향상하는데 사용돼요.",
                         fontSize = 11.sp,
-                        color = Color(0xFF999999),
+                        color = TextMuted,
                     )
                 }
             }
@@ -198,7 +205,7 @@ fun BasicHealthInfoScreen(
         Text(
             text = "나중에 할게요",
             fontSize = 13.sp,
-            color = Color(0xFF555555),
+            color = TextHint,
             textDecoration = TextDecoration.Underline,
             modifier =
                 Modifier
