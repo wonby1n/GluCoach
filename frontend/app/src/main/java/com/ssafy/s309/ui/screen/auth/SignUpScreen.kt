@@ -40,6 +40,7 @@ import com.ssafy.s309.ui.theme.AccentBorder
 import com.ssafy.s309.ui.theme.Background
 import com.ssafy.s309.ui.theme.BorderLight
 import com.ssafy.s309.ui.theme.Disabled
+import com.ssafy.s309.ui.theme.Error
 import com.ssafy.s309.ui.theme.Primary
 import com.ssafy.s309.ui.theme.TextHint
 import com.ssafy.s309.ui.theme.TextLabel
@@ -111,6 +112,15 @@ fun SignUpScreen(
                     ),
             )
 
+            if (email.isNotEmpty() && !isEmailValid) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "올바른 이메일 형식을 입력해주세요",
+                    fontSize = 12.sp,
+                    color = Error,
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
@@ -140,6 +150,15 @@ fun SignUpScreen(
                     ),
             )
 
+            if (password.isNotEmpty() && !isPasswordValid) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "비밀번호는 6자 이상이어야 합니다",
+                    fontSize = 12.sp,
+                    color = Error,
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
@@ -168,6 +187,15 @@ fun SignUpScreen(
                         unfocusedBorderColor = BorderLight,
                     ),
             )
+
+            if (confirmPassword.isNotEmpty() && !isPasswordMatch) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "비밀번호가 일치하지 않습니다",
+                    fontSize = 12.sp,
+                    color = Error,
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
