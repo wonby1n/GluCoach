@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GluCoach</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        .container { text-align: center; padding: 2rem; }
+        h1 { font-size: 3rem; margin-bottom: 1rem; }
+        p { font-size: 1.2rem; opacity: 0.9; margin-bottom: 2rem; }
+        .status { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+        .badge {
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            padding: 0.5rem 1.2rem;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GluCoach</h1>
+        <p>혈당 관리 AI 코치 서비스</p>
+        <div class="status">
+            <span class="badge">🟢 서버 운영 중</span>
+            <span class="badge">📱 Android 앱 전용</span>
+        </div>
+    </div>
+</body>
+</html>
