@@ -195,28 +195,43 @@ events {
 }
 
 http {
+    # 백엔드 컨테이너 연결
     upstream backend {
         server backend:8080;
     }
 
-    upstream ai {
-        server ai:8000;
+    # 젠킨스 컨테이너 연결 
+    # (호스트 포트가 9090이라도 컨테이너 내부 통신은 8080을 사용합니다)
+    upstream jenkins {
+        server jenkins:8080;
     }
 
-    # HTTP → HTTPS 리다이렉트
+    # AI 컨테이너는 아직 준비 중이므로 주석 처리 (나중에 필요할 때 해제하세요)
+    # upstream ai {
+    #     server ai:8000;
+    # }
+
+    # 1. HTTP → HTTPS 리다이렉트
     server {
         listen 80;
         server_name k14s309.p.ssafy.io;
         return 301 https://$host$request_uri;
     }
 
+    # 2. HTTPS 설정
     server {
         listen 443 ssl;
         server_name k14s309.p.ssafy.io;
 
+        # 발급받은 인증서 경로 (Docker 마운트 경로 기준)
         ssl_certificate /etc/nginx/ssl/fullchain.pem;
         ssl_certificate_key /etc/nginx/ssl/privkey.pem;
 
+        # 보안 최적화 설정
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_prefer_server_ciphers on;
+
+        # 백엔드 API 연결
         location /api {
             proxy_pass http://backend;
             proxy_set_header Host $host;
@@ -225,13 +240,26 @@ http {
             proxy_set_header X-Forwarded-Proto $scheme;
         }
 
-        location /ai {
-            proxy_pass http://ai;
+        # 젠킨스 연결 (https://k14s309.p.ssafy.io/jenkins 로 접속)
+        location /jenkins {
+            proxy_pass http://jenkins;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Jenkins 리다이렉트 문제 방지를 위한 설정
+            proxy_redirect http:// https://;
         }
+
+        # AI 서비스 (필요 시 주석 해제)
+        # location /ai {
+        #     proxy_pass http://ai;
+        #     proxy_set_header Host $host;
+        #     proxy_set_header X-Real-IP $remote_addr;
+        #     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        #     proxy_set_header X-Forwarded-Proto $scheme;
+        # }
     }
 }
 ```

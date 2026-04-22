@@ -3,14 +3,14 @@ pipeline {
 
     environment {
         // EC2 받으면 아래 IP만 수정
-        EC2_HOST    = 'ubuntu@<EC2-IP>'
+        EC2_HOST    = 'ubuntu@k14s309.p.ssafy.io'
         EC2_KEY     = credentials('ec2-ssh-key')
         DEPLOY_PATH = '/home/ubuntu/S14P31S309'
-        BRANCH      = 'develop'
+        BRANCH      = 'release'
     }
 
     triggers {
-        gitlab(triggerOnPush: true, branchFilterType: 'NameBasedFilter', includeBranchesSpec: 'develop')
+        gitlab(triggerOnPush: true, branchFilterType: 'NameBasedFilter', includeBranchesSpec: 'release')
     }
 
     stages {
