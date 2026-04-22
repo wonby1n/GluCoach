@@ -3,7 +3,6 @@ package com.ssafy.s309.ui.screen.onboarding
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -80,7 +79,7 @@ fun BasicHealthInfoScreen(
 
         OnboardingHeader(
             title = "신체 정보를 알려주세요.",
-            subtitle = "관리하고 싶은 목표 혈당 범위가 있나요?",
+            subtitle = "정확한 데이터 분석을 위해 기본 정보가 필요해요.",
         )
 
         Spacer(modifier = Modifier.height(32.dp))
