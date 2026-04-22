@@ -44,13 +44,13 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
 
-    // Lombok
-    compileOnly("org.projectlombok:lombok")
-    annotationProcessor("org.projectlombok:lombok")
-
     // AWS S3
     implementation(platform("software.amazon.awssdk:bom:2.29.0"))
     implementation("software.amazon.awssdk:s3")
+
+    // Lombok
+    compileOnly("org.projectlombok:lombok")
+    annotationProcessor("org.projectlombok:lombok")
 
     // 개발 도구
     developmentOnly("org.springframework.boot:spring-boot-devtools")
