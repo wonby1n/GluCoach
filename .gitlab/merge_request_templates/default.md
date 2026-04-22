@@ -7,7 +7,7 @@
 
 ## 📌 이슈 번호
 
-> Closes [S309-](https://ssafy.atlassian.net/browse/S14P31S309-)
+> Closes [S14P31S309-](https://ssafy.atlassian.net/browse/S14P31S309-)
 
 ## 💥 작업 내용
 

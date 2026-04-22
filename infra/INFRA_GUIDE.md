@@ -1,19 +1,25 @@
 # S309 인프라 배포 가이드
 
-EC2 서버를 받은 후 Jenkins + Docker + PostgreSQL 기반의 CI/CD 환경을 구축하는 단계별 가이드입니다.
+EC2 서버 배포 환경 기준 단계별 가이드입니다.
+
+- **서버 도메인**: `k14s309.p.ssafy.io`
+- **접속 계정**: `ubuntu`
+- **인증 파일**: `K14S309T.pem` (팀 비공개 채널에서 수령, 절대 외부 공유 금지)
 
 ---
 
 ## 전체 흐름
 
 ```
-EC2 접속 (SSH)
-    → 기본 패키지 설치 (Docker, Java)
-    → Jenkins 설치 및 계정 설정
+EC2 SSH 접속
+    → 기본 패키지 설치 (Docker)
+    → UFW 방화벽 설정 (필수)
+    → Java 21 + Jenkins 설치 (포트 변경)
     → 프로젝트 clone
     → .env 파일 작성
     → Jenkins 파이프라인 설정
     → GitLab 웹훅 연결
+    → HTTPS 인증서 발급
     → 첫 배포 확인
 ```
 
@@ -21,71 +27,83 @@ EC2 접속 (SSH)
 
 ## 1단계 — EC2 SSH 접속
 
-SSAFY에서 `.pem` 키파일과 EC2 IP를 받습니다.
+```fish
+# pem 파일을 ~/.ssh/ 로 이동 (최초 1회)
+mv ~/Downloads/K14S309T.pem ~/.ssh/K14S309T.pem
 
-```bash
-# 키파일 권한 설정 (최초 1회)
-chmod 400 ssafy-key.pem
+# 키파일 권한 설정 (최초 1회, Windows WSL/fish)
+icacls $env:USERPROFILE\.ssh\K14S309T.pem /inheritance:r /grant:r (whoami)":R"
 
 # EC2 접속
-ssh -i ssafy-key.pem ubuntu@<EC2-IP>
+ssh -i ~/.ssh/K14S309T.pem ubuntu@k14s309.p.ssafy.io
 ```
-
-> Windows 환경이라면 PowerShell 또는 Git Bash에서 실행하세요.
-
-### AWS 보안 그룹 포트 열기
-
-AWS 콘솔 → EC2 → 보안 그룹 → 인바운드 규칙 편집에서 아래 포트를 추가합니다.
-
-| 포트 | 프로토콜 | 용도 |
-|------|----------|------|
-| 22 | TCP | SSH 접속 |
-| 80 | TCP | HTTP (Nginx) |
-| 443 | TCP | HTTPS (SSL, 추후 설정) |
-| 8080 | TCP | Jenkins 웹 UI |
-
-> PostgreSQL(5432), Redis(6379)는 외부에 열지 않습니다. Docker 내부 네트워크로만 통신하고, DataGrip 등 외부 툴은 SSH 터널로 접속합니다.
 
 ---
 
-## 2단계 — EC2 기본 패키지 설치
-
-EC2 서버에 접속한 상태에서 실행합니다.
+## 2단계 — 기본 패키지 설치
 
 ```bash
-# 패키지 목록 업데이트
 sudo apt update && sudo apt upgrade -y
 
 # Docker 설치
 sudo apt install -y docker.io docker-compose-plugin
 
-# Docker 서비스 시작 및 자동 시작 등록
 sudo systemctl enable --now docker
 
-# 현재 사용자(ubuntu)를 docker 그룹에 추가 (sudo 없이 docker 사용)
+# ubuntu 사용자를 docker 그룹에 추가
 sudo usermod -aG docker ubuntu
+
+# Java 21 설치 (Jenkins용)
+sudo apt install -y openjdk-21-jdk
 
 # 적용을 위해 재로그인
 exit
-ssh -i ssafy-key.pem ubuntu@<EC2-IP>
+ssh -i K14S309T.pem ubuntu@k14s309.p.ssafy.io
 
 # 확인
-docker --version
-docker compose version
+docker --version && docker compose version && java -version
+```
 
-# Java 21 설치 (Jenkins 실행에 필요)
-sudo apt install -y openjdk-21-jdk
-java -version
+정상 출력 예시:
+
+```
+Docker version 28.1.1, build 4eba377
+Docker Compose version v2.35.1
+openjdk version "21.0.x" 2024-xx-xx
 ```
 
 ---
 
-## 3단계 — Jenkins 설치 및 계정 설정
+## 3단계 — UFW 방화벽 포트 추가
 
-### 3-1. Jenkins 설치
+> SSAFY EC2는 UFW가 이미 활성화된 상태로 제공됩니다.
+> 기본 개방 포트: 22(SSH), 443(HTTPS)
+> `sudo ufw enable`을 다시 실행하지 마세요 — 실수로 22번이 닫히면 접속 불가가 됩니다.
 
 ```bash
-# Jenkins 공식 저장소 등록
+# 현재 UFW 상태 먼저 확인
+sudo ufw status verbose
+
+# HTTP (Nginx)
+sudo ufw allow 80
+
+# Jenkins 웹 UI (기본 8080 → 9090으로 변경, SSAFY 기본 포트 변경 요구사항)
+sudo ufw allow 9090
+
+# 상태 재확인
+sudo ufw status verbose
+```
+
+> **주의**: SSH 22번은 이미 열려 있으므로 건드리지 마세요.
+> DB(5432), Redis(6379), Backend(8080), AI(8000)는 Docker 내부 네트워크만 사용 → UFW에 추가 불필요
+
+---
+
+## 4단계 — Jenkins 설치 (포트 9090으로 변경)
+
+### 4-1. Jenkins 설치
+
+```bash
 curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee \
   /usr/share/keyrings/jenkins-keyring.asc > /dev/null
 
@@ -95,26 +113,46 @@ echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
 
 sudo apt update && sudo apt install -y jenkins
 
-# Jenkins 시작 및 자동 시작 등록
 sudo systemctl enable --now jenkins
+```
 
-# 상태 확인
+### 4-2. Jenkins 포트 8080 → 9090 변경
+
+```bash
+sudo nano /usr/lib/systemd/system/jenkins.service
+```
+
+아래 줄을 찾아 수정:
+
+```
+# 수정 전
+Environment="JENKINS_PORT=8080"
+
+# 수정 후
+Environment="JENKINS_PORT=9090"
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart jenkins
+
+# 확인
 sudo systemctl status jenkins
 ```
 
-### 3-2. 초기 설정 (브라우저)
+### 4-3. 초기 설정 (브라우저)
 
-1. 브라우저에서 `http://<EC2-IP>:8080` 접속
-2. 초기 admin 비밀번호 확인 후 입력:
+1. `http://k14s309.p.ssafy.io:9090` 접속
+2. 초기 비밀번호 입력:
    ```bash
    sudo cat /var/lib/jenkins/secrets/initialAdminPassword
    ```
-3. **"Install suggested plugins"** 선택 (권장 플러그인 자동 설치)
-4. admin 계정 생성 (아이디/비밀번호 팀원과 공유)
+3. **Install suggested plugins** 선택
+4. admin 계정 생성
 
-### 3-3. 추가 플러그인 설치
+### 4-4. 추가 플러그인 설치
 
-Jenkins 관리 → Plugins → Available plugins 에서 아래를 검색해 설치합니다.
+Jenkins 관리 → Plugins → Available plugins:
 
 - `GitLab` — GitLab 웹훅 트리거
 - `SSH Agent` — SSH 키를 사용한 원격 배포
@@ -122,159 +160,220 @@ Jenkins 관리 → Plugins → Available plugins 에서 아래를 검색해 설�
 
 ---
 
-## 4단계 — 프로젝트 clone
+## 5단계 — HTTPS 인증서 발급 (Let's Encrypt)
+
+> 443 포트를 사용하려면 SSL 인증서가 필요합니다.
 
 ```bash
-cd /home/ubuntu
-git clone <GitLab 레포지토리 URL> S14P31S309
-cd S14P31S309
+# Certbot 설치
+sudo apt install -y certbot
+
+# 인증서 발급 (Nginx 중단 없이 standalone 방식)
+# docker compose가 실행 중이라면 먼저 nginx 중단
+sudo certbot certonly --standalone -d k14s309.p.ssafy.io
+
+# 인증서 위치
+# /etc/letsencrypt/live/k14s309.p.ssafy.io/fullchain.pem
+# /etc/letsencrypt/live/k14s309.p.ssafy.io/privkey.pem
 ```
 
-> GitLab이 Private 레포라면 EC2의 SSH 공개키를 GitLab에 등록해야 합니다.
->
-> ```bash
-> # EC2에서 SSH 키 생성 (없는 경우)
-> ssh-keygen -t ed25519 -C "ec2-deploy"
->
-> # 공개키 출력 → GitLab 프로필 → SSH Keys에 붙여넣기
-> cat ~/.ssh/id_ed25519.pub
-> ```
+발급 후 `infra/nginx/ssl/` 디렉토리에 복사:
+
+```bash
+sudo mkdir -p /home/ubuntu/S14P31S309/infra/nginx/ssl
+sudo cp /etc/letsencrypt/live/k14s309.p.ssafy.io/fullchain.pem /home/ubuntu/S14P31S309/infra/nginx/ssl/
+sudo cp /etc/letsencrypt/live/k14s309.p.ssafy.io/privkey.pem /home/ubuntu/S14P31S309/infra/nginx/ssl/
+```
+
+### nginx.conf HTTPS 설정 추가
+
+인증서 발급 후 `infra/nginx/nginx.conf`를 아래와 같이 교체:
+
+```nginx
+events {
+    worker_connections 1024;
+}
+
+http {
+    # 백엔드 컨테이너 연결
+    upstream backend {
+        server backend:8080;
+    }
+
+    # 젠킨스 컨테이너 연결 
+    # (호스트 포트가 9090이라도 컨테이너 내부 통신은 8080을 사용합니다)
+    upstream jenkins {
+        server jenkins:8080;
+    }
+
+    # AI 컨테이너는 아직 준비 중이므로 주석 처리 (나중에 필요할 때 해제하세요)
+    # upstream ai {
+    #     server ai:8000;
+    # }
+
+    # 1. HTTP → HTTPS 리다이렉트
+    server {
+        listen 80;
+        server_name k14s309.p.ssafy.io;
+        return 301 https://$host$request_uri;
+    }
+
+    # 2. HTTPS 설정
+    server {
+        listen 443 ssl;
+        server_name k14s309.p.ssafy.io;
+
+        # 발급받은 인증서 경로 (Docker 마운트 경로 기준)
+        ssl_certificate /etc/nginx/ssl/fullchain.pem;
+        ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+
+        # 보안 최적화 설정
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_prefer_server_ciphers on;
+
+        # 백엔드 API 연결
+        location /api {
+            proxy_pass http://backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # 젠킨스 연결 (https://k14s309.p.ssafy.io/jenkins 로 접속)
+        location /jenkins {
+            proxy_pass http://jenkins;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Jenkins 리다이렉트 문제 방지를 위한 설정
+            proxy_redirect http:// https://;
+        }
+
+        # AI 서비스 (필요 시 주석 해제)
+        # location /ai {
+        #     proxy_pass http://ai;
+        #     proxy_set_header Host $host;
+        #     proxy_set_header X-Real-IP $remote_addr;
+        #     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        #     proxy_set_header X-Forwarded-Proto $scheme;
+        # }
+    }
+}
+```
 
 ---
 
-## 5단계 — .env 파일 작성
+## 6단계 — 프로젝트 clone
 
-`docker-compose.yml`이 참조하는 환경변수 파일입니다.
-**이 파일은 git에 올리지 않습니다** (`.gitignore`에 이미 등록됨).
+```bash
+cd /home/ubuntu
+
+# EC2 SSH 키 생성 (GitLab 등록용)
+ssh-keygen -t ed25519 -C "k14s309-ec2"
+cat ~/.ssh/id_ed25519.pub
+# → 출력된 공개키를 GitLab 프로필 → SSH Keys에 등록
+
+# clone
+git clone git@lab.ssafy.com:s14-final/S14P31S309.git
+cd S14P31S309
+```
+
+---
+
+## 7단계 — .env 파일 작성
 
 ```bash
 nano /home/ubuntu/S14P31S309/infra/.env
 ```
 
-아래 내용을 작성합니다. 비밀번호는 팀 내부에서 안전하게 관리하세요.
-
 ```env
-# PostgreSQL 컨테이너 설정
+# PostgreSQL
 POSTGRES_DB=s309
 POSTGRES_USER=s309user
-POSTGRES_PASSWORD=여기에_강력한_비밀번호
+POSTGRES_PASSWORD=여기에_강력한_비밀번호_작성
 
-# Spring Boot 백엔드 DB 연결
-# postgres는 docker-compose 내 서비스 이름 (컨테이너끼리 통신)
+# Spring Boot
 DB_URL=jdbc:postgresql://postgres:5432/s309
 DB_USERNAME=s309user
-DB_PASSWORD=여기에_강력한_비밀번호
-
-# Spring 프로파일
+DB_PASSWORD=여기에_강력한_비밀번호_작성
 SPRING_PROFILES_ACTIVE=prod
 
 # Redis
-REDIS_HOST=redis
-REDIS_PORT=6379
-REDIS_PASSWORD=
+REDIS_PASSWORD=여기에_강력한_비밀번호_작성
 
-# AI 서버
+# AI
 AI_DEBUG=false
 ```
 
-> `DB_URL`의 `postgres`, `REDIS_HOST`의 `redis`는 호스트명이 아니라 `docker-compose.yml`의 서비스명입니다.
-> 컨테이너끼리는 서비스명으로 통신하므로 `localhost`가 아닙니다.
+> `postgres`, `redis`는 Docker 서비스명입니다. `localhost` 아님에 주의.
 
 ---
 
-## 6단계 — Jenkins SSH Credentials 등록
+## 8단계 — Jenkins Credentials 등록
 
-Jenkins가 EC2에 SSH로 배포하려면 키를 등록해야 합니다.
+### SSH Credentials (EC2 배포용)
 
-1. Jenkins 관리 → Credentials → System → Global credentials → **Add Credentials**
+1. Jenkins 관리 → Credentials → Global → **Add Credentials**
 2. Kind: `SSH Username with private key`
-3. ID: `ec2-ssh-key` (Jenkinsfile에서 참조하는 이름)
+3. ID: `ec2-ssh-key`
 4. Username: `ubuntu`
-5. Private Key → Enter directly → `.pem` 파일 내용 전체 붙여넣기
+5. Private Key → Enter directly → `K14S309T.pem` 내용 전체 붙여넣기
 6. Save
 
 ---
 
-## 7단계 — Jenkins 파이프라인 생성
+## 9단계 — Jenkins 파이프라인 생성
 
-1. Jenkins 메인 → **New Item**
-2. 이름 입력 → `Pipeline` 선택 → OK
-3. Pipeline 설정:
+1. Jenkins → **New Item** → 이름 입력 → `Pipeline` → OK
+2. Pipeline 설정:
    - Definition: `Pipeline script from SCM`
    - SCM: `Git`
    - Repository URL: GitLab 레포 주소
-   - Credentials: GitLab 접근용 계정 추가
    - Branch: `*/develop`
    - Script Path: `infra/Jenkinsfile`
-4. Save
+3. Save
 
-### Jenkinsfile EC2 정보 수정
+### Jenkinsfile 도메인 수정
 
-EC2 IP를 받으면 `infra/Jenkinsfile`의 한 줄만 수정합니다:
+`infra/Jenkinsfile`에서 EC2 호스트 설정:
 
 ```groovy
-EC2_HOST = 'ubuntu@<실제-EC2-IP>'  // 여기만 수정
+EC2_HOST = 'ubuntu@k14s309.p.ssafy.io'
 ```
-
-수정 후 커밋하면 다음 빌드부터 적용됩니다.
-
-### 파이프라인 동작 방식
-
-```
-GitLab push (develop 브랜치)
-    → Jenkins 웹훅 수신
-    → EC2에 SSH 접속
-    → git pull origin develop
-    → docker compose up -d --build
-    → Health Check (curl /api/health)
-```
-
-> 빌드는 EC2에서 직접 수행합니다. Jenkins 서버에 Docker 이미지를 만들지 않으므로 Jenkins 서버 사양이 낮아도 됩니다.
 
 ---
 
-## 8단계 — GitLab 웹훅 연결
+## 10단계 — GitLab 웹훅 연결
 
-코드가 push되면 Jenkins 파이프라인이 자동 실행되도록 연결합니다.
-
-1. GitLab 레포 → Settings → Webhooks → **Add new webhook**
-2. URL: `http://<EC2-IP>:8080/project/<Jenkins-job-이름>`
+1. GitLab 레포 → Settings → Webhooks
+2. URL: `http://k14s309.p.ssafy.io:9090/project/<Jenkins-job-이름>`
 3. Trigger: `Push events`, `Merge request events` 체크
 4. Add webhook → Test → 200 OK 확인
 
-> Jenkins에서 GitLab 웹훅 허용 설정:
-> Jenkins 관리 → Security → "Enable authentication for /project end-point" 체크 해제 (또는 GitLab 플러그인에서 토큰 설정)
-
 ---
 
-## 9단계 — 첫 배포 확인
-
-Jenkins 없이 EC2에서 직접 먼저 테스트합니다.
+## 11단계 — 첫 배포 확인
 
 ```bash
 cd /home/ubuntu/S14P31S309/infra
 
-# 컨테이너 빌드 및 실행
 docker compose --env-file .env up -d --build
 
 # 상태 확인
 docker compose ps
 
 # 로그 확인
-docker compose logs postgres    # DB 정상 시작 여부
-docker compose logs backend     # Spring 부팅 로그
-docker compose logs ai          # Python 서버 로그
-docker compose logs nginx       # Nginx 로그
-```
+docker compose logs postgres
+docker compose logs backend
+docker compose logs ai
+docker compose logs nginx
 
-### 동작 확인
-
-```bash
-# Nginx를 통해 백엔드 응답 확인
+# API 응답 확인
 curl http://localhost/api/health
-
-# PostgreSQL 접속 테스트
-docker exec -it s309-postgres psql -U s309user -d s309db -c "\l"
+curl https://k14s309.p.ssafy.io/api/health
 ```
 
 ---
@@ -282,79 +381,43 @@ docker exec -it s309-postgres psql -U s309user -d s309db -c "\l"
 ## 컨테이너 구조
 
 ```
-EC2 서버
-└── Docker
-    ├── s309-nginx (포트 80) ─── 외부 요청 분기
-    │   ├── /api/** → s309-backend (8080)
-    │   └── /ai/**  → s309-ai (8000)
-    ├── s309-backend (Spring Boot, Java 21)
-    │   ├── DB 연결: s309-postgres:5432
-    │   └── 캐시 연결: s309-redis:6379
-    ├── s309-ai (FastAPI, Python 3.12)
-    │   └── 캐시 연결: s309-redis:6379
-    ├── s309-postgres (PostgreSQL 17)
-    │   └── 초기화: infra/postgres/init/01-init.sql
-    └── s309-redis (Redis 7)
+k14s309.p.ssafy.io (EC2)
+└── Docker (internal network: s309_internal)
+    ├── s309-nginx     → 80, 443 (외부 노출)
+    │   ├── /api/**    → s309-backend:8080
+    │   └── /ai/**     → s309-ai:8000
+    ├── s309-backend   → 내부 8080 (외부 비노출)
+    ├── s309-ai        → 내부 8000 (외부 비노출)
+    ├── s309-postgres  → 내부 5432 (외부 비노출)
+    └── s309-redis     → 내부 6379 (외부 비노출)
 ```
 
-> `infra/mysql/` 폴더는 사용하지 않습니다. PostgreSQL로 전환됐으므로 무시하세요.
+> DB/Redis는 외부에 포트가 열려있지 않습니다.
+> DataGrip 접속은 SSH 터널을 사용하세요 (아래 참고).
 
 ---
 
-## DataGrip 연결 설정
+## DataGrip SSH 터널 연결
 
-DataGrip에서 EC2의 PostgreSQL과 Redis에 접속하는 방법입니다.
-PostgreSQL/Redis 포트는 외부에 열려있지 않으므로 **SSH 터널**을 통해 접속합니다.
+### PostgreSQL
 
-### PostgreSQL 연결 (EC2)
-
-1. DataGrip → **+** → Data Source → **PostgreSQL**
-2. **SSH/SSL 탭** 설정:
-   - Use SSH tunnel: ✅ 체크
-   - Proxy host: `<EC2-IP>`
-   - Proxy port: `22`
-   - Proxy user: `ubuntu`
-   - Auth type: `Key pair (OpenSSH or PuTTY)`
-   - Private key file: `.pem` 파일 경로 선택
-3. **General 탭** 설정:
-   - Host: `localhost`
-   - Port: `5432`
+1. DataGrip → + → PostgreSQL
+2. **SSH/SSL 탭**:
+   - Use SSH tunnel: ✅
+   - Proxy host: `k14s309.p.ssafy.io`, Port: `22`, User: `ubuntu`
+   - Auth type: Key pair → `K14S309T.pem` 선택
+3. **General 탭**:
+   - Host: `localhost`, Port: `5432`
    - Database: `s309`
-   - User: `.env`의 `POSTGRES_USER` 값
-   - Password: `.env`의 `POSTGRES_PASSWORD` 값
-4. **Test Connection** → 성공 확인 후 OK
-
-### PostgreSQL 연결 (로컬 개발)
-
-SSH 터널 없이 직접 연결합니다.
-
-1. DataGrip → **+** → Data Source → **PostgreSQL**
-2. **General 탭** 설정:
-   - Host: `localhost`
-   - Port: `5432`
-   - Database: `s309`
-   - User / Password: `.env.example` 참고
-3. Test Connection → OK
-
-### Redis 연결 (EC2)
-
-1. DataGrip → **+** → Data Source → **Redis**
-2. **SSH/SSL 탭** 설정 (PostgreSQL과 동일하게):
-   - Use SSH tunnel: ✅ 체크
-   - Proxy host: `<EC2-IP>`, Port: `22`, User: `ubuntu`
-   - Private key file: `.pem` 파일 경로
-3. **General 탭** 설정:
-   - Host: `localhost`
-   - Port: `6379`
+   - User/Password: `.env` 값
 4. Test Connection → OK
 
-### Redis 연결 (로컬 개발)
+### Redis
 
-1. DataGrip → **+** → Data Source → **Redis**
-2. Host: `localhost`, Port: `6379`
-3. Test Connection → OK
-
-> DataGrip에서 Redis를 사용하려면 **Database Tools and SQL** 플러그인이 활성화되어 있어야 합니다 (기본 활성화).
+1. DataGrip → + → Redis
+2. **SSH/SSL 탭**: PostgreSQL과 동일 설정
+3. **General 탭**: Host: `localhost`, Port: `6379`
+4. Test Connection → OK
 
 ---
 
@@ -362,28 +425,23 @@ SSH 터널 없이 직접 연결합니다.
 
 ```bash
 # 전체 재시작
-docker compose down && docker compose up -d --build
+docker compose down && docker compose --env-file .env up -d --build
 
-# 특정 서비스만 재시작
-docker compose restart backend
+# 특정 서비스만 재빌드
+docker compose up -d --build backend
 
-# 실시간 로그 보기
+# 실시간 로그
 docker compose logs -f backend
 
 # 컨테이너 내부 접속
-docker exec -it s309-backend /bin/sh
-docker exec -it s309-postgres psql -U s309user -d s309db
-docker exec -it s309-redis redis-cli
+docker exec -it s309-postgres psql -U s309user -d s309
+docker exec -it s309-redis redis-cli -a <REDIS_PASSWORD>
 
-# Redis 기본 명령어 (redis-cli 접속 후)
-# KEYS *          → 전체 키 목록
-# GET <key>       → 값 조회
-# DEL <key>       → 키 삭제
-# FLUSHALL        → 전체 삭제 (주의!)
+# Jenkins 재시작
+sudo systemctl restart jenkins
 
-# 이미지/볼륨 정리 (주의: DB 데이터 날아감)
-docker compose down -v
-docker system prune -a
+# UFW 상태 확인
+sudo ufw status verbose
 ```
 
 ---
@@ -392,30 +450,33 @@ docker system prune -a
 
 | 증상 | 원인 | 해결 |
 |------|------|------|
-| backend가 계속 재시작 | postgres/redis 헬스체크 실패 | `docker compose logs postgres` 또는 `logs redis` 확인, `.env` 값 일치 여부 |
-| 8080 접속 안 됨 | 보안 그룹 미설정 | AWS 콘솔에서 인바운드 규칙 확인 |
+| SSH 접속 끊김 | UFW에서 22 차단됨 | SSAFY에 EC2 초기화 요청 (복구 불가) — 절대 22번 건드리지 말것 |
+| backend 재시작 반복 | DB 헬스체크 실패 | `docker compose logs postgres`, `.env` 값 확인 |
+| Jenkins 접속 안 됨 | UFW 9090 미오픈 | `sudo ufw allow 9090` |
+| HTTPS 인증서 오류 | 80포트 점유 중 | `docker compose stop nginx` 후 certbot 실행 |
 | `permission denied` (docker) | 그룹 미적용 | `sudo usermod -aG docker ubuntu` 후 재로그인 |
-| Jenkins 빌드 중 `./gradlew: Permission denied` | 실행 권한 없음 | `chmod +x backend/gradlew` 후 커밋 |
-| DB 연결 에러 (Spring) | `DB_URL` 오타 | `.env`에서 `postgres`가 서비스명인지 확인 |
-| Redis 연결 에러 | `REDIS_HOST` 오타 | `.env`에서 `REDIS_HOST=redis` (서비스명)인지 확인 |
-| DataGrip SSH 터널 실패 | 키 파일 형식 문제 | `.pem` 파일을 OpenSSH 형식으로 사용, 파일 경로에 한글/공백 없는지 확인 |
+| DataGrip SSH 터널 실패 | 키 파일 형식 | `.pem` OpenSSH 형식인지 확인, 경로에 한글 없는지 확인 |
 
 ---
 
 ## 체크리스트
 
 ```
-[ ] EC2 SSH 접속 성공
-[ ] 보안 그룹 포트 오픈 (22, 80, 8080) — 5432/6379는 열지 않음
-[ ] Docker 설치 및 권한 설정
-[ ] Jenkins 설치 + 계정 생성 + 플러그인 설치
+[ ] SSH 접속 성공 (ssh -i K14S309T.pem ubuntu@k14s309.p.ssafy.io)
+[ ] Docker 설치 및 ubuntu 그룹 설정
+[ ] UFW 포트 추가 (80, 9090) — 22/443은 기본 오픈 상태
+[ ] Java 21 설치
+[ ] Jenkins 설치 + 포트 9090으로 변경 + 계정 생성
+[ ] Jenkins 플러그인 설치 (GitLab, SSH Agent, Docker Pipeline)
 [ ] 프로젝트 git clone
-[ ] infra/.env 파일 작성 (PostgreSQL + Redis 항목 포함)
+[ ] infra/.env 작성 (강력한 비밀번호 사용)
+[ ] HTTPS 인증서 발급 (Let's Encrypt)
+[ ] nginx/ssl/ 에 인증서 복사
+[ ] nginx.conf HTTPS 설정 업데이트
 [ ] Jenkins SSH Credentials 등록
-[ ] Jenkins 파이프라인 생성
-[ ] Jenkinsfile EC2_HOST 수정 후 커밋
+[ ] Jenkins 파이프라인 생성 + Jenkinsfile 도메인 수정
 [ ] GitLab 웹훅 연결
-[ ] docker compose up 첫 배포 성공 (postgres, redis, backend, ai, nginx)
-[ ] curl로 API 응답 확인
-[ ] DataGrip SSH 터널로 PostgreSQL/Redis 접속 확인
+[ ] docker compose up 첫 배포 성공
+[ ] curl https://k14s309.p.ssafy.io/api/health 응답 확인
+[ ] DataGrip SSH 터널 접속 확인
 ```
