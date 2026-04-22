@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -29,13 +30,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.s309.R
+import com.ssafy.s309.ui.theme.AccentBorder
+import com.ssafy.s309.ui.theme.Background
+import com.ssafy.s309.ui.theme.BorderLight
+import com.ssafy.s309.ui.theme.Disabled
+import com.ssafy.s309.ui.theme.Error
 import com.ssafy.s309.ui.theme.Primary
+import com.ssafy.s309.ui.theme.TextHint
+import com.ssafy.s309.ui.theme.TextLabel
+import com.ssafy.s309.ui.theme.TextPlaceholder
 
 @Composable
 fun SignUpScreen(
@@ -47,11 +57,17 @@ fun SignUpScreen(
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
 
+    val isEmailValid = email.isNotEmpty() && email.contains("@")
+    val isPasswordValid = password.length >= 6
+    val isPasswordMatch = password.isNotEmpty() && confirmPassword.isNotEmpty() && password == confirmPassword
+    val isFormValid = isEmailValid && isPasswordValid && isPasswordMatch
+
     Column(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF2F4F5))
+                .background(Background)
+                .statusBarsPadding()
                 .padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -69,87 +85,126 @@ fun SignUpScreen(
                 Modifier
                     .fillMaxWidth()
                     .background(Color.White, RoundedCornerShape(12.dp))
-                    .border(1.dp, Color(0xFFB8E0E8), RoundedCornerShape(12.dp))
+                    .border(1.dp, AccentBorder, RoundedCornerShape(12.dp))
                     .padding(horizontal = 20.dp, vertical = 24.dp),
         ) {
             Text(
                 text = "이메일",
                 fontSize = 13.sp,
-                color = Color(0xFF444444),
+                color = TextLabel,
                 fontWeight = FontWeight.Medium,
             )
             Spacer(modifier = Modifier.height(6.dp))
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
-                placeholder = { Text("Value", color = Color(0xFFBBBBBB)) },
+                placeholder = { Text("example@email.com", color = TextPlaceholder) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = KeyboardType.Email,
+                        imeAction = ImeAction.Next,
+                    ),
                 colors =
                     OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Primary,
-                        unfocusedBorderColor = Color(0xFFDDDDDD),
+                        unfocusedBorderColor = BorderLight,
                     ),
             )
+
+            if (email.isNotEmpty() && !isEmailValid) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "올바른 이메일 형식을 입력해주세요",
+                    fontSize = 12.sp,
+                    color = Error,
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
                 text = "비밀번호",
                 fontSize = 13.sp,
-                color = Color(0xFF444444),
+                color = TextLabel,
                 fontWeight = FontWeight.Medium,
             )
             Spacer(modifier = Modifier.height(6.dp))
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                placeholder = { Text("Value", color = Color(0xFFBBBBBB)) },
+                placeholder = { Text("6자 이상", color = TextPlaceholder) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Next,
+                    ),
                 colors =
                     OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Primary,
-                        unfocusedBorderColor = Color(0xFFDDDDDD),
+                        unfocusedBorderColor = BorderLight,
                     ),
             )
+
+            if (password.isNotEmpty() && !isPasswordValid) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "비밀번호는 6자 이상이어야 합니다",
+                    fontSize = 12.sp,
+                    color = Error,
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
                 text = "비밀번호 확인",
                 fontSize = 13.sp,
-                color = Color(0xFF444444),
+                color = TextLabel,
                 fontWeight = FontWeight.Medium,
             )
             Spacer(modifier = Modifier.height(6.dp))
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
-                placeholder = { Text("Value", color = Color(0xFFBBBBBB)) },
+                placeholder = { Text("비밀번호 재입력", color = TextPlaceholder) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Done,
+                    ),
                 colors =
                     OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Primary,
-                        unfocusedBorderColor = Color(0xFFDDDDDD),
+                        unfocusedBorderColor = BorderLight,
                     ),
             )
+
+            if (confirmPassword.isNotEmpty() && !isPasswordMatch) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "비밀번호가 일치하지 않습니다",
+                    fontSize = 12.sp,
+                    color = Error,
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
                 text = "이미 회원이세요?",
                 fontSize = 13.sp,
-                color = Color(0xFF555555),
+                color = TextHint,
                 textDecoration = TextDecoration.Underline,
                 modifier = Modifier.clickable { onAlreadyMemberClick() },
             )
@@ -163,7 +218,12 @@ fun SignUpScreen(
                         .fillMaxWidth()
                         .height(48.dp),
                 shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = Primary,
+                        disabledContainerColor = Disabled,
+                    ),
+                enabled = isFormValid,
             ) {
                 Text(
                     text = "Sign Up",

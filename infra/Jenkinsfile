@@ -2,46 +2,50 @@ pipeline {
     agent any
 
     environment {
-        // EC2 받으면 아래 IP만 수정
-        EC2_HOST    = 'ubuntu@<EC2-IP>'
-        EC2_KEY     = credentials('ec2-ssh-key')
-        DEPLOY_PATH = '/home/ubuntu/S14P31S309'
-        BRANCH      = 'develop'
+        EC2_USER = 'ubuntu'
+        EC2_HOST = 'k14s309.p.ssafy.io'
+        DEPLOY_DIR = '/home/ubuntu/S14P31S309'
+        GIT_REPO = 'https://lab.ssafy.com/s14-final/S14P31S309.git'
     }
 
     triggers {
-        gitlab(triggerOnPush: true, branchFilterType: 'NameBasedFilter', includeBranchesSpec: 'develop')
+        gitlab(
+            triggerOnPush: true,
+            branchFilterType: 'NameBasedFilter',
+            includeBranchesSpec: 'release'
+        )
+
     }
 
     stages {
         stage('Checkout') {
             steps {
-                checkout scm
+                git(
+                    url: "${GIT_REPO}",
+                    branch: 'release',
+                    credentialsId: 'gitlab-token'    // Jenkins Credentials ID (Username with Password)
+                )
+            }
+        }
+
+        stage('Build Backend') {
+            steps {
+                dir('backend') {
+                    sh 'chmod +x gradlew'
+                    sh './gradlew bootJar -x test'
+                }
             }
         }
 
         stage('Deploy to EC2') {
             steps {
-                sshagent(['ec2-ssh-key']) {
+                sshagent(credentials: ['ec2-ssh-key']) {    // Jenkins Credentials ID
                     sh """
-                        ssh -o StrictHostKeyChecking=no ${EC2_HOST} '
-                            cd ${DEPLOY_PATH} &&
-                            git pull origin ${BRANCH} &&
-                            docker compose -f infra/docker-compose.yml --env-file infra/.env up -d --build --remove-orphans
-                        '
-                    """
-                }
-            }
-        }
-
-        stage('Health Check') {
-            steps {
-                sshagent(['ec2-ssh-key']) {
-                    sh """
-                        ssh -o StrictHostKeyChecking=no ${EC2_HOST} '
-                            sleep 15 &&
-                            docker compose -f ${DEPLOY_PATH}/infra/docker-compose.yml ps &&
-                            curl -sf http://localhost/api/health || (echo "Health check failed" && exit 1)
+                        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} '
+                            cd ${DEPLOY_DIR} &&
+                            git pull origin release &&
+                            docker compose -f infra/docker-compose.yml down &&
+                            docker compose -f infra/docker-compose.yml up -d --build
                         '
                     """
                 }
@@ -51,10 +55,39 @@ pipeline {
 
     post {
         success {
-            echo '✅ 배포 성공!'
+            sh """
+                curl -s -X POST 'https://meeting.ssafy.com/hooks/41zy4nefxjbezfet79cbuzs34h' \
+                -H 'Content-Type: application/json' \
+                -d '{
+                    "attachments": [{
+                        "color": "#00c851",
+                        "title": ":white_check_mark: GluCoach 배포 성공!",
+                        "text": "release 브랜치 배포가 완료되었습니다.",
+                        "fields": [
+                            {"short": true, "title": "브랜치", "value": "release"},
+                            {"short": true, "title": "빌드 번호", "value": "#${env.BUILD_NUMBER}"}
+                        ],
+                        "actions": [{"name": "빌드 로그", "integration": {"url": "${env.BUILD_URL}"}}]
+                    }]
+                }'
+            """
         }
         failure {
-            echo '❌ 배포 실패 — Jenkins 로그를 확인하세요.'
+            sh """
+                curl -s -X POST 'https://meeting.ssafy.com/hooks/41zy4nefxjbezfet79cbuzs34h' \
+                -H 'Content-Type: application/json' \
+                -d '{
+                    "attachments": [{
+                        "color": "#ff4444",
+                        "title": ":x: GluCoach 배포 실패!",
+                        "text": "release 브랜치 빌드가 실패했습니다. 로그를 확인해주세요.",
+                        "fields": [
+                            {"short": true, "title": "브랜치", "value": "release"},
+                            {"short": true, "title": "빌드 번호", "value": "#${env.BUILD_NUMBER}"}
+                        ]
+                    }]
+                }'
+            """
         }
         always {
             cleanWs()
