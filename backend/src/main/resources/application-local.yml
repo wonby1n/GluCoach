@@ -12,3 +12,9 @@ logging:
   level:
     com.ssafy.s309: DEBUG
     org.hibernate.SQL: DEBUG
+
+jwt:
+  secret: localDevSecretKeyMustBeAtLeast32BytesLongForHS256Algorithm
+  access-expiration-ms: 3600000
+  refresh-expiration-ms: 2592000000
+  issuer: glucofit-backend

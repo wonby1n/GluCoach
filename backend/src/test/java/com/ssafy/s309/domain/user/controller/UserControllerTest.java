@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ssafy.s309.config.SecurityConfig;
+import com.ssafy.s309.config.TestSecurityConfig;
 import com.ssafy.s309.domain.user.dto.GuardianRequest;
 import com.ssafy.s309.domain.user.dto.GuardianResponse;
 import com.ssafy.s309.domain.user.dto.SettingsResponse;
@@ -20,12 +22,21 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.ComponentScan.Filter;
+import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(UserController.class)
+@WebMvcTest(
+    controllers = UserController.class,
+    excludeFilters = {
+      @Filter(type = FilterType.ASSIGNABLE_TYPE, classes = SecurityConfig.class),
+      @Filter(type = FilterType.REGEX, pattern = "com\\.ssafy\\.s309\\.domain\\.auth\\..*")
+    })
+@Import(TestSecurityConfig.class)
 @SuppressWarnings("NonAsciiCharacters")
 class UserControllerTest {
 
