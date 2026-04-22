@@ -70,4 +70,27 @@ public class User extends BaseEntity {
     this.height = height;
     this.weight = weight;
   }
+
+  public void updateSettings(
+      Float height,
+      Float weight,
+      DiabetesType diabetesType,
+      Boolean isMedicated,
+      Integer targetLow,
+      Integer targetHigh,
+      Integer alertLow,
+      Integer alertHigh,
+      Boolean nightWatch,
+      String characterType) {
+    if (height != null) this.height = height;
+    if (weight != null) this.weight = weight;
+    if (diabetesType != null) this.diabetesType = diabetesType;
+    if (isMedicated != null) this.isMedicated = isMedicated;
+    if (targetLow != null) this.targetLow = targetLow;
+    if (targetHigh != null) this.targetHigh = targetHigh;
+    if (alertLow != null) this.alertLow = alertLow;
+    if (alertHigh != null) this.alertHigh = alertHigh;
+    if (nightWatch != null) this.nightWatch = nightWatch;
+    if (characterType != null) this.characterType = characterType;
+  }
 }
