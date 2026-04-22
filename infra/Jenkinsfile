@@ -2,14 +2,28 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_REGISTRY = 'your-registry.example.com'
-        EC2_HOST = 'your-ec2-host'
+        EC2_USER = 'ubuntu'
+        EC2_HOST = 'k14s309.p.ssafy.io'
+        DEPLOY_DIR = '/home/ubuntu/S14P31S309'
+        GIT_REPO = 'https://lab.ssafy.com/s14-final/S14P31S309.git'
+    }
+
+    triggers {
+        gitlab(
+            triggerOnPush: true,
+            branchFilterType: 'NameBasedFilter',
+            includeBranchesSpec: 'release'
+        )
     }
 
     stages {
         stage('Checkout') {
             steps {
-                checkout scm
+                git(
+                    url: "${GIT_REPO}",
+                    branch: 'release',
+                    credentialsId: 'gitlab-token'    // Jenkins Credentials ID (Username with Password)
+                )
             }
         }
 
@@ -22,11 +36,10 @@ pipeline {
             }
         }
 
-        stage('Build Frontend APK') {
+        stage('Build AI') {
             steps {
-                dir('frontend') {
-                    sh 'chmod +x gradlew'
-                    sh './gradlew :app:assembleRelease'
+                dir('ai') {
+                    sh 'docker build -t s309-ai .'
                 }
             }
         }
@@ -34,24 +47,31 @@ pipeline {
         stage('Build Docker Images') {
             steps {
                 sh 'docker build -t s309-backend ./backend'
-                sh 'docker build -t s309-ai ./ai'
             }
         }
 
         stage('Deploy to EC2') {
             steps {
-                // TODO: SSH를 통한 EC2 배포 스크립트 작성
-                echo 'Deploy stage - configure SSH and docker-compose up'
+                sshagent(credentials: ['ec2-ssh-key']) {    // Jenkins Credentials ID
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} '
+                            cd ${DEPLOY_DIR} &&
+                            git pull origin release &&
+                            docker compose -f infra/docker-compose.yml down &&
+                            docker compose -f infra/docker-compose.yml up -d --build
+                        '
+                    """
+                }
             }
         }
     }
 
     post {
         success {
-            echo 'Pipeline succeeded!'
+            echo 'Deploy succeeded!'
         }
         failure {
-            echo 'Pipeline failed!'
+            echo 'Deploy failed!'
         }
     }
 }
