@@ -39,6 +39,10 @@ dependencies {
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
 
+    // AWS S3
+    implementation(platform("software.amazon.awssdk:bom:2.29.0"))
+    implementation("software.amazon.awssdk:s3")
+
     // Lombok
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
