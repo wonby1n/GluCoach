@@ -23,11 +23,15 @@ bash scripts/setup-hooks.sh
 ```
 
 이후 `git commit`을 하면:
+
 - **backend/** 파일 변경 시 → Java 코드 스타일 자동 수정 (Spotless)
 - **frontend/** 파일 변경 시 → Kotlin 코드 스타일 자동 수정 (ktlint) + 품질 검사 (detekt)
 
 > 린트를 일시적으로 건너뛰려면 `git commit --no-verify`
 > 하지만 가급적 사용하지 마세요.
+
+- 커밋 메시지에 [#숫자] 포맷으로 이슈 키 입력 가능
+    - 예: [#131] feature: 로그인... → 자동으로 [S14P31S309-131]
 
 ### 3. .env 관리 규칙
 
@@ -46,22 +50,61 @@ cp infra/.env.example infra/.env
 
 ### 4. 브랜치 전략
 
-| 브랜치 | 용도 |
-|--------|------|
-| `master` | 배포용 (직접 push 금지) |
-| `develop` | 개발 통합 브랜치 |
-| `feature/<기능명>` | 기능 개발 |
-| `fix/<이슈명>` | 버그 수정 |
+```
+develop          ← 팀 자체 추가 기능 통합
+develop-client   ← 클라이언트 요구 기능 통합
+       ↓                ↓
+          release       ← 둘 다 합쳐 실서비스 검증
+              ↓
+           master       ← 최종 배포 (태그로 버전 관리)
+```
+
+| 브랜치                             | 용도                      | 직접 push   |
+| ---------------------------------- | ------------------------- | ----------- |
+| `master`                           | 최종 배포                 | 금지 (MR만) |
+| `release`                          | 전체 통합 실서비스 검증   | 금지 (MR만) |
+| `develop-client`                   | 클라이언트 요구 기능 통합 | 금지 (MR만) |
+| `develop`                          | 팀 자체 추가 기능 통합    | 금지 (MR만) |
+| `{파트}/feature-{기능}-{이슈번호}` | 기능 개발                 | 허용        |
+| `hotfix/{기능}-{이슈번호}`         | 운영 긴급 수정            | 허용        |
+
+### 기능 유형별 MR 대상
+
+| 기능 유형                | MR 보낼 곳                                  |
+| ------------------------ | ------------------------------------------- |
+| **클라이언트 요구 기능** | `develop-client` (필요 시 `develop`도 추가) |
+| **팀 자체 추가 기능**    | `develop`만                                 |
+
+> **하나의 feature 브랜치 → 여러 브랜치 동시 MR 가능**
+>
+> GitLab에서 같은 소스 브랜치로 target만 달리해서 MR을 여러 개 열면 됩니다.
+>
+> 예: `fe/feature-login` → `develop-client` MR 1개 + `develop` MR 1개
+
+### 작업 흐름
 
 ```bash
-# 작업 시작
+# 1. 브랜치 생성 (develop 또는 develop-client 기준)
 git checkout develop
 git pull origin develop
-git checkout -b feature/기능명
+git checkout -b fe/feature-login-S14P31S309-131
 
-# 작업 완료 후
-git push origin feature/기능명
-# → GitLab에서 MR(Merge Request) 생성
+# 2. 작업 후 push
+git push origin fe/feature-login-S14P31S309-131
+
+# 3. GitLab에서 MR 생성
+#    클라이언트 기능: develop-client 대상 MR (+ 필요 시 develop도)
+#    팀 자체 기능:    develop 대상 MR만
+```
+
+### 배포 플로우
+
+```bash
+# Step 1. develop + develop-client → release (실서비스 검증)
+
+# Step 2. release → master → 태그
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
 ---
@@ -70,52 +113,55 @@ git push origin feature/기능명
 
 ### 필요한 것
 
-| 항목 | 버전 | 비고 |
-|------|------|------|
-| JDK | 21 (Eclipse Temurin) | `java -version`으로 확인 |
-| IDE | IntelliJ IDEA | Community 또는 Ultimate |
-| PostgreSQL | 17 | 로컬 설치 또는 Docker (Docker 권장) |
+| 항목       | 버전                 | 비고                                |
+| ---------- | -------------------- | ----------------------------------- |
+| JDK        | 21 (Eclipse Temurin) | `java -version`으로 확인            |
+| IDE        | IntelliJ IDEA        | Community 또는 Ultimate             |
+| PostgreSQL | 17                   | 로컬 설치 또는 Docker (Docker 권장) |
 
 ### Step 1. JDK 21 설치
 
 [Eclipse Temurin 21 다운로드](https://adoptium.net/temurin/releases/?version=21)
 
 설치 후 확인:
+
 ```bash
 java -version
 # openjdk version "21.x.x"
 ```
 
 **Windows 환경 변수**: `JAVA_HOME`에 JDK 설치 경로 등록 필요
-(예: `C:\Program Files\Eclipse Adoptium\jdk-21.x.x-hotspot`)
+(예: `C:\\Program Files\\Eclipse Adoptium\\jdk-21.x.x-hotspot`)
 
-> 주의: 경로 끝에 `\bin`을 붙이면 안 됩니다.
+> 주의: 경로 끝에 `\\bin`을 붙이면 안 됩니다.
 
 ### Step 2. PostgreSQL 설치 및 DB 생성
 
-> **권장: Docker 방식 (A안)** — 설치/삭제 간편, OS 무관, 팀 환경 통일  
+> **권장: Docker 방식 (A안)** — 설치/삭제 간편, OS 무관, 팀 환경 통일
+>
 > 직접 설치(B안)는 Docker를 쓸 수 없는 경우에만 선택
 
 ---
 
-#### A안: Docker로 실행 (권장)
+### A안: Docker로 실행 (권장)
 
 **사전 조건**: Docker Desktop 설치 ([다운로드](https://www.docker.com/products/docker-desktop/))
 
 로컬 개발용으로 PostgreSQL 컨테이너만 단독 실행:
 
 ```bash
-docker run -d \
-  --name s309-postgres \
-  -e POSTGRES_DB=s309 \
-  -e POSTGRES_USER=ssafy \
-  -e POSTGRES_PASSWORD=ssafy \
-  -p 5432:5432 \
-  -v s309-postgres-data:/var/lib/postgresql/data \
+docker run -d \\
+  --name s309-postgres \\
+  -e POSTGRES_DB=s309 \\
+  -e POSTGRES_USER=ssafy \\
+  -e POSTGRES_PASSWORD=ssafy1234 \\
+  -p 5432:5432 \\
+  -v s309-postgres-data:/var/lib/postgresql/data \\
   postgres:17-alpine
 ```
 
 실행 확인:
+
 ```bash
 docker ps
 # s309-postgres 컨테이너가 보이면 성공
@@ -125,12 +171,14 @@ docker logs s309-postgres
 ```
 
 접속 테스트 (선택):
+
 ```bash
 docker exec -it s309-postgres psql -U ssafy -d s309
-# psql 프롬프트가 뜨면 \q 입력으로 종료
+# psql 프롬프트가 뜨면 \\q 입력으로 종료
 ```
 
 **컨테이너 제어:**
+
 ```bash
 docker stop s309-postgres     # 중지
 docker start s309-postgres    # 재시작
@@ -140,20 +188,23 @@ docker volume rm s309-postgres-data  # 데이터까지 삭제
 
 ---
 
-#### B안: 직접 설치
+### B안: 직접 설치
 
-**Windows**: [PostgreSQL Installer](https://www.postgresql.org/download/windows/)에서 PostgreSQL 17 설치  
+**Windows**: [PostgreSQL Installer](https://www.postgresql.org/download/windows/)에서 PostgreSQL 17 설치
+
 - 설치 중 `postgres` 계정 비밀번호 설정 (기억해둘 것)
 - Port: `5432` (기본값)
 - Locale: `C` 또는 `Default locale`
 
 **WSL / Ubuntu**:
+
 ```bash
 sudo apt update && sudo apt install -y postgresql-17 postgresql-client-17
 sudo systemctl start postgresql
 ```
 
 **macOS (Homebrew)**:
+
 ```bash
 brew install postgresql@17
 brew services start postgresql@17
@@ -170,14 +221,14 @@ brew services start postgresql@17
 ```sql
 CREATE DATABASE s309;
 
-CREATE USER ssafy WITH PASSWORD 'ssafy';
+CREATE USER ssafy WITH PASSWORD 'ssafy1234';
 GRANT ALL PRIVILEGES ON DATABASE s309 TO ssafy;
 
 -- PostgreSQL 15+ 에서는 스키마 권한 추가 부여 필요
-\c s309
+\\c s309
 GRANT ALL ON SCHEMA public TO ssafy;
 
-\q
+\\q
 ```
 
 ### Step 3. .env 설정
@@ -188,10 +239,10 @@ cp backend/.env.example backend/.env
 
 `backend/.env`를 열어서 값을 채웁니다:
 
-```env
+```
 DB_URL=jdbc:postgresql://localhost:5432/s309
 DB_USERNAME=ssafy
-DB_PASSWORD=ssafy
+DB_PASSWORD=ssafy1234
 SPRING_PROFILES_ACTIVE=local
 SERVER_PORT=8080
 JPA_DDL_AUTO=update
@@ -205,6 +256,7 @@ cd backend
 ```
 
 정상 실행 확인:
+
 - http://localhost:8080/api/health → `{"status":"UP"}`
 - http://localhost:8080/swagger-ui.html → API 문서
 
@@ -215,6 +267,7 @@ cd backend
 3. Settings > Build > Compiler > Annotation Processors → **Enable** 체크 (Lombok용)
 
 **권장 플러그인:**
+
 - **Lombok** — 필수 (getter/setter/builder 등 어노테이션)
 - **EditorConfig** — 코드 스타일 자동 적용
 - **SonarQube for IDE** — 실시간 코드 품질 검사
@@ -259,12 +312,12 @@ backend/
 
 ### 필요한 것
 
-| 항목 | 버전 | 비고 |
-|------|------|------|
-| Android Studio | Otter 3 이상 | 최신 안정 버전 |
-| Kotlin | 2.2.10 | 프로젝트에 설정됨 |
-| Gradle | 9.3.1 | 프로젝트에 설정됨 |
-| compileSdk | 36 | build.gradle.kts에 설정됨 |
+| 항목           | 버전         | 비고                      |
+| -------------- | ------------ | ------------------------- |
+| Android Studio | Otter 3 이상 | 최신 안정 버전            |
+| Kotlin         | 2.2.10       | 프로젝트에 설정됨         |
+| Gradle         | 9.3.1        | 프로젝트에 설정됨         |
+| compileSdk     | 36           | build.gradle.kts에 설정됨 |
 
 ### Step 1. Android Studio 설치
 
@@ -277,9 +330,11 @@ backend/
 Android Studio > Settings > Languages & Frameworks > **Android SDK**
 
 **SDK Platforms 탭:**
+
 - `Android 16.0 ("Baklava")` — API Level 36 체크
 
 **SDK Tools 탭:**
+
 - Android SDK Build-Tools (최신)
 - Android SDK Command-line Tools
 - Android Emulator
@@ -323,15 +378,15 @@ cd frontend
 
 ### 프로젝트 기술 스택
 
-| 라이브러리 | 용도 |
-|-----------|------|
-| Jetpack Compose | UI (XML 대신 선언형 UI) |
-| Material3 | 디자인 시스템 |
-| Hilt | 의존성 주입 (DI) |
-| Navigation Compose | 화면 이동 |
-| Retrofit 2 + OkHttp | HTTP API 호출 |
-| Coil 3 | 이미지 로딩 |
-| kotlinx.serialization | JSON 직렬화 |
+| 라이브러리            | 용도                    |
+| --------------------- | ----------------------- |
+| Jetpack Compose       | UI (XML 대신 선언형 UI) |
+| Material3             | 디자인 시스템           |
+| Hilt                  | 의존성 주입 (DI)        |
+| Navigation Compose    | 화면 이동               |
+| Retrofit 2 + OkHttp   | HTTP API 호출           |
+| Coil 3                | 이미지 로딩             |
+| kotlinx.serialization | JSON 직렬화             |
 
 ### 주요 디렉토리 구조
 
@@ -359,18 +414,19 @@ frontend/
 
 ### 필요한 것
 
-| 항목 | 버전 | 비고 |
-|------|------|------|
-| Python | 3.12 | `python --version`으로 확인 |
-| IDE | VS Code 권장 | PyCharm도 가능 |
+| 항목   | 버전         | 비고                        |
+| ------ | ------------ | --------------------------- |
+| Python | 3.12         | `python --version`으로 확인 |
+| IDE    | VS Code 권장 | PyCharm도 가능              |
 
 ### Step 1. Python 설치
 
 [Python 3.12 다운로드](https://www.python.org/downloads/)
 
 (권장) uv 패키지 매니저 설치:
+
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+curl -LsSf <https://astral.sh/uv/install.sh> | sh
 ```
 
 ### Step 2. .env 설정
@@ -397,6 +453,7 @@ uvicorn app.main:app --reload
 ```
 
 정상 실행 확인:
+
 - http://localhost:8000/health
 - http://localhost:8000/docs → API 문서 (Swagger)
 
@@ -428,16 +485,17 @@ ai/
 
 ### 필요한 것
 
-| 항목 | 버전 | 비고 |
-|------|------|------|
+| 항목           | 버전 | 비고                        |
+| -------------- | ---- | --------------------------- |
 | Docker Desktop | 최신 | `docker --version`으로 확인 |
-| Docker Compose | v2 | Docker Desktop에 포함 |
+| Docker Compose | v2   | Docker Desktop에 포함       |
 
 ### Step 1. Docker 설치
 
 [Docker Desktop 다운로드](https://www.docker.com/products/docker-desktop/)
 
 설치 확인:
+
 ```bash
 docker --version
 docker compose version
@@ -451,13 +509,13 @@ cp infra/.env.example infra/.env
 
 `infra/.env`를 열어서 값을 채웁니다:
 
-```env
+```
 POSTGRES_DB=s309
 POSTGRES_USER=ssafy
-POSTGRES_PASSWORD=ssafy
+POSTGRES_PASSWORD=ssafy1234
 DB_URL=jdbc:postgresql://postgres:5432/s309
 DB_USERNAME=ssafy
-DB_PASSWORD=ssafy
+DB_PASSWORD=ssafy1234
 SPRING_PROFILES_ACTIVE=local
 AI_DEBUG=false
 ```
@@ -473,12 +531,14 @@ docker compose up -d
 ```
 
 실행 확인:
+
 ```bash
 docker compose ps        # 컨테이너 상태 확인
 docker compose logs -f   # 로그 확인
 ```
 
 접속:
+
 - http://localhost/api/health → Backend (Nginx 경유)
 - http://localhost/ai/health → AI (Nginx 경유)
 
@@ -512,12 +572,12 @@ infra/
 
 서비스 구성:
 
-| 서비스 | 이미지 | 포트 | 역할 |
-|--------|--------|------|------|
-| postgres | postgres:17-alpine | 5432 | 데이터베이스 |
-| backend | 자체 빌드 | 8080 | Spring Boot API |
-| ai | 자체 빌드 | 8000 | FastAPI AI 서버 |
-| nginx | nginx:alpine | 80 | 리버스 프록시 |
+| 서비스   | 이미지             | 포트 | 역할            |
+| -------- | ------------------ | ---- | --------------- |
+| postgres | postgres:17-alpine | 5432 | 데이터베이스    |
+| backend  | 자체 빌드          | 8080 | Spring Boot API |
+| ai       | 자체 빌드          | 8000 | FastAPI AI 서버 |
+| nginx    | nginx:alpine       | 80   | 리버스 프록시   |
 
 ---
 
@@ -526,6 +586,7 @@ infra/
 프로젝트 루트의 `.editorconfig`가 모든 파트에 공통 적용됩니다. EditorConfig를 지원하는 IDE라면 별도 설정 없이 자동 반영됩니다.
 
 **공통 규칙:**
+
 - 인코딩: UTF-8
 - 줄바꿈: LF (Windows에서도 LF 통일)
 - 들여쓰기: 스페이스 4칸 (yml/json/toml만 2칸)
@@ -536,24 +597,24 @@ infra/
 
 **도구**: Spotless + Google Java Style (커밋 시 자동 적용)
 
-| 항목 | 규칙 |
-|------|------|
-| 들여쓰기 | 스페이스 2칸 (Google Java Style 기본값) |
-| 최대 줄 길이 | 100자 |
-| import 정렬 | 자동 정리, 사용하지 않는 import 제거 |
-| 중괄호 | K&R 스타일 (여는 중괄호는 같은 줄) |
-| 파일 끝 | 반드시 빈 줄 1개 |
+| 항목         | 규칙                                    |
+| ------------ | --------------------------------------- |
+| 들여쓰기     | 스페이스 2칸 (Google Java Style 기본값) |
+| 최대 줄 길이 | 100자                                   |
+| import 정렬  | 자동 정리, 사용하지 않는 import 제거    |
+| 중괄호       | K&R 스타일 (여는 중괄호는 같은 줄)      |
+| 파일 끝      | 반드시 빈 줄 1개                        |
 
 **네이밍:**
 
-| 대상 | 규칙 | 예시 |
-|------|------|------|
-| 클래스 | PascalCase | `UserService`, `HealthController` |
-| 메서드/변수 | camelCase | `findById`, `userName` |
-| 상수 | UPPER_SNAKE_CASE | `MAX_RETRY_COUNT` |
-| 패키지 | 소문자 | `com.ssafy.s309.controller` |
-| DTO | 접미사 `Request`/`Response` | `LoginRequest`, `UserResponse` |
-| Entity | 테이블명과 일치 | `User`, `Device` |
+| 대상        | 규칙                        | 예시                              |
+| ----------- | --------------------------- | --------------------------------- |
+| 클래스      | PascalCase                  | `UserService`, `HealthController` |
+| 메서드/변수 | camelCase                   | `findById`, `userName`            |
+| 상수        | UPPER_SNAKE_CASE            | `MAX_RETRY_COUNT`                 |
+| 패키지      | 소문자                      | `com.ssafy.s309.controller`       |
+| DTO         | 접미사 `Request`/`Response` | `LoginRequest`, `UserResponse`    |
+| Entity      | 테이블명과 일치             | `User`, `Device`                  |
 
 **패키지 구조 규칙:**
 
@@ -567,6 +628,7 @@ config/      ← Spring 설정 클래스
 ```
 
 **기타:**
+
 - Lombok 사용: `@Getter`, `@Builder`, `@RequiredArgsConstructor` 권장
 - `@Setter` 사용 지양 (불변 객체 지향)
 - Entity에 `@Builder` 사용 시 `@AllArgsConstructor(access = AccessLevel.PRIVATE)` 함께 사용
@@ -577,29 +639,30 @@ config/      ← Spring 설정 클래스
 
 **도구**: ktlint (스타일 자동 수정) + detekt (품질 검사) — 커밋 시 자동 적용
 
-| 항목 | 규칙 |
-|------|------|
-| 들여쓰기 | 스페이스 4칸 |
-| 최대 줄 길이 | 120자 |
+| 항목            | 규칙                                |
+| --------------- | ----------------------------------- |
+| 들여쓰기        | 스페이스 4칸                        |
+| 최대 줄 길이    | 120자                               |
 | wildcard import | 금지 (`import package.*` 사용 불가) |
-| 함수 최대 길이 | 50줄 (detekt) |
-| 함수 파라미터 | 최대 8개 (detekt) |
-| 클래스 함수 수 | 최대 15개 (detekt) |
+| 함수 최대 길이  | 50줄 (detekt)                       |
+| 함수 파라미터   | 최대 8개 (detekt)                   |
+| 클래스 함수 수  | 최대 15개 (detekt)                  |
 
 **네이밍:**
 
-| 대상 | 규칙 | 예시 |
-|------|------|------|
-| 클래스/인터페이스 | PascalCase | `UserRepository`, `DeviceState` |
-| 함수/변수 | camelCase | `fetchUsers`, `isLoading` |
-| 상수 | UPPER_SNAKE_CASE | `BASE_URL` |
-| Composable 함수 | PascalCase (예외) | `HomeScreen`, `DeviceCard` |
-| 패키지 | 소문자 | `com.ssafy.s309.ui.screen` |
+| 대상              | 규칙              | 예시                            |
+| ----------------- | ----------------- | ------------------------------- |
+| 클래스/인터페이스 | PascalCase        | `UserRepository`, `DeviceState` |
+| 함수/변수         | camelCase         | `fetchUsers`, `isLoading`       |
+| 상수              | UPPER_SNAKE_CASE  | `BASE_URL`                      |
+| Composable 함수   | PascalCase (예외) | `HomeScreen`, `DeviceCard`      |
+| 패키지            | 소문자            | `com.ssafy.s309.ui.screen`      |
 
 > Compose 함수는 일반 Kotlin 함수와 달리 PascalCase를 사용합니다.
 > `ui/`, `composable/`, `screen/` 하위 파일에서는 detekt가 이 규칙을 허용합니다.
 
 **Compose 규칙:**
+
 - State는 ViewModel에서 관리, Composable은 표시만
 - `remember`/`mutableStateOf` 대신 `StateFlow` + `collectAsStateWithLifecycle()` 권장
 - Composable 파라미터 순서: 필수값 → 옵션값 → modifier → content lambda
@@ -621,21 +684,21 @@ navigation/  ← 네비게이션 그래프
 
 **도구**: Ruff (VS Code 확장)
 
-| 항목 | 규칙 |
-|------|------|
-| 들여쓰기 | 스페이스 4칸 |
-| 최대 줄 길이 | 120자 |
-| 따옴표 | 큰따옴표 `"` (Ruff 기본값) |
-| import 정렬 | isort 규칙 (Ruff 내장) |
+| 항목         | 규칙                       |
+| ------------ | -------------------------- |
+| 들여쓰기     | 스페이스 4칸               |
+| 최대 줄 길이 | 120자                      |
+| 따옴표       | 큰따옴표 `"` (Ruff 기본값) |
+| import 정렬  | isort 규칙 (Ruff 내장)     |
 
 **네이밍:**
 
-| 대상 | 규칙 | 예시 |
-|------|------|------|
-| 클래스 | PascalCase | `UserService`, `DeviceModel` |
-| 함수/변수 | snake_case | `get_user`, `device_id` |
-| 상수 | UPPER_SNAKE_CASE | `API_VERSION` |
-| 파일명 | snake_case | `user_router.py` |
+| 대상          | 규칙                | 예시                           |
+| ------------- | ------------------- | ------------------------------ |
+| 클래스        | PascalCase          | `UserService`, `DeviceModel`   |
+| 함수/변수     | snake_case          | `get_user`, `device_id`        |
+| 상수          | UPPER_SNAKE_CASE    | `API_VERSION`                  |
+| 파일명        | snake_case          | `user_router.py`               |
 | Pydantic 모델 | PascalCase + 접미사 | `UserCreate`, `DeviceResponse` |
 
 **패키지 구조 규칙:**
@@ -648,6 +711,7 @@ config.py    ← 환경 설정 (pydantic-settings)
 ```
 
 **기타:**
+
 - Type hint 필수 (함수 파라미터, 반환값)
 - Pydantic v2 문법 사용 (`model_validator` 등)
 - API 경로 prefix: `/ai/` (Nginx에서 라우팅)
@@ -656,26 +720,26 @@ config.py    ← 환경 설정 (pydantic-settings)
 
 **Docker/Nginx 컨벤션:**
 
-| 항목 | 규칙 |
-|------|------|
-| 컨테이너 이름 | `s309-서비스명` (예: `s309-backend`) |
-| 이미지 태그 | 항상 버전 명시 (예: `postgres:17-alpine`, `nginx:alpine`) |
-| 환경변수 | `.env` 파일로 관리, docker-compose.yml에 직접 값 넣지 않기 |
-| 볼륨 | named volume 사용 (예: `postgres-data`) |
-| 포트 | 호스트:컨테이너 형식 명시 |
+| 항목          | 규칙                                                       |
+| ------------- | ---------------------------------------------------------- |
+| 컨테이너 이름 | `s309-서비스명` (예: `s309-backend`)                       |
+| 이미지 태그   | 항상 버전 명시 (예: `postgres:17-alpine`, `nginx:alpine`)  |
+| 환경변수      | `.env` 파일로 관리, docker-compose.yml에 직접 값 넣지 않기 |
+| 볼륨          | named volume 사용 (예: `postgres-data`)                    |
+| 포트          | 호스트:컨테이너 형식 명시                                  |
 
 ---
 
 ## 포트 정리
 
-| 서비스 | 포트 | URL |
-|--------|------|-----|
-| Backend | 8080 | http://localhost:8080 |
-| AI | 8000 | http://localhost:8000 |
-| PostgreSQL | 5432 | - |
-| Nginx | 80 | http://localhost |
-| Swagger (BE) | 8080 | http://localhost:8080/swagger-ui.html |
-| Swagger (AI) | 8000 | http://localhost:8000/docs |
+| 서비스       | 포트 | URL                                             |
+| ------------ | ---- | ----------------------------------------------- |
+| Backend      | 8080 | [http://localhost:8080](http://localhost:8080/) |
+| AI           | 8000 | [http://localhost:8000](http://localhost:8000/) |
+| PostgreSQL   | 5432 | -                                               |
+| Nginx        | 80   | [http://localhost](http://localhost/)           |
+| Swagger (BE) | 8080 | http://localhost:8080/swagger-ui.html           |
+| Swagger (AI) | 8000 | http://localhost:8000/docs                      |
 
 ---
 
@@ -683,34 +747,34 @@ config.py    ← 환경 설정 (pydantic-settings)
 
 ### Backend
 
-| 증상 | 원인 | 해결 |
-|------|------|------|
-| `Access denied for user` | DB 계정 불일치 | `.env`의 DB_USERNAME/PASSWORD 확인 |
-| 로그인 화면 뜸 | Spring Security | `/api/health`, `/swagger-ui.html`은 인증 없이 접근 가능. 다른 API는 인증 필요 |
-| `Port 5432 already in use` | PostgreSQL이 이미 실행 중 | `netstat -aon \| findstr 5432`으로 확인 후 중복 서비스 중지 |
-| `password authentication failed` | DB 비밀번호 불일치 | `.env`와 PostgreSQL 계정 비밀번호 일치 확인 |
-| `database "s309" does not exist` | DB 미생성 | Step 2의 `CREATE DATABASE` 실행 확인 |
-| Gradle JVM 오류 | JAVA_HOME 불일치 | `JAVA_HOME`이 JDK 21을 가리키는지 확인 (경로 끝에 `\bin` 없어야 함) |
+| 증상                             | 원인                      | 해결                                                                          |
+| -------------------------------- | ------------------------- | ----------------------------------------------------------------------------- |
+| `Access denied for user`         | DB 계정 불일치            | `.env`의 DB_USERNAME/PASSWORD 확인                                            |
+| 로그인 화면 뜸                   | Spring Security           | `/api/health`, `/swagger-ui.html`은 인증 없이 접근 가능. 다른 API는 인증 필요 |
+| `Port 5432 already in use`       | PostgreSQL이 이미 실행 중 | `netstat -aon \| findstr 5432`으로 확인 후 중복 서비스 중지                   |
+| `password authentication failed` | DB 비밀번호 불일치        | `.env`와 PostgreSQL 계정 비밀번호 일치 확인                                   |
+| `database "s309" does not exist` | DB 미생성                 | Step 2의 `CREATE DATABASE` 실행 확인                                          |
+| Gradle JVM 오류                  | JAVA_HOME 불일치          | `JAVA_HOME`이 JDK 21을 가리키는지 확인 (경로 끝에 `\\bin` 없어야 함)          |
 
 ### Frontend
 
-| 증상 | 원인 | 해결 |
-|------|------|------|
-| Gradle Sync 실패 | SDK 미설치 | SDK Manager에서 API 36 + Build-Tools 설치 |
+| 증상             | 원인               | 해결                                      |
+| ---------------- | ------------------ | ----------------------------------------- |
+| Gradle Sync 실패 | SDK 미설치         | SDK Manager에서 API 36 + Build-Tools 설치 |
 | 에뮬레이터 안 뜸 | 시스템 이미지 없음 | Device Manager에서 API 36 이미지 다운로드 |
-| ktlint 에러 | 코드 스타일 불일치 | `./gradlew ktlintFormat`으로 자동 수정 |
+| ktlint 에러      | 코드 스타일 불일치 | `./gradlew ktlintFormat`으로 자동 수정    |
 
 ### AI
 
-| 증상 | 원인 | 해결 |
-|------|------|------|
-| `ModuleNotFoundError` | 의존성 미설치 | `pip install -r requirements.txt` |
-| 포트 충돌 | 8000 포트 사용 중 | `uvicorn app.main:app --port 8001` |
+| 증상                  | 원인              | 해결                               |
+| --------------------- | ----------------- | ---------------------------------- |
+| `ModuleNotFoundError` | 의존성 미설치     | `pip install -r requirements.txt`  |
+| 포트 충돌             | 8000 포트 사용 중 | `uvicorn app.main:app --port 8001` |
 
 ### Docker
 
-| 증상 | 원인 | 해결 |
-|------|------|------|
-| `connection refused` | 서비스 미시작 | `docker compose ps`로 상태 확인 |
-| DB 연결 실패 | .env 미설정 | `infra/.env` 파일 확인 |
-| 빌드 실패 | Dockerfile 문제 | `docker compose logs 서비스명`으로 확인 |
+| 증상                 | 원인            | 해결                                    |
+| -------------------- | --------------- | --------------------------------------- |
+| `connection refused` | 서비스 미시작   | `docker compose ps`로 상태 확인         |
+| DB 연결 실패         | .env 미설정     | `infra/.env` 파일 확인                  |
+| 빌드 실패            | Dockerfile 문제 | `docker compose logs 서비스명`으로 확인 |
