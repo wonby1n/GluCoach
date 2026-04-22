@@ -30,6 +30,8 @@ import com.ssafy.s309.data.model.GlucoseRange
 import com.ssafy.s309.data.model.GlucoseReading
 import com.ssafy.s309.data.model.MealEvent
 import com.ssafy.s309.ui.theme.GlucoachColors
+import com.ssafy.s309.ui.theme.GlucoachCorner
+import com.ssafy.s309.ui.theme.GlucoachSpacing
 import kotlin.math.max
 import kotlin.math.min
 
@@ -55,8 +57,8 @@ fun GlucoseChartCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .shadow(3.dp, RoundedCornerShape(20.dp))
-                .clip(RoundedCornerShape(20.dp))
+                .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
+                .clip(RoundedCornerShape(GlucoachCorner.card))
                 .background(GlucoachColors.Surface)
                 .padding(start = 22.dp, end = 16.dp, top = 14.dp, bottom = 12.dp),
     ) {
@@ -79,7 +81,7 @@ fun GlucoseChartCard(
             )
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
 
         GlucoseChartBody(
             readings = readings,
@@ -240,7 +242,7 @@ private fun MealPin(
                     .align(
                         alignmentFor(horizontalBias),
                     )
-                    .padding(bottom = 4.dp)
+                    .padding(bottom = GlucoachSpacing.xs)
                     .size(MEAL_PIN_SIZE),
             contentAlignment = Alignment.Center,
         ) {

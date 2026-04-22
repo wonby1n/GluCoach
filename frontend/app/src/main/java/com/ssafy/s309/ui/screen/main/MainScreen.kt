@@ -42,6 +42,7 @@ import com.ssafy.s309.ui.component.GlucoseChartCard
 import com.ssafy.s309.ui.component.GlucoseChartTimeAxis
 import com.ssafy.s309.ui.component.SummaryStatCard
 import com.ssafy.s309.ui.theme.GlucoachColors
+import com.ssafy.s309.ui.theme.GlucoachSpacing
 
 /**
  * 메인/일반 화면.
@@ -107,19 +108,19 @@ fun MainScreenContent(
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 22.dp),
             ) {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
                 TodayConditionHeader(
                     onBellClick = onBellClick,
                     bellIcon = bellIcon,
                 )
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
 
                 CurrentGlucoseCard(
                     currentMgDl = state.currentGlucoseMgDl ?: 0,
                     diffFromPrevious = state.diffFromPrevious,
                     mascotSlot = mascotSlot,
                 )
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
                 GlucoseChartCard(
                     readings = state.glucoseSeries,
@@ -131,13 +132,13 @@ fun MainScreenContent(
                 GlucoseChartTimeAxis(
                     labels = listOf("08:00", "10:00", "12:00", "14:00"),
                 )
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
                 SummaryRow(
                     caloriesKcal = state.summary.caloriesBurnedKcal,
                     sleepMinutes = state.summary.sleepMinutes,
                 )
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
             }
 
             BottomNavBar(
@@ -218,7 +219,7 @@ private fun SummaryRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.lg),
     ) {
         SummaryStatCard(
             title = "칼로리 소모",

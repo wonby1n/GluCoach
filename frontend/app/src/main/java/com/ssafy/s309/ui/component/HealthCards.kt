@@ -23,6 +23,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.s309.ui.theme.GlucoachColors
+import com.ssafy.s309.ui.theme.GlucoachCorner
+import com.ssafy.s309.ui.theme.GlucoachSpacing
 
 /**
  * 메인 화면 상단 "현재 혈당" 카드.
@@ -43,20 +45,20 @@ fun CurrentGlucoseCard(
             modifier
                 .fillMaxWidth()
                 .height(304.dp)
-                .shadow(4.dp, RoundedCornerShape(20.dp))
-                .clip(RoundedCornerShape(20.dp))
+                .shadow(4.dp, RoundedCornerShape(GlucoachCorner.card))
+                .clip(RoundedCornerShape(GlucoachCorner.card))
                 .background(GlucoachColors.Surface)
                 .border(
                     width = 1.dp,
                     color = GlucoachColors.Border,
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(GlucoachCorner.card),
                 ),
     ) {
         // 좌측 텍스트 블록
         Column(
             modifier =
                 Modifier
-                    .padding(start = 24.dp, top = 18.dp)
+                    .padding(start = GlucoachSpacing.xxl, top = 18.dp)
                     .width(140.dp),
             verticalArrangement = Arrangement.spacedBy(13.dp),
         ) {
@@ -79,7 +81,7 @@ fun CurrentGlucoseCard(
                     color = GlucoachColors.TextSecondary,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 8.dp),
+                    modifier = Modifier.padding(bottom = GlucoachSpacing.sm),
                 )
             }
             Text(
@@ -95,7 +97,7 @@ fun CurrentGlucoseCard(
             modifier =
                 Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 12.dp, bottom = 12.dp)
+                    .padding(end = GlucoachSpacing.md, bottom = GlucoachSpacing.md)
                     .size(width = 180.dp, height = 240.dp),
             contentAlignment = Alignment.BottomEnd,
         ) {
@@ -130,10 +132,10 @@ fun SummaryStatCard(
     Column(
         modifier =
             modifier
-                .shadow(3.dp, RoundedCornerShape(20.dp))
-                .clip(RoundedCornerShape(20.dp))
+                .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
+                .clip(RoundedCornerShape(GlucoachCorner.card))
                 .background(GlucoachColors.Surface)
-                .padding(horizontal = 19.dp, vertical = 16.dp),
+                .padding(horizontal = 19.dp, vertical = GlucoachSpacing.lg),
     ) {
         Text(
             text = title,

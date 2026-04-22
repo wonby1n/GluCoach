@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.s309.ui.theme.GlucoachColors
+import com.ssafy.s309.ui.theme.GlucoachSpacing
 
 /**
  * 하단 탭 엔트리. 아이콘은 추후 asset 으로 교체되므로 현재는 nullable 로 둔다.
@@ -58,7 +59,7 @@ fun BottomNavBar(
                 .height(BOTTOM_BAR_HEIGHT)
                 .background(GlucoachColors.Surface)
                 .border(width = 1.dp, color = GlucoachColors.Border)
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = GlucoachSpacing.lg),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {

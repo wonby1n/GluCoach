@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.s309.data.model.NotificationItem
 import com.ssafy.s309.ui.theme.GlucoachColors
+import com.ssafy.s309.ui.theme.GlucoachSpacing
 
 /**
  * "메인/알림" 화면. 메인 화면 위에 오른쪽에서 슬라이드 인되는 패널로 사용된다.
@@ -49,15 +50,15 @@ fun NotificationPanel(
             modifier
                 .fillMaxHeight()
                 .background(GlucoachColors.Background)
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = GlucoachSpacing.xxl),
     ) {
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
         NotificationPanelTopBar(onBack = onBack)
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
         NotificationPanelTitleRow(onClearAll = onClearAll)
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
         LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(GlucoachSpacing.md),
             modifier = Modifier.fillMaxSize(),
         ) {
             items(
