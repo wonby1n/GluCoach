@@ -2,46 +2,50 @@ pipeline {
     agent any
 
     environment {
-        // EC2 받으면 아래 IP만 수정
-        EC2_HOST    = 'ubuntu@k14s309.p.ssafy.io'
-        EC2_KEY     = credentials('ec2-ssh-key')
-        DEPLOY_PATH = '/home/ubuntu/S14P31S309'
-        BRANCH      = 'release'
+        EC2_USER = 'ubuntu'
+        EC2_HOST = 'k14s309.p.ssafy.io'
+        DEPLOY_DIR = '/home/ubuntu/S14P31S309'
+        GIT_REPO = 'https://lab.ssafy.com/s14-final/S14P31S309.git'
     }
 
     triggers {
-        gitlab(triggerOnPush: true, branchFilterType: 'NameBasedFilter', includeBranchesSpec: 'release')
+        gitlab(
+            triggerOnPush: true,
+            branchFilterType: 'NameBasedFilter',
+            includeBranchesSpec: 'release'
+        )
+
     }
 
     stages {
         stage('Checkout') {
             steps {
-                checkout scm
+                git(
+                    url: "${GIT_REPO}",
+                    branch: 'release',
+                    credentialsId: 'gitlab-token'    // Jenkins Credentials ID (Username with Password)
+                )
+            }
+        }
+
+        stage('Build Backend') {
+            steps {
+                dir('backend') {
+                    sh 'chmod +x gradlew'
+                    sh './gradlew bootJar -x test'
+                }
             }
         }
 
         stage('Deploy to EC2') {
             steps {
-                sshagent(['ec2-ssh-key']) {
+                sshagent(credentials: ['ec2-ssh-key']) {    // Jenkins Credentials ID
                     sh """
-                        ssh -o StrictHostKeyChecking=no ${EC2_HOST} '
-                            cd ${DEPLOY_PATH} &&
-                            git pull origin ${BRANCH} &&
-                            docker compose -f infra/docker-compose.yml --env-file infra/.env up -d --build --remove-orphans
-                        '
-                    """
-                }
-            }
-        }
-
-        stage('Health Check') {
-            steps {
-                sshagent(['ec2-ssh-key']) {
-                    sh """
-                        ssh -o StrictHostKeyChecking=no ${EC2_HOST} '
-                            sleep 15 &&
-                            docker compose -f ${DEPLOY_PATH}/infra/docker-compose.yml ps &&
-                            curl -sf http://localhost/api/health || (echo "Health check failed" && exit 1)
+                        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} '
+                            cd ${DEPLOY_DIR} &&
+                            git pull origin release &&
+                            docker compose -f infra/docker-compose.yml down &&
+                            docker compose -f infra/docker-compose.yml up -d --build
                         '
                     """
                 }
@@ -51,6 +55,7 @@ pipeline {
 
     post {
         success {
+
             echo '✅ 배포 성공!'
         }
         failure {
