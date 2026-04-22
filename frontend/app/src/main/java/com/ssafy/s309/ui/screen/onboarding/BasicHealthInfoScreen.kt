@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -66,17 +67,22 @@ fun BasicHealthInfoScreen(
             Modifier
                 .fillMaxSize()
                 .background(Background)
+                .statusBarsPadding()
                 .padding(horizontal = 24.dp, vertical = 16.dp),
     ) {
-        OnboardingBackButton(onClick = onBackClick)
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Image(
-            painter = painterResource(id = R.drawable.ic_glucoach_logo),
-            contentDescription = "Glucoach Logo",
-            modifier = Modifier.width(160.dp),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OnboardingBackButton(onClick = onBackClick)
+            Spacer(modifier = Modifier.weight(1f))
+            Image(
+                painter = painterResource(id = R.drawable.ic_glucoach_logo),
+                contentDescription = "Glucoach Logo",
+                modifier = Modifier.width(160.dp),
+            )
+            Spacer(modifier = Modifier.weight(1f))
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
 
