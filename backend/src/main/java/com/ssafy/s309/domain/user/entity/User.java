@@ -26,8 +26,10 @@ public class User extends BaseEntity {
   @Column(nullable = false, unique = true)
   private String email;
 
+  private String password;
+
   @Column(nullable = false, length = 32)
-  private String provider = "email"; // 로그인 방식 (email/kakao/google)
+  private String provider = "email";
 
   private Float height; // 키 (cm)
 
@@ -64,8 +66,9 @@ public class User extends BaseEntity {
   private List<Guardian> guardians = new ArrayList<>();
 
   @Builder
-  private User(String email, String provider, Float height, Float weight) {
+  private User(String email, String password, String provider, Float height, Float weight) {
     this.email = email;
+    this.password = password;
     if (provider != null) this.provider = provider;
     this.height = height;
     this.weight = weight;
