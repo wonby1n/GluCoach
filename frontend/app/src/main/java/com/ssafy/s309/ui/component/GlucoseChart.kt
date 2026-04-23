@@ -4,11 +4,13 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,6 +45,7 @@ import kotlin.math.min
  * @param meals 식사 이벤트 (밥그릇 핀으로 표시)
  * @param hoursLabel 제목 우측 라벨 (예: "최근 6시간")
  * @param mealPinIcon 밥그릇 아이콘 asset — null 이면 원형 자리 표시자로 렌더
+ * @param timeLabels X축 시간 라벨 (예: ["08:00","10:00","12:00","14:00"]). 빈 리스트면 렌더 생략.
  */
 @Composable
 fun GlucoseChartCard(
@@ -52,6 +55,7 @@ fun GlucoseChartCard(
     modifier: Modifier = Modifier,
     hoursLabel: String = "최근 6시간",
     mealPinIcon: (@Composable () -> Unit)? = null,
+    timeLabels: List<String> = emptyList(),
 ) {
     Column(
         modifier =
@@ -89,6 +93,10 @@ fun GlucoseChartCard(
             meals = meals,
             mealPinIcon = mealPinIcon,
         )
+
+        if (timeLabels.isNotEmpty()) {
+            GlucoseChartTimeAxis(labels = timeLabels)
+        }
     }
 }
 
@@ -107,39 +115,56 @@ private fun GlucoseChartBody(
     val maxTime = readings.lastOrNull()?.timestampMillis ?: 1L
     val timeSpan = (maxTime - minTime).coerceAtLeast(1L)
 
-    Box(
+    BoxWithConstraints(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .height(CHART_BODY_HEIGHT),
     ) {
-        // Y축 라벨 (상단/하단)
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = "${range.maxMgDl}",
-                color = GlucoachColors.TextPrimary,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(start = 4.dp),
-            )
-            Text(
-                text = "${range.minMgDl}",
-                color = GlucoachColors.TextPrimary,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
-            )
-        }
+        // Canvas 와 동일한 수직 패딩을 사용해 Y라벨을 회색 박스 상/하단에 정렬한다.
+        val canvasInnerHeight = maxHeight - CHART_TOP_PADDING - CHART_BOTTOM_PADDING
+        val yRange = (yMax - yMin).toFloat().coerceAtLeast(1f)
+        val topLabelOffset =
+            CHART_TOP_PADDING +
+                canvasInnerHeight * ((yMax - range.maxMgDl).toFloat() / yRange) -
+                Y_LABEL_HALF_HEIGHT
+        val bottomLabelOffset =
+            CHART_TOP_PADDING +
+                canvasInnerHeight * ((yMax - range.minMgDl).toFloat() / yRange) -
+                Y_LABEL_HALF_HEIGHT
+
+        Text(
+            text = "${range.maxMgDl}",
+            color = GlucoachColors.TextPrimary,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            modifier =
+                Modifier
+                    .offset(y = topLabelOffset)
+                    .padding(start = 4.dp),
+        )
+        Text(
+            text = "${range.minMgDl}",
+            color = GlucoachColors.TextPrimary,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            modifier =
+                Modifier
+                    .offset(y = bottomLabelOffset)
+                    .padding(start = 4.dp),
+        )
 
         Canvas(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .height(CHART_BODY_HEIGHT)
-                    .padding(start = 28.dp, end = 8.dp, top = 4.dp, bottom = 8.dp),
+                    .padding(
+                        start = CHART_X_START_PADDING,
+                        end = CHART_X_END_PADDING,
+                        top = CHART_TOP_PADDING,
+                        bottom = CHART_BOTTOM_PADDING,
+                    ),
         ) {
             val chartWidth = size.width
             val chartHeight = size.height
@@ -208,22 +233,18 @@ private fun GlucoseChartBody(
             }
         }
 
-        // 5) 식사 핀 (밥그릇 아이콘) - Canvas 위에 Composable 로 겹쳐둔다.
-        //    실제 asset 이 주입되면 mealPinIcon 으로 렌더.
+        // 5) 식사 핀 — 그래프 하단(시간 축 바로 위)에 배치.
+        //    matchParentSize 로 차트 본문 전체를 덮은 뒤 verticalBias=1f 로 하단 정렬,
+        //    Canvas 와 동일한 수평 패딩을 적용해 x 좌표가 그래프 x축과 일치한다.
         meals.forEach { meal ->
-            val ratio = (meal.timestampMillis - minTime).toFloat() / timeSpan.toFloat()
-            val clamped = ratio.coerceIn(0f, 1f)
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.BottomStart,
-            ) {
-                // 좌측 Y라벨 padding(28dp) + 오른쪽 padding(8dp)을 고려한 수평 비율 계산은
-                // 복잡도를 낮추기 위해 근사치로 처리. 정확 매칭은 BoxWithConstraints 로 확장 가능.
-                MealPin(
-                    pinIcon = mealPinIcon,
-                    horizontalBias = clamped,
-                )
-            }
+            val ratio =
+                ((meal.timestampMillis - minTime).toFloat() / timeSpan.toFloat())
+                    .coerceIn(0f, 1f)
+            MealPin(
+                pinIcon = mealPinIcon,
+                horizontalBias = ratio,
+                modifier = Modifier.matchParentSize(),
+            )
         }
     }
 }
@@ -232,17 +253,19 @@ private fun GlucoseChartBody(
 private fun MealPin(
     pinIcon: (@Composable () -> Unit)?,
     horizontalBias: Float,
+    modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = Modifier.fillMaxWidth(),
+        modifier =
+            modifier.padding(
+                start = CHART_X_START_PADDING,
+                end = CHART_X_END_PADDING,
+            ),
     ) {
         Box(
             modifier =
                 Modifier
-                    .align(
-                        alignmentFor(horizontalBias),
-                    )
-                    .padding(bottom = GlucoachSpacing.xs)
+                    .align(alignmentFor(horizontalBias))
                     .size(MEAL_PIN_SIZE),
             contentAlignment = Alignment.Center,
         ) {
@@ -282,7 +305,11 @@ fun GlucoseChartTimeAxis(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(start = 28.dp, end = 8.dp, top = 4.dp),
+                .padding(
+                    start = CHART_X_START_PADDING,
+                    end = CHART_X_END_PADDING,
+                    top = 4.dp,
+                ),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         labels.forEach { label ->
@@ -297,4 +324,11 @@ fun GlucoseChartTimeAxis(
 }
 
 private val CHART_BODY_HEIGHT = 110.dp
+private val CHART_TOP_PADDING = 4.dp
+private val CHART_BOTTOM_PADDING = 8.dp
+private val CHART_X_START_PADDING = 28.dp
+private val CHART_X_END_PADDING = 8.dp
+
+// 11sp Bold 텍스트의 시각적 수직 중심 보정값 (텍스트 top 기준 → 라인 정렬)
+private val Y_LABEL_HALF_HEIGHT = 7.dp
 private val MEAL_PIN_SIZE = 28.dp
