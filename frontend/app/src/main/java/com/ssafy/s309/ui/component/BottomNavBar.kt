@@ -61,7 +61,7 @@ fun BottomNavBar(
                 .border(width = 1.dp, color = GlucoachColors.Border)
                 .padding(horizontal = GlucoachSpacing.lg),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
         items.forEach { item ->
             BottomNavEntry(
@@ -118,12 +118,11 @@ private fun BottomNavEntry(
                         if (isSelected) {
                             GlucoachColors.PrimaryDark
                         } else {
-                            GlucoachColors.TextSecondary
+                            GlucoachColors.Primary
                         },
                     modifier = Modifier.size(ICON_SIZE),
                 )
             }
-            // 아이콘이 아직 없을 때는 빈 자리만 차지 (추후 drawable 삽입 시 자동 표시)
         }
     }
 }
