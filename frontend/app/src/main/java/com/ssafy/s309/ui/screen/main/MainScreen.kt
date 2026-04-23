@@ -1,6 +1,7 @@
 package com.ssafy.s309.ui.screen.main
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -106,42 +107,54 @@ fun MainScreenContent(
     ) {
         // === 메인 컨텐츠 ===
         Column(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 22.dp),
-            ) {
-                Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
-                TodayConditionHeader(
-                    onBellClick = onBellClick,
-                    bellIcon = bellIcon,
-                )
-                Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+            Crossfade(
+                targetState = selectedTab,
+                animationSpec = tween(300),
+                modifier = Modifier.weight(1f),
+                label = "tab-crossfade",
+            ) { tab ->
+                when (tab) {
+                    "profile" -> MyPageContent()
 
-                CurrentGlucoseCard(
-                    currentMgDl = state.currentGlucoseMgDl ?: 0,
-                    diffFromPrevious = state.diffFromPrevious,
-                    mascotSlot = mascotSlot,
-                )
-                Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+                    else ->
+                        Column(
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(horizontal = 22.dp),
+                        ) {
+                            Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+                            TodayConditionHeader(
+                                onBellClick = onBellClick,
+                                bellIcon = bellIcon,
+                            )
+                            Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
 
-                GlucoseChartCard(
-                    readings = state.glucoseSeries,
-                    range = state.glucoseRange,
-                    meals = state.meals,
-                    hoursLabel = "최근 6시간",
-                    mealPinIcon = mealPinIcon,
-                    timeLabels = listOf("08:00", "10:00", "12:00", "14:00"),
-                )
-                Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+                            CurrentGlucoseCard(
+                                currentMgDl = state.currentGlucoseMgDl ?: 0,
+                                diffFromPrevious = state.diffFromPrevious,
+                                mascotSlot = mascotSlot,
+                            )
+                            Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
-                SummaryRow(
-                    caloriesKcal = state.summary.caloriesBurnedKcal,
-                    sleepMinutes = state.summary.sleepMinutes,
-                )
-                Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+                            GlucoseChartCard(
+                                readings = state.glucoseSeries,
+                                range = state.glucoseRange,
+                                meals = state.meals,
+                                hoursLabel = "최근 6시간",
+                                mealPinIcon = mealPinIcon,
+                                timeLabels = listOf("08:00", "10:00", "12:00", "14:00"),
+                            )
+                            Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+                            SummaryRow(
+                                caloriesKcal = state.summary.caloriesBurnedKcal,
+                                sleepMinutes = state.summary.sleepMinutes,
+                            )
+                            Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+                        }
+                }
             }
 
             BottomNavBar(
