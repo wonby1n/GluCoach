@@ -6,15 +6,17 @@ pipeline {
         EC2_HOST = 'k14s309.p.ssafy.io'
         DEPLOY_DIR = '/home/ubuntu/S14P31S309'
         GIT_REPO = 'https://lab.ssafy.com/s14-final/S14P31S309.git'
+        JENKINS_URL_CUSTOM = 'http://13.125.178.132:9090'
     }
 
     triggers {
         gitlab(
             triggerOnPush: true,
+            triggerOnMergeRequest: true,
+            triggerOnAcceptedMergeRequest: true,
             branchFilterType: 'NameBasedFilter',
             includeBranchesSpec: 'release'
         )
-
     }
 
     stages {
@@ -43,6 +45,8 @@ pipeline {
                     sh """
                         ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} '
                             cd ${DEPLOY_DIR} &&
+                            git reset --hard HEAD &&
+                            git clean -fd &&
                             git pull origin release &&
                             docker compose -f infra/docker-compose.yml down &&
                             docker compose -f infra/docker-compose.yml up -d --build
@@ -61,13 +65,13 @@ pipeline {
                 -d '{
                     "attachments": [{
                         "color": "#00c851",
-                        "title": ":white_check_mark: GluCoach 배포 성공!",
+                        "title": ":white_check_mark: :hawon_note: GluCoach 배포 성공!",
                         "text": "release 브랜치 배포가 완료되었습니다.",
                         "fields": [
                             {"short": true, "title": "브랜치", "value": "release"},
                             {"short": true, "title": "빌드 번호", "value": "#${env.BUILD_NUMBER}"}
                         ],
-                        "actions": [{"name": "빌드 로그", "integration": {"url": "${env.BUILD_URL}"}}]
+                        "actions": [{"name": "빌드 로그", "integration": {"url": "${JENKINS_URL_CUSTOM}/job/glucoach/${env.BUILD_NUMBER}/console"}}]
                     }]
                 }'
             """
@@ -79,12 +83,13 @@ pipeline {
                 -d '{
                     "attachments": [{
                         "color": "#ff4444",
-                        "title": ":x: GluCoach 배포 실패!",
+                        "title": ":x: :hawon_note: GluCoach 배포 실패!",
                         "text": "release 브랜치 빌드가 실패했습니다. 로그를 확인해주세요.",
                         "fields": [
                             {"short": true, "title": "브랜치", "value": "release"},
                             {"short": true, "title": "빌드 번호", "value": "#${env.BUILD_NUMBER}"}
-                        ]
+                        ],
+                        "actions": [{"name": "빌드 로그", "integration": {"url": "${JENKINS_URL_CUSTOM}/job/glucoach/${env.BUILD_NUMBER}/console"}}]
                     }]
                 }'
             """
