@@ -70,6 +70,10 @@ public class JwtProvider {
     return TOKEN_TYPE_ACCESS.equals(parseClaims(token).get(CLAIM_TOKEN_TYPE, String.class));
   }
 
+  public UUID getUserId(String token) {
+    return UUID.fromString(parseClaims(token).getSubject());
+  }
+
   // ── 내부 헬퍼 ─────────────────────────────────────────────
 
   private String buildToken(UUID userId, String email, String tokenType, long expirationMs) {
