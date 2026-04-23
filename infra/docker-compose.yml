@@ -2,31 +2,32 @@ version: '3.8'
 
 services:
   n8n:
-    image: docker.n8n.io/n8n/n8n:latest
-    container_name: s309-n8n
-    restart: unless-stopped
-    ports:                                                                                                                              ports:
-      - "5678:5678"
-    volumes:
-      - n8n-data:/home/node/.n8n
-    environment:
-      - TZ=Asia/Seoul                                                                                                                        - N8N_HOST=13.125.178.132
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=http
-      - WEBHOOK_URL=http://13.125.178.132:5678
-      - N8N_EDITOR_BASE_URL=http://13.125.178.132:5678
-# PostgreSQL 연동 (코드 리뷰 자동화의 안정적 처리를 위해 권장)
-      - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
-      - DB_POSTGRESDB_HOST=postgres
-      - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_USER=${POSTGRES_USER}
-      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - internal
+      image: docker.n8n.io/n8n/n8n:latest
+      container_name: s309-n8n
+      restart: unless-stopped
+      ports:
+        - "5678:5678"
+      volumes:
+        - n8n-data:/home/node/.n8n
+      environment:
+        - TZ=Asia/Seoul
+        - N8N_HOST=13.125.178.132
+        - N8N_PORT=5678
+        - N8N_PROTOCOL=http
+        - WEBHOOK_URL=http://13.125.178.132:5678
+        - N8N_EDITOR_BASE_URL=http://13.125.178.132:5678
+        # PostgreSQL 연동
+        - DB_TYPE=postgresdb
+        - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+        - DB_POSTGRESDB_HOST=postgres
+        - DB_POSTGRESDB_PORT=5432
+        - DB_POSTGRESDB_USER=${POSTGRES_USER}
+        - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      depends_on:
+        postgres:
+          condition: service_healthy
+      networks:
+        - internal
   postgres:
     image: postgres:17-alpine
     container_name: s309-postgres
