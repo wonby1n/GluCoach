@@ -14,7 +14,8 @@ services:
       - N8N_PROTOCOL=https
       - WEBHOOK_URL=https://k14s309.p.ssafy.io/n8n/
       - N8N_EDITOR_BASE_URL=https://k14s309.p.ssafy.io/n8n/
-      - N8N_PATH=/n8n/
+      # - N8N_PATH=/n8n/
+      - N8N_SECURE_COOKIE=false
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
       - DB_POSTGRESDB_HOST=postgres
