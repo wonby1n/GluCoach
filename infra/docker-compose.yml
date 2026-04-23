@@ -1,4 +1,31 @@
 services:
+  n8n:
+    image: n8nio/n8n:latest  # 표준 Docker Hub 이미지로 변경 (확실함)
+    container_name: s309-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n-data:/home/node/.n8n
+    environment:
+      - TZ=Asia/Seoul
+      - N8N_HOST=k14s309.p.ssafy.io
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - WEBHOOK_URL=https://k14s309.p.ssafy.io/n8n/
+      - N8N_EDITOR_BASE_URL=https://k14s309.p.ssafy.io/n8n/
+      - N8N_PATH=/n8n/
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
   postgres:
     image: postgres:17-alpine
     container_name: s309-postgres
@@ -95,10 +122,10 @@ services:
       - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - /home/ubuntu/ssl:/etc/nginx/ssl:ro
       - ./nginx/html:/usr/share/nginx/html:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO /dev/null --no-check-certificate https://localhost/ || exit 1"]
+      test: ["CMD-SHELL", "wget -qO /dev/null --no-check-certificate https://127.0.0.1/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -113,7 +140,7 @@ services:
 volumes:
   postgres-data:
   redis-data:
-
+  n8n-data:
 networks:
   internal:
     driver: bridge
