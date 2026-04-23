@@ -61,7 +61,7 @@ fun BottomNavBar(
                 .border(width = 1.dp, color = GlucoachColors.Border)
                 .padding(horizontal = GlucoachSpacing.lg),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
         items.forEach { item ->
             BottomNavEntry(
@@ -103,10 +103,11 @@ private fun BottomNavEntry(
             )
         }
     } else {
+        // 클릭 영역은 접근성 최소치(48dp) 를 확보하고, 내부 아이콘만 24dp 로 렌더.
         Box(
             modifier =
                 Modifier
-                    .size(ICON_SIZE)
+                    .size(TOUCH_TARGET_SIZE)
                     .clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
@@ -118,16 +119,18 @@ private fun BottomNavEntry(
                         if (isSelected) {
                             GlucoachColors.PrimaryDark
                         } else {
-                            GlucoachColors.TextSecondary
+                            GlucoachColors.Primary
                         },
                     modifier = Modifier.size(ICON_SIZE),
                 )
             }
-            // 아이콘이 아직 없을 때는 빈 자리만 차지 (추후 drawable 삽입 시 자동 표시)
         }
     }
 }
 
 private val BOTTOM_BAR_HEIGHT = 60.dp
 private val CENTER_BUTTON_SIZE = 48.dp
+
+// Material 접근성 최소 터치 타겟 (48dp). 시각적 아이콘은 ICON_SIZE 로 렌더.
+private val TOUCH_TARGET_SIZE = 48.dp
 private val ICON_SIZE = 24.dp

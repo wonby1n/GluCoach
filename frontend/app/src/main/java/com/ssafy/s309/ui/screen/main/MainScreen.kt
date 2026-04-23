@@ -21,6 +21,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,7 +45,6 @@ import com.ssafy.s309.ui.component.BottomNavBar
 import com.ssafy.s309.ui.component.BottomNavItem
 import com.ssafy.s309.ui.component.CurrentGlucoseCard
 import com.ssafy.s309.ui.component.GlucoseChartCard
-import com.ssafy.s309.ui.component.GlucoseChartTimeAxis
 import com.ssafy.s309.ui.component.SummaryStatCard
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
@@ -128,9 +133,7 @@ fun MainScreenContent(
                     meals = state.meals,
                     hoursLabel = "최근 6시간",
                     mealPinIcon = mealPinIcon,
-                )
-                GlucoseChartTimeAxis(
-                    labels = listOf("08:00", "10:00", "12:00", "14:00"),
+                    timeLabels = listOf("08:00", "10:00", "12:00", "14:00"),
                 )
                 Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
@@ -240,13 +243,12 @@ private fun SummaryRow(
 
 /**
  * 기본 하단 탭 구성. 추후 navigation-compose 연결 시 id 를 route 와 매핑한다.
- * 아이콘은 asset 추가 전까지 null 로 비워둔다.
  */
 private fun defaultBottomNavItems(): List<BottomNavItem> =
     listOf(
-        BottomNavItem(id = "home", label = "홈"),
-        BottomNavItem(id = "report", label = "리포트"),
-        BottomNavItem(id = "add", label = "추가", isCenter = true),
-        BottomNavItem(id = "edit", label = "기록"),
-        BottomNavItem(id = "profile", label = "마이페이지"),
+        BottomNavItem(id = "home", label = "홈", icon = Icons.Outlined.Home),
+        BottomNavItem(id = "report", label = "리포트", icon = Icons.Outlined.Description),
+        BottomNavItem(id = "add", label = "추가", icon = Icons.Outlined.Add, isCenter = true),
+        BottomNavItem(id = "edit", label = "기록", icon = Icons.Outlined.Tune),
+        BottomNavItem(id = "profile", label = "마이페이지", icon = Icons.Outlined.Person),
     )
