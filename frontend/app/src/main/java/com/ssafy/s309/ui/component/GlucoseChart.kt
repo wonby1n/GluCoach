@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,7 +26,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.s309.data.model.GlucoseRange
@@ -115,6 +119,19 @@ private fun GlucoseChartBody(
     val maxTime = readings.lastOrNull()?.timestampMillis ?: 1L
     val timeSpan = (maxTime - minTime).coerceAtLeast(1L)
 
+    // Y 라벨 텍스트 높이를 실측 후 절반을 수직 정렬 보정값으로 사용.
+    // 상수 대신 실측을 쓰는 이유: 시스템 폰트 스케일(1.3x/1.5x)이 적용돼도 회색 박스
+    // 경계선과 라벨이 어긋나지 않도록 보장하기 위함.
+    val density = LocalDensity.current
+    val textMeasurer = rememberTextMeasurer()
+    val yLabelStyle = remember { TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+    val yLabelHalfHeight =
+        remember(textMeasurer, yLabelStyle, density) {
+            with(density) {
+                (textMeasurer.measure(text = "0", style = yLabelStyle).size.height / 2).toDp()
+            }
+        }
+
     BoxWithConstraints(
         modifier =
             Modifier
@@ -127,11 +144,11 @@ private fun GlucoseChartBody(
         val topLabelOffset =
             CHART_TOP_PADDING +
                 canvasInnerHeight * ((yMax - range.maxMgDl).toFloat() / yRange) -
-                Y_LABEL_HALF_HEIGHT
+                yLabelHalfHeight
         val bottomLabelOffset =
             CHART_TOP_PADDING +
                 canvasInnerHeight * ((yMax - range.minMgDl).toFloat() / yRange) -
-                Y_LABEL_HALF_HEIGHT
+                yLabelHalfHeight
 
         Text(
             text = "${range.maxMgDl}",
@@ -328,7 +345,4 @@ private val CHART_TOP_PADDING = 4.dp
 private val CHART_BOTTOM_PADDING = 8.dp
 private val CHART_X_START_PADDING = 28.dp
 private val CHART_X_END_PADDING = 8.dp
-
-// 11sp Bold 텍스트의 시각적 수직 중심 보정값 (텍스트 top 기준 → 라인 정렬)
-private val Y_LABEL_HALF_HEIGHT = 7.dp
 private val MEAL_PIN_SIZE = 28.dp
