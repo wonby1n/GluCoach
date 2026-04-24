@@ -6,6 +6,10 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     debug: bool = False
 
+    model_dir: str = "outputs/food_v1"
+    model_device: str = "cpu"
+    model_top_k: int = 5
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
