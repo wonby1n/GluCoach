@@ -32,7 +32,10 @@ public class SecurityConfig {
             auth ->
                 auth.requestMatchers(
                         "/api/health",
-                        "/api/auth/**",
+                        "/api/auth/signup",
+                        "/api/auth/login",
+                        "/api/auth/reissue",
+                        "/api/auth/logout",
                         "/swagger-ui/**",
                         "/swagger-ui.html",
                         "/swagger-resources/**",

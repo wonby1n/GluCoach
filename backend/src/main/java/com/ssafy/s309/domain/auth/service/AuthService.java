@@ -44,7 +44,7 @@ public class AuthService {
   public TokenResponse login(LoginRequest request) {
     User user =
         userRepository
-            .findByEmail(request.email())
+            .findByEmailAndDeletedAtIsNull(request.email())
             .orElseThrow(() -> new IllegalArgumentException("이메일 또는 비밀번호가 올바르지 않습니다"));
 
     if (user.getPassword() == null
@@ -82,6 +82,27 @@ public class AuthService {
       UUID userId = jwtProvider.getUserId(refreshToken);
       refreshTokenService.delete(userId);
     }
+  }
+
+  @Transactional
+  public void withdraw(UUID userId, String password) {
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다"));
+
+    if (user.isDeleted()) {
+      throw new IllegalArgumentException("이미 탈퇴한 사용자입니다");
+    }
+
+    if (user.getPassword() != null) {
+      if (password == null || !passwordEncoder.matches(password, user.getPassword())) {
+        throw new IllegalArgumentException("비밀번호가 올바르지 않습니다");
+      }
+    }
+
+    user.withdraw();
+    refreshTokenService.delete(userId);
   }
 
   private TokenResponse issueTokens(UUID userId, String email) {
