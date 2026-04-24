@@ -177,10 +177,14 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                         contentScale = ContentScale.Fit,
                     )
                 },
+                onGraphClick = { navController.navigate(Screen.Graph.route) },
             )
         }
         composable(Screen.Graph.route) {
-            GraphScreen()
+            GraphScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateTo = { navController.popBackStack() },
+            )
         }
     }
 }
