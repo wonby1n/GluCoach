@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -336,7 +337,6 @@ private fun WeeklyGlucoseChart() {
                 val minVal = 50f
                 val maxVal = 200f
                 val range = maxVal - minVal
-                val paddingLeft = 0f
 
                 fun yFor(v: Float) = h - ((v - minVal) / range) * h
 
@@ -345,14 +345,14 @@ private fun WeeklyGlucoseChart() {
 
                 drawLine(
                     color = gridColor,
-                    start = Offset(paddingLeft, yFor(180f)),
+                    start = Offset(0f, yFor(180f)),
                     end = Offset(w, yFor(180f)),
                     strokeWidth = 1f,
                     pathEffect = dashEffect,
                 )
                 drawLine(
                     color = gridColor,
-                    start = Offset(paddingLeft, yFor(60f)),
+                    start = Offset(0f, yFor(60f)),
                     end = Offset(w, yFor(60f)),
                     strokeWidth = 1f,
                     pathEffect = dashEffect,
@@ -529,9 +529,9 @@ private fun FoodGradeCard(food: ReportFoodCard) {
     val gradeColor =
         when (food.grade) {
             "A" -> GlucoachColors.Primary
-            "B" -> Color(0xFFFFA726)
+            "B" -> GlucoachColors.GradeB
             "C" -> GlucoachColors.SpikeBadgeText
-            else -> Color(0xFFD32F2F)
+            else -> GlucoachColors.GradeD
         }
 
     Column(
@@ -638,7 +638,7 @@ private fun PatternRow(item: PatternItem) {
                     .background(item.iconBgColor.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center,
         ) {
-            androidx.compose.material3.Icon(
+            Icon(
                 imageVector = item.icon,
                 contentDescription = null,
                 tint = item.iconBgColor,
