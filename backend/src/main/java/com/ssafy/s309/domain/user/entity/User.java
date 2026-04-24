@@ -74,6 +74,19 @@ public class User extends BaseEntity {
     this.weight = weight;
   }
 
+  public boolean isDeleted() {
+    return this.deletedAt != null;
+  }
+
+  public void withdraw() {
+    this.deletedAt = LocalDateTime.now();
+    this.email = "deleted_" + this.userId + "@withdrawn.local";
+    this.password = null;
+    this.height = null;
+    this.weight = null;
+    this.guardians.clear();
+  }
+
   public void updateSettings(
       Float height,
       Float weight,
