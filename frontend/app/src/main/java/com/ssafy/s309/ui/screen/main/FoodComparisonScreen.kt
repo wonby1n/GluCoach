@@ -205,7 +205,6 @@ fun FoodComparisonContent(modifier: Modifier = Modifier) {
                 }
             }
 
-//            Spacer(modifier = Modifier.height(80.dp))
             Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
         }
 
@@ -320,8 +319,8 @@ private fun SpikeStatusBadge(
     isStable: Boolean,
     onInfoClick: () -> Unit,
 ) {
-    val badgeColor = if (isStable) Color(0xFFE0F2F1) else Color(0xFFFFE0B2)
-    val textColor = if (isStable) Color(0xFF00796B) else Color(0xFFE65100)
+    val badgeColor = if (isStable) GlucoachColors.StableBadgeBg else GlucoachColors.SpikeBadgeBg
+    val textColor = if (isStable) GlucoachColors.StableBadgeText else GlucoachColors.SpikeBadgeText
     val text = if (isStable) "안정적이에요" else "스파이크 높음"
 
     Row(
@@ -338,16 +337,17 @@ private fun SpikeStatusBadge(
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
         )
-        Spacer(modifier = Modifier.width(4.dp))
-        Icon(
-            imageVector = Icons.Outlined.Info,
-            contentDescription = "영양 정보",
-            tint = textColor,
-            modifier =
-                Modifier
-                    .size(16.dp)
-                    .clickable(onClick = onInfoClick),
-        )
+        IconButton(
+            onClick = onInfoClick,
+            modifier = Modifier.size(32.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Info,
+                contentDescription = "영양 정보",
+                tint = textColor,
+                modifier = Modifier.size(16.dp),
+            )
+        }
     }
 }
 
@@ -413,7 +413,7 @@ private fun GlucoseComparisonChart(
                 fontWeight = FontWeight.Bold,
             )
             Column(horizontalAlignment = Alignment.End) {
-                LegendDot(color = Color(0xFFBDBDBD), label = foodA.name)
+                LegendDot(color = GlucoachColors.ChartLineInactive, label = foodA.name)
                 Spacer(modifier = Modifier.height(4.dp))
                 LegendDot(color = GlucoachColors.Primary, label = foodB.name)
             }
@@ -501,7 +501,7 @@ private fun GlucoseComparisonChart(
                     )
                 }
 
-                drawCurve(foodA.glucoseCurve, Color(0xFFBDBDBD))
+                drawCurve(foodA.glucoseCurve, GlucoachColors.ChartLineInactive)
                 drawCurve(foodB.glucoseCurve, GlucoachColors.Primary)
             }
 
@@ -565,7 +565,7 @@ private fun TipCard() {
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(GlucoachCorner.card))
-                .background(Color(0xFFE8F5E9))
+                .background(GlucoachColors.TipBg)
                 .padding(GlucoachSpacing.lg),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -573,7 +573,7 @@ private fun TipCard() {
             modifier =
                 Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFF66BB6A))
+                    .background(GlucoachColors.TipAccent)
                     .padding(horizontal = GlucoachSpacing.sm, vertical = GlucoachSpacing.xs),
         ) {
             Text(
