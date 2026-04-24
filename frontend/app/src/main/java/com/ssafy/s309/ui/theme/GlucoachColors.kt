@@ -13,4 +13,16 @@ object GlucoachColors {
     val Surface = Color(0xFFFFFFFF)
     val RangeBox = Color(0xFFE0E0E0) // 혈당 범위 회색 박스
     val ChartGrid = Color(0xFFB0B0B0)
+    val ChartLineInactive = Color(0xFFBDBDBD)
+
+    val StableBadgeBg = Color(0xFFE0F2F1)
+    val StableBadgeText = Color(0xFF00796B)
+    val SpikeBadgeBg = Color(0xFFFFE0B2)
+    val SpikeBadgeText = Color(0xFFE65100)
+
+    val TipBg = Color(0xFFE8F5E9)
+    val TipAccent = Color(0xFF66BB6A)
+
+    val GradeB = Color(0xFFFFA726)
+    val GradeD = Color(0xFFD32F2F)
 }
