@@ -2,7 +2,7 @@ package com.ssafy.s309.ui.screen.main
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -46,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -106,18 +107,23 @@ fun FoodScanFlow(onClose: () -> Unit) {
     var selectedIndex by remember { mutableIntStateOf(-1) }
 
     when (step) {
-        ScanStep.CAMERA ->
+        ScanStep.CAMERA -> {
+            BackHandler { onClose() }
             CameraScreen(
                 onClose = onClose,
                 onPhotoTaken = { step = ScanStep.ANALYZING },
             )
+        }
 
-        ScanStep.ANALYZING ->
+        ScanStep.ANALYZING -> {
+            BackHandler(enabled = false) { }
             AnalyzingScreen(
                 onComplete = { step = ScanStep.RESULT },
             )
+        }
 
-        ScanStep.RESULT ->
+        ScanStep.RESULT -> {
+            BackHandler { step = ScanStep.CAMERA }
             AnalyzingResultScreen(
                 selectedIndex = selectedIndex,
                 onSelect = { selectedIndex = it },
@@ -125,8 +131,10 @@ fun FoodScanFlow(onClose: () -> Unit) {
                     if (selectedIndex >= 0) step = ScanStep.SIMULATION
                 },
             )
+        }
 
-        ScanStep.SIMULATION ->
+        ScanStep.SIMULATION -> {
+            BackHandler { step = ScanStep.RESULT }
             SimulationScreen(
                 food = candidates[selectedIndex],
                 onBack = { step = ScanStep.RESULT },
@@ -136,6 +144,7 @@ fun FoodScanFlow(onClose: () -> Unit) {
                 },
                 onRecordMeal = { },
             )
+        }
     }
 }
 
@@ -144,7 +153,7 @@ fun FoodScanFlow(onClose: () -> Unit) {
 @Composable
 private fun CameraScreen(
     onClose: () -> Unit,
-    onPhotoTaken: (Uri?) -> Unit,
+    onPhotoTaken: () -> Unit,
 ) {
     val context = LocalContext.current
     var hasCameraPermission by remember {
@@ -166,6 +175,7 @@ private fun CameraScreen(
     }
 
     val imageCapture = remember { ImageCapture.Builder().build() }
+    var isTaking by remember { mutableStateOf(false) }
 
     Column(
         modifier =
@@ -253,7 +263,10 @@ private fun CameraScreen(
                     .clip(CircleShape)
                     .border(3.dp, Color.White, CircleShape)
                     .clickable {
-                        takePhoto(imageCapture, context) { uri -> onPhotoTaken(uri) }
+                        if (!isTaking) {
+                            isTaking = true
+                            takePhoto(imageCapture, context) { onPhotoTaken() }
+                        }
                     },
             contentAlignment = Alignment.Center,
         ) {
@@ -272,7 +285,6 @@ private fun CameraScreen(
 
 @Composable
 private fun CameraPreviewView(imageCapture: ImageCapture) {
-    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
     AndroidView(
@@ -295,6 +307,7 @@ private fun CameraPreviewView(imageCapture: ImageCapture) {
                                 imageCapture,
                             )
                         } catch (_: Exception) {
+                            // 카메라를 지원하지 않는 에뮬레이터·기기에서 안전하게 무시
                         }
                     },
                     ContextCompat.getMainExecutor(ctx),
@@ -308,7 +321,7 @@ private fun CameraPreviewView(imageCapture: ImageCapture) {
 private fun takePhoto(
     imageCapture: ImageCapture,
     context: android.content.Context,
-    onResult: (Uri?) -> Unit,
+    onResult: () -> Unit,
 ) {
     val photoFile = File.createTempFile("food_", ".jpg", context.cacheDir)
     val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
@@ -318,11 +331,11 @@ private fun takePhoto(
         ContextCompat.getMainExecutor(context),
         object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                onResult(Uri.fromFile(photoFile))
+                onResult()
             }
 
             override fun onError(exc: ImageCaptureException) {
-                onResult(null)
+                onResult()
             }
         },
     )
@@ -334,7 +347,7 @@ private fun takePhoto(
 private fun AnalyzingScreen(onComplete: () -> Unit) {
     val steps =
         remember {
-            mutableListOf(
+            mutableStateListOf(
                 AnalysisStatus.PENDING,
                 AnalysisStatus.PENDING,
                 AnalysisStatus.PENDING,
