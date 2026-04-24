@@ -22,6 +22,12 @@ services:
       - DB_POSTGRESDB_PORT=5432
       - DB_POSTGRESDB_USER=${POSTGRES_USER}
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,8 +73,10 @@ services:
       AWS_S3_SECRET_KEY: ${AWS_S3_SECRET_KEY}
       AWS_S3_REGION: ${AWS_S3_REGION:-ap-northeast-2}
       AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     healthcheck:
-      test: ["CMD-SHELL", "pidof java || exit 1"]
+      test: ["CMD-SHELL", "nc -z -w1 localhost 8080 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -108,6 +116,12 @@ services:
       - "8000"
     environment:
       DEBUG: ${AI_DEBUG:-false}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     depends_on:
       redis:
         condition: service_healthy
@@ -134,7 +148,7 @@ services:
       backend:
         condition: service_healthy
       ai:
-        condition: service_started
+        condition: service_healthy
     networks:
       - internal
 
