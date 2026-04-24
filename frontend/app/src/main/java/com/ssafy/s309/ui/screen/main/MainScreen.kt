@@ -45,6 +45,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -124,7 +126,8 @@ fun MainScreenContent(
     userEmail: String = "",
 ) {
     var selectedTab by rememberSaveable { mutableStateOf("home") }
-    var showFoodScan by remember { mutableStateOf(false) }
+    var showCamera by remember { mutableStateOf(false) }
+    var scanSessionId by remember { mutableIntStateOf(0) }
     var showReportSheet by remember { mutableStateOf(false) }
     var showAddSheet by remember { mutableStateOf(false) }
 
@@ -151,6 +154,25 @@ fun MainScreenContent(
                                 onGuardianClick = onGuardianClick,
                                 userEmail = userEmail,
                             )
+                        "add" -> {
+                            if (!showCamera) {
+                                key(scanSessionId) {
+                                    FoodScanContent(
+                                        onBack = { selectedTab = "home" },
+                                        onRetakePhoto = {
+                                            scanSessionId++
+                                            showCamera = true
+                                        },
+                                    )
+                                }
+                            } else {
+                                Box(
+                                    Modifier
+                                        .fillMaxSize()
+                                        .background(GlucoachColors.Background),
+                                )
+                            }
+                        }
                         "edit" -> FoodComparisonContent()
                         "meallog" ->
                             MealLogContent(
@@ -281,7 +303,9 @@ fun MainScreenContent(
                         },
                         onFoodScan = {
                             showAddSheet = false
-                            showFoodScan = true
+                            scanSessionId++
+                            showCamera = true
+                            selectedTab = "add"
                         },
                         onClose = { showAddSheet = false },
                     )
@@ -311,8 +335,16 @@ fun MainScreenContent(
             )
         }
 
-        if (showFoodScan) {
-            FoodScanFlow(onClose = { showFoodScan = false })
+        if (showCamera) {
+            CameraScreen(
+                onClose = {
+                    showCamera = false
+                    selectedTab = "home"
+                },
+                onPhotoTaken = {
+                    showCamera = false
+                },
+            )
         }
 
         AnimatedVisibility(
