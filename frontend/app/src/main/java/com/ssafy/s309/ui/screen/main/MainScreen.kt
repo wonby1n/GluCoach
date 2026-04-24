@@ -70,6 +70,7 @@ fun MainScreen(
     mascotSlot: (@Composable () -> Unit)? = null,
     bellIcon: (@Composable () -> Unit)? = null,
     mealPinIcon: (@Composable () -> Unit)? = null,
+    onGraphClick: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -81,6 +82,7 @@ fun MainScreen(
         mascotSlot = mascotSlot,
         bellIcon = bellIcon,
         mealPinIcon = mealPinIcon,
+        onGraphClick = onGraphClick,
     )
 }
 
@@ -96,6 +98,7 @@ fun MainScreenContent(
     mascotSlot: (@Composable () -> Unit)? = null,
     bellIcon: (@Composable () -> Unit)? = null,
     mealPinIcon: (@Composable () -> Unit)? = null,
+    onGraphClick: () -> Unit = {},
 ) {
     var selectedTab by remember { mutableStateOf("home") }
 
@@ -146,6 +149,7 @@ fun MainScreenContent(
                                 hoursLabel = "최근 6시간",
                                 mealPinIcon = mealPinIcon,
                                 timeLabels = listOf("08:00", "10:00", "12:00", "14:00"),
+                                onClick = onGraphClick,
                             )
                             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
