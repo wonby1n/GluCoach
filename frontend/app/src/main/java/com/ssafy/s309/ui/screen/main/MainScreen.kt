@@ -101,6 +101,7 @@ fun MainScreenContent(
     onGraphClick: () -> Unit = {},
 ) {
     var selectedTab by remember { mutableStateOf("home") }
+    var showFoodScan by remember { mutableStateOf(false) }
 
     Box(
         modifier =
@@ -166,8 +167,19 @@ fun MainScreenContent(
             BottomNavBar(
                 items = defaultBottomNavItems(),
                 selectedId = selectedTab,
-                onItemClick = { selectedTab = it.id },
+                onItemClick = { item ->
+                    if (item.id == "add") {
+                        showFoodScan = true
+                    } else {
+                        selectedTab = item.id
+                    }
+                },
             )
+        }
+
+        // === 음식 촬영 플로우 (전체화면 오버레이) ===
+        if (showFoodScan) {
+            FoodScanFlow(onClose = { showFoodScan = false })
         }
 
         // === 알림 슬라이드 패널 (오른쪽 오버레이) ===

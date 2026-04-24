@@ -16,6 +16,7 @@ kotlinxSerializationConverter = "1.0.0"
 junit = "4.13.2"
 junitExt = "1.2.1"
 espresso = "3.6.1"
+camerax = "1.4.1"
 ksp = "2.3.2"
 
 [libraries]
@@ -57,6 +58,11 @@ coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp"
 # kotlinx.serialization
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 retrofit-kotlinx-serialization = { group = "com.jakewharton.retrofit", name = "retrofit2-kotlinx-serialization-converter", version.ref = "kotlinxSerializationConverter" }
+
+# CameraX
+androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
+androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
+androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
 
 # 테스트
 junit = { group = "junit", name = "junit", version.ref = "junit" }
