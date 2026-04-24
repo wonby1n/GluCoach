@@ -14,3 +14,9 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+jwt:
+  secret: testSecretKeyMustBeAtLeast32BytesLongForHS256Algorithm
+  access-expiration-ms: 3600000
+  refresh-expiration-ms: 2592000000
+  issuer: glucofit-backend-test

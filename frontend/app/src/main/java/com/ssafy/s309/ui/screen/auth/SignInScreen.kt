@@ -110,7 +110,9 @@ fun SignInScreen(
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                // SignUp 과 동일. KeyboardType.Password 는 일부 한국 IME 에서 숫자 키패드로
+                // 해석되어 알파벳/특수문자 입력이 막히므로 Text 를 사용한다.
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                 colors =
                     OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Primary,

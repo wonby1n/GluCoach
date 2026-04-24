@@ -39,6 +39,14 @@ dependencies {
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
 
+    // Redis
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
+
+    // JWT (JJWT 0.12.x)
+    implementation("io.jsonwebtoken:jjwt-api:0.12.6")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
+
     // AWS S3
     implementation(platform("software.amazon.awssdk:bom:2.29.0"))
     implementation("software.amazon.awssdk:s3")
@@ -46,10 +54,6 @@ dependencies {
     // Lombok
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
-
-    // AWS S3
-    implementation(platform("software.amazon.awssdk:bom:2.29.0"))
-    implementation("software.amazon.awssdk:s3")
 
     // 개발 도구
     developmentOnly("org.springframework.boot:spring-boot-devtools")

@@ -32,3 +32,10 @@ temp/
 # tldr
 .tldr
 .tldrignore
+
+
+# Claude CLI 핸드오프 임시 번들 (커밋 금지)
+_claude-task/
+
+# 기타 찌꺼기
+unzip
