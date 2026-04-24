@@ -22,4 +22,7 @@ object GlucoachColors {
 
     val TipBg = Color(0xFFE8F5E9)
     val TipAccent = Color(0xFF66BB6A)
+
+    val GradeB = Color(0xFFFFA726)
+    val GradeD = Color(0xFFD32F2F)
 }

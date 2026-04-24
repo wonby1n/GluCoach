@@ -119,6 +119,7 @@ fun MainScreenContent(
                 when (tab) {
                     "profile" -> MyPageContent()
                     "edit" -> FoodComparisonContent()
+                    "report" -> AIReportContent()
 
                     else ->
                         Column(
