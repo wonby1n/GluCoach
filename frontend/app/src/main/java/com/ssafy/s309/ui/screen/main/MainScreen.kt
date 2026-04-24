@@ -25,9 +25,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -115,6 +115,7 @@ fun MainScreenContent(
             ) { tab ->
                 when (tab) {
                     "profile" -> MyPageContent()
+                    "edit" -> FoodComparisonContent()
 
                     else ->
                         Column(
@@ -262,6 +263,6 @@ private fun defaultBottomNavItems(): List<BottomNavItem> =
         BottomNavItem(id = "home", label = "홈", icon = Icons.Outlined.Home),
         BottomNavItem(id = "report", label = "리포트", icon = Icons.Outlined.Description),
         BottomNavItem(id = "add", label = "추가", icon = Icons.Outlined.Add, isCenter = true),
-        BottomNavItem(id = "edit", label = "기록", icon = Icons.Outlined.Tune),
+        BottomNavItem(id = "edit", label = "기록", icon = Icons.Outlined.EditNote),
         BottomNavItem(id = "profile", label = "마이페이지", icon = Icons.Outlined.Person),
     )
