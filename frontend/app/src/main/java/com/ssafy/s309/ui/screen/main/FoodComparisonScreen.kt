@@ -20,10 +20,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Clear
@@ -35,6 +34,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -50,20 +51,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -72,6 +74,7 @@ import com.ssafy.s309.R
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
+import kotlinx.coroutines.delay
 
 // ── 데이터 ──────────────────────────────────────────────
 
@@ -119,7 +122,7 @@ private val allFoods =
         ),
         FoodItem(
             name = "연어샐러드",
-            imageResId = R.drawable.salmon_salad,
+            imageResId = R.drawable.jjajangmyeon,
             isStable = true,
             maxGlucose = 125,
             recoveryTimeText = "1시간",
@@ -132,7 +135,7 @@ private val allFoods =
         ),
         FoodItem(
             name = "연어(조리전)",
-            imageResId = R.drawable.salmon_salad,
+            imageResId = R.drawable.jjajangmyeon,
             isStable = true,
             maxGlucose = 110,
             recoveryTimeText = "50분",
@@ -145,7 +148,7 @@ private val allFoods =
         ),
         FoodItem(
             name = "연어회",
-            imageResId = R.drawable.salmon_salad,
+            imageResId = R.drawable.jjajangmyeon,
             isStable = true,
             maxGlucose = 105,
             recoveryTimeText = "45분",
@@ -158,7 +161,7 @@ private val allFoods =
         ),
         FoodItem(
             name = "연어구이",
-            imageResId = R.drawable.salmon_salad,
+            imageResId = R.drawable.jjajangmyeon,
             isStable = true,
             maxGlucose = 115,
             recoveryTimeText = "55분",
@@ -171,7 +174,7 @@ private val allFoods =
         ),
         FoodItem(
             name = "훈제연어",
-            imageResId = R.drawable.salmon_salad,
+            imageResId = R.drawable.jjajangmyeon,
             isStable = true,
             maxGlucose = 108,
             recoveryTimeText = "50분",
@@ -184,7 +187,7 @@ private val allFoods =
         ),
         FoodItem(
             name = "고등어구이",
-            imageResId = R.drawable.grilled_mackerel,
+            imageResId = R.drawable.jjambbong,
             isStable = true,
             maxGlucose = 118,
             recoveryTimeText = "55분",
@@ -212,6 +215,8 @@ fun FoodComparisonContent(modifier: Modifier = Modifier) {
                 foodA = null
                 foodB = null
             },
+            onFoodARemoved = { foodA = null },
+            onFoodBRemoved = { foodB = null },
             modifier = modifier,
         )
     } else {
@@ -221,6 +226,8 @@ fun FoodComparisonContent(modifier: Modifier = Modifier) {
             onFoodSelected = { food ->
                 if (foodA == null) foodA = food else foodB = food
             },
+            onFoodARemoved = { foodA = null },
+            onFoodBRemoved = { foodB = null },
             modifier = modifier,
         )
     }
@@ -233,11 +240,14 @@ private fun FoodSelectionContent(
     foodA: FoodItem?,
     foodB: FoodItem?,
     onFoodSelected: (FoodItem) -> Unit,
+    onFoodARemoved: () -> Unit,
+    onFoodBRemoved: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showSearchDialog by remember { mutableStateOf(false) }
     var showNutritionDialog by remember { mutableStateOf(false) }
     var nutritionFood by remember { mutableStateOf<FoodItem?>(null) }
+    val recentKeywords = remember { mutableStateListOf("연어(조리전)", "연어구이", "연어회", "훈제연어") }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -282,6 +292,7 @@ private fun FoodSelectionContent(
                             nutritionFood = foodA
                             showNutritionDialog = true
                         },
+                        onRemoveClick = onFoodARemoved,
                         modifier = Modifier.weight(1f),
                     )
                 } else {
@@ -298,6 +309,7 @@ private fun FoodSelectionContent(
                             nutritionFood = foodB
                             showNutritionDialog = true
                         },
+                        onRemoveClick = onFoodBRemoved,
                         modifier = Modifier.weight(1f),
                     )
                 } else {
@@ -340,6 +352,7 @@ private fun FoodSelectionContent(
 
         if (showSearchDialog) {
             FoodSearchDialog(
+                recentKeywords = recentKeywords,
                 onFoodSelected = { food ->
                     onFoodSelected(food)
                     showSearchDialog = false
@@ -386,6 +399,7 @@ private fun EmptyFoodSlot(
 private fun SelectedFoodSlot(
     food: FoodItem,
     onInfoClick: () -> Unit,
+    onRemoveClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -397,12 +411,27 @@ private fun SelectedFoodSlot(
                 .border(1.dp, GlucoachColors.Border, RoundedCornerShape(GlucoachCorner.card))
                 .padding(GlucoachSpacing.lg),
     ) {
-        Text(
-            text = food.name,
-            color = GlucoachColors.TextPrimary,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = food.name,
+                color = GlucoachColors.TextPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Icon(
+                imageVector = Icons.Filled.Close,
+                contentDescription = "음식 삭제",
+                tint = GlucoachColors.TextSecondary,
+                modifier =
+                    Modifier
+                        .size(18.dp)
+                        .clickable(onClick = onRemoveClick),
+            )
+        }
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
 
@@ -567,21 +596,22 @@ private fun EmptyChartPlaceholder() {
 
 @Composable
 private fun FoodSearchDialog(
+    recentKeywords: MutableList<String>,
     onFoodSelected: (FoodItem) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    var searchQuery by remember { mutableStateOf("") }
-    var isSearchFocused by remember { mutableStateOf(false) }
-    val recentKeywords = remember { mutableStateListOf("연어(조리전)", "연어구이", "연어회", "훈제연어") }
+    var searchQuery by remember { mutableStateOf(TextFieldValue("")) }
     val focusRequester = remember { FocusRequester() }
-    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     val filteredFoods =
-        if (searchQuery.isBlank()) {
+        if (searchQuery.text.isBlank()) {
             emptyList()
         } else {
-            allFoods.filter { it.name.contains(searchQuery, ignoreCase = true) }
+            allFoods.filter {
+                it.name.contains(searchQuery.text, ignoreCase = true)
+            }
         }
 
     Dialog(
@@ -593,12 +623,10 @@ private fun FoodSearchDialog(
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp)
-                    .padding(top = 80.dp)
                     .clip(RoundedCornerShape(GlucoachCorner.card))
                     .background(GlucoachColors.Surface)
                     .padding(GlucoachSpacing.xl),
         ) {
-            // 탭 헤더
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -616,17 +644,15 @@ private fun FoodSearchDialog(
                     modifier = Modifier.weight(1f),
                 )
 
-                if (selectedTab == 1) {
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.size(28.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Close,
-                            contentDescription = "닫기",
-                            tint = GlucoachColors.TextSecondary,
-                        )
-                    }
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "닫기",
+                        tint = GlucoachColors.TextSecondary,
+                    )
                 }
             }
 
@@ -634,98 +660,74 @@ private fun FoodSearchDialog(
 
             when (selectedTab) {
                 0 -> {
-                    // 검색 입력 필드
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Row(
-                            modifier =
-                                Modifier
-                                    .weight(1f)
-                                    .height(44.dp)
-                                    .clip(RoundedCornerShape(22.dp))
-                                    .border(
-                                        width = 1.5.dp,
-                                        color =
-                                            if (isSearchFocused) {
-                                                GlucoachColors.Primary
-                                            } else {
-                                                GlucoachColors.Border
-                                            },
-                                        shape = RoundedCornerShape(22.dp),
-                                    )
-                                    .padding(horizontal = GlucoachSpacing.lg),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        singleLine = true,
+                        keyboardOptions =
+                            KeyboardOptions(
+                                keyboardType = KeyboardType.Text,
+                                imeAction = ImeAction.Search,
+                            ),
+                        textStyle =
+                            TextStyle(
+                                color = GlucoachColors.TextPrimary,
+                                fontSize = 14.sp,
+                            ),
+                        placeholder = {
+                            Text(
+                                text = "음식명을 입력해주세요.",
+                                color = GlucoachColors.TextSecondary,
+                                fontSize = 14.sp,
+                            )
+                        },
+                        leadingIcon = {
                             Icon(
                                 imageVector = Icons.Outlined.Search,
                                 contentDescription = null,
                                 tint = GlucoachColors.TextSecondary,
                                 modifier = Modifier.size(20.dp),
                             )
-                            Spacer(modifier = Modifier.width(GlucoachSpacing.sm))
-                            BasicTextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it },
-                                singleLine = true,
-                                textStyle =
-                                    TextStyle(
-                                        color = GlucoachColors.TextPrimary,
-                                        fontSize = 14.sp,
-                                    ),
-                                cursorBrush = SolidColor(GlucoachColors.Primary),
-                                modifier =
-                                    Modifier
-                                        .weight(1f)
-                                        .focusRequester(focusRequester)
-                                        .onFocusChanged { isSearchFocused = it.isFocused },
-                                decorationBox = { innerTextField ->
-                                    Box {
-                                        if (searchQuery.isEmpty()) {
-                                            Text(
-                                                text = "음식명을 입력해주세요.",
-                                                color = GlucoachColors.TextSecondary,
-                                                fontSize = 14.sp,
-                                            )
-                                        }
-                                        innerTextField()
+                        },
+                        trailingIcon =
+                            if (searchQuery.text.isNotEmpty()) {
+                                {
+                                    IconButton(
+                                        onClick = { searchQuery = TextFieldValue("") },
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Clear,
+                                            contentDescription = "지우기",
+                                            tint = GlucoachColors.TextSecondary,
+                                            modifier = Modifier.size(16.dp),
+                                        )
                                     }
-                                },
-                            )
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(
-                                    onClick = { searchQuery = "" },
-                                    modifier = Modifier.size(20.dp),
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Clear,
-                                        contentDescription = "지우기",
-                                        tint = GlucoachColors.TextSecondary,
-                                        modifier = Modifier.size(16.dp),
-                                    )
                                 }
-                            }
-                        }
+                            } else {
+                                null
+                            },
+                        shape = RoundedCornerShape(22.dp),
+                        colors =
+                            OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = GlucoachColors.Primary,
+                                unfocusedBorderColor = GlucoachColors.Border,
+                                cursorColor = GlucoachColors.Primary,
+                            ),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .focusRequester(focusRequester),
+                    )
 
-                        if (searchQuery.isNotEmpty()) {
-                            Spacer(modifier = Modifier.width(GlucoachSpacing.sm))
-                            Text(
-                                text = "취소",
-                                color = GlucoachColors.TextSecondary,
-                                fontSize = 14.sp,
-                                modifier =
-                                    Modifier.clickable {
-                                        searchQuery = ""
-                                        focusManager.clearFocus()
-                                    },
-                            )
-                        }
+                    LaunchedEffect(Unit) {
+                        delay(200)
+                        focusRequester.requestFocus()
+                        keyboardController?.show()
                     }
 
                     Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
 
-                    if (searchQuery.isBlank()) {
+                    if (searchQuery.text.isBlank()) {
                         Box(
                             modifier =
                                 Modifier
@@ -763,13 +765,13 @@ private fun FoodSearchDialog(
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
+                                            .padding(vertical = GlucoachSpacing.md)
                                             .clickable {
                                                 if (!recentKeywords.contains(food.name)) {
                                                     recentKeywords.add(0, food.name)
                                                 }
                                                 onFoodSelected(food)
-                                            }
-                                            .padding(vertical = GlucoachSpacing.md),
+                                            },
                                 )
                                 HorizontalDivider(color = GlucoachColors.Border.copy(alpha = 0.5f))
                             }
@@ -778,7 +780,6 @@ private fun FoodSearchDialog(
                 }
 
                 1 -> {
-                    // 최근 검색 목록
                     if (recentKeywords.isEmpty()) {
                         Box(
                             modifier =
@@ -800,16 +801,19 @@ private fun FoodSearchDialog(
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
+                                            .padding(vertical = GlucoachSpacing.md)
                                             .clickable {
-                                                val food = allFoods.find { it.name == keyword }
+                                                val food =
+                                                    allFoods.find {
+                                                        it.name == keyword
+                                                    }
                                                 if (food != null) {
                                                     onFoodSelected(food)
                                                 } else {
                                                     selectedTab = 0
-                                                    searchQuery = keyword
+                                                    searchQuery = TextFieldValue(keyword)
                                                 }
-                                            }
-                                            .padding(vertical = GlucoachSpacing.md),
+                                            },
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                 ) {
@@ -837,10 +841,6 @@ private fun FoodSearchDialog(
                 }
             }
         }
-    }
-
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
     }
 }
 
@@ -870,6 +870,8 @@ private fun FoodComparisonResultContent(
     foodA: FoodItem,
     foodB: FoodItem,
     onResetSelection: () -> Unit,
+    onFoodARemoved: () -> Unit,
+    onFoodBRemoved: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var selectedFoodIndex by remember { mutableIntStateOf(1) }
@@ -900,6 +902,7 @@ private fun FoodComparisonResultContent(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.md),
             ) {
+                val removeCallbacks = listOf(onFoodARemoved, onFoodBRemoved)
                 foods.forEachIndexed { index, food ->
                     FoodCard(
                         food = food,
@@ -909,6 +912,7 @@ private fun FoodComparisonResultContent(
                             nutritionDialogFoodIndex = index
                             showNutritionDialog = true
                         },
+                        onRemoveClick = removeCallbacks[index],
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -989,92 +993,91 @@ private fun FoodCard(
     isSelected: Boolean,
     onSelect: () -> Unit,
     onInfoClick: () -> Unit,
+    onRemoveClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val borderColor = if (isSelected) GlucoachColors.Primary else GlucoachColors.Border
 
-    Box(modifier = modifier) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
-                    .clip(RoundedCornerShape(GlucoachCorner.card))
-                    .background(GlucoachColors.Surface)
-                    .border(
-                        width = if (isSelected) 2.dp else 1.dp,
-                        color = borderColor,
-                        shape = RoundedCornerShape(GlucoachCorner.card),
-                    )
-                    .clickable(onClick = onSelect)
-                    .padding(GlucoachSpacing.lg),
-            horizontalAlignment = Alignment.CenterHorizontally,
+    Column(
+        modifier =
+            modifier
+                .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
+                .clip(RoundedCornerShape(GlucoachCorner.card))
+                .background(GlucoachColors.Surface)
+                .border(
+                    width = if (isSelected) 2.dp else 1.dp,
+                    color = borderColor,
+                    shape = RoundedCornerShape(GlucoachCorner.card),
+                )
+                .clickable(onClick = onSelect)
+                .padding(GlucoachSpacing.lg),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = food.name,
                 color = GlucoachColors.TextPrimary,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.Start),
             )
-
-            Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
-
-            Image(
-                painter = painterResource(id = food.imageResId),
-                contentDescription = food.name,
-                modifier = Modifier.size(100.dp),
-                contentScale = ContentScale.Fit,
-            )
-
-            Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
-
-            SpikeStatusBadge(
-                isStable = food.isStable,
-                onInfoClick = onInfoClick,
-            )
-
-            Spacer(modifier = Modifier.height(GlucoachSpacing.md))
-
-            Row(
+            Icon(
+                imageVector = Icons.Filled.Close,
+                contentDescription = "음식 삭제",
+                tint = GlucoachColors.TextSecondary,
                 modifier =
                     Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .border(1.dp, GlucoachColors.Border, RoundedCornerShape(8.dp)),
-            ) {
-                StatCell(
-                    label = "최고 혈당",
-                    value = "${food.maxGlucose}",
-                    unit = "mg/dL",
-                    modifier = Modifier.weight(1f),
-                )
-                Box(
-                    modifier =
-                        Modifier
-                            .width(1.dp)
-                            .height(48.dp)
-                            .background(GlucoachColors.Border),
-                )
-                StatCell(
-                    label = "정상 복귀",
-                    value = food.recoveryTimeText,
-                    unit = "",
-                    modifier = Modifier.weight(1f),
-                )
-            }
+                        .size(18.dp)
+                        .clickable(onClick = onRemoveClick),
+            )
         }
 
-        if (isSelected) {
-            Icon(
-                imageVector = Icons.Filled.CheckCircle,
-                contentDescription = "선택됨",
-                tint = GlucoachColors.Primary,
+        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+
+        Image(
+            painter = painterResource(id = food.imageResId),
+            contentDescription = food.name,
+            modifier = Modifier.size(100.dp),
+            contentScale = ContentScale.Fit,
+        )
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+
+        SpikeStatusBadge(
+            isStable = food.isStable,
+            onInfoClick = onInfoClick,
+        )
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .border(1.dp, GlucoachColors.Border, RoundedCornerShape(8.dp)),
+        ) {
+            StatCell(
+                label = "최고 혈당",
+                value = "${food.maxGlucose}",
+                unit = "mg/dL",
+                modifier = Modifier.weight(1f),
+            )
+            Box(
                 modifier =
                     Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(GlucoachSpacing.sm)
-                        .size(24.dp),
+                        .width(1.dp)
+                        .height(48.dp)
+                        .background(GlucoachColors.Border),
+            )
+            StatCell(
+                label = "정상 복귀",
+                value = food.recoveryTimeText,
+                unit = "",
+                modifier = Modifier.weight(1f),
             )
         }
     }
