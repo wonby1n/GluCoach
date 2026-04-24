@@ -37,7 +37,7 @@ public class AuthController {
   }
 
   @Operation(summary = "토큰 재발급")
-  @PostMapping("/reissue")
+  @PostMapping("/refresh")
   public ResponseEntity<TokenResponse> reissue(@Valid @RequestBody ReissueRequest request) {
     return ResponseEntity.ok(authService.reissue(request.refreshToken()));
   }
