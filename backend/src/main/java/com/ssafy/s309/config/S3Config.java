@@ -32,25 +32,30 @@ public class S3Config {
 
   @Bean
   public S3Client s3Client() {
-    S3Client.Builder builder =
-        S3Client.builder().region(Region.of(region)).credentialsProvider(credentials());
     if (!endpoint.isBlank()) {
-      builder
+      return S3Client.builder()
+          .region(Region.of(region))
+          .credentialsProvider(credentials())
           .endpointOverride(URI.create(endpoint))
-          .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build());
+          .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+          .build();
     }
-    return builder.build();
+    return S3Client.builder().region(Region.of(region)).credentialsProvider(credentials()).build();
   }
 
   @Bean
   public S3Presigner s3Presigner() {
-    S3Presigner.Builder builder =
-        S3Presigner.builder().region(Region.of(region)).credentialsProvider(credentials());
     if (!endpoint.isBlank()) {
-      builder
+      return S3Presigner.builder()
+          .region(Region.of(region))
+          .credentialsProvider(credentials())
           .endpointOverride(URI.create(endpoint))
-          .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build());
+          .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+          .build();
     }
-    return builder.build();
+    return S3Presigner.builder()
+        .region(Region.of(region))
+        .credentialsProvider(credentials())
+        .build();
   }
 }
