@@ -3,6 +3,10 @@ package com.ssafy.s309.ui.screen.main
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
@@ -19,15 +23,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -37,6 +49,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,20 +64,6 @@ import com.ssafy.s309.ui.component.SummaryStatCard
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
 
-/**
- * 메인/일반 화면.
- *
- * - 상단: "오늘의 컨디션" 타이틀 + 벨(알림) 아이콘
- * - 현재 혈당 카드 (키키 마스코트 자리는 asset 주입 슬롯)
- * - 오늘 혈당 흐름 그래프
- * - 칼로리 소모 / 수면 카드
- * - 하단바
- * - 벨 클릭 시 [NotificationPanel] 이 우측에서 슬라이드 인
- *
- * @param mascotSlot 키키 캐릭터 이미지 Composable (asset 추가 후 Image 주입)
- * @param bellIcon 벨 아이콘 Composable (asset 추가 후 Icon 주입)
- * @param mealPinIcon 밥그릇 핀 Composable (asset 추가 후 Image 주입)
- */
 @Composable
 fun MainScreen(
     viewModel: MainViewModel = hiltViewModel(),
@@ -86,9 +86,6 @@ fun MainScreen(
     )
 }
 
-/**
- * UI 전용 컨텐츠. ViewModel 의존성을 제거하여 Preview/테스트에서 재사용 가능.
- */
 @Composable
 fun MainScreenContent(
     state: MainUiState,
@@ -102,6 +99,7 @@ fun MainScreenContent(
 ) {
     var selectedTab by remember { mutableStateOf("home") }
     var showFoodScan by remember { mutableStateOf(false) }
+    var showReportSheet by remember { mutableStateOf(false) }
 
     Box(
         modifier =
@@ -109,58 +107,101 @@ fun MainScreenContent(
                 .fillMaxSize()
                 .background(GlucoachColors.Background),
     ) {
-        // === 메인 컨텐츠 ===
         Column(modifier = Modifier.fillMaxSize()) {
-            Crossfade(
-                targetState = selectedTab,
-                animationSpec = tween(300),
-                modifier = Modifier.weight(1f),
-                label = "tab-crossfade",
-            ) { tab ->
-                when (tab) {
-                    "profile" -> MyPageContent()
-                    "edit" -> FoodComparisonContent()
-                    "report" -> AIReportContent()
+            Box(modifier = Modifier.weight(1f)) {
+                Crossfade(
+                    targetState = selectedTab,
+                    animationSpec = tween(300),
+                    modifier = Modifier.fillMaxSize(),
+                    label = "tab-crossfade",
+                ) { tab ->
+                    when (tab) {
+                        "profile" -> MyPageContent()
+                        "edit" -> FoodComparisonContent()
+                        "report" -> AIReportContent()
+                        "food-report" -> FoodReportContent()
 
-                    else ->
-                        Column(
-                            modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    .verticalScroll(rememberScrollState())
-                                    .padding(horizontal = 22.dp),
-                        ) {
-                            Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
-                            TodayConditionHeader(
-                                onBellClick = onBellClick,
-                                bellIcon = bellIcon,
-                            )
-                            Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+                        else ->
+                            Column(
+                                modifier =
+                                    Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(horizontal = 22.dp),
+                            ) {
+                                Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+                                TodayConditionHeader(
+                                    onBellClick = onBellClick,
+                                    bellIcon = bellIcon,
+                                )
+                                Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
 
-                            CurrentGlucoseCard(
-                                currentMgDl = state.currentGlucoseMgDl ?: 0,
-                                diffFromPrevious = state.diffFromPrevious,
-                                mascotSlot = mascotSlot,
-                            )
-                            Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+                                CurrentGlucoseCard(
+                                    currentMgDl = state.currentGlucoseMgDl ?: 0,
+                                    diffFromPrevious = state.diffFromPrevious,
+                                    mascotSlot = mascotSlot,
+                                )
+                                Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
-                            GlucoseChartCard(
-                                readings = state.glucoseSeries,
-                                range = state.glucoseRange,
-                                meals = state.meals,
-                                hoursLabel = "최근 6시간",
-                                mealPinIcon = mealPinIcon,
-                                timeLabels = listOf("08:00", "10:00", "12:00", "14:00"),
-                                onClick = onGraphClick,
-                            )
-                            Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+                                GlucoseChartCard(
+                                    readings = state.glucoseSeries,
+                                    range = state.glucoseRange,
+                                    meals = state.meals,
+                                    hoursLabel = "최근 6시간",
+                                    mealPinIcon = mealPinIcon,
+                                    timeLabels = listOf("08:00", "10:00", "12:00", "14:00"),
+                                    onClick = onGraphClick,
+                                )
+                                Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
-                            SummaryRow(
-                                caloriesKcal = state.summary.caloriesBurnedKcal,
-                                sleepMinutes = state.summary.sleepMinutes,
-                            )
-                            Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
-                        }
+                                SummaryRow(
+                                    caloriesKcal = state.summary.caloriesBurnedKcal,
+                                    sleepMinutes = state.summary.sleepMinutes,
+                                )
+                                Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+                            }
+                    }
+                }
+
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showReportSheet,
+                    enter = fadeIn(animationSpec = tween(durationMillis = 280)),
+                    exit = fadeOut(animationSpec = tween(durationMillis = 240)),
+                ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.3f))
+                                .clickable { showReportSheet = false },
+                    )
+                }
+
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showReportSheet,
+                    enter =
+                        expandVertically(
+                            expandFrom = Alignment.Bottom,
+                            animationSpec = tween(durationMillis = 280),
+                        ),
+                    exit =
+                        shrinkVertically(
+                            shrinkTowards = Alignment.Bottom,
+                            animationSpec = tween(durationMillis = 240),
+                        ),
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                ) {
+                    ReportMenuSheet(
+                        onAIReport = {
+                            showReportSheet = false
+                            selectedTab = "report"
+                        },
+                        onFoodReport = {
+                            showReportSheet = false
+                            selectedTab = "food-report"
+                        },
+                        onClose = { showReportSheet = false },
+                    )
                 }
             }
 
@@ -168,21 +209,22 @@ fun MainScreenContent(
                 items = defaultBottomNavItems(),
                 selectedId = selectedTab,
                 onItemClick = { item ->
-                    if (item.id == "add") {
-                        showFoodScan = true
-                    } else {
-                        selectedTab = item.id
+                    when (item.id) {
+                        "add" -> showFoodScan = true
+                        "report" -> showReportSheet = !showReportSheet
+                        else -> {
+                            showReportSheet = false
+                            selectedTab = item.id
+                        }
                     }
                 },
             )
         }
 
-        // === 음식 촬영 플로우 (전체화면 오버레이) ===
         if (showFoodScan) {
             FoodScanFlow(onClose = { showFoodScan = false })
         }
 
-        // === 알림 슬라이드 패널 (오른쪽 오버레이) ===
         AnimatedVisibility(
             visible = state.isNotificationPanelOpen,
             enter =
@@ -235,7 +277,6 @@ private fun TodayConditionHeader(
         ) {
             bellIcon?.invoke()
                 ?: Box(
-                    // asset 미주입 상태에서 클릭 가능한 원형 자리 표시자
                     modifier =
                         Modifier
                             .size(24.dp)
@@ -272,9 +313,6 @@ private fun SummaryRow(
     }
 }
 
-/**
- * 기본 하단 탭 구성. 추후 navigation-compose 연결 시 id 를 route 와 매핑한다.
- */
 private fun defaultBottomNavItems(): List<BottomNavItem> =
     listOf(
         BottomNavItem(id = "home", label = "홈", icon = Icons.Outlined.Home),
@@ -283,3 +321,90 @@ private fun defaultBottomNavItems(): List<BottomNavItem> =
         BottomNavItem(id = "edit", label = "기록", icon = Icons.Outlined.EditNote),
         BottomNavItem(id = "profile", label = "마이페이지", icon = Icons.Outlined.Person),
     )
+
+@Composable
+private fun ReportMenuSheet(
+    onAIReport: () -> Unit,
+    onFoodReport: () -> Unit,
+    onClose: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .shadow(8.dp, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .background(GlucoachColors.Surface)
+                .padding(horizontal = 22.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+        ) {
+            IconButton(
+                onClick = onClose,
+                modifier =
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .size(32.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "닫기",
+                    tint = GlucoachColors.TextSecondary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onAIReport() }
+                    .padding(vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.DateRange,
+                contentDescription = null,
+                tint = GlucoachColors.TextPrimary,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "AI 주간 리포트",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 16.sp,
+            )
+        }
+
+        HorizontalDivider(color = GlucoachColors.Border)
+
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onFoodReport() }
+                    .padding(vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Search,
+                contentDescription = null,
+                tint = GlucoachColors.TextPrimary,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "나의 음식 성적표",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 16.sp,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+    }
+}
