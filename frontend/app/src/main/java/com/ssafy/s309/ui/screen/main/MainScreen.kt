@@ -1,6 +1,7 @@
 package com.ssafy.s309.ui.screen.main
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -24,9 +25,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -69,6 +70,7 @@ fun MainScreen(
     mascotSlot: (@Composable () -> Unit)? = null,
     bellIcon: (@Composable () -> Unit)? = null,
     mealPinIcon: (@Composable () -> Unit)? = null,
+    onGraphClick: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -80,6 +82,7 @@ fun MainScreen(
         mascotSlot = mascotSlot,
         bellIcon = bellIcon,
         mealPinIcon = mealPinIcon,
+        onGraphClick = onGraphClick,
     )
 }
 
@@ -95,8 +98,10 @@ fun MainScreenContent(
     mascotSlot: (@Composable () -> Unit)? = null,
     bellIcon: (@Composable () -> Unit)? = null,
     mealPinIcon: (@Composable () -> Unit)? = null,
+    onGraphClick: () -> Unit = {},
 ) {
     var selectedTab by remember { mutableStateOf("home") }
+    var showFoodScan by remember { mutableStateOf(false) }
 
     Box(
         modifier =
@@ -106,49 +111,75 @@ fun MainScreenContent(
     ) {
         // === 메인 컨텐츠 ===
         Column(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 22.dp),
-            ) {
-                Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
-                TodayConditionHeader(
-                    onBellClick = onBellClick,
-                    bellIcon = bellIcon,
-                )
-                Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+            Crossfade(
+                targetState = selectedTab,
+                animationSpec = tween(300),
+                modifier = Modifier.weight(1f),
+                label = "tab-crossfade",
+            ) { tab ->
+                when (tab) {
+                    "profile" -> MyPageContent()
+                    "edit" -> FoodComparisonContent()
+                    "report" -> AIReportContent()
 
-                CurrentGlucoseCard(
-                    currentMgDl = state.currentGlucoseMgDl ?: 0,
-                    diffFromPrevious = state.diffFromPrevious,
-                    mascotSlot = mascotSlot,
-                )
-                Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+                    else ->
+                        Column(
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(horizontal = 22.dp),
+                        ) {
+                            Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+                            TodayConditionHeader(
+                                onBellClick = onBellClick,
+                                bellIcon = bellIcon,
+                            )
+                            Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
 
-                GlucoseChartCard(
-                    readings = state.glucoseSeries,
-                    range = state.glucoseRange,
-                    meals = state.meals,
-                    hoursLabel = "최근 6시간",
-                    mealPinIcon = mealPinIcon,
-                    timeLabels = listOf("08:00", "10:00", "12:00", "14:00"),
-                )
-                Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+                            CurrentGlucoseCard(
+                                currentMgDl = state.currentGlucoseMgDl ?: 0,
+                                diffFromPrevious = state.diffFromPrevious,
+                                mascotSlot = mascotSlot,
+                            )
+                            Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
-                SummaryRow(
-                    caloriesKcal = state.summary.caloriesBurnedKcal,
-                    sleepMinutes = state.summary.sleepMinutes,
-                )
-                Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+                            GlucoseChartCard(
+                                readings = state.glucoseSeries,
+                                range = state.glucoseRange,
+                                meals = state.meals,
+                                hoursLabel = "최근 6시간",
+                                mealPinIcon = mealPinIcon,
+                                timeLabels = listOf("08:00", "10:00", "12:00", "14:00"),
+                                onClick = onGraphClick,
+                            )
+                            Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+                            SummaryRow(
+                                caloriesKcal = state.summary.caloriesBurnedKcal,
+                                sleepMinutes = state.summary.sleepMinutes,
+                            )
+                            Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+                        }
+                }
             }
 
             BottomNavBar(
                 items = defaultBottomNavItems(),
                 selectedId = selectedTab,
-                onItemClick = { selectedTab = it.id },
+                onItemClick = { item ->
+                    if (item.id == "add") {
+                        showFoodScan = true
+                    } else {
+                        selectedTab = item.id
+                    }
+                },
             )
+        }
+
+        // === 음식 촬영 플로우 (전체화면 오버레이) ===
+        if (showFoodScan) {
+            FoodScanFlow(onClose = { showFoodScan = false })
         }
 
         // === 알림 슬라이드 패널 (오른쪽 오버레이) ===
@@ -249,6 +280,6 @@ private fun defaultBottomNavItems(): List<BottomNavItem> =
         BottomNavItem(id = "home", label = "홈", icon = Icons.Outlined.Home),
         BottomNavItem(id = "report", label = "리포트", icon = Icons.Outlined.Description),
         BottomNavItem(id = "add", label = "추가", icon = Icons.Outlined.Add, isCenter = true),
-        BottomNavItem(id = "edit", label = "기록", icon = Icons.Outlined.Tune),
+        BottomNavItem(id = "edit", label = "기록", icon = Icons.Outlined.EditNote),
         BottomNavItem(id = "profile", label = "마이페이지", icon = Icons.Outlined.Person),
     )

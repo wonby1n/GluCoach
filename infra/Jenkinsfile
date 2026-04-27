@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    options {
+        disableConcurrentBuilds()
+    }
+
     environment {
         EC2_USER = 'ubuntu'
         EC2_HOST = 'k14s309.p.ssafy.io'
@@ -11,8 +15,6 @@ pipeline {
 
     triggers {
         gitlab(
-            triggerOnPush: true,
-            triggerOnMergeRequest: true,
             triggerOnAcceptedMergeRequest: true,
             branchFilterType: 'NameBasedFilter',
             includeBranchesSpec: 'release'

@@ -2,6 +2,7 @@ package com.ssafy.s309.ui.component
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -60,6 +61,7 @@ fun GlucoseChartCard(
     hoursLabel: String = "최근 6시간",
     mealPinIcon: (@Composable () -> Unit)? = null,
     timeLabels: List<String> = emptyList(),
+    onClick: (() -> Unit)? = null,
 ) {
     Column(
         modifier =
@@ -67,6 +69,7 @@ fun GlucoseChartCard(
                 .fillMaxWidth()
                 .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
                 .clip(RoundedCornerShape(GlucoachCorner.card))
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
                 .background(GlucoachColors.Surface)
                 .padding(start = 22.dp, end = 16.dp, top = 14.dp, bottom = 12.dp),
     ) {
