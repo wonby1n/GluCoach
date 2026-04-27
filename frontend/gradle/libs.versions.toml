@@ -18,6 +18,7 @@ junitExt = "1.2.1"
 espresso = "3.6.1"
 camerax = "1.4.1"
 ksp = "2.3.2"
+fastble = "2.4.0"
 
 [libraries]
 # AndroidX
@@ -63,6 +64,9 @@ retrofit-kotlinx-serialization = { group = "com.jakewharton.retrofit", name = "r
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
+
+# BLE
+fastble = { group = "com.github.Jasonchenlijian", name = "FastBle", version.ref = "fastble" }
 
 # 테스트
 junit = { group = "junit", name = "junit", version.ref = "junit" }
