@@ -30,6 +30,11 @@ springdoc:
   api-docs:
     path: /api-docs
 
+ai-service:
+  base-url: ${AI_SERVICE_URL:http://localhost:8000}
+  connect-timeout-ms: ${AI_CONNECT_TIMEOUT:3000}
+  read-timeout-ms: ${AI_READ_TIMEOUT:5000}
+
 aws:
   s3:
     access-key: ${AWS_S3_ACCESS_KEY}
