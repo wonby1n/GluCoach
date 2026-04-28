@@ -45,6 +45,8 @@ class BleDataParser
         // ────────────────────────────────────────
 
         private val recentRawValues = ArrayDeque<Int>(MAX_HISTORY)
+
+        @Volatile
         private var movingAverage: Int = 0
 
         // ────────────────────────────────────────
