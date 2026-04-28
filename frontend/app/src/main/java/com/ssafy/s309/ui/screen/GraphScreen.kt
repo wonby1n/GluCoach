@@ -22,12 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.EditNote
-import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,8 +49,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ssafy.s309.ui.component.BottomNavBar
-import com.ssafy.s309.ui.component.BottomNavItem
 import com.ssafy.s309.ui.theme.Primary
 import java.util.Calendar
 
@@ -91,24 +84,12 @@ private fun getCurrentWeekDates(): Pair<List<Int>, Int> {
 }
 
 @Composable
-fun GraphScreen(
-    onBack: () -> Unit = {},
-    onNavigateTo: (String) -> Unit = {},
-) {
+fun GraphScreen(onBack: () -> Unit = {}) {
     val (weekDates, todayIndex) = remember { getCurrentWeekDates() }
     var selectedDay by remember { mutableIntStateOf(todayIndex) }
     val currentValue = dummyGlucoseData.last()
     val currentColor = glucoseColor(currentValue)
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-    val navItems =
-        listOf(
-            BottomNavItem(id = "home", label = "홈", icon = Icons.Outlined.Home),
-            BottomNavItem(id = "report", label = "리포트", icon = Icons.Outlined.Description),
-            BottomNavItem(id = "add", label = "추가", icon = Icons.Outlined.Add, isCenter = true),
-            BottomNavItem(id = "edit", label = "기록", icon = Icons.Outlined.EditNote),
-            BottomNavItem(id = "profile", label = "마이페이지", icon = Icons.Outlined.Person),
-        )
 
     if (isLandscape) {
         GraphScreenLandscape(
@@ -118,9 +99,7 @@ fun GraphScreen(
             onDaySelect = { selectedDay = it },
             currentValue = currentValue,
             currentColor = currentColor,
-            navItems = navItems,
             onBack = onBack,
-            onNavigateTo = onNavigateTo,
         )
     } else {
         GraphScreenPortrait(
@@ -130,9 +109,7 @@ fun GraphScreen(
             onDaySelect = { selectedDay = it },
             currentValue = currentValue,
             currentColor = currentColor,
-            navItems = navItems,
             onBack = onBack,
-            onNavigateTo = onNavigateTo,
         )
     }
 }
@@ -147,9 +124,7 @@ private fun GraphScreenPortrait(
     onDaySelect: (Int) -> Unit,
     currentValue: Float,
     currentColor: Color,
-    navItems: List<BottomNavItem>,
     onBack: () -> Unit,
-    onNavigateTo: (String) -> Unit,
 ) {
     Column(
         modifier =
@@ -160,7 +135,7 @@ private fun GraphScreenPortrait(
         Column(
             modifier =
                 Modifier
-                    .weight(1f)
+                    .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 24.dp, vertical = 52.dp),
         ) {
@@ -236,12 +211,6 @@ private fun GraphScreenPortrait(
                 GlucoseCanvas(modifier = Modifier.fillMaxWidth().height(300.dp))
             }
         }
-
-        BottomNavBar(
-            items = navItems,
-            selectedId = "home",
-            onItemClick = { onNavigateTo(it.id) },
-        )
     }
 }
 
@@ -255,9 +224,7 @@ private fun GraphScreenLandscape(
     onDaySelect: (Int) -> Unit,
     currentValue: Float,
     currentColor: Color,
-    navItems: List<BottomNavItem>,
     onBack: () -> Unit,
-    onNavigateTo: (String) -> Unit,
 ) {
     Column(
         modifier =
@@ -390,12 +357,6 @@ private fun GraphScreenLandscape(
                         .clickable(onClick = onBack),
             )
         }
-
-        BottomNavBar(
-            items = navItems,
-            selectedId = "home",
-            onItemClick = { onNavigateTo(it.id) },
-        )
     }
 }
 
