@@ -1,6 +1,7 @@
 package com.ssafy.s309.ui.screen.ble
 
 import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -40,10 +41,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ssafy.s309.data.ble.BleConnectionState
@@ -59,6 +62,7 @@ fun BleScreen(
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val scannedDevices by viewModel.scannedDevices.collectAsStateWithLifecycle()
 
+    val context = LocalContext.current
     val blePermissions =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
@@ -71,8 +75,16 @@ fun BleScreen(
             if (results.values.all { it }) viewModel.startScan()
         }
 
+    // 권한이 이미 있으면 바로 스캔, 없으면 요청
+    LaunchedEffect(Unit) {
+        val allGranted =
+            blePermissions.all {
+                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+            }
+        if (allGranted) viewModel.startScan() else permissionLauncher.launch(blePermissions)
+    }
+
     DisposableEffect(Unit) {
-        permissionLauncher.launch(blePermissions)
         onDispose { viewModel.stopScan() }
     }
 
