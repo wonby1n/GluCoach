@@ -218,6 +218,8 @@ fun MealLogContent(
     modifier: Modifier = Modifier,
 ) {
     var selectedMeal by remember { mutableStateOf<MealRecord?>(null) }
+    var displayedMeal by remember { mutableStateOf<MealRecord?>(null) }
+    if (selectedMeal != null) displayedMeal = selectedMeal
 
     if (selectedMeal != null) {
         BackHandler { selectedMeal = null }
@@ -234,7 +236,7 @@ fun MealLogContent(
             enter = fadeIn(),
             exit = fadeOut(),
         ) {
-            selectedMeal?.let { meal ->
+            displayedMeal?.let { meal ->
                 MealDetailContent(
                     meal = meal,
                     onBack = { selectedMeal = null },
