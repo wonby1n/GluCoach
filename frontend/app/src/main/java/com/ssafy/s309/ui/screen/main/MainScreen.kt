@@ -65,6 +65,10 @@ import com.ssafy.s309.ui.component.GlucoseChartCard
 import com.ssafy.s309.ui.component.SummaryStatCard
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import java.util.TimeZone
 
 @Composable
 fun MainScreen(
@@ -158,13 +162,27 @@ fun MainScreenContent(
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
+                                val chartTimeLabels =
+                                    remember {
+                                        val sdf = SimpleDateFormat("HH:mm", Locale.KOREA)
+                                        sdf.timeZone = TimeZone.getTimeZone("Asia/Seoul")
+                                        val cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Seoul"))
+                                        val h = cal.get(Calendar.HOUR_OF_DAY)
+                                        val base = h - (h % 2)
+                                        listOf(-6, -4, -2, 0).map { offset ->
+                                            val c = cal.clone() as Calendar
+                                            c.set(Calendar.HOUR_OF_DAY, base + offset)
+                                            c.set(Calendar.MINUTE, 0)
+                                            sdf.format(c.time)
+                                        }
+                                    }
                                 GlucoseChartCard(
                                     readings = state.glucoseSeries,
                                     range = state.glucoseRange,
                                     meals = state.meals,
                                     hoursLabel = "최근 6시간",
                                     mealPinIcon = mealPinIcon,
-                                    timeLabels = listOf("08:00", "10:00", "12:00", "14:00"),
+                                    timeLabels = chartTimeLabels,
                                     onClick = onGraphClick,
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
