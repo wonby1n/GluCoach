@@ -14,7 +14,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Bluetooth
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -31,6 +35,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.s309.data.model.GlucoseRange
@@ -94,16 +99,60 @@ fun GlucoseChartCard(
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
 
-        GlucoseChartBody(
-            readings = readings,
-            range = range,
-            meals = meals,
-            mealPinIcon = mealPinIcon,
-        )
-
-        if (timeLabels.isNotEmpty()) {
-            GlucoseChartTimeAxis(labels = timeLabels)
+        if (readings.isEmpty()) {
+            DeviceNotConnected()
+        } else {
+            GlucoseChartBody(
+                readings = readings,
+                range = range,
+                meals = meals,
+                mealPinIcon = mealPinIcon,
+            )
+            if (timeLabels.isNotEmpty()) {
+                GlucoseChartTimeAxis(labels = timeLabels)
+            }
         }
+    }
+}
+
+@Composable
+private fun DeviceNotConnected() {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(CHART_BODY_HEIGHT + 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(40.dp)
+                    .background(GlucoachColors.Background, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Bluetooth,
+                contentDescription = null,
+                tint = GlucoachColors.Primary,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "기기가 연동되어 있지 않아요",
+            color = GlucoachColors.TextPrimary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "CGM 기기를 연동하면 혈당 흐름을 확인할 수 있어요",
+            color = GlucoachColors.TextSecondary,
+            fontSize = 11.sp,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
