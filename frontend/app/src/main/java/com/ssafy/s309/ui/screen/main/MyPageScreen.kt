@@ -37,6 +37,7 @@ fun MyPageContent(
     onDeviceClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
+    userEmail: String = "",
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -64,7 +65,7 @@ fun MyPageContent(
         InfoMenuItem(
             icon = Icons.Outlined.ManageAccounts,
             title = "내 계정",
-            value = "test123@test.com",
+            value = userEmail.ifEmpty { null },
             onClick = onAccountClick,
         )
         InfoMenuItem(

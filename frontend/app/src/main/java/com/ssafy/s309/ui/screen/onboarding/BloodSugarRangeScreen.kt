@@ -69,6 +69,7 @@ fun BloodSugarRangeScreen(
         BloodSugarRangeDialog(
             onDismiss = { showDialog = false },
             onConfirm = { showDialog = false },
+            onSkip = onSkipClick,
         )
     }
 
@@ -199,6 +200,7 @@ fun RangeValueBox(value: Int) {
 fun BloodSugarRangeDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
+    onSkip: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -244,11 +246,11 @@ fun BloodSugarRangeDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 OnboardingButton(
-                    text = "알겠어요",
+                    text = "설정하기",
                     onClick = onConfirm,
                 )
                 OutlinedButton(
-                    onClick = onDismiss,
+                    onClick = onSkip,
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -256,7 +258,7 @@ fun BloodSugarRangeDialog(
                     shape = RoundedCornerShape(8.dp),
                 ) {
                     Text(
-                        text = "뒤로가기",
+                        text = "나중에 하기",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium,
                         color = Primary,
