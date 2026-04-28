@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -35,6 +37,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.s309.R
+import com.ssafy.s309.ui.theme.Error
 import com.ssafy.s309.ui.theme.Primary
 
 @Composable
@@ -42,6 +45,8 @@ fun SignInScreen(
     onSignInClick: (String, String) -> Unit,
     onForgotPasswordClick: () -> Unit,
     onBackClick: () -> Unit,
+    isLoading: Boolean = false,
+    errorMessage: String? = null,
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -122,6 +127,16 @@ fun SignInScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            if (errorMessage != null) {
+                Text(
+                    text = errorMessage,
+                    fontSize = 13.sp,
+                    color = Error,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             Button(
                 onClick = { onSignInClick(email, password) },
                 modifier =
@@ -130,13 +145,22 @@ fun SignInScreen(
                         .height(48.dp),
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                enabled = !isLoading,
             ) {
-                Text(
-                    text = "Sign In",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color.White,
-                )
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text(
+                        text = "Sign In",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White,
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))

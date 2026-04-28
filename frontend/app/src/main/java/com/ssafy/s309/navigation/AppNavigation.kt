@@ -5,9 +5,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -26,6 +30,8 @@ import com.ssafy.s309.ui.screen.onboarding.SignupDoneScreen
 import com.ssafy.s309.ui.screen.onboarding.TreatmentPillsScreen
 import com.ssafy.s309.ui.screen.onboarding.TreatmentSelectionScreen
 import com.ssafy.s309.ui.screen.onboarding.TreatmentTimeScreen
+import com.ssafy.s309.ui.viewmodel.AuthUiState
+import com.ssafy.s309.ui.viewmodel.AuthViewModel
 
 sealed class Screen(val route: String) {
     object Landing : Screen("landing")
@@ -57,6 +63,9 @@ sealed class Screen(val route: String) {
 
 @Composable
 fun AppNavigation(navController: NavHostController = rememberNavController()) {
+    val authViewModel: AuthViewModel = hiltViewModel()
+    val authState by authViewModel.uiState.collectAsState()
+
     NavHost(
         navController = navController,
         startDestination = Screen.Landing.route,
@@ -77,15 +86,23 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             )
         }
         composable(Screen.SignIn.route) {
-            SignInScreen(
-                onSignInClick = { _, _ ->
-                    // TODO: 백엔드 연동 후 실제 인증 로직으로 교체
+            LaunchedEffect(authState) {
+                if (authState is AuthUiState.LoginSuccess) {
+                    authViewModel.resetState()
                     navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
+                }
+            }
+
+            SignInScreen(
+                onSignInClick = { email, password ->
+                    authViewModel.login(email, password)
                 },
                 onForgotPasswordClick = {},
                 onBackClick = { navController.popBackStack() },
+                isLoading = authState is AuthUiState.Loading,
+                errorMessage = (authState as? AuthUiState.Error)?.message,
             )
         }
         composable(
@@ -93,13 +110,23 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             enterTransition = { fadeIn() },
             exitTransition = { fadeOut() },
         ) {
-            SignUpScreen(
-                onSignUpClick = { _, _, _ ->
-                    // TODO: 백엔드 연동 후 실제 회원가입 로직으로 교체
+            LaunchedEffect(authState) {
+                if (authState is AuthUiState.LoginSuccess &&
+                    (authState as AuthUiState.LoginSuccess).isNewUser
+                ) {
+                    authViewModel.resetState()
                     navController.navigate(Screen.BasicHealthInfo.route)
+                }
+            }
+
+            SignUpScreen(
+                onSignUpClick = { email, password, _ ->
+                    authViewModel.signup(email, password)
                 },
                 onAlreadyMemberClick = { navController.navigate(Screen.SignIn.route) },
                 onBackClick = { navController.popBackStack() },
+                isLoading = authState is AuthUiState.Loading,
+                errorMessage = (authState as? AuthUiState.Error)?.message,
             )
         }
         composable(Screen.BasicHealthInfo.route) {
@@ -117,8 +144,13 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         }
         composable(Screen.DiabetesTypeSelection.route) {
             DiabetesTypeSelectionScreen(
-                onNextClick = { _ ->
-                    navController.navigate(Screen.TreatmentSelection.route)
+                onNextClick = { selectedIndex ->
+                    if (selectedIndex == 0) {
+                        // 당뇨 전 혈당 관리 → 치료 관련 화면 스킵
+                        navController.navigate(Screen.BloodSugarRange.route)
+                    } else {
+                        navController.navigate(Screen.TreatmentSelection.route)
+                    }
                 },
                 onBackClick = { navController.popBackStack() },
             )
@@ -168,6 +200,17 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             )
         }
         composable(Screen.Main.route) {
+            LaunchedEffect(authState) {
+                if (authState is AuthUiState.LogoutSuccess ||
+                    authState is AuthUiState.WithdrawSuccess
+                ) {
+                    authViewModel.resetState()
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Main.route) { inclusive = true }
+                    }
+                }
+            }
+
             MainScreen(
                 mascotSlot = {
                     Image(
@@ -178,6 +221,8 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     )
                 },
                 onGraphClick = { navController.navigate(Screen.Graph.route) },
+                onLogoutClick = { authViewModel.logout() },
+                userEmail = authViewModel.userEmail,
             )
         }
         composable(Screen.Graph.route) {
