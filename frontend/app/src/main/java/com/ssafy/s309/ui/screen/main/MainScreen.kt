@@ -10,7 +10,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,7 +24,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -37,6 +35,7 @@ import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.HorizontalDivider
@@ -179,9 +178,8 @@ fun MainScreenContent(
                                 GlucoseChartCard(
                                     readings = state.glucoseSeries,
                                     range = state.glucoseRange,
-                                    meals = state.meals,
+                                    isDeviceConnected = state.isDeviceConnected,
                                     hoursLabel = "최근 6시간",
-                                    mealPinIcon = mealPinIcon,
                                     timeLabels = chartTimeLabels,
                                     onClick = onGraphClick,
                                 )
@@ -345,14 +343,16 @@ private fun TodayConditionHeader(
                     .clickable(onClick = onBellClick),
             contentAlignment = Alignment.Center,
         ) {
-            bellIcon?.invoke()
-                ?: Box(
-                    modifier =
-                        Modifier
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .border(1.dp, GlucoachColors.PrimaryDark, CircleShape),
+            if (bellIcon != null) {
+                bellIcon()
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.Notifications,
+                    contentDescription = "알림",
+                    tint = GlucoachColors.Primary,
+                    modifier = Modifier.size(24.dp),
                 )
+            }
         }
     }
 }

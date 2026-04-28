@@ -118,11 +118,21 @@ fun GraphScreen(
     bleViewModel: BleViewModel = hiltViewModel(),
 ) {
     val connectionState by bleViewModel.connectionState.collectAsStateWithLifecycle()
+    val glucoseReadings by bleViewModel.glucoseReadings.collectAsStateWithLifecycle()
     val isDeviceConnected = connectionState is BleConnectionState.Connected
+
+    val displayData =
+        if (glucoseReadings.isNotEmpty()) {
+            glucoseReadings.map { it.valueMgDl.toFloat() }
+        } else if (isDeviceConnected) {
+            listOf(0f, 0f)
+        } else {
+            dummyGlucoseData
+        }
 
     val (weekDates, todayIndex) = remember { getCurrentWeekDates() }
     var selectedDay by remember { mutableIntStateOf(todayIndex) }
-    val currentValue = dummyGlucoseData.last()
+    val currentValue = glucoseReadings.lastOrNull()?.valueMgDl?.toFloat() ?: 0f
     val currentColor = glucoseColor(currentValue)
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
@@ -137,6 +147,7 @@ fun GraphScreen(
             onBack = onBack,
             onNavigateToBle = onNavigateToBle,
             isDeviceConnected = isDeviceConnected,
+            chartData = displayData,
         )
     } else {
         GraphScreenPortrait(
@@ -149,6 +160,7 @@ fun GraphScreen(
             onBack = onBack,
             onNavigateToBle = onNavigateToBle,
             isDeviceConnected = isDeviceConnected,
+            chartData = displayData,
         )
     }
 }
@@ -166,6 +178,7 @@ private fun GraphScreenPortrait(
     onBack: () -> Unit,
     onNavigateToBle: () -> Unit = {},
     isDeviceConnected: Boolean = false,
+    chartData: List<Float> = dummyGlucoseData,
 ) {
     Column(
         modifier =
@@ -249,11 +262,11 @@ private fun GraphScreenPortrait(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    HighLowRow()
+                    HighLowRow(chartData = chartData)
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    GlucoseCanvas(modifier = Modifier.fillMaxWidth().height(300.dp))
+                    GlucoseCanvas(modifier = Modifier.fillMaxWidth().height(300.dp), data = chartData)
                 }
             }
         }
@@ -273,6 +286,7 @@ private fun GraphScreenLandscape(
     onBack: () -> Unit,
     onNavigateToBle: () -> Unit = {},
     isDeviceConnected: Boolean = false,
+    chartData: List<Float> = dummyGlucoseData,
 ) {
     Box(
         modifier =
@@ -358,7 +372,7 @@ private fun GraphScreenLandscape(
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(text = "최고 ", fontSize = 11.sp, color = Color(0xFF888888))
                                 Text(
-                                    text = "${dummyGlucoseData.max().toInt()}",
+                                    text = "${chartData.max().toInt()}",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF333333),
@@ -369,7 +383,7 @@ private fun GraphScreenLandscape(
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(text = "최저 ", fontSize = 11.sp, color = Color(0xFF888888))
                                 Text(
-                                    text = "${dummyGlucoseData.min().toInt()}",
+                                    text = "${chartData.min().toInt()}",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF333333),
@@ -392,6 +406,7 @@ private fun GraphScreenLandscape(
                                 .weight(1f)
                                 .fillMaxHeight()
                                 .padding(horizontal = 12.dp, vertical = 12.dp),
+                        data = chartData,
                     )
                 }
             }
@@ -444,7 +459,7 @@ private fun DeviceNotConnectedPlaceholder(onNavigateToBle: () -> Unit = {}) {
             color = Color(0xFF333333),
         )
         Text(
-            text = "CGM 기기를 연동하면\n실시간 혈당 추이를 확인할 수 있어요",
+            text = "기기를 연동하면\n실시간 혈당 추이를 확인할 수 있어요",
             fontSize = 14.sp,
             color = Color(0xFF888888),
             textAlign = TextAlign.Center,
@@ -582,13 +597,13 @@ private fun DaySelector(
 }
 
 @Composable
-private fun HighLowRow() {
+private fun HighLowRow(chartData: List<Float> = dummyGlucoseData) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier.size(8.dp).background(colorDanger, CircleShape))
         Spacer(modifier = Modifier.width(6.dp))
         Text(text = "최고 ", fontSize = 15.sp, color = Color(0xFF888888))
         Text(
-            text = "${dummyGlucoseData.max().toInt()}",
+            text = "${chartData.max().toInt()}",
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             color = Color(0xFF333333),
@@ -598,7 +613,7 @@ private fun HighLowRow() {
         Spacer(modifier = Modifier.width(6.dp))
         Text(text = "최저 ", fontSize = 15.sp, color = Color(0xFF888888))
         Text(
-            text = "${dummyGlucoseData.min().toInt()}",
+            text = "${chartData.min().toInt()}",
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             color = Color(0xFF333333),
@@ -607,7 +622,10 @@ private fun HighLowRow() {
 }
 
 @Composable
-private fun GlucoseCanvas(modifier: Modifier = Modifier) {
+private fun GlucoseCanvas(
+    modifier: Modifier = Modifier,
+    data: List<Float> = dummyGlucoseData,
+) {
     val timeLabels = remember { getKrTimeLabels() }
     Canvas(modifier = modifier) {
         val w = size.width
@@ -617,7 +635,6 @@ private fun GlucoseCanvas(modifier: Modifier = Modifier) {
         val leftPad = 48f
         val chartW = w - leftPad
 
-        val data = dummyGlucoseData
         val n = data.size
         val stepX = chartW / (n - 1)
 
