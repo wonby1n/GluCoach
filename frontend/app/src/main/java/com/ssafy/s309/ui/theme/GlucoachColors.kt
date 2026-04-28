@@ -25,4 +25,15 @@ object GlucoachColors {
 
     val GradeB = Color(0xFFFFA726)
     val GradeD = Color(0xFFD32F2F)
+
+    val GradeS = Color(0xFF4CAF50)
+    val GradeSBg = Color(0xFFE8F5E9)
+    val GradeA = Color(0xFF71C1D2)
+    val GradeABg = Color(0xFFE0F7FA)
+    val GradeBBg = Color(0xFFF1F8E9)
+    val GradeC = Color(0xFFFFB74D)
+    val GradeCBg = Color(0xFFFFF8E1)
+    val GradeDBg = Color(0xFFFBE9E7)
+    val GradeF = Color(0xFFE57373)
+    val GradeFBg = Color(0xFFFFEBEE)
 }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1065273335268",
+    "project_id": "glucoach-s309",
+    "storage_bucket": "glucoach-s309.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1065273335268:android:8f31e564023a8627853bf1",
+        "android_client_info": {
+          "package_name": "com.ssafy.s309"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCdze8stga0fos5NAqpEpJxOvSyd7FDd3k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

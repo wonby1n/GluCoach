@@ -58,8 +58,9 @@ fun TreatmentSelectionScreen(
 ) {
     val treatmentMethods =
         listOf(
-            TreatmentMethod("약물 복용하고\n있어요.", Icons.Filled.Medication),
-            TreatmentMethod("주사를 투여하고\n있어요.", Icons.Outlined.Vaccines),
+            TreatmentMethod("약물 복용하고 있어요.", Icons.Filled.Medication),
+            TreatmentMethod("주사를 투여하고 있어요.", Icons.Outlined.Vaccines),
+            TreatmentMethod("약물 + 주사 모두 사용해요.", Icons.Filled.Medication),
         )
 
     var selectedMethod by remember { mutableStateOf<Int?>(null) }
@@ -103,7 +104,7 @@ fun TreatmentSelectionScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            treatmentMethods.forEachIndexed { index, method ->
+            treatmentMethods.take(2).forEachIndexed { index, method ->
                 TreatmentMethodCard(
                     method = method,
                     isSelected = selectedMethod == index,
@@ -112,6 +113,14 @@ fun TreatmentSelectionScreen(
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        TreatmentMethodCardWide(
+            method = treatmentMethods[2],
+            isSelected = selectedMethod == 2,
+            onClick = { selectedMethod = 2 },
+        )
 
         Spacer(modifier = Modifier.weight(1f))
 
@@ -133,7 +142,7 @@ fun TreatmentMethodCard(
     Column(
         modifier =
             modifier
-                .height(200.dp)
+                .height(160.dp)
                 .background(Color.White, RoundedCornerShape(12.dp))
                 .border(
                     width = if (isSelected) 2.dp else 1.dp,
@@ -148,18 +157,62 @@ fun TreatmentMethodCard(
         Icon(
             imageVector = method.icon,
             contentDescription = method.title,
-            modifier = Modifier.size(64.dp),
+            modifier = Modifier.size(48.dp),
             tint = if (isSelected) Primary else TextMuted,
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
+        Text(
+            text = method.title,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = TextLabel,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+fun TreatmentMethodCardWide(
+    method: TreatmentMethod,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(Color.White, RoundedCornerShape(12.dp))
+                .border(
+                    width = if (isSelected) 2.dp else 1.dp,
+                    color = if (isSelected) Primary else CardInactive,
+                    shape = RoundedCornerShape(12.dp),
+                )
+                .clickable { onClick() }
+                .padding(horizontal = 24.dp, vertical = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Medication,
+            contentDescription = null,
+            modifier = Modifier.size(28.dp),
+            tint = if (isSelected) Primary else TextMuted,
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Icon(
+            imageVector = Icons.Outlined.Vaccines,
+            contentDescription = null,
+            modifier = Modifier.size(28.dp),
+            tint = if (isSelected) Primary else TextMuted,
+        )
+        Spacer(modifier = Modifier.width(16.dp))
         Text(
             text = method.title,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
             color = TextLabel,
-            textAlign = TextAlign.Center,
         )
     }
 }
