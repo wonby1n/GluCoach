@@ -53,6 +53,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ssafy.s309.data.ble.BleConnectionState
+import com.ssafy.s309.ui.screen.ble.BleViewModel
 import com.ssafy.s309.ui.theme.Primary
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -66,9 +70,6 @@ private val dayLabels = listOf("월", "화", "수", "목", "금", "토", "일")
 private val colorNormal = Color(0xFF71C1D2)
 private val colorWarning = Color(0xFFF6B44C)
 private val colorDanger = Color(0xFFE96A6A)
-
-// CGM 기기 연동 여부 — 실제 기기 연동 구현 시 변경
-private val isDeviceConnected = false
 
 private fun glucoseColor(value: Float) =
     when {
@@ -111,7 +112,14 @@ private fun getCurrentWeekDates(): Pair<List<Int>, Int> {
 }
 
 @Composable
-fun GraphScreen(onBack: () -> Unit = {}) {
+fun GraphScreen(
+    onBack: () -> Unit = {},
+    onNavigateToBle: () -> Unit = {},
+    bleViewModel: BleViewModel = hiltViewModel(),
+) {
+    val connectionState by bleViewModel.connectionState.collectAsStateWithLifecycle()
+    val isDeviceConnected = connectionState is BleConnectionState.Connected
+
     val (weekDates, todayIndex) = remember { getCurrentWeekDates() }
     var selectedDay by remember { mutableIntStateOf(todayIndex) }
     val currentValue = dummyGlucoseData.last()
@@ -127,6 +135,8 @@ fun GraphScreen(onBack: () -> Unit = {}) {
             currentValue = currentValue,
             currentColor = currentColor,
             onBack = onBack,
+            onNavigateToBle = onNavigateToBle,
+            isDeviceConnected = isDeviceConnected,
         )
     } else {
         GraphScreenPortrait(
@@ -137,6 +147,8 @@ fun GraphScreen(onBack: () -> Unit = {}) {
             currentValue = currentValue,
             currentColor = currentColor,
             onBack = onBack,
+            onNavigateToBle = onNavigateToBle,
+            isDeviceConnected = isDeviceConnected,
         )
     }
 }
@@ -152,6 +164,8 @@ private fun GraphScreenPortrait(
     currentValue: Float,
     currentColor: Color,
     onBack: () -> Unit,
+    onNavigateToBle: () -> Unit = {},
+    isDeviceConnected: Boolean = false,
 ) {
     Column(
         modifier =
@@ -194,7 +208,7 @@ private fun GraphScreenPortrait(
             Spacer(modifier = Modifier.height(24.dp))
 
             if (!isDeviceConnected) {
-                DeviceNotConnectedPlaceholder()
+                DeviceNotConnectedPlaceholder(onNavigateToBle = onNavigateToBle)
             } else {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
@@ -257,6 +271,8 @@ private fun GraphScreenLandscape(
     currentValue: Float,
     currentColor: Color,
     onBack: () -> Unit,
+    onNavigateToBle: () -> Unit = {},
+    isDeviceConnected: Boolean = false,
 ) {
     Box(
         modifier =
@@ -274,7 +290,7 @@ private fun GraphScreenLandscape(
             contentAlignment = Alignment.Center,
         ) {
             if (!isDeviceConnected) {
-                DeviceNotConnectedPlaceholder()
+                DeviceNotConnectedPlaceholder(onNavigateToBle = onNavigateToBle)
             } else {
                 Row(modifier = Modifier.fillMaxSize()) {
                     Column(
@@ -398,7 +414,7 @@ private fun GraphScreenLandscape(
 // ── 공용 컴포넌트 ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun DeviceNotConnectedPlaceholder() {
+private fun DeviceNotConnectedPlaceholder(onNavigateToBle: () -> Unit = {}) {
     Column(
         modifier =
             Modifier
@@ -435,7 +451,7 @@ private fun DeviceNotConnectedPlaceholder() {
         )
         Spacer(modifier = Modifier.height(4.dp))
         Button(
-            onClick = {},
+            onClick = onNavigateToBle,
             colors = ButtonDefaults.buttonColors(containerColor = Primary),
             shape = RoundedCornerShape(12.dp),
         ) {
