@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -378,7 +379,7 @@ private fun EmptyFoodSlot(
     Box(
         modifier =
             modifier
-                .height(240.dp)
+                .height(285.dp)
                 .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
                 .clip(RoundedCornerShape(GlucoachCorner.card))
                 .background(GlucoachColors.Surface)
@@ -405,12 +406,13 @@ private fun SelectedFoodSlot(
     Column(
         modifier =
             modifier
-                .height(240.dp)
+                .height(285.dp)
                 .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
                 .clip(RoundedCornerShape(GlucoachCorner.card))
                 .background(GlucoachColors.Surface)
                 .border(1.dp, GlucoachColors.Border, RoundedCornerShape(GlucoachCorner.card))
                 .padding(GlucoachSpacing.lg),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -457,6 +459,23 @@ private fun SelectedFoodSlot(
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
 
+        Box(
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(GlucoachColors.Border)
+                    .padding(horizontal = GlucoachSpacing.md, vertical = GlucoachSpacing.xs),
+        ) {
+            Text(
+                text = "하나 더 선택해주세요",
+                color = GlucoachColors.TextSecondary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+
         Row(
             modifier =
                 Modifier
@@ -474,7 +493,7 @@ private fun SelectedFoodSlot(
                 modifier =
                     Modifier
                         .width(1.dp)
-                        .height(48.dp)
+                        .fillMaxHeight()
                         .background(GlucoachColors.Border),
             )
             StatCell(
@@ -996,6 +1015,7 @@ private fun FoodCard(
     Column(
         modifier =
             modifier
+                .height(285.dp)
                 .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
                 .clip(RoundedCornerShape(GlucoachCorner.card))
                 .background(GlucoachColors.Surface)
@@ -1074,7 +1094,7 @@ private fun FoodCard(
                 modifier =
                     Modifier
                         .width(1.dp)
-                        .height(48.dp)
+                        .fillMaxHeight()
                         .background(GlucoachColors.Border),
             )
             StatCell(
