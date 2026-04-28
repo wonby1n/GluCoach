@@ -378,7 +378,7 @@ private fun EmptyFoodSlot(
     Box(
         modifier =
             modifier
-                .height(216.dp)
+                .height(240.dp)
                 .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
                 .clip(RoundedCornerShape(GlucoachCorner.card))
                 .background(GlucoachColors.Surface)
@@ -405,7 +405,7 @@ private fun SelectedFoodSlot(
     Column(
         modifier =
             modifier
-                .height(216.dp)
+                .height(240.dp)
                 .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
                 .clip(RoundedCornerShape(GlucoachCorner.card))
                 .background(GlucoachColors.Surface)
@@ -436,7 +436,7 @@ private fun SelectedFoodSlot(
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
 
-        Box {
+        Box(modifier = Modifier.fillMaxWidth()) {
             Image(
                 painter = painterResource(id = food.imageResId),
                 contentDescription = food.name,
