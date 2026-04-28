@@ -417,12 +417,24 @@ private fun SelectedFoodSlot(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = food.name,
-                color = GlucoachColors.TextPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = food.name,
+                    color = GlucoachColors.TextPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.width(GlucoachSpacing.xs))
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = "영양 정보",
+                    tint = GlucoachColors.TextSecondary,
+                    modifier =
+                        Modifier
+                            .size(18.dp)
+                            .clickable(onClick = onInfoClick),
+                )
+            }
             Icon(
                 imageVector = Icons.Filled.Close,
                 contentDescription = "음식 삭제",
@@ -436,30 +448,12 @@ private fun SelectedFoodSlot(
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
 
-        Box(modifier = Modifier.fillMaxWidth()) {
-            Image(
-                painter = painterResource(id = food.imageResId),
-                contentDescription = food.name,
-                modifier = Modifier.size(100.dp).align(Alignment.Center),
-                contentScale = ContentScale.Fit,
-            )
-            IconButton(
-                onClick = onInfoClick,
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomStart)
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(GlucoachColors.TextSecondary.copy(alpha = 0.7f)),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Info,
-                    contentDescription = "영양 정보",
-                    tint = Color.White,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-        }
+        Image(
+            painter = painterResource(id = food.imageResId),
+            contentDescription = food.name,
+            modifier = Modifier.size(100.dp).align(Alignment.CenterHorizontally),
+            contentScale = ContentScale.Fit,
+        )
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
 
@@ -1019,12 +1013,24 @@ private fun FoodCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = food.name,
-                color = GlucoachColors.TextPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = food.name,
+                    color = GlucoachColors.TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.width(GlucoachSpacing.xs))
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = "영양 정보",
+                    tint = GlucoachColors.TextSecondary,
+                    modifier =
+                        Modifier
+                            .size(18.dp)
+                            .clickable(onClick = onInfoClick),
+                )
+            }
             Icon(
                 imageVector = Icons.Filled.Close,
                 contentDescription = "음식 삭제",
@@ -1047,10 +1053,7 @@ private fun FoodCard(
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
 
-        SpikeStatusBadge(
-            isStable = food.isStable,
-            onInfoClick = onInfoClick,
-        )
+        SpikeStatusBadge(isStable = food.isStable)
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.md))
 
@@ -1085,16 +1088,12 @@ private fun FoodCard(
 }
 
 @Composable
-private fun SpikeStatusBadge(
-    isStable: Boolean,
-    onInfoClick: () -> Unit,
-) {
+private fun SpikeStatusBadge(isStable: Boolean) {
     val badgeColor = if (isStable) GlucoachColors.StableBadgeBg else GlucoachColors.SpikeBadgeBg
     val textColor = if (isStable) GlucoachColors.StableBadgeText else GlucoachColors.SpikeBadgeText
     val text = if (isStable) "안정적이에요" else "스파이크 높음"
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    Box(
         modifier =
             Modifier
                 .clip(RoundedCornerShape(16.dp))
@@ -1107,17 +1106,6 @@ private fun SpikeStatusBadge(
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
         )
-        IconButton(
-            onClick = onInfoClick,
-            modifier = Modifier.size(32.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Info,
-                contentDescription = "영양 정보",
-                tint = textColor,
-                modifier = Modifier.size(16.dp),
-            )
-        }
     }
 }
 
