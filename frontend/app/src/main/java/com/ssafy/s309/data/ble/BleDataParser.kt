@@ -49,6 +49,14 @@ class BleDataParser
         @Volatile
         private var movingAverage: Int = 0
 
+        /**
+         * 이동평균이 한 번이라도 실제 raw 값으로 갱신됐는지 여부.
+         * false 인 동안엔 [applyFilterAndConvert] 가 첫 raw 값을 [movingAverage] 로 강제 세팅해
+         * 호출 순서를 잘못 지키더라도 첫 패킷이 스파이크 필터에 무조건 걸리지 않도록 한다.
+         */
+        @Volatile
+        private var hasReceivedAnyData: Boolean = false
+
         // ────────────────────────────────────────
         // 단계별 메서드
         // ────────────────────────────────────────
@@ -76,6 +84,7 @@ class BleDataParser
             } else {
                 movingAverage = (raw + movingAverage) / 2
             }
+            hasReceivedAnyData = true
         }
 
         /**
@@ -88,6 +97,13 @@ class BleDataParser
             raw: Int,
             timestampMillis: Long,
         ): GlucoseReading? {
+            // 방어적 처리: 호출 순서가 잘못되어 [trackMovingAverage] 가 한 번도 호출되지 않은
+            // 상태로 진입하면 movingAverage 가 0 이라 첫 raw 가 반드시 스파이크로 판정된다.
+            // 그 경우엔 첫 raw 값으로 movingAverage 를 초기화해 필터를 통과시킨다.
+            if (!hasReceivedAnyData) {
+                movingAverage = raw
+                hasReceivedAnyData = true
+            }
             if (abs(movingAverage - raw) >= spikeThreshold) return null
 
             val value =
@@ -118,6 +134,7 @@ class BleDataParser
         fun reset() {
             recentRawValues.clear()
             movingAverage = 0
+            hasReceivedAnyData = false
         }
 
         /** 한 번에 여러 설정을 적용. */
