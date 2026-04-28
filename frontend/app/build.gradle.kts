@@ -90,6 +90,9 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
 
+    // BLE (FastBle)
+    implementation(libs.fastble)
+
     // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
