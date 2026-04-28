@@ -71,6 +71,8 @@ fun MainScreen(
     bellIcon: (@Composable () -> Unit)? = null,
     mealPinIcon: (@Composable () -> Unit)? = null,
     onGraphClick: () -> Unit = {},
+    onLogoutClick: () -> Unit = {},
+    userEmail: String = "",
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -83,6 +85,8 @@ fun MainScreen(
         bellIcon = bellIcon,
         mealPinIcon = mealPinIcon,
         onGraphClick = onGraphClick,
+        onLogoutClick = onLogoutClick,
+        userEmail = userEmail,
     )
 }
 
@@ -96,6 +100,8 @@ fun MainScreenContent(
     bellIcon: (@Composable () -> Unit)? = null,
     mealPinIcon: (@Composable () -> Unit)? = null,
     onGraphClick: () -> Unit = {},
+    onLogoutClick: () -> Unit = {},
+    userEmail: String = "",
 ) {
     var selectedTab by remember { mutableStateOf("home") }
     var showFoodScan by remember { mutableStateOf(false) }
@@ -116,7 +122,7 @@ fun MainScreenContent(
                     label = "tab-crossfade",
                 ) { tab ->
                     when (tab) {
-                        "profile" -> MyPageContent()
+                        "profile" -> MyPageContent(onLogoutClick = onLogoutClick, userEmail = userEmail)
                         "edit" -> FoodComparisonContent()
                         "report" -> AIReportContent()
                         "food-report" -> FoodReportContent()
