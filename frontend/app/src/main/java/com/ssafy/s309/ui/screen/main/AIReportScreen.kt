@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,8 +53,11 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.s309.R
@@ -254,50 +259,69 @@ private fun WeeklySummaryRow() {
         horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.md),
     ) {
         summaryCards.forEach { card ->
-            SummaryStatItem(card)
+            SummaryStatItem(card = card, modifier = Modifier.width(130.dp))
         }
     }
 }
 
 @Composable
-private fun SummaryStatItem(card: SummaryCard) {
+private fun SummaryStatItem(
+    card: SummaryCard,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier =
-            Modifier
-                .width(130.dp)
+            modifier
+                .height(120.dp)
                 .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
                 .clip(RoundedCornerShape(GlucoachCorner.card))
                 .background(GlucoachColors.Surface)
                 .padding(GlucoachSpacing.lg),
     ) {
-        Text(
-            text = card.title,
-            color = GlucoachColors.TextSecondary,
-            fontSize = 12.sp,
-        )
-        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
-        Row(verticalAlignment = Alignment.Bottom) {
+        Box(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentAlignment = Alignment.CenterStart,
+        ) {
             Text(
-                text = card.value,
-                color = GlucoachColors.TextPrimary,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = card.unit,
+                text = card.title,
                 color = GlucoachColors.TextSecondary,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(bottom = 4.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
-        Spacer(modifier = Modifier.height(GlucoachSpacing.xs))
-        Text(
-            text = card.changeText,
-            color = card.changeColor,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
+        Box(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = card.value,
+                    color = GlucoachColors.TextPrimary,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = card.unit,
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 11.sp,
+                )
+            }
+        }
+        Box(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Text(
+                text = card.changeText,
+                color = card.changeColor,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -305,6 +329,12 @@ private fun SummaryStatItem(card: SummaryCard) {
 
 @Composable
 private fun WeeklyGlucoseChart() {
+    var selectedIndex by remember { mutableStateOf<Int?>(null) }
+    val days = listOf("월", "화", "수", "목", "금", "토", "일")
+    val minVal = 50f
+    val maxVal = 200f
+    val range = maxVal - minVal
+
     Column(
         modifier =
             Modifier
@@ -325,18 +355,22 @@ private fun WeeklyGlucoseChart() {
 
         val chartHeight = 150.dp
 
+        var chartWidthPx by remember { mutableIntStateOf(0) }
+        val density = LocalDensity.current
+        val widthDp = with(density) { chartWidthPx.toDp() }
+        val stepDp = if (weeklyGlucose.size > 1 && chartWidthPx > 0) widthDp / (weeklyGlucose.size - 1) else 0.dp
+
         Box(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(chartHeight),
+                    .height(chartHeight)
+                    .padding(horizontal = 14.dp)
+                    .onSizeChanged { chartWidthPx = it.width },
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
-                val minVal = 50f
-                val maxVal = 200f
-                val range = maxVal - minVal
 
                 fun yFor(v: Float) = h - ((v - minVal) / range) * h
 
@@ -369,14 +403,7 @@ private fun WeeklyGlucoseChart() {
                                 val x0 = (i - 1) * step
                                 val x1 = i * step
                                 val cx = (x0 + x1) / 2f
-                                cubicTo(
-                                    cx,
-                                    yFor(points[i - 1]),
-                                    cx,
-                                    yFor(points[i]),
-                                    x1,
-                                    yFor(points[i]),
-                                )
+                                cubicTo(cx, yFor(points[i - 1]), cx, yFor(points[i]), x1, yFor(points[i]))
                             }
                         }
                     drawPath(
@@ -385,22 +412,48 @@ private fun WeeklyGlucoseChart() {
                         style = Stroke(width = 2.5f, cap = StrokeCap.Round),
                     )
 
+                    selectedIndex?.let { idx ->
+                        val cx = idx * step
+                        val cy = yFor(points[idx])
+                        drawLine(
+                            color = GlucoachColors.TextSecondary,
+                            start = Offset(cx, cy + 12f),
+                            end = Offset(cx, h),
+                            strokeWidth = 1.5f,
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)),
+                        )
+                    }
+
                     points.forEachIndexed { i, v ->
                         val cx = i * step
                         val cy = yFor(v)
-                        drawCircle(
-                            color = GlucoachColors.Surface,
-                            radius = 6f,
-                            center = Offset(cx, cy),
-                        )
-                        drawCircle(
-                            color = GlucoachColors.Primary,
-                            radius = 5f,
-                            center = Offset(cx, cy),
-                            style = Stroke(width = 2.5f),
-                        )
+                        if (selectedIndex == i) {
+                            drawCircle(color = GlucoachColors.Primary, radius = 8f, center = Offset(cx, cy))
+                            drawCircle(color = GlucoachColors.Surface, radius = 4f, center = Offset(cx, cy))
+                        } else {
+                            drawCircle(color = GlucoachColors.Surface, radius = 6f, center = Offset(cx, cy))
+                            drawCircle(color = GlucoachColors.Primary, radius = 5f, center = Offset(cx, cy), style = Stroke(width = 2.5f))
+                        }
                     }
                 }
+            }
+
+            selectedIndex?.let { idx ->
+                val v = weeklyGlucose[idx]
+                val text = "${v.toInt()}"
+                val textHalfWidth = (text.length * 3.5f).dp
+                val cx = stepDp * idx
+                val cyRatio = 1f - ((v - minVal) / range)
+                val cy = chartHeight * cyRatio
+                val tipX = (cx - textHalfWidth).coerceIn(0.dp, widthDp - textHalfWidth * 2)
+                val tipY = maxOf(0.dp, cy - 28.dp)
+                Text(
+                    text = text,
+                    color = GlucoachColors.Primary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.offset(x = tipX, y = tipY),
+                )
             }
 
             Text(
@@ -426,12 +479,23 @@ private fun WeeklyGlucoseChart() {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            listOf("월", "화", "수", "목", "금", "토", "일").forEach { day ->
-                Text(
-                    text = day,
-                    color = GlucoachColors.TextSecondary,
-                    fontSize = 12.sp,
-                )
+            days.forEachIndexed { idx, day ->
+                val isSelected = selectedIndex == idx
+                Box(
+                    modifier =
+                        Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(if (isSelected) GlucoachColors.Primary else Color.Transparent)
+                            .clickable { selectedIndex = if (selectedIndex == idx) null else idx },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = day,
+                        color = if (isSelected) Color.White else GlucoachColors.TextSecondary,
+                        fontSize = 12.sp,
+                    )
+                }
             }
         }
     }
