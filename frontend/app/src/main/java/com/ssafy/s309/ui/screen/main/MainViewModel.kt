@@ -32,6 +32,7 @@ class MainViewModel
                 val range = healthRepository.getGlucoseTargetRange()
                 val summary = healthRepository.getTodaySummary()
                 val notifications = healthRepository.getNotifications()
+                val initialSeries = healthRepository.getRecentGlucose()
 
                 _uiState.update { state ->
                     state.copy(
@@ -39,6 +40,7 @@ class MainViewModel
                         glucoseRange = range,
                         summary = summary,
                         notifications = notifications,
+                        glucoseSeries = initialSeries,
                     )
                 }
             }

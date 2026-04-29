@@ -86,8 +86,7 @@ class HealthRepository
         /** 최근 혈당 흐름. 메인 화면 그래프 초기 로드용. */
         suspend fun getRecentGlucose(hours: Int = 6): List<GlucoseReading> {
             // TODO(BE 연동): return healthApi.getRecentGlucose(hours)
-            // BLE 미연동 상태에서는 빈 리스트 반환 → 차트에 "기기 연동 없음" UI 표시
-            return emptyList()
+            return MOCK_GLUCOSE_SERIES
         }
 
         /** 사용자 목표 혈당 범위 (그래프의 회색 박스). */
