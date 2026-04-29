@@ -30,11 +30,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.TrendingDown
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -83,6 +91,14 @@ private data class ReportFoodCard(
     val recoveryTime: String,
 )
 
+private data class FoodMealRecord(
+    val date: String,
+    val mealType: String,
+    val foodName: String,
+    val peakGlucose: Int,
+    val recoveryTime: String,
+)
+
 private data class PatternItem(
     val icon: ImageVector,
     val iconBgColor: Color,
@@ -111,6 +127,39 @@ private val cautionFoods =
         ReportFoodCard("떡볶이", R.drawable.keto_kimbap, "D", 210, "2시간 40분"),
     )
 
+private val foodMealRecords =
+    mapOf(
+        "연어 샐러드" to
+            listOf(
+                FoodMealRecord("4월 28일", "아침", "연어 샐러드", 122, "58분"),
+                FoodMealRecord("4월 24일", "점심", "연어 샐러드", 128, "1시간 5분"),
+            ),
+        "고등어 구이 정식" to
+            listOf(
+                FoodMealRecord("4월 27일", "저녁", "고등어 구이 정식", 133, "1시간 10분"),
+                FoodMealRecord("4월 25일", "점심", "고등어 구이 정식", 137, "1시간 15분"),
+            ),
+        "키토 김밥" to
+            listOf(
+                FoodMealRecord("4월 26일", "점심", "키토 김밥", 130, "1시간 8분"),
+                FoodMealRecord("4월 23일", "아침", "키토 김밥", 137, "1시간 20분"),
+            ),
+        "짜장면" to
+            listOf(
+                FoodMealRecord("4월 28일", "점심", "짜장면", 185, "2시간 15분"),
+                FoodMealRecord("4월 24일", "저녁", "짜장면", 178, "2시간 5분"),
+            ),
+        "짬뽕" to
+            listOf(
+                FoodMealRecord("4월 27일", "점심", "짬뽕", 165, "1시간 50분"),
+            ),
+        "떡볶이" to
+            listOf(
+                FoodMealRecord("4월 26일", "저녁", "떡볶이", 210, "2시간 40분"),
+                FoodMealRecord("4월 22일", "점심", "떡볶이", 198, "2시간 20분"),
+            ),
+    )
+
 private val weeklyGlucose = listOf(105f, 118f, 110f, 125f, 108f, 132f, 112f)
 
 private val patternItems =
@@ -137,8 +186,11 @@ private val patternItems =
 
 // ── 진입점 ──────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AIReportContent(modifier: Modifier = Modifier) {
+    var selectedFood by remember { mutableStateOf<ReportFoodCard?>(null) }
+
     Column(
         modifier =
             modifier
@@ -187,7 +239,15 @@ fun AIReportContent(modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.height(GlucoachSpacing.md))
         }
 
-        FoodTopWorstSection()
+        FoodTopWorstSection(onFoodClick = { selectedFood = it })
+
+        selectedFood?.let { food ->
+            FoodMealHistorySheet(
+                food = food,
+                records = foodMealRecords[food.name].orEmpty(),
+                onDismiss = { selectedFood = null },
+            )
+        }
 
         Column(modifier = Modifier.padding(horizontal = 22.dp)) {
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
@@ -504,7 +564,7 @@ private fun WeeklyGlucoseChart() {
 // ── 음식 선정 TOP / WORST ───────────────────────────────
 
 @Composable
-private fun FoodTopWorstSection() {
+private fun FoodTopWorstSection(onFoodClick: (ReportFoodCard) -> Unit = {}) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val foods = if (selectedTab == 0) stableFoods else cautionFoods
 
@@ -547,7 +607,7 @@ private fun FoodTopWorstSection() {
             horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.md),
         ) {
             items(foods) { food ->
-                FoodGradeCard(food = food)
+                FoodGradeCard(food = food, onClick = { onFoodClick(food) })
             }
         }
 
@@ -589,7 +649,10 @@ private fun FoodTab(
 }
 
 @Composable
-private fun FoodGradeCard(food: ReportFoodCard) {
+private fun FoodGradeCard(
+    food: ReportFoodCard,
+    onClick: () -> Unit = {},
+) {
     val gradeColor =
         when (food.grade) {
             "A" -> GlucoachColors.Primary
@@ -605,6 +668,7 @@ private fun FoodGradeCard(food: ReportFoodCard) {
                 .clip(RoundedCornerShape(GlucoachCorner.card))
                 .border(1.dp, GlucoachColors.Border, RoundedCornerShape(GlucoachCorner.card))
                 .background(GlucoachColors.Surface)
+                .clickable(onClick = onClick)
                 .padding(GlucoachSpacing.md),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -725,6 +789,160 @@ private fun PatternRow(item: PatternItem) {
                 color = GlucoachColors.TextSecondary,
                 fontSize = 13.sp,
                 lineHeight = 18.sp,
+            )
+        }
+    }
+}
+
+// ── 음식 식사 기록 BottomSheet ─────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FoodMealHistorySheet(
+    food: ReportFoodCard,
+    records: List<FoodMealRecord>,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = GlucoachColors.Surface,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = null,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 22.dp)
+                    .padding(top = 24.dp, bottom = 32.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column {
+                    Text(
+                        text = food.name,
+                        color = GlucoachColors.TextSecondary,
+                        fontSize = 13.sp,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "지난 주 식사 기록",
+                        color = GlucoachColors.TextPrimary,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "2026.04.22~2026.04.28",
+                        color = GlucoachColors.TextSecondary,
+                        fontSize = 13.sp,
+                    )
+                }
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = "닫기",
+                        tint = GlucoachColors.TextSecondary,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+            if (records.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "이번 주 식사 기록이 없어요",
+                        color = GlucoachColors.TextSecondary,
+                        fontSize = 14.sp,
+                    )
+                }
+            } else {
+                records.forEachIndexed { index, record ->
+                    if (index == 0 || records[index - 1].date != record.date) {
+                        if (index > 0) Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+                        Text(
+                            text = record.date,
+                            color = GlucoachColors.TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+                    }
+                    MealRecordCard(record)
+                    if (index < records.lastIndex && records[index + 1].date == record.date) {
+                        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MealRecordCard(record: FoodMealRecord) {
+    val icon =
+        when (record.mealType) {
+            "아침" -> Icons.Outlined.WbSunny
+            "점심" -> Icons.Outlined.LightMode
+            else -> Icons.Outlined.DarkMode
+        }
+    val bgColor =
+        when (record.mealType) {
+            "아침" -> Color(0xFFFFF8E1)
+            "점심" -> Color(0xFFDDF3F8)
+            else -> Color(0xFFE8EAF6)
+        }
+
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(GlucoachCorner.card))
+                .background(bgColor)
+                .padding(horizontal = GlucoachSpacing.lg, vertical = GlucoachSpacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = GlucoachColors.TextSecondary,
+            modifier = Modifier.size(24.dp),
+        )
+        Spacer(modifier = Modifier.width(GlucoachSpacing.md))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "${record.mealType} 식사",
+                color = GlucoachColors.TextSecondary,
+                fontSize = 12.sp,
+            )
+            Text(
+                text = record.foodName,
+                color = GlucoachColors.TextPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = "최고 ${record.peakGlucose}mg/dL",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = "복귀 ${record.recoveryTime}",
+                color = GlucoachColors.TextSecondary,
+                fontSize = 11.sp,
             )
         }
     }
