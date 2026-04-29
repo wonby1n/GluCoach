@@ -27,22 +27,26 @@ class TokenManager
             prefs.edit().putString(KEY_EMAIL, email).apply()
         }
 
+        fun saveUserId(userId: String) {
+            prefs.edit().putString(KEY_USER_ID, userId).apply()
+        }
+
         fun getAccessToken(): String? = prefs.getString(KEY_ACCESS, null)
 
         fun getRefreshToken(): String? = prefs.getString(KEY_REFRESH, null)
 
         fun getEmail(): String? = prefs.getString(KEY_EMAIL, null)
 
-        fun saveUserId(userId: String) {
-            prefs.edit().putString(KEY_USER_ID, userId).apply()
-        }
-
         fun getUserId(): String? = prefs.getString(KEY_USER_ID, null)
 
         fun parseUserIdFromJwt(token: String): String? =
             try {
                 val payload = token.split(".").getOrNull(1) ?: return null
-                val decoded = android.util.Base64.decode(payload, android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING)
+                val decoded =
+                    android.util.Base64.decode(
+                        payload,
+                        android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING,
+                    )
                 org.json.JSONObject(String(decoded)).getString("sub")
             } catch (e: Exception) {
                 null

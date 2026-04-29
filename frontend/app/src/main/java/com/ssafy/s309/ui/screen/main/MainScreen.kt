@@ -47,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -119,7 +120,7 @@ fun MainScreenContent(
     onGuardianClick: () -> Unit = {},
     userEmail: String = "",
 ) {
-    var selectedTab by remember { mutableStateOf("home") }
+    var selectedTab by rememberSaveable { mutableStateOf("home") }
     var showFoodScan by remember { mutableStateOf(false) }
     var showReportSheet by remember { mutableStateOf(false) }
     var showAddSheet by remember { mutableStateOf(false) }
