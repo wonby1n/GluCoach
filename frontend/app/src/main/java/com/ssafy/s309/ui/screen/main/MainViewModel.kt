@@ -81,6 +81,27 @@ class MainViewModel
             _uiState.update { it.copy(isNotificationPanelOpen = false) }
         }
 
+        fun selectNotification(item: com.ssafy.s309.data.model.NotificationItem) {
+            _uiState.update { it.copy(selectedNotification = item) }
+        }
+
+        fun dismissNotificationDetail() {
+            val selected =
+                _uiState.value.selectedNotification ?: run {
+                    _uiState.update { it.copy(selectedNotification = null) }
+                    return
+                }
+            _uiState.update { state ->
+                state.copy(
+                    selectedNotification = null,
+                    notifications =
+                        state.notifications.map {
+                            if (it.id == selected.id) it.copy(isUnread = false) else it
+                        },
+                )
+            }
+        }
+
         fun clearAllNotifications() {
             _uiState.update { it.copy(notifications = emptyList()) }
         }

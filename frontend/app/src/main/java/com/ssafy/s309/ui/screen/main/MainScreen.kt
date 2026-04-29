@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -86,6 +87,8 @@ fun MainScreen(
         onBellClick = viewModel::openNotificationPanel,
         onNotificationBack = viewModel::closeNotificationPanel,
         onClearAllNotifications = viewModel::clearAllNotifications,
+        onNotificationClick = viewModel::selectNotification,
+        onDismissNotificationDetail = viewModel::dismissNotificationDetail,
         mascotSlot = mascotSlot,
         bellIcon = bellIcon,
         mealPinIcon = mealPinIcon,
@@ -101,6 +104,8 @@ fun MainScreenContent(
     onBellClick: () -> Unit,
     onNotificationBack: () -> Unit,
     onClearAllNotifications: () -> Unit,
+    onNotificationClick: (com.ssafy.s309.data.model.NotificationItem) -> Unit = {},
+    onDismissNotificationDetail: () -> Unit = {},
     mascotSlot: (@Composable () -> Unit)? = null,
     bellIcon: (@Composable () -> Unit)? = null,
     mealPinIcon: (@Composable () -> Unit)? = null,
@@ -130,7 +135,6 @@ fun MainScreenContent(
                     when (tab) {
                         "profile" -> MyPageContent(onLogoutClick = onLogoutClick, userEmail = userEmail)
                         "edit" -> FoodComparisonContent()
-                        "profile" -> MyPageContent()
                         "meallog" ->
                             MealLogContent(
                                 onBackToHome = { selectedTab = "home" },
@@ -150,6 +154,7 @@ fun MainScreenContent(
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
                                 TodayConditionHeader(
                                     onBellClick = onBellClick,
+                                    hasUnread = state.notifications.any { it.isUnread },
                                     bellIcon = bellIcon,
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
@@ -295,6 +300,20 @@ fun MainScreenContent(
 
         AnimatedVisibility(
             visible = state.isNotificationPanelOpen,
+            enter = fadeIn(animationSpec = tween(durationMillis = 280)),
+            exit = fadeOut(animationSpec = tween(durationMillis = 240)),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.3f))
+                        .clickable(onClick = onNotificationBack),
+            )
+        }
+
+        AnimatedVisibility(
+            visible = state.isNotificationPanelOpen,
             enter =
                 slideInHorizontally(
                     initialOffsetX = { fullWidth -> fullWidth },
@@ -315,6 +334,14 @@ fun MainScreenContent(
                 notifications = state.notifications,
                 onBack = onNotificationBack,
                 onClearAll = onClearAllNotifications,
+                onNotificationClick = onNotificationClick,
+            )
+        }
+
+        if (state.selectedNotification != null) {
+            NotificationDetailOverlay(
+                notification = state.selectedNotification,
+                onDismiss = onDismissNotificationDetail,
             )
         }
     }
@@ -323,7 +350,8 @@ fun MainScreenContent(
 @Composable
 private fun TodayConditionHeader(
     onBellClick: () -> Unit,
-    bellIcon: (@Composable () -> Unit)?,
+    hasUnread: Boolean,
+    bellIcon: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -348,9 +376,18 @@ private fun TodayConditionHeader(
             } else {
                 Icon(
                     imageVector = Icons.Outlined.Notifications,
-                    contentDescription = "알림",
+                    contentDescription = if (hasUnread) "새 알림" else "알림",
                     tint = GlucoachColors.Primary,
                     modifier = Modifier.size(24.dp),
+                )
+            }
+            if (hasUnread) {
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .size(8.dp)
+                            .background(Color(0xFFE53935), shape = CircleShape),
                 )
             }
         }

@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -29,20 +31,12 @@ import com.ssafy.s309.data.model.NotificationItem
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
 
-/**
- * "메인/알림" 화면. 메인 화면 위에 오른쪽에서 슬라이드 인되는 패널로 사용된다.
- *
- * 애니메이션/슬라이드 진입은 상위 [MainScreen] 의 AnimatedVisibility 에서 제어한다.
- *
- * @param notifications 표시할 알림 목록
- * @param onBack 뒤로가기 아이콘 클릭
- * @param onClearAll "모두 지우기" 클릭
- */
 @Composable
 fun NotificationPanel(
     notifications: List<NotificationItem>,
     onBack: () -> Unit,
     onClearAll: () -> Unit,
+    onNotificationClick: (NotificationItem) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -65,7 +59,10 @@ fun NotificationPanel(
                 items = notifications,
                 key = { it.id },
             ) { item ->
-                NotificationRow(item = item)
+                NotificationRow(
+                    item = item,
+                    onClick = { onNotificationClick(item) },
+                )
             }
         }
     }
@@ -78,7 +75,6 @@ private fun NotificationPanelTopBar(onBack: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        // 뒤로가기 아이콘 자리 - 추후 ic_chevron_left drawable 로 교체
         Box(
             modifier =
                 Modifier
@@ -86,7 +82,6 @@ private fun NotificationPanelTopBar(onBack: () -> Unit) {
                     .clickable(onClick = onBack),
             contentAlignment = Alignment.Center,
         ) {
-            // asset 미주입 상태에서는 "<" 텍스트로 대체 (시각적 플레이스홀더)
             Text(
                 text = "<",
                 color = Color.Black,
@@ -125,16 +120,19 @@ private fun NotificationPanelTitleRow(onClearAll: () -> Unit) {
 }
 
 @Composable
-private fun NotificationRow(item: NotificationItem) {
+private fun NotificationRow(
+    item: NotificationItem,
+    onClick: () -> Unit,
+) {
     val textColor = if (item.isUnread) Color.Black else GlucoachColors.TextSecondary
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .height(56.dp),
+                .height(56.dp)
+                .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // 알림 아이콘 자리 - 추후 type 별 drawable 로 교체
         Box(
             modifier =
                 Modifier
@@ -166,6 +164,75 @@ private fun NotificationRow(item: NotificationItem) {
                 color = textColor,
                 fontSize = 12.sp,
             )
+        }
+    }
+}
+
+@Composable
+fun NotificationDetailOverlay(
+    notification: NotificationItem,
+    onDismiss: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f))
+                .clickable(onClick = onDismiss),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth(0.85f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White)
+                    .clickable(enabled = false, onClick = {})
+                    .padding(20.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = notification.title,
+                    color = Color.Black,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = notification.timeAgoText,
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 12.sp,
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = notification.message,
+                color = GlucoachColors.TextPrimary,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.End)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(GlucoachColors.Primary)
+                        .clickable(onClick = onDismiss)
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+            ) {
+                Text(
+                    text = "확인",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
     }
 }
