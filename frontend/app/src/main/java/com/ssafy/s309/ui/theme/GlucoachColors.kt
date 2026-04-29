@@ -19,6 +19,8 @@ object GlucoachColors {
     val StableBadgeText = Color(0xFF00796B)
     val SpikeBadgeBg = Color(0xFFFFE0B2)
     val SpikeBadgeText = Color(0xFFE65100)
+    val SelectBadgeBg = Color(0xFFDDF3F8)
+    val SelectBadgeText = Color(0xFF4EA8BC)
 
     val TipBg = Color(0xFFE8F5E9)
     val TipAccent = Color(0xFF66BB6A)
