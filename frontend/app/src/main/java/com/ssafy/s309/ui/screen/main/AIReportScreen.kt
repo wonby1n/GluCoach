@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.s309.R
@@ -254,50 +255,69 @@ private fun WeeklySummaryRow() {
         horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.md),
     ) {
         summaryCards.forEach { card ->
-            SummaryStatItem(card)
+            SummaryStatItem(card = card, modifier = Modifier.width(130.dp))
         }
     }
 }
 
 @Composable
-private fun SummaryStatItem(card: SummaryCard) {
+private fun SummaryStatItem(
+    card: SummaryCard,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier =
-            Modifier
-                .width(130.dp)
+            modifier
+                .height(120.dp)
                 .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
                 .clip(RoundedCornerShape(GlucoachCorner.card))
                 .background(GlucoachColors.Surface)
                 .padding(GlucoachSpacing.lg),
     ) {
-        Text(
-            text = card.title,
-            color = GlucoachColors.TextSecondary,
-            fontSize = 12.sp,
-        )
-        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
-        Row(verticalAlignment = Alignment.Bottom) {
+        Box(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentAlignment = Alignment.CenterStart,
+        ) {
             Text(
-                text = card.value,
-                color = GlucoachColors.TextPrimary,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = card.unit,
+                text = card.title,
                 color = GlucoachColors.TextSecondary,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(bottom = 4.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
-        Spacer(modifier = Modifier.height(GlucoachSpacing.xs))
-        Text(
-            text = card.changeText,
-            color = card.changeColor,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
+        Box(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = card.value,
+                    color = GlucoachColors.TextPrimary,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = card.unit,
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 11.sp,
+                )
+            }
+        }
+        Box(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Text(
+                text = card.changeText,
+                color = card.changeColor,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
