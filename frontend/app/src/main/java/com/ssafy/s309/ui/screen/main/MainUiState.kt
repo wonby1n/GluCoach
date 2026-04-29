@@ -31,4 +31,5 @@ data class MainUiState(
     val summary: DailyHealthSummary = DailyHealthSummary(0, 0),
     val notifications: List<NotificationItem> = emptyList(),
     val isNotificationPanelOpen: Boolean = false,
+    val selectedNotification: NotificationItem? = null,
 )
