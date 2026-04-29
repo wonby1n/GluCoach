@@ -14,13 +14,45 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.google.firebase.messaging.FirebaseMessaging
+import com.ssafy.s309.data.repository.source.SamsungHealthHolder
 import com.ssafy.s309.navigation.AppNavigation
 import com.ssafy.s309.ui.theme.S309Theme
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
 import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    // Samsung Health SDK 는 Activity 인스턴스를 요구하므로, MainActivity 라이프사이클에
+    // 맞춰 Holder 에 자기 자신을 등록한다. 미지원/미설치 디바이스에서는 Holder 가 내부적으로
+    // null 을 유지하며 SamsungHealthDataSource 가 mock fallback 으로 떨어진다.
+    //
+    // @Inject lateinit var 대신 EntryPointAccessors 를 사용하는 이유: Hilt 2.55 + Kotlin 2.2
+    // 조합에서 members-injection validation 시 dagger 의 kotlin-metadata-jvm 이 metadata
+    // 버전 2.2.0 을 거부하는 이슈가 있다 (class file metadata 2.2 vs lib max 2.1). 필드 주입을
+    // 피하면 해당 validation 경로를 우회한다. constructor injection 은 영향 없음.
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface MainActivityEntryPoint {
+        fun samsungHealthHolder(): SamsungHealthHolder
+    }
+
+    private val samsungHealthHolder: SamsungHealthHolder by lazy {
+        EntryPointAccessors
+            .fromApplication(applicationContext, MainActivityEntryPoint::class.java)
+            .samsungHealthHolder()
+    }
+
+    // Samsung Health 권한 자동 요청은 Activity 라이프타임당 1회만. onResume 마다 다시 띄우면
+    // 사용자가 한 번 거부 후 짜증나므로 가드. SDK 표준 동작상 이미 부여된 권한이면 다이얼로그
+    // 자체가 안 뜨므로 추가 체크 불필요.
+    private var samsungAutoRequested = false
+
     private val notificationPermissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestPermission(),
@@ -30,6 +62,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        samsungHealthHolder.attach(this)
         requestNotificationPermission()
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (task.isSuccessful) Log.d("FCM", "토큰: ${task.result}")
@@ -48,6 +81,34 @@ class MainActivity : ComponentActivity() {
                     AppNavigation()
                 }
             }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        maybeRequestSamsungHealthAtLaunch()
+    }
+
+    override fun onDestroy() {
+        samsungHealthHolder.detach()
+        super.onDestroy()
+    }
+
+    /**
+     * 앱 진입 직후 Samsung Health 권한 다이얼로그를 띄운다 (라이프타임 1회).
+     *
+     * - Activity 가 RESUMED 상태여야 다이얼로그가 표시되므로 onResume 에서 호출.
+     * - SDK 표준 동작상 이미 부여된 권한이면 즉시 리턴되며 다이얼로그가 안 뜸.
+     * - 매니저 null (SDK 미지원/미설치/생성 실패) 또는 API 29 미만이면 no-op.
+     */
+    private fun maybeRequestSamsungHealthAtLaunch() {
+        if (samsungAutoRequested) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        val mgr = samsungHealthHolder.manager ?: return
+        samsungAutoRequested = true
+        lifecycleScope.launch {
+            runCatching { mgr.requestPermissions() }
+                .onFailure { Log.w("MainActivity", "Samsung Health 권한 요청 실패", it) }
         }
     }
 
