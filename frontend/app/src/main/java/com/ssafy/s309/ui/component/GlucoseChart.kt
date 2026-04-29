@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bluetooth
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -102,9 +103,43 @@ fun GlucoseChartCard(
             if (timeLabels.isNotEmpty()) {
                 GlucoseChartTimeAxis(labels = timeLabels)
             }
-        } else if (!isDeviceConnected) {
+        } else if (isDeviceConnected) {
+            ConnectedWaiting()
+        } else {
             DeviceNotConnected()
         }
+    }
+}
+
+@Composable
+private fun ConnectedWaiting() {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(CHART_BODY_HEIGHT + 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(32.dp),
+            color = GlucoachColors.Primary,
+            strokeWidth = 3.dp,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "측정 대기 중",
+            color = GlucoachColors.TextPrimary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "혈당 데이터를 수신하고 있어요",
+            color = GlucoachColors.TextSecondary,
+            fontSize = 11.sp,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
