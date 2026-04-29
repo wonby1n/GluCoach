@@ -44,12 +44,13 @@ MEAL_PATTERN_MAP = {
 LABEL_STEPS = list(range(5, 125, 5))               # [5, 10, ..., 120]
 LABEL_COLS = [f"BG_{t}min" for t in LABEL_STEPS]   # 24개
 
+# meal_time은 sin/cos 두 컬럼으로 대체 (정규화 불필요)
 FEATURE_COLS = [
     "carbs", "meal_time_sin", "meal_time_cos", "current_glucose",
     "fasting_bg", "weight_kg", "activity", "diabetes_type", "meal_pattern",
 ]
 
-# z-score 정규화 대상
+# z-score 정규화 대상 (meal_time_sin/cos, 정수 인코딩 컬럼 제외)
 MODEL1_FEATURE_SCALE_COLS = ["carbs", "current_glucose", "fasting_bg", "weight_kg"]
 
 
@@ -272,6 +273,7 @@ def main(args):
     train, val, test, user_split = split_by_patient(df)
     print(f"   train={len(train)}건  val={len(val)}건  test={len(test)}건")
 
+    # user_split.json 저장
     models_dir.mkdir(parents=True, exist_ok=True)
     with open(models_dir / "user_split.json", "w") as f:
         json.dump(user_split, f, indent=2)
