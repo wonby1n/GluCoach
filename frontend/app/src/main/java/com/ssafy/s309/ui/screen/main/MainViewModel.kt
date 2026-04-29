@@ -32,7 +32,6 @@ class MainViewModel
                 val range = healthRepository.getGlucoseTargetRange()
                 val summary = healthRepository.getTodaySummary()
                 val notifications = healthRepository.getNotifications()
-                val initialSeries = healthRepository.getRecentGlucose()
 
                 _uiState.update { state ->
                     state.copy(
@@ -40,7 +39,6 @@ class MainViewModel
                         glucoseRange = range,
                         summary = summary,
                         notifications = notifications,
-                        glucoseSeries = initialSeries,
                     )
                 }
             }
@@ -49,7 +47,19 @@ class MainViewModel
         private fun observeBleConnection() {
             viewModelScope.launch {
                 healthRepository.bleConnectionState.collect { bleState ->
-                    _uiState.update { it.copy(isDeviceConnected = bleState is BleConnectionState.Connected) }
+                    val connected = bleState is BleConnectionState.Connected
+                    _uiState.update { state ->
+                        if (connected) {
+                            state.copy(isDeviceConnected = true)
+                        } else {
+                            state.copy(
+                                isDeviceConnected = false,
+                                glucoseSeries = emptyList(),
+                                currentGlucoseMgDl = null,
+                                diffFromPrevious = 0,
+                            )
+                        }
+                    }
                 }
             }
         }
