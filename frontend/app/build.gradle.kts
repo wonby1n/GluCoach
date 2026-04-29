@@ -90,9 +90,15 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
 
+    // BLE (FastBle)
+    implementation(libs.fastble)
+
     // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
+
+    // Vico Charts
+    implementation("com.patrykandpatrick.vico:compose-m3:1.15.0")
 
     // Glance (홈화면 위젯)
     implementation(libs.androidx.glance.appwidget)

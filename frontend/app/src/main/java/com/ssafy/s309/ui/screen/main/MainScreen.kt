@@ -10,7 +10,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,10 +30,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.CompareArrows
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.HorizontalDivider
@@ -63,6 +65,10 @@ import com.ssafy.s309.ui.component.GlucoseChartCard
 import com.ssafy.s309.ui.component.SummaryStatCard
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import java.util.TimeZone
 
 @Composable
 fun MainScreen(
@@ -81,6 +87,8 @@ fun MainScreen(
         onBellClick = viewModel::openNotificationPanel,
         onNotificationBack = viewModel::closeNotificationPanel,
         onClearAllNotifications = viewModel::clearAllNotifications,
+        onNotificationClick = viewModel::selectNotification,
+        onDismissNotificationDetail = viewModel::dismissNotificationDetail,
         mascotSlot = mascotSlot,
         bellIcon = bellIcon,
         mealPinIcon = mealPinIcon,
@@ -96,6 +104,8 @@ fun MainScreenContent(
     onBellClick: () -> Unit,
     onNotificationBack: () -> Unit,
     onClearAllNotifications: () -> Unit,
+    onNotificationClick: (com.ssafy.s309.data.model.NotificationItem) -> Unit = {},
+    onDismissNotificationDetail: () -> Unit = {},
     mascotSlot: (@Composable () -> Unit)? = null,
     bellIcon: (@Composable () -> Unit)? = null,
     mealPinIcon: (@Composable () -> Unit)? = null,
@@ -106,6 +116,7 @@ fun MainScreenContent(
     var selectedTab by remember { mutableStateOf("home") }
     var showFoodScan by remember { mutableStateOf(false) }
     var showReportSheet by remember { mutableStateOf(false) }
+    var showAddSheet by remember { mutableStateOf(false) }
 
     Box(
         modifier =
@@ -124,6 +135,11 @@ fun MainScreenContent(
                     when (tab) {
                         "profile" -> MyPageContent(onLogoutClick = onLogoutClick, userEmail = userEmail)
                         "edit" -> FoodComparisonContent()
+                        "meallog" ->
+                            MealLogContent(
+                                onBackToHome = { selectedTab = "home" },
+                            )
+                        "food-comparison" -> FoodComparisonContent()
                         "report" -> AIReportContent()
                         "food-report" -> FoodReportContent()
 
@@ -138,6 +154,7 @@ fun MainScreenContent(
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
                                 TodayConditionHeader(
                                     onBellClick = onBellClick,
+                                    hasUnread = state.notifications.any { it.isUnread },
                                     bellIcon = bellIcon,
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
@@ -149,13 +166,26 @@ fun MainScreenContent(
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
+                                val chartTimeLabels =
+                                    remember {
+                                        val sdf = SimpleDateFormat("HH:mm", Locale.KOREA)
+                                        sdf.timeZone = TimeZone.getTimeZone("Asia/Seoul")
+                                        val cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Seoul"))
+                                        val h = cal.get(Calendar.HOUR_OF_DAY)
+                                        val base = h - (h % 2)
+                                        listOf(-6, -4, -2, 0).map { offset ->
+                                            val c = cal.clone() as Calendar
+                                            c.set(Calendar.HOUR_OF_DAY, base + offset)
+                                            c.set(Calendar.MINUTE, 0)
+                                            sdf.format(c.time)
+                                        }
+                                    }
                                 GlucoseChartCard(
                                     readings = state.glucoseSeries,
                                     range = state.glucoseRange,
-                                    meals = state.meals,
+                                    isDeviceConnected = state.isDeviceConnected,
                                     hoursLabel = "최근 6시간",
-                                    mealPinIcon = mealPinIcon,
-                                    timeLabels = listOf("08:00", "10:00", "12:00", "14:00"),
+                                    timeLabels = chartTimeLabels,
                                     onClick = onGraphClick,
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
@@ -170,7 +200,7 @@ fun MainScreenContent(
                 }
 
                 androidx.compose.animation.AnimatedVisibility(
-                    visible = showReportSheet,
+                    visible = showReportSheet || showAddSheet,
                     enter = fadeIn(animationSpec = tween(durationMillis = 280)),
                     exit = fadeOut(animationSpec = tween(durationMillis = 240)),
                 ) {
@@ -179,7 +209,10 @@ fun MainScreenContent(
                             Modifier
                                 .fillMaxSize()
                                 .background(Color.Black.copy(alpha = 0.3f))
-                                .clickable { showReportSheet = false },
+                                .clickable {
+                                    showReportSheet = false
+                                    showAddSheet = false
+                                },
                     )
                 }
 
@@ -209,6 +242,33 @@ fun MainScreenContent(
                         onClose = { showReportSheet = false },
                     )
                 }
+
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showAddSheet,
+                    enter =
+                        expandVertically(
+                            expandFrom = Alignment.Bottom,
+                            animationSpec = tween(durationMillis = 280),
+                        ),
+                    exit =
+                        shrinkVertically(
+                            shrinkTowards = Alignment.Bottom,
+                            animationSpec = tween(durationMillis = 240),
+                        ),
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                ) {
+                    AddMenuSheet(
+                        onABComparison = {
+                            showAddSheet = false
+                            selectedTab = "food-comparison"
+                        },
+                        onFoodScan = {
+                            showAddSheet = false
+                            showFoodScan = true
+                        },
+                        onClose = { showAddSheet = false },
+                    )
+                }
             }
 
             BottomNavBar(
@@ -216,10 +276,17 @@ fun MainScreenContent(
                 selectedId = selectedTab,
                 onItemClick = { item ->
                     when (item.id) {
-                        "add" -> showFoodScan = true
-                        "report" -> showReportSheet = !showReportSheet
+                        "add" -> {
+                            showReportSheet = false
+                            showAddSheet = !showAddSheet
+                        }
+                        "report" -> {
+                            showAddSheet = false
+                            showReportSheet = !showReportSheet
+                        }
                         else -> {
                             showReportSheet = false
+                            showAddSheet = false
                             selectedTab = item.id
                         }
                     }
@@ -229,6 +296,20 @@ fun MainScreenContent(
 
         if (showFoodScan) {
             FoodScanFlow(onClose = { showFoodScan = false })
+        }
+
+        AnimatedVisibility(
+            visible = state.isNotificationPanelOpen,
+            enter = fadeIn(animationSpec = tween(durationMillis = 280)),
+            exit = fadeOut(animationSpec = tween(durationMillis = 240)),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.3f))
+                        .clickable(onClick = onNotificationBack),
+            )
         }
 
         AnimatedVisibility(
@@ -253,6 +334,14 @@ fun MainScreenContent(
                 notifications = state.notifications,
                 onBack = onNotificationBack,
                 onClearAll = onClearAllNotifications,
+                onNotificationClick = onNotificationClick,
+            )
+        }
+
+        if (state.selectedNotification != null) {
+            NotificationDetailOverlay(
+                notification = state.selectedNotification,
+                onDismiss = onDismissNotificationDetail,
             )
         }
     }
@@ -261,7 +350,8 @@ fun MainScreenContent(
 @Composable
 private fun TodayConditionHeader(
     onBellClick: () -> Unit,
-    bellIcon: (@Composable () -> Unit)?,
+    hasUnread: Boolean,
+    bellIcon: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -281,14 +371,25 @@ private fun TodayConditionHeader(
                     .clickable(onClick = onBellClick),
             contentAlignment = Alignment.Center,
         ) {
-            bellIcon?.invoke()
-                ?: Box(
+            if (bellIcon != null) {
+                bellIcon()
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.Notifications,
+                    contentDescription = if (hasUnread) "새 알림" else "알림",
+                    tint = GlucoachColors.Primary,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            if (hasUnread) {
+                Box(
                     modifier =
                         Modifier
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .border(1.dp, GlucoachColors.PrimaryDark, CircleShape),
+                            .align(Alignment.TopEnd)
+                            .size(8.dp)
+                            .background(Color(0xFFE53935), shape = CircleShape),
                 )
+            }
         }
     }
 }
@@ -324,7 +425,7 @@ private fun defaultBottomNavItems(): List<BottomNavItem> =
         BottomNavItem(id = "home", label = "홈", icon = Icons.Outlined.Home),
         BottomNavItem(id = "report", label = "리포트", icon = Icons.Outlined.Description),
         BottomNavItem(id = "add", label = "추가", icon = Icons.Outlined.Add, isCenter = true),
-        BottomNavItem(id = "edit", label = "기록", icon = Icons.Outlined.EditNote),
+        BottomNavItem(id = "meallog", label = "기록", icon = Icons.Outlined.EditNote),
         BottomNavItem(id = "profile", label = "마이페이지", icon = Icons.Outlined.Person),
     )
 
@@ -406,6 +507,93 @@ private fun ReportMenuSheet(
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = "나의 음식 성적표",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 16.sp,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun AddMenuSheet(
+    onABComparison: () -> Unit,
+    onFoodScan: () -> Unit,
+    onClose: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .shadow(8.dp, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .background(GlucoachColors.Surface)
+                .padding(horizontal = 22.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+        ) {
+            IconButton(
+                onClick = onClose,
+                modifier =
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .size(32.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "닫기",
+                    tint = GlucoachColors.TextSecondary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onABComparison() }
+                    .padding(vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.CompareArrows,
+                contentDescription = null,
+                tint = GlucoachColors.TextPrimary,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "A/B 비교 시뮬레이션",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 16.sp,
+            )
+        }
+
+        HorizontalDivider(color = GlucoachColors.Border)
+
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onFoodScan() }
+                    .padding(vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.CameraAlt,
+                contentDescription = null,
+                tint = GlucoachColors.TextPrimary,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "음식 리포트",
                 color = GlucoachColors.TextPrimary,
                 fontSize = 16.sp,
             )
