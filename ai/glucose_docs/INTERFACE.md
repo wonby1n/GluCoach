@@ -9,9 +9,17 @@
 |---|---|---|---|
 | POST | `/api/predict/glucose/meal` | Model 1 — 식사 시점 → 식후 120분 BG | 사용자가 음식 선택 시 |
 | POST | `/api/predict/glucose/now`  | Model 2 — 현재 시점 → 향후 120분 BG | 식사 외 시점 (한계 있음, 아래 참고) |
+| POST | `/api/predict/glucose/personalize` | 환자별 fine-tune (자동 폐기 로직 있음) | 환자 식사+실측 30+ 페어 쌓이면 |
 | GET  | `/api/predict/glucose/health` | 모델 로드 상태 + GPU 가용성 | 헬스체크 |
 
 **공통**: 응답의 `predicted` 는 항상 24개 (5분 간격, 5~120분). 곡선 시각화용.
+
+### 캘리브레이션은 백엔드 책임
+패치 raw signal → BG 변환은 **백엔드/앱이 패치 제조사 generic 공식 그대로 사용**:
+```
+BG_mg_dl = (0.048 * raw) - 37.93 + correctVal
+```
+환자별 정밀 캘리브레이션은 임상 데이터 충분히 모인 후 도입 예정. 본 AI 서버는 BG (mg/dL) 단위로 입력 받음.
 
 ---
 
@@ -107,7 +115,76 @@
 
 ---
 
-## 3) `GET /api/predict/glucose/health`
+## 3) `POST /api/predict/glucose/personalize`
+
+환자 본인의 식사 + 식후 24개 실측 BG 페어로 base 모델 fine-tune.
+
+### Request
+
+```json
+{
+  "user_id": "kim_001",
+  "user_profile": {
+    "fasting_bg": 100, "weight_kg": 65,
+    "activity": "low", "diabetes_type": "T1D", "meal_pattern": "regular_3"
+  },
+  "history": [
+    {
+      "carbs": 60,
+      "meal_time_iso": "2026-04-15T08:30:00",
+      "current_glucose": 105,
+      "bg_curve": [108, 115, 124, 138, 152, 165, 172, 175, 173, 168, 161, 155, 149, 144, 140, 137, 134, 131, 129, 127, 126, 125, 123, 123]
+    },
+    ...
+  ]
+}
+```
+
+| 필드 | 제약 | 설명 |
+|---|---|---|
+| `history` | min 10개 (권장 30+) | 환자 본인 식사 페어. 각 페어 = 식사 정보 + 식후 24개 실측 BG |
+| `bg_curve` | 정확히 24개 | 식후 5/10/.../120분 BG (mg/dL, raw, 패치 측정값) |
+| `user_profile` | - | 모든 식사에 동일 적용 |
+
+### Response (200)
+
+```json
+{
+  "user_id": "kim_001",
+  "status": "personalized",
+  "n_samples": 30,
+  "base_rmse_30min": 21.0,
+  "personalized_rmse_30min": 17.3,
+  "improvement_percent": 17.6,
+  "message": "17.6% 개선 (base RMSE@30=21.00 → personalized=17.30)"
+}
+```
+
+또는 base 보다 개선 없으면:
+```json
+{
+  "user_id": "kim_001",
+  "status": "rejected",
+  "n_samples": 25,
+  "base_rmse_30min": 21.0,
+  "personalized_rmse_30min": 23.1,
+  "improvement_percent": -10.0,
+  "message": "개선 없음 ... base 그대로 사용."
+}
+```
+
+| 필드 | 의미 |
+|---|---|
+| `status` | `"personalized"` (저장됨, 다음 추론부터 자동 사용) / `"rejected"` (개선 없어 폐기, base 유지) |
+| `improvement_percent` | base 대비 RMSE@30 개선율. 음수면 폐기됨 |
+| `message` | 사용자에게 보여줄 메시지 |
+
+> ⚠️ **자동 폐기 로직**: personalized RMSE 가 base 보다 안 좋으면 모델 파일 만들지 않음. 사용자 손해 없이 안전.
+> 추후 `/meal` 호출 시 자동으로 personalized 모델 사용 (`mode: "personalized"`).
+
+---
+
+## 4) `GET /api/predict/glucose/health`
 
 ### Response (200)
 
@@ -195,3 +272,5 @@ curl http://localhost:8000/api/predict/glucose/health
 | 날짜 | 변경 |
 |---|---|
 | 2026-04-29 | 초기 작성. prefix `/api/predict/glucose/{meal,now}` 분리 (백엔드 팀 표 `/api/predict/glucose` 단일 → 합의 후 분리) |
+| 2026-04-29 | `/api/predict/glucose/personalize` 추가 (환자별 fine-tune + 자동 폐기 로직) |
+| 2026-04-29 | 캘리브레이션은 백엔드/앱 책임 — AI 는 BG (mg/dL) 단위로 입력 받음 (패치 제조사 generic 공식 사용) |

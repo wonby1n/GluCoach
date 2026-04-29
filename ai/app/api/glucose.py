@@ -1,22 +1,28 @@
 """혈당 예측 FastAPI 라우터 (Jira S14P31S309-278).
 
 prefix: /api/predict/glucose
-- POST /meal   — Model 1, 음식 선택 시 식후 120분 예측
-- POST /now    — Model 2, 현재 시점 향후 120분 예측 (식사 없음 가정)
-- GET  /health — 모델 로드 상태
+- POST /meal         — Model 1, 음식 선택 시 식후 120분 예측
+- POST /now          — Model 2, 현재 시점 향후 120분 예측 (식사 없음 가정)
+- POST /personalize  — 환자별 fine-tune (개선 없으면 자동 폐기)
+- GET  /health       — 모델 로드 상태
 """
 
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from app.glucose import interface
+from app.glucose import interface, personalize
+from app.glucose.constants import DEFAULT_MODELS_DIR
+from app.glucose.predict import reset_predictors
 from app.schemas.glucose import (
     HealthResponse,
     MealPredictRequest,
     NowPredictRequest,
+    PersonalizeRequest,
+    PersonalizeResponse,
     PredictResponse,
 )
 
@@ -47,6 +53,60 @@ async def predict_now(req: NowPredictRequest) -> PredictResponse:
     except Exception:
         logger.exception("now prediction failed")
         raise HTTPException(status_code=500, detail="internal error")
+
+
+@router.post("/personalize", response_model=PersonalizeResponse)
+async def personalize_user(req: PersonalizeRequest) -> PersonalizeResponse:
+    """환자별 fine-tune. base 보다 개선 없으면 자동 폐기 (rejected)."""
+    base_path = Path(DEFAULT_MODELS_DIR) / "lstm_meal.pt"
+    if not base_path.exists():
+        raise HTTPException(
+            status_code=503,
+            detail="base 모델 (lstm_meal.pt) 미존재. 학습 필요.",
+        )
+    save_path = Path(DEFAULT_MODELS_DIR) / f"lstm_meal_personalized_{req.user_id}.pt"
+
+    try:
+        result = personalize.finetune_from_history(
+            user_id=req.user_id,
+            history=[item.model_dump() for item in req.history],
+            user_profile=req.user_profile.model_dump(),
+            base_model_path=base_path,
+            save_path=save_path,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception:
+        logger.exception("personalize failed")
+        raise HTTPException(status_code=500, detail="internal error")
+
+    # personalized 모델 변경됐으니 추론 캐시 초기화
+    reset_predictors()
+
+    if result["status"] == "rejected":
+        message = (
+            f"개선 없음 (base RMSE@30={result['base_rmse_30min']:.2f}, "
+            f"personalized={result['personalized_rmse_30min']:.2f}). "
+            f"base 그대로 사용."
+        )
+    else:
+        message = (
+            f"{result['improvement_percent']:.1f}% 개선 "
+            f"(base RMSE@30={result['base_rmse_30min']:.2f} → "
+            f"personalized={result['personalized_rmse_30min']:.2f})"
+        )
+
+    return PersonalizeResponse(
+        user_id=req.user_id,
+        status=result["status"],
+        n_samples=result["n_samples"],
+        base_rmse_30min=result["base_rmse_30min"],
+        personalized_rmse_30min=result["personalized_rmse_30min"],
+        improvement_percent=result["improvement_percent"],
+        message=message,
+    )
 
 
 @router.get("/health", response_model=HealthResponse)

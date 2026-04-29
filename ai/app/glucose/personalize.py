@@ -3,29 +3,19 @@
 base 모델 (lstm_meal.pt) 을 특정 환자 1명의 데이터로 추가 학습 → 그 환자
 전용 모델 (lstm_meal_personalized_{user_id}.pt) 생성.
 
-전제:
-- base 모델 학습 완료 (ai/models/lstm_meal.pt)
-- CSV 에 **user_id 컬럼 유지** (preprocess.py 가 drop 하지 않도록 추가 요청 필요)
-- val 또는 test 환자 중 한 명 선택 (base 가 학습한 적 없는 환자가 의미 있음)
+진입점 두 개:
+- `finetune_meal(...)`: CLI 용, train.csv/val.csv 의 user_id 컬럼으로 필터
+- `finetune_from_history(...)`: API 용, raw history dict 받아서 처리
 
-사용:
-    python -m app.glucose.personalize \\
-        --base models/lstm_meal.pt \\
-        --csv data/processed/val.csv \\
-        --user sim_0042
-
-전략:
-- 카테고리 임베딩 freeze (일반적 표현 보존)
-- encoder + LSTM cell + head 만 fine-tune
-- lr = base lr 의 1/10 (overfit 방지)
-- 환자 데이터 70/30 split (finetune/val_finetune)
-- base 모델 vs personalized 의 val_finetune RMSE 비교 출력
+자동 폐기 로직: personalized 가 base 보다 RMSE@30 안 좋으면 모델 저장 X.
 """
 
 from __future__ import annotations
 
 import argparse
+import math
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -36,12 +26,15 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 
 from app.glucose.constants import (
+    ACTIVITY_MAP,
     DEFAULT_MODELS_DIR,
     DEFAULT_PROCESSED_DIR,
+    DIABETES_TYPE_MAP,
     LABEL_COLS,
     LABEL_STEPS,
     MEAL_CATEGORICAL_COLS,
     MEAL_CONTINUOUS_COLS,
+    MEAL_PATTERN_MAP,
 )
 from app.glucose.data_loader import load_scaler
 from app.glucose.model import MealLSTMDecoder, load_torch_model, save_torch_model
@@ -51,9 +44,12 @@ from app.glucose.seed import set_seed
 KEY_HORIZONS = [30, 60, 120]
 
 
-class _PerUserMealDataset(Dataset):
-    """단일 환자의 행만 담은 임시 Dataset."""
+# ─────────────────────────────────────────────────────────────────────
+# Dataset
+# ─────────────────────────────────────────────────────────────────────
 
+
+class _PerUserMealDataset(Dataset):
     def __init__(self, df: pd.DataFrame) -> None:
         self.x_continuous = df[MEAL_CONTINUOUS_COLS].to_numpy(dtype=np.float32)
         self.x_categorical = df[MEAL_CATEGORICAL_COLS].to_numpy(dtype=np.int64)
@@ -70,6 +66,11 @@ class _PerUserMealDataset(Dataset):
             ),
             torch.from_numpy(self.y[idx]),
         )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 평가 헬퍼
+# ─────────────────────────────────────────────────────────────────────
 
 
 def _inverse_bg(y_norm: np.ndarray, bg_scaler: Any) -> np.ndarray:
@@ -107,10 +108,15 @@ def _print_horizon_summary(label: str, rmse: np.ndarray) -> None:
     print(f"  [{label}] " + ", ".join(parts))
 
 
-def finetune_meal(
+# ─────────────────────────────────────────────────────────────────────
+# 핵심 학습 + 자동 폐기 (두 진입점이 공유)
+# ─────────────────────────────────────────────────────────────────────
+
+
+def _train_eval_save_or_reject(
+    df_user: pd.DataFrame,
+    user_id: str,
     base_model_path: Path,
-    csv_with_user_id: Path,
-    target_user_id: str,
     save_path: Path,
     epochs: int = 15,
     lr: float = 1e-4,
@@ -118,58 +124,53 @@ def finetune_meal(
     batch_size: int = 16,
     device: str = "cuda",
     seed: int = 42,
-) -> None:
+) -> dict[str, Any]:
+    """공통 학습 로직. 자동 폐기 포함.
+
+    Returns:
+        dict {status, n_samples, base_rmse_30min, personalized_rmse_30min,
+              improvement_percent, save_path}
+    """
     device_t = torch.device(device if torch.cuda.is_available() else "cpu")
     print(f"  device: {device_t}")
+
+    if len(df_user) < 10:
+        raise ValueError(
+            f"환자 {user_id} 데이터 너무 적음 ({len(df_user)} 건). 최소 10개 필요."
+        )
+    print(f"  환자 {user_id}: 총 {len(df_user)} 건")
 
     scaler = load_scaler()
     bg_scaler = scaler["bg_target"]
 
-    # 1. CSV 에서 target user 필터
-    df = pd.read_csv(csv_with_user_id)
-    if "user_id" not in df.columns:
-        raise RuntimeError(
-            f"{csv_with_user_id} 에 user_id 컬럼 없음. "
-            "preprocess.py 가 user_id 컬럼을 유지하도록 데이터 담당자에게 요청 필요."
-        )
-    df_user = df[df["user_id"] == target_user_id].reset_index(drop=True)
-    if len(df_user) < 5:
-        raise RuntimeError(
-            f"환자 {target_user_id} 의 데이터가 너무 적음 ({len(df_user)} 건). "
-            "개인화 의미 없음. 환자당 30+ 건 권장."
-        )
-    print(f"  환자 {target_user_id}: 총 {len(df_user)} 건")
-
-    # 2. 70/30 split (random)
+    # 70/30 split
     rng = np.random.default_rng(seed)
     indices = rng.permutation(len(df_user))
-    n_finetune = int(len(df_user) * finetune_ratio)
-    df_ft = df_user.iloc[indices[:n_finetune]].reset_index(drop=True)
-    df_val = df_user.iloc[indices[n_finetune:]].reset_index(drop=True)
+    n_ft = int(len(df_user) * finetune_ratio)
+    df_ft = df_user.iloc[indices[:n_ft]].reset_index(drop=True)
+    df_val = df_user.iloc[indices[n_ft:]].reset_index(drop=True)
     print(f"  finetune={len(df_ft)}, val={len(df_val)}")
 
     ft_loader = DataLoader(_PerUserMealDataset(df_ft), batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(_PerUserMealDataset(df_val), batch_size=batch_size, shuffle=False)
 
-    # 3. base 모델 로드
+    # base 모델 로드
     if not base_model_path.exists():
-        raise RuntimeError(f"base 모델 없음: {base_model_path}. 먼저 train_base.py --model lstm")
-    model, base_meta = load_torch_model(base_model_path, MealLSTMDecoder)
+        raise RuntimeError(f"base 모델 없음: {base_model_path}")
+    model, _ = load_torch_model(base_model_path, MealLSTMDecoder)
     model = model.to(device_t)
 
-    # 4. base 모델로 val 평가 (비교 기준)
+    # base 평가
     base_rmse = _evaluate(model, val_loader, device_t, bg_scaler)
+    base_rmse_30 = float(base_rmse[LABEL_STEPS.index(30)])
     _print_horizon_summary("base", base_rmse)
 
-    # 5. embedding freeze (일반적 표현 보존)
+    # 임베딩 freeze
     for emb in model.cat_embed.embeddings:
         for p in emb.parameters():
             p.requires_grad = False
-    n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    n_frozen = sum(p.numel() for p in model.parameters() if not p.requires_grad)
-    print(f"  freeze: {n_frozen:,}, trainable: {n_trainable:,}")
 
-    # 6. fine-tune
+    # fine-tune
     optim = torch.optim.Adam(
         [p for p in model.parameters() if p.requires_grad], lr=lr
     )
@@ -200,22 +201,43 @@ def finetune_meal(
             f"val RMSE_30={rmse_30:.2f}  ({time.time()-t0:.1f}s)"
         )
         if rmse_30 < best_rmse:
-            best_rmse = rmse_30
+            best_rmse = float(rmse_30)
             best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
 
     if best_state is not None:
         model.load_state_dict(best_state)
 
-    # 7. 결과 비교
+    # 결과 비교
     final_rmse = _evaluate(model, val_loader, device_t, bg_scaler)
+    final_rmse_30 = float(final_rmse[LABEL_STEPS.index(30)])
+    delta_30 = base_rmse_30 - final_rmse_30
+    pct = 100 * delta_30 / base_rmse_30 if base_rmse_30 > 0 else 0.0
+
     print()
     _print_horizon_summary("base", base_rmse)
     _print_horizon_summary("pers", final_rmse)
-
-    delta_30 = float(base_rmse[LABEL_STEPS.index(30)] - final_rmse[LABEL_STEPS.index(30)])
     sign = "↓" if delta_30 > 0 else "↑"
-    pct = 100 * delta_30 / base_rmse[LABEL_STEPS.index(30)]
     print(f"  Δ@30min = {abs(delta_30):.2f} mg/dL {sign}  ({pct:+.1f}%)")
+
+    # 자동 폐기: personalized 가 base 보다 안 좋으면 저장 X
+    if delta_30 <= 0:
+        print(
+            f"\n  ✗ rejected: base 보다 RMSE 개선 없음. 모델 저장 안 함, base 그대로 사용."
+        )
+        # 기존 personalized 파일이 있으면 삭제 (이전 학습 결과 유지하지 않음)
+        if save_path.exists():
+            save_path.unlink()
+            meta_path = save_path.with_suffix(save_path.suffix + ".meta.json")
+            if meta_path.exists():
+                meta_path.unlink()
+        return {
+            "status": "rejected",
+            "n_samples": int(len(df_user)),
+            "base_rmse_30min": base_rmse_30,
+            "personalized_rmse_30min": final_rmse_30,
+            "improvement_percent": float(pct),
+            "save_path": None,
+        }
 
     # 저장
     save_torch_model(
@@ -224,7 +246,7 @@ def finetune_meal(
         meta={
             "model_class": "MealLSTMDecoder",
             "base_model": str(base_model_path),
-            "target_user_id": target_user_id,
+            "target_user_id": user_id,
             "n_finetune": int(len(df_ft)),
             "n_val": int(len(df_val)),
             "epochs": epochs,
@@ -234,7 +256,152 @@ def finetune_meal(
             "improvement_30min_mg_dl": delta_30,
         },
     )
-    print(f"\n  saved: {save_path}")
+    print(f"\n  ✓ saved: {save_path}")
+    return {
+        "status": "personalized",
+        "n_samples": int(len(df_user)),
+        "base_rmse_30min": base_rmse_30,
+        "personalized_rmse_30min": final_rmse_30,
+        "improvement_percent": float(pct),
+        "save_path": str(save_path),
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 진입점 1: CLI (CSV 에서 환자 필터)
+# ─────────────────────────────────────────────────────────────────────
+
+
+def finetune_meal(
+    base_model_path: Path,
+    csv_with_user_id: Path,
+    target_user_id: str,
+    save_path: Path,
+    epochs: int = 15,
+    lr: float = 1e-4,
+    finetune_ratio: float = 0.7,
+    batch_size: int = 16,
+    device: str = "cuda",
+    seed: int = 42,
+) -> dict[str, Any]:
+    """CLI 용. 정규화된 train/val csv 에서 user_id 컬럼으로 필터."""
+    df = pd.read_csv(csv_with_user_id)
+    if "user_id" not in df.columns:
+        raise RuntimeError(f"{csv_with_user_id} 에 user_id 컬럼 없음.")
+    df_user = df[df["user_id"] == target_user_id].reset_index(drop=True)
+
+    return _train_eval_save_or_reject(
+        df_user=df_user,
+        user_id=target_user_id,
+        base_model_path=base_model_path,
+        save_path=save_path,
+        epochs=epochs,
+        lr=lr,
+        finetune_ratio=finetune_ratio,
+        batch_size=batch_size,
+        device=device,
+        seed=seed,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 진입점 2: API (raw history dict 받아서 처리)
+# ─────────────────────────────────────────────────────────────────────
+
+
+def finetune_from_history(
+    user_id: str,
+    history: list[dict[str, Any]],
+    user_profile: dict[str, Any],
+    base_model_path: Path,
+    save_path: Path,
+    epochs: int = 15,
+    lr: float = 1e-4,
+    finetune_ratio: float = 0.7,
+    batch_size: int = 16,
+    device: str = "cuda",
+    seed: int = 42,
+) -> dict[str, Any]:
+    """API 용. raw history list 를 정규화된 DataFrame 으로 변환 후 학습.
+
+    Args:
+        user_id: 환자 ID
+        history: list of {carbs, meal_time_iso, current_glucose, bg_curve: [24]}
+        user_profile: {fasting_bg, weight_kg, activity, diabetes_type, meal_pattern}
+                      (모든 식사에 동일 적용)
+        base_model_path: lstm_meal.pt
+        save_path: 출력 경로 (lstm_meal_personalized_{user_id}.pt)
+    """
+    set_seed(seed)
+    scaler = load_scaler()
+    feature_scaler = scaler["model1_features"]
+    bg_scaler = scaler["bg_target"]
+
+    try:
+        activity_int = ACTIVITY_MAP[user_profile["activity"]]
+        dtype_int = DIABETES_TYPE_MAP[user_profile["diabetes_type"]]
+        meal_pattern_int = MEAL_PATTERN_MAP[user_profile["meal_pattern"]]
+    except KeyError as e:
+        raise ValueError(f"unknown enum value: {e}") from e
+
+    fasting_bg = float(user_profile["fasting_bg"])
+    weight_kg = float(user_profile["weight_kg"])
+
+    rows: list[dict[str, Any]] = []
+    for item in history:
+        carbs = float(item["carbs"])
+        current_glucose = float(item["current_glucose"])
+        bg_curve = list(item["bg_curve"])
+        if len(bg_curve) != 24:
+            raise ValueError(f"bg_curve must have 24 values, got {len(bg_curve)}")
+
+        # meal_time → sin/cos
+        dt = datetime.fromisoformat(item["meal_time_iso"].replace("Z", "+00:00"))
+        hour = dt.hour + dt.minute / 60.0 + dt.second / 3600.0
+        sin_t = math.sin(2 * math.pi * hour / 24.0)
+        cos_t = math.cos(2 * math.pi * hour / 24.0)
+
+        # 4개 컬럼 정규화: [carbs, current_glucose, fasting_bg, weight_kg]
+        raw_4 = np.array([[carbs, current_glucose, fasting_bg, weight_kg]], dtype=np.float32)
+        scaled_4 = feature_scaler.transform(raw_4)[0]
+
+        # BG 정규화
+        bg_norm = bg_scaler.transform(np.array(bg_curve).reshape(-1, 1)).flatten()
+
+        row: dict[str, Any] = {
+            "user_id": user_id,
+            "carbs": float(scaled_4[0]),
+            "meal_time_sin": sin_t,
+            "meal_time_cos": cos_t,
+            "current_glucose": float(scaled_4[1]),
+            "fasting_bg": float(scaled_4[2]),
+            "weight_kg": float(scaled_4[3]),
+            "activity": activity_int,
+            "diabetes_type": dtype_int,
+            "meal_pattern": meal_pattern_int,
+        }
+        for i, t in enumerate(LABEL_STEPS):
+            row[f"BG_{t}min"] = float(bg_norm[i])
+        rows.append(row)
+
+    df_user = pd.DataFrame(rows)
+    return _train_eval_save_or_reject(
+        df_user=df_user,
+        user_id=user_id,
+        base_model_path=base_model_path,
+        save_path=save_path,
+        epochs=epochs,
+        lr=lr,
+        finetune_ratio=finetune_ratio,
+        batch_size=batch_size,
+        device=device,
+        seed=seed,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# CLI
+# ─────────────────────────────────────────────────────────────────────
 
 
 def main() -> None:
@@ -259,7 +426,7 @@ def main() -> None:
     save_path = out_dir / f"lstm_meal_personalized_{args.user}.pt"
 
     print(f"[Personalize] user={args.user}")
-    finetune_meal(
+    result = finetune_meal(
         base_model_path=Path(args.base),
         csv_with_user_id=Path(args.csv),
         target_user_id=args.user,
@@ -269,6 +436,7 @@ def main() -> None:
         batch_size=args.batch_size,
         device=args.device,
     )
+    print(f"\nresult: {result}")
 
 
 if __name__ == "__main__":

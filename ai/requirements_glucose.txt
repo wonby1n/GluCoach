@@ -24,5 +24,3 @@ pydantic_settings
 # 시각화 / 평가
 matplotlib>=3.7
 
-# 시뮬레이터 (직접 호출 필요 시)
-# simglucose  # 팀 보강 버전 사용 중이므로 주석 처리

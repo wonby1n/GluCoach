@@ -99,6 +99,43 @@ class NowPredictRequest(BaseModel):
 
 
 # ─────────────────────────────────────────────────────────────────────
+# 개인화 fine-tune
+# ─────────────────────────────────────────────────────────────────────
+
+
+class MealHistoryItem(BaseModel):
+    """환자 본인의 식사 + 식후 24개 실측 BG 페어 (fine-tune 학습 데이터)."""
+
+    carbs: float = Field(ge=0, le=300)
+    meal_time_iso: str
+    current_glucose: float = Field(ge=20, le=600)
+    bg_curve: list[float] = Field(
+        min_length=24,
+        max_length=24,
+        description="식후 5/10/15/.../120분 BG 24개 (mg/dL, raw)",
+    )
+
+
+class PersonalizeRequest(BaseModel):
+    user_id: str = Field(min_length=1)
+    user_profile: UserProfileWithPattern
+    history: list[MealHistoryItem] = Field(
+        min_length=10,
+        description="환자 본인 식사+실측 페어. 최소 10개. 권장 30+",
+    )
+
+
+class PersonalizeResponse(BaseModel):
+    user_id: str
+    status: Literal["personalized", "rejected"]
+    n_samples: int
+    base_rmse_30min: float
+    personalized_rmse_30min: float
+    improvement_percent: float = Field(description="음수면 base 가 더 좋음 (rejected)")
+    message: str
+
+
+# ─────────────────────────────────────────────────────────────────────
 # Health
 # ─────────────────────────────────────────────────────────────────────
 
