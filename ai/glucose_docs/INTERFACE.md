@@ -7,15 +7,15 @@
 
 | Method | Path | 역할 | 호출 시점 |
 |---|---|---|---|
-| POST | `/inference/glucose/meal` | Model 1 — 식사 시점 → 식후 120분 BG | 사용자가 음식 선택 시 |
-| POST | `/inference/glucose/now`  | Model 2 — 현재 시점 → 향후 120분 BG | 식사 외 시점 (한계 있음, 아래 참고) |
-| GET  | `/inference/glucose/health` | 모델 로드 상태 + GPU 가용성 | 헬스체크 |
+| POST | `/api/predict/glucose/meal` | Model 1 — 식사 시점 → 식후 120분 BG | 사용자가 음식 선택 시 |
+| POST | `/api/predict/glucose/now`  | Model 2 — 현재 시점 → 향후 120분 BG | 식사 외 시점 (한계 있음, 아래 참고) |
+| GET  | `/api/predict/glucose/health` | 모델 로드 상태 + GPU 가용성 | 헬스체크 |
 
 **공통**: 응답의 `predicted` 는 항상 24개 (5분 간격, 5~120분). 곡선 시각화용.
 
 ---
 
-## 1) `POST /inference/glucose/meal`
+## 1) `POST /api/predict/glucose/meal`
 
 ### Request
 
@@ -74,7 +74,7 @@
 
 ---
 
-## 2) `POST /inference/glucose/now`
+## 2) `POST /api/predict/glucose/now`
 
 > ⚠️ **한계 명시**: 시뮬레이터의 식사 사이 BG 동역학이 단순(basal 평형 + 인슐린 잔효)해서 본 모델 정확도는 식사 시점 모델보다 낮습니다. 실제 환자의 운동/스트레스/dawn phenomenon 등은 반영되지 않습니다.
 
@@ -107,7 +107,7 @@
 
 ---
 
-## 3) `GET /inference/glucose/health`
+## 3) `GET /api/predict/glucose/health`
 
 ### Response (200)
 
@@ -147,7 +147,7 @@
 
 ### Model 1
 ```bash
-curl -X POST http://localhost:8000/inference/glucose/meal \
+curl -X POST http://localhost:8000/api/predict/glucose/meal \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "test",
@@ -162,7 +162,7 @@ curl -X POST http://localhost:8000/inference/glucose/meal \
 
 ### Model 2
 ```bash
-curl -X POST http://localhost:8000/inference/glucose/now \
+curl -X POST http://localhost:8000/api/predict/glucose/now \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "test",
@@ -175,7 +175,7 @@ curl -X POST http://localhost:8000/inference/glucose/now \
 
 ### Health
 ```bash
-curl http://localhost:8000/inference/glucose/health
+curl http://localhost:8000/api/predict/glucose/health
 ```
 
 ---
@@ -194,4 +194,4 @@ curl http://localhost:8000/inference/glucose/health
 
 | 날짜 | 변경 |
 |---|---|
-| 2026-04-29 | 초기 작성. prefix `/inference/glucose/{meal,now}` 분리 (백엔드 팀 표 `/inference/glucose` 단일 → 합의 후 분리) |
+| 2026-04-29 | 초기 작성. prefix `/api/predict/glucose/{meal,now}` 분리 (백엔드 팀 표 `/api/predict/glucose` 단일 → 합의 후 분리) |

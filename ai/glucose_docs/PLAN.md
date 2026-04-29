@@ -109,9 +109,9 @@
 - [ ] **P4-5**: FastAPI 라우터 (Jira 278 본체)
   - `app/schemas/glucose.py` — Pydantic 스키마 두 세트 (MealRequest/Response, NowRequest/Response)
   - `app/api/glucose.py`:
-    - `POST /ai/predict/glucose/meal` → interface.predict_meal_response
-    - `POST /ai/predict/glucose/now` → interface.predict_now
-    - `GET /ai/predict/glucose/health`
+    - `POST /api/predict/glucose/meal` → interface.predict_meal_response
+    - `POST /api/predict/glucose/now` → interface.predict_now
+    - `GET /api/predict/glucose/health`
   - `app/main.py` 에 include_router
 
 **예상 시간**: 3시간

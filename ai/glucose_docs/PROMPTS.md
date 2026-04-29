@@ -11,7 +11,7 @@
 > - **두 모델 병행**:
 >   - Model 1 (식사 시점): 9 features → 24 BG (식후 5~120분)
 >   - Model 2 (현재 시점): 12 timestep BG + profile 4 → 24 BG (향후 5~120분)
-> - 엔드포인트 분리: `POST /ai/predict/glucose/meal`, `POST /ai/predict/glucose/now`
+> - 엔드포인트 분리: `POST /api/predict/glucose/meal`, `POST /api/predict/glucose/now`
 > - 입력 dim 변경: meal_time → meal_time_sin, meal_time_cos (cyclic 변환, 입력 8 → 9)
 > - **BG 출력 z-score 정규화**: 학습은 정규화된 값, 추론 시 inverse_transform
 > - scaler.pkl 구조: dict (`model1_features, bg_target, profile`)
@@ -724,7 +724,7 @@ class NowPredictRequest(BaseModel):
 
 (2) app/api/glucose.py — 라우터
 
-router = APIRouter(prefix="/ai/predict/glucose", tags=["glucose"])
+router = APIRouter(prefix="/api/predict/glucose", tags=["glucose"])
 
 @router.post("/meal", response_model=PredictResponse)
 async def predict_meal(req: MealPredictRequest):
@@ -758,9 +758,9 @@ app.include_router(glucose_router.router)
 테스트:
 - uvicorn app.main:app --reload
 - /docs 에서 두 엔드포인트 보임
-- /ai/predict/glucose/meal 더미 요청: T1D, 라면 80g, recent_values 단일 → 24 BG 응답
-- /ai/predict/glucose/now 더미 요청: recent_values 12개, profile → 24 BG 응답
-- /ai/predict/glucose/health 정상 응답
+- /api/predict/glucose/meal 더미 요청: T1D, 라면 80g, recent_values 단일 → 24 BG 응답
+- /api/predict/glucose/now 더미 요청: recent_values 12개, profile → 24 BG 응답
+- /api/predict/glucose/health 정상 응답
 - 잘못된 요청(recent_values 11개 → /now) → 422 자동 거절
 ```
 

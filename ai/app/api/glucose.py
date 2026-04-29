@@ -1,6 +1,6 @@
 """혈당 예측 FastAPI 라우터 (Jira S14P31S309-278).
 
-prefix: /inference/glucose
+prefix: /api/predict/glucose
 - POST /meal   — Model 1, 음식 선택 시 식후 120분 예측
 - POST /now    — Model 2, 현재 시점 향후 120분 예측 (식사 없음 가정)
 - GET  /health — 모델 로드 상태
@@ -22,7 +22,7 @@ from app.schemas.glucose import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/inference/glucose", tags=["glucose"])
+router = APIRouter(prefix="/api/predict/glucose", tags=["glucose"])
 
 
 @router.post("/meal", response_model=PredictResponse)

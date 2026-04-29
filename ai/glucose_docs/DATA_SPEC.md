@@ -260,7 +260,7 @@ with open("ai/models/scaler.pkl", "wb") as f:
 
 ## 추론 시 전처리 (서버 측)
 
-### Model 1 (`POST /ai/predict/glucose/meal`)
+### Model 1 (`POST /api/predict/glucose/meal`)
 
 API 요청에서 받은 raw 값 → 학습 시 형식으로 변환:
 
@@ -271,7 +271,7 @@ API 요청에서 받은 raw 값 → 학습 시 형식으로 변환:
 5. `scaler["model1_features"]` 로 transform (4개 컬럼)
 6. 모델 forward → 정규화된 24개 BG → `scaler["bg_target"].inverse_transform(...)` → raw mg/dL 응답
 
-### Model 2 (`POST /ai/predict/glucose/now`)
+### Model 2 (`POST /api/predict/glucose/now`)
 
 1. `recent_values` (최근 60분 BG, 12개) → `scaler["bg_target"].transform(reshape(-1,1)).flatten()`
    - 클라이언트가 12개보다 적게 보내면 0번째 값으로 padding 또는 에러 (정책 결정 필요)

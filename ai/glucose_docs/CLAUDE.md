@@ -36,8 +36,8 @@ SSAFY 캡스톤. 화이바이오메드 비침습 CGM 패치를 위한 AI 백엔�
 본 폴더(ai/)는 자체 FastAPI 서버 (`ai/app/main.py`).
 - **추론 코드**: `ai/app/glucose/` — 모델 학습/추론/평가 함수
 - **REST API** (Jira 278): `ai/app/api/glucose.py`
-  - `POST /ai/predict/glucose/meal` — Model 1, 음식 선택 시점에서 식후 120분 예측
-  - `POST /ai/predict/glucose/now` — Model 2, 현재 시점에서 향후 120분 예측 (식사 없음 가정)
+  - `POST /api/predict/glucose/meal` — Model 1, 음식 선택 시점에서 식후 120분 예측
+  - `POST /api/predict/glucose/now` — Model 2, 현재 시점에서 향후 120분 예측 (식사 없음 가정)
 - **백엔드 협의 결과** (Step 0):
   - 사용자 파라미터(`fasting_bg, weight_kg, activity, diabetes_type`)는 백엔드가 본 ai 서버에 함께 넘김
   - 응답: **24개 BG 시퀀스** (5분 간격, 곡선 시각화용)
@@ -54,7 +54,7 @@ SSAFY 캡스톤. 화이바이오메드 비침습 CGM 패치를 위한 AI 백엔�
 | 출력 | 식후 120분 BG (24개, 5분 간격) | 향후 120분 BG (24개, 5분 간격) |
 | 데이터 | `processed/{train,val,test}.csv` (meal-event flat) | `processed/timeseries/{train,val,test}.npz` (sliding window) |
 | 모델 | Ridge / MLP / LSTM(encoder-decoder) | LSTM time-series |
-| 엔드포인트 | `/ai/predict/glucose/meal` | `/ai/predict/glucose/now` |
+| 엔드포인트 | `/api/predict/glucose/meal` | `/api/predict/glucose/now` |
 
 **환자 단위 70/15/15 분할** — 두 모델 모두 같은 환자 split 유지 (모델 1과 2의 train 환자가 같은 풀, val/test 도 동일 환자 셋). 같은 환자 데이터가 train+test에 동시 포함되지 않도록.
 
@@ -196,7 +196,7 @@ ai/
 │   ├── main.py          ← FastAPI 엔트리포인트 (이미 존재)
 │   ├── api/             ← FastAPI 라우터 (이미 존재, glucose.py 추가)
 │   │   ├── __init__.py
-│   │   └── glucose.py   ← /ai/predict/glucose/{meal,now} 두 엔드포인트
+│   │   └── glucose.py   ← /api/predict/glucose/{meal,now} 두 엔드포인트
 │   ├── schemas/         ← Pydantic 모델 (이미 존재)
 │   │   └── glucose.py   ← 요청/응답 스키마 (Model 1, Model 2 둘 다)
 │   ├── glucose/         ← 본 모듈 (추론 코드), 새로 생성
