@@ -9,7 +9,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -54,6 +53,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -354,16 +355,19 @@ private fun WeeklyGlucoseChart() {
 
         val chartHeight = 150.dp
 
-        BoxWithConstraints(
+        var chartWidthPx by remember { mutableIntStateOf(0) }
+        val density = LocalDensity.current
+        val widthDp = with(density) { chartWidthPx.toDp() }
+        val stepDp = if (weeklyGlucose.size > 1 && chartWidthPx > 0) widthDp / (weeklyGlucose.size - 1) else 0.dp
+
+        Box(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .height(chartHeight)
-                    .padding(horizontal = 14.dp),
+                    .padding(horizontal = 14.dp)
+                    .onSizeChanged { chartWidthPx = it.width },
         ) {
-            val widthDp = maxWidth
-            val stepDp = if (weeklyGlucose.size > 1) widthDp / (weeklyGlucose.size - 1) else 0.dp
-
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
