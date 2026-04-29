@@ -47,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,6 +79,8 @@ fun MainScreen(
     mealPinIcon: (@Composable () -> Unit)? = null,
     onGraphClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    onGuardianClick: () -> Unit = {},
     userEmail: String = "",
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -94,6 +97,8 @@ fun MainScreen(
         mealPinIcon = mealPinIcon,
         onGraphClick = onGraphClick,
         onLogoutClick = onLogoutClick,
+        onSettingsClick = onSettingsClick,
+        onGuardianClick = onGuardianClick,
         userEmail = userEmail,
     )
 }
@@ -111,9 +116,11 @@ fun MainScreenContent(
     mealPinIcon: (@Composable () -> Unit)? = null,
     onGraphClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    onGuardianClick: () -> Unit = {},
     userEmail: String = "",
 ) {
-    var selectedTab by remember { mutableStateOf("home") }
+    var selectedTab by rememberSaveable { mutableStateOf("home") }
     var showFoodScan by remember { mutableStateOf(false) }
     var showReportSheet by remember { mutableStateOf(false) }
     var showAddSheet by remember { mutableStateOf(false) }
@@ -133,7 +140,13 @@ fun MainScreenContent(
                     label = "tab-crossfade",
                 ) { tab ->
                     when (tab) {
-                        "profile" -> MyPageContent(onLogoutClick = onLogoutClick, userEmail = userEmail)
+                        "profile" ->
+                            MyPageContent(
+                                onLogoutClick = onLogoutClick,
+                                onHealthDetailClick = onSettingsClick,
+                                onGuardianClick = onGuardianClick,
+                                userEmail = userEmail,
+                            )
                         "edit" -> FoodComparisonContent()
                         "meallog" ->
                             MealLogContent(

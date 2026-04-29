@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.FamilyRestroom
 import androidx.compose.material.icons.outlined.ManageAccounts
 import androidx.compose.material.icons.outlined.SentimentSatisfied
 import androidx.compose.material.icons.outlined.Settings
@@ -34,6 +35,7 @@ import com.ssafy.s309.ui.theme.GlucoachSpacing
 fun MyPageContent(
     onAccountClick: () -> Unit = {},
     onHealthDetailClick: () -> Unit = {},
+    onGuardianClick: () -> Unit = {},
     onDeviceClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
@@ -72,6 +74,11 @@ fun MyPageContent(
             icon = Icons.Outlined.SentimentSatisfied,
             title = "건강 세부사항",
             onClick = onHealthDetailClick,
+        )
+        InfoMenuItem(
+            icon = Icons.Outlined.FamilyRestroom,
+            title = "보호자 관리",
+            onClick = onGuardianClick,
         )
         InfoMenuItem(
             icon = Icons.Outlined.Smartphone,
