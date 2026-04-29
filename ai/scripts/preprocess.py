@@ -283,9 +283,9 @@ def main(args):
     train, val, test = normalize(train, val, test, models_dir)
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    train.drop(columns=["user_id"]).to_csv(output_dir / "train.csv", index=False)
-    val.drop(columns=["user_id"]).to_csv(output_dir / "val.csv", index=False)
-    test.drop(columns=["user_id"]).to_csv(output_dir / "test.csv", index=False)
+    train.to_csv(output_dir / "train.csv", index=False)
+    val.to_csv(output_dir / "val.csv", index=False)
+    test.to_csv(output_dir / "test.csv", index=False)
 
     print(f"Step 6. 저장 완료: {output_dir}")
     print(f"   feature 컬럼 (9개): {FEATURE_COLS}")
