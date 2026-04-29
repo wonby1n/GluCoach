@@ -135,7 +135,6 @@ fun MainScreenContent(
                     when (tab) {
                         "profile" -> MyPageContent(onLogoutClick = onLogoutClick, userEmail = userEmail)
                         "edit" -> FoodComparisonContent()
-                        "profile" -> MyPageContent()
                         "meallog" ->
                             MealLogContent(
                                 onBackToHome = { selectedTab = "home" },
