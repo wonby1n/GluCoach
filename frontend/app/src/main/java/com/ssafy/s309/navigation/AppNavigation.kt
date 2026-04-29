@@ -22,6 +22,7 @@ import com.ssafy.s309.ui.screen.auth.LandingScreen
 import com.ssafy.s309.ui.screen.auth.LoginScreen
 import com.ssafy.s309.ui.screen.auth.SignInScreen
 import com.ssafy.s309.ui.screen.auth.SignUpScreen
+import com.ssafy.s309.ui.screen.health.HealthSourceScreen
 import com.ssafy.s309.ui.screen.main.MainScreen
 import com.ssafy.s309.ui.screen.onboarding.BasicHealthInfoScreen
 import com.ssafy.s309.ui.screen.onboarding.BloodSugarRangeScreen
@@ -59,6 +60,8 @@ sealed class Screen(val route: String) {
     object Main : Screen("main")
 
     object Graph : Screen("graph")
+
+    object HealthSource : Screen("health_source")
 }
 
 @Composable
@@ -221,6 +224,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     )
                 },
                 onGraphClick = { navController.navigate(Screen.Graph.route) },
+                onConnectedDeviceClick = { navController.navigate(Screen.HealthSource.route) },
                 onLogoutClick = { authViewModel.logout() },
                 userEmail = authViewModel.userEmail,
             )
@@ -229,6 +233,11 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             GraphScreen(
                 onBack = { navController.popBackStack() },
                 onNavigateTo = { navController.popBackStack() },
+            )
+        }
+        composable(Screen.HealthSource.route) {
+            HealthSourceScreen(
+                onBack = { navController.popBackStack() },
             )
         }
     }

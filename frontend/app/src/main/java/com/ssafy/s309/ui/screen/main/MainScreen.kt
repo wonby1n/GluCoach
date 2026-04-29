@@ -71,6 +71,7 @@ fun MainScreen(
     bellIcon: (@Composable () -> Unit)? = null,
     mealPinIcon: (@Composable () -> Unit)? = null,
     onGraphClick: () -> Unit = {},
+    onConnectedDeviceClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
     userEmail: String = "",
 ) {
@@ -85,6 +86,7 @@ fun MainScreen(
         bellIcon = bellIcon,
         mealPinIcon = mealPinIcon,
         onGraphClick = onGraphClick,
+        onConnectedDeviceClick = onConnectedDeviceClick,
         onLogoutClick = onLogoutClick,
         userEmail = userEmail,
     )
@@ -100,6 +102,7 @@ fun MainScreenContent(
     bellIcon: (@Composable () -> Unit)? = null,
     mealPinIcon: (@Composable () -> Unit)? = null,
     onGraphClick: () -> Unit = {},
+    onConnectedDeviceClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
     userEmail: String = "",
 ) {
@@ -122,7 +125,12 @@ fun MainScreenContent(
                     label = "tab-crossfade",
                 ) { tab ->
                     when (tab) {
-                        "profile" -> MyPageContent(onLogoutClick = onLogoutClick, userEmail = userEmail)
+                        "profile" ->
+                            MyPageContent(
+                                onLogoutClick = onLogoutClick,
+                                userEmail = userEmail,
+                                onDeviceClick = onConnectedDeviceClick,
+                            )
                         "edit" -> FoodComparisonContent()
                         "report" -> AIReportContent()
                         "food-report" -> FoodReportContent()
