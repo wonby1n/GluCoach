@@ -25,6 +25,7 @@ class AuthRepository
                 val response = authApi.signup(SignupRequest(email, password))
                 tokenManager.saveTokens(response.accessToken, response.refreshToken)
                 tokenManager.saveEmail(email)
+                tokenManager.parseUserIdFromJwt(response.accessToken)?.let { tokenManager.saveUserId(it) }
                 response
             }
 
@@ -36,6 +37,7 @@ class AuthRepository
                 val response = authApi.login(LoginRequest(email, password))
                 tokenManager.saveTokens(response.accessToken, response.refreshToken)
                 tokenManager.saveEmail(email)
+                tokenManager.parseUserIdFromJwt(response.accessToken)?.let { tokenManager.saveUserId(it) }
                 response
             }
 

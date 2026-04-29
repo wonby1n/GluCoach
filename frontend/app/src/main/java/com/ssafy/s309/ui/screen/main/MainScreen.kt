@@ -78,6 +78,8 @@ fun MainScreen(
     mealPinIcon: (@Composable () -> Unit)? = null,
     onGraphClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    onGuardianClick: () -> Unit = {},
     userEmail: String = "",
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -94,6 +96,8 @@ fun MainScreen(
         mealPinIcon = mealPinIcon,
         onGraphClick = onGraphClick,
         onLogoutClick = onLogoutClick,
+        onSettingsClick = onSettingsClick,
+        onGuardianClick = onGuardianClick,
         userEmail = userEmail,
     )
 }
@@ -111,6 +115,8 @@ fun MainScreenContent(
     mealPinIcon: (@Composable () -> Unit)? = null,
     onGraphClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    onGuardianClick: () -> Unit = {},
     userEmail: String = "",
 ) {
     var selectedTab by remember { mutableStateOf("home") }
@@ -133,7 +139,13 @@ fun MainScreenContent(
                     label = "tab-crossfade",
                 ) { tab ->
                     when (tab) {
-                        "profile" -> MyPageContent(onLogoutClick = onLogoutClick, userEmail = userEmail)
+                        "profile" ->
+                            MyPageContent(
+                                onLogoutClick = onLogoutClick,
+                                onHealthDetailClick = onSettingsClick,
+                                onGuardianClick = onGuardianClick,
+                                userEmail = userEmail,
+                            )
                         "edit" -> FoodComparisonContent()
                         "meallog" ->
                             MealLogContent(
