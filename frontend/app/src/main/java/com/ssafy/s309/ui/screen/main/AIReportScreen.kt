@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -325,6 +328,12 @@ private fun SummaryStatItem(
 
 @Composable
 private fun WeeklyGlucoseChart() {
+    var selectedIndex by remember { mutableStateOf<Int?>(null) }
+    val days = listOf("월", "화", "수", "목", "금", "토", "일")
+    val minVal = 50f
+    val maxVal = 200f
+    val range = maxVal - minVal
+
     Column(
         modifier =
             Modifier
@@ -345,18 +354,19 @@ private fun WeeklyGlucoseChart() {
 
         val chartHeight = 150.dp
 
-        Box(
+        BoxWithConstraints(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(chartHeight),
+                    .height(chartHeight)
+                    .padding(horizontal = 14.dp),
         ) {
+            val widthDp = maxWidth
+            val stepDp = if (weeklyGlucose.size > 1) widthDp / (weeklyGlucose.size - 1) else 0.dp
+
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
-                val minVal = 50f
-                val maxVal = 200f
-                val range = maxVal - minVal
 
                 fun yFor(v: Float) = h - ((v - minVal) / range) * h
 
@@ -389,14 +399,7 @@ private fun WeeklyGlucoseChart() {
                                 val x0 = (i - 1) * step
                                 val x1 = i * step
                                 val cx = (x0 + x1) / 2f
-                                cubicTo(
-                                    cx,
-                                    yFor(points[i - 1]),
-                                    cx,
-                                    yFor(points[i]),
-                                    x1,
-                                    yFor(points[i]),
-                                )
+                                cubicTo(cx, yFor(points[i - 1]), cx, yFor(points[i]), x1, yFor(points[i]))
                             }
                         }
                     drawPath(
@@ -405,22 +408,48 @@ private fun WeeklyGlucoseChart() {
                         style = Stroke(width = 2.5f, cap = StrokeCap.Round),
                     )
 
+                    selectedIndex?.let { idx ->
+                        val cx = idx * step
+                        val cy = yFor(points[idx])
+                        drawLine(
+                            color = GlucoachColors.TextSecondary,
+                            start = Offset(cx, cy + 12f),
+                            end = Offset(cx, h),
+                            strokeWidth = 1.5f,
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)),
+                        )
+                    }
+
                     points.forEachIndexed { i, v ->
                         val cx = i * step
                         val cy = yFor(v)
-                        drawCircle(
-                            color = GlucoachColors.Surface,
-                            radius = 6f,
-                            center = Offset(cx, cy),
-                        )
-                        drawCircle(
-                            color = GlucoachColors.Primary,
-                            radius = 5f,
-                            center = Offset(cx, cy),
-                            style = Stroke(width = 2.5f),
-                        )
+                        if (selectedIndex == i) {
+                            drawCircle(color = GlucoachColors.Primary, radius = 8f, center = Offset(cx, cy))
+                            drawCircle(color = GlucoachColors.Surface, radius = 4f, center = Offset(cx, cy))
+                        } else {
+                            drawCircle(color = GlucoachColors.Surface, radius = 6f, center = Offset(cx, cy))
+                            drawCircle(color = GlucoachColors.Primary, radius = 5f, center = Offset(cx, cy), style = Stroke(width = 2.5f))
+                        }
                     }
                 }
+            }
+
+            selectedIndex?.let { idx ->
+                val v = weeklyGlucose[idx]
+                val text = "${v.toInt()}"
+                val textHalfWidth = (text.length * 3.5f).dp
+                val cx = stepDp * idx
+                val cyRatio = 1f - ((v - minVal) / range)
+                val cy = chartHeight * cyRatio
+                val tipX = (cx - textHalfWidth).coerceIn(0.dp, widthDp - textHalfWidth * 2)
+                val tipY = maxOf(0.dp, cy - 28.dp)
+                Text(
+                    text = text,
+                    color = GlucoachColors.Primary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.offset(x = tipX, y = tipY),
+                )
             }
 
             Text(
@@ -446,12 +475,23 @@ private fun WeeklyGlucoseChart() {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            listOf("월", "화", "수", "목", "금", "토", "일").forEach { day ->
-                Text(
-                    text = day,
-                    color = GlucoachColors.TextSecondary,
-                    fontSize = 12.sp,
-                )
+            days.forEachIndexed { idx, day ->
+                val isSelected = selectedIndex == idx
+                Box(
+                    modifier =
+                        Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(if (isSelected) GlucoachColors.Primary else Color.Transparent)
+                            .clickable { selectedIndex = if (selectedIndex == idx) null else idx },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = day,
+                        color = if (isSelected) Color.White else GlucoachColors.TextSecondary,
+                        fontSize = 12.sp,
+                    )
+                }
             }
         }
     }
