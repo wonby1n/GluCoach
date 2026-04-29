@@ -54,18 +54,18 @@ class MainViewModel
 
         private fun observeGlucoseStream() {
             viewModelScope.launch {
-                healthRepository.glucoseStream.collect { reading ->
+                healthRepository.glucoseHistory.collect { history ->
+                    val current = history.lastOrNull() ?: return@collect
+                    val diff =
+                        if (history.size >= 2) {
+                            current.valueMgDl - history[history.lastIndex - 1].valueMgDl
+                        } else {
+                            0
+                        }
                     _uiState.update { state ->
-                        val newSeries = (state.glucoseSeries + reading).takeLast(100)
-                        val diff =
-                            if (newSeries.size >= 2) {
-                                reading.valueMgDl - newSeries[newSeries.lastIndex - 1].valueMgDl
-                            } else {
-                                0
-                            }
                         state.copy(
-                            glucoseSeries = newSeries,
-                            currentGlucoseMgDl = reading.valueMgDl,
+                            glucoseSeries = history,
+                            currentGlucoseMgDl = current.valueMgDl,
                             diffFromPrevious = diff,
                         )
                     }

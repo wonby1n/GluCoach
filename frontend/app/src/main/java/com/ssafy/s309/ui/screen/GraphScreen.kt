@@ -372,7 +372,7 @@ private fun GraphScreenLandscape(
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(text = "최고 ", fontSize = 11.sp, color = Color(0xFF888888))
                                 Text(
-                                    text = "${chartData.max().toInt()}",
+                                    text = "${(chartData.maxOrNull() ?: 0f).toInt()}",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF333333),
@@ -383,7 +383,7 @@ private fun GraphScreenLandscape(
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(text = "최저 ", fontSize = 11.sp, color = Color(0xFF888888))
                                 Text(
-                                    text = "${chartData.min().toInt()}",
+                                    text = "${(chartData.minOrNull() ?: 0f).toInt()}",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF333333),
@@ -603,7 +603,7 @@ private fun HighLowRow(chartData: List<Float> = dummyGlucoseData) {
         Spacer(modifier = Modifier.width(6.dp))
         Text(text = "최고 ", fontSize = 15.sp, color = Color(0xFF888888))
         Text(
-            text = "${chartData.max().toInt()}",
+            text = "${(chartData.maxOrNull() ?: 0f).toInt()}",
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             color = Color(0xFF333333),
@@ -613,7 +613,7 @@ private fun HighLowRow(chartData: List<Float> = dummyGlucoseData) {
         Spacer(modifier = Modifier.width(6.dp))
         Text(text = "최저 ", fontSize = 15.sp, color = Color(0xFF888888))
         Text(
-            text = "${chartData.min().toInt()}",
+            text = "${(chartData.minOrNull() ?: 0f).toInt()}",
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             color = Color(0xFF333333),
@@ -636,6 +636,7 @@ private fun GlucoseCanvas(
         val chartW = w - leftPad
 
         val n = data.size
+        if (n < 2) return@Canvas
         val stepX = chartW / (n - 1)
 
         fun xOf(i: Int) = leftPad + i * stepX
@@ -702,7 +703,7 @@ private fun GlucoseCanvas(
         drawCircle(color = Primary, radius = 8f, center = Offset(lastX, lastY))
         drawCircle(color = Color.White, radius = 4f, center = Offset(lastX, lastY))
 
-        val peakIdx = data.indexOf(data.max())
+        val peakIdx = data.indexOf(data.maxOrNull() ?: return@Canvas)
         drawCircle(color = colorDanger.copy(alpha = 0.2f), radius = 18f, center = Offset(xOf(peakIdx), yOf(data[peakIdx])))
         drawCircle(color = colorDanger, radius = 8f, center = Offset(xOf(peakIdx), yOf(data[peakIdx])))
         drawCircle(color = Color.White, radius = 4f, center = Offset(xOf(peakIdx), yOf(data[peakIdx])))
