@@ -14,7 +14,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Bluetooth
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -31,11 +36,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.s309.data.model.GlucoseRange
 import com.ssafy.s309.data.model.GlucoseReading
-import com.ssafy.s309.data.model.MealEvent
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
@@ -56,10 +61,9 @@ import kotlin.math.min
 fun GlucoseChartCard(
     readings: List<GlucoseReading>,
     range: GlucoseRange,
-    meals: List<MealEvent>,
     modifier: Modifier = Modifier,
+    isDeviceConnected: Boolean = false,
     hoursLabel: String = "최근 6시간",
-    mealPinIcon: (@Composable () -> Unit)? = null,
     timeLabels: List<String> = emptyList(),
     onClick: (() -> Unit)? = null,
 ) {
@@ -94,16 +98,89 @@ fun GlucoseChartCard(
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
 
-        GlucoseChartBody(
-            readings = readings,
-            range = range,
-            meals = meals,
-            mealPinIcon = mealPinIcon,
-        )
-
-        if (timeLabels.isNotEmpty()) {
-            GlucoseChartTimeAxis(labels = timeLabels)
+        if (readings.isNotEmpty()) {
+            GlucoseChartBody(readings = readings, range = range)
+            if (timeLabels.isNotEmpty()) {
+                GlucoseChartTimeAxis(labels = timeLabels)
+            }
+        } else if (isDeviceConnected) {
+            ConnectedWaiting()
+        } else {
+            DeviceNotConnected()
         }
+    }
+}
+
+@Composable
+private fun ConnectedWaiting() {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(CHART_BODY_HEIGHT + 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(32.dp),
+            color = GlucoachColors.Primary,
+            strokeWidth = 3.dp,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "측정 대기 중",
+            color = GlucoachColors.TextPrimary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "혈당 데이터를 수신하고 있어요",
+            color = GlucoachColors.TextSecondary,
+            fontSize = 11.sp,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun DeviceNotConnected() {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(CHART_BODY_HEIGHT + 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(40.dp)
+                    .background(GlucoachColors.Background, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Bluetooth,
+                contentDescription = null,
+                tint = GlucoachColors.Primary,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "기기가 연동되어 있지 않아요",
+            color = GlucoachColors.TextPrimary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "기기를 연동하면 혈당 흐름을 확인할 수 있어요",
+            color = GlucoachColors.TextSecondary,
+            fontSize = 11.sp,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -111,8 +188,6 @@ fun GlucoseChartCard(
 private fun GlucoseChartBody(
     readings: List<GlucoseReading>,
     range: GlucoseRange,
-    meals: List<MealEvent>,
-    mealPinIcon: (@Composable () -> Unit)?,
 ) {
     // 축 라벨 계산
     val yMax = max(range.maxMgDl, readings.maxOfOrNull { it.valueMgDl } ?: range.maxMgDl) + 20
@@ -252,67 +327,7 @@ private fun GlucoseChartBody(
                 )
             }
         }
-
-        // 5) 식사 핀 — 그래프 하단(시간 축 바로 위)에 배치.
-        //    matchParentSize 로 차트 본문 전체를 덮은 뒤 verticalBias=1f 로 하단 정렬,
-        //    Canvas 와 동일한 수평 패딩을 적용해 x 좌표가 그래프 x축과 일치한다.
-        meals.forEach { meal ->
-            val ratio =
-                ((meal.timestampMillis - minTime).toFloat() / timeSpan.toFloat())
-                    .coerceIn(0f, 1f)
-            MealPin(
-                pinIcon = mealPinIcon,
-                horizontalBias = ratio,
-                modifier = Modifier.matchParentSize(),
-            )
-        }
     }
-}
-
-@Composable
-private fun MealPin(
-    pinIcon: (@Composable () -> Unit)?,
-    horizontalBias: Float,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier =
-            modifier.padding(
-                start = CHART_X_START_PADDING,
-                end = CHART_X_END_PADDING,
-            ),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .align(alignmentFor(horizontalBias))
-                    .size(MEAL_PIN_SIZE),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (pinIcon != null) {
-                pinIcon()
-            } else {
-                // 자리 표시자: asset 주입 전에도 위치 확인 가능
-                Box(
-                    modifier =
-                        Modifier
-                            .size(16.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(GlucoachColors.TextSecondary),
-                )
-            }
-        }
-    }
-}
-
-/**
- * 0f..1f 를 Compose Alignment 로 근사 변환한다.
- * Canvas 와 정확히 정렬하려면 BoxWithConstraints + dp 오프셋으로 교체 가능.
- */
-private fun alignmentFor(bias: Float): Alignment {
-    val clamped = bias.coerceIn(0f, 1f)
-    val horizontal = -1f + 2f * clamped
-    return androidx.compose.ui.BiasAlignment(horizontalBias = horizontal, verticalBias = 1f)
 }
 
 /** X축 시간 라벨 행 (예: 08:00 / 10:00 / 12:00 / 14:00) */

@@ -1,6 +1,12 @@
 package com.ssafy.s309.data.repository
 
+
 import android.util.Log
+
+import com.ssafy.s309.data.ble.BleConnectionState
+import com.ssafy.s309.data.ble.BleManager
+import com.ssafy.s309.data.ble.BleProcessingSettings
+import com.ssafy.s309.data.ble.ScannedDevice
 import com.ssafy.s309.data.model.DailyHealthSummary
 import com.ssafy.s309.data.model.GlucoseRange
 import com.ssafy.s309.data.model.GlucoseReading
@@ -10,11 +16,13 @@ import com.ssafy.s309.data.repository.source.HealthConnectDataSource
 import com.ssafy.s309.data.repository.source.HealthDataSource
 import com.ssafy.s309.data.repository.source.MockHealthDataSource
 import com.ssafy.s309.data.repository.source.SamsungHealthDataSource
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 건강/혈당 관련 데이터를 조회하는 Repository.
+ * 건강/혈당 관련 데이터 + BLE 패치 통신을 단일 진입점으로 노출하는 Repository.
  *
  * 외부 시그니처는 변경되지 않는다 — MainViewModel 등 호출부는 영향받지 않는다.
  *
@@ -25,6 +33,12 @@ import javax.inject.Singleton
  *
  * 권한 미부여 / SDK 미지원 / 매니저 생성 실패 등 어떤 상황에서도 mock 으로 안전하게
  * 떨어지므로, 디바이스 환경과 무관하게 메인 화면은 항상 동일하게 동작한다.
+ * UI(ViewModel) 는 이 클래스만 의존하면 되고, 내부적으로 [BleManager] 를 통해 패치와 통신한다.
+ *
+ * 데이터 소스 현재 상태:
+ * - 정적 조회 메서드(`getRecentGlucose` 등): mock 데이터 (BE 연동 시 [TODO] 영역 교체)
+ * - [glucoseStream]: BLE 패치에서 도착하는 실시간 측정 값 — 실제 데이터
+ * - BLE 연결/제어: [BleManager] 위임
  */
 @Singleton
 class HealthRepository
@@ -41,6 +55,66 @@ class HealthRepository
         /** 최근 혈당 흐름. 메인 화면 그래프에 사용. */
         suspend fun getRecentGlucose(hours: Int = 6): List<GlucoseReading> =
             firstNonEmptyList { it.getRecentGlucose(hours) } ?: mockDataSource.getRecentGlucose(hours)
+        private val bleManager: BleManager,
+        // TODO(BE 연동): 실제 API 연결 시 주입 활성화
+        // private val healthApi: HealthApi,
+    ) {
+        // ────────────────────────────────────────
+        // BLE 상태 / 스트림 (UI 가 collect)
+        // ────────────────────────────────────────
+
+        /** 패치 연결 상태 (Idle / Scanning / Connecting / Connected / Disconnected / Error). */
+        val bleConnectionState: StateFlow<BleConnectionState> = bleManager.connectionState
+
+        /** 스캔으로 발견된 패치 후보 목록. */
+        val scannedDevices: StateFlow<List<ScannedDevice>> = bleManager.scannedDevices
+
+        /** 패치에서 도착하는 실시간 혈당 측정 값 (이벤트 스트림). */
+        val glucoseStream: SharedFlow<GlucoseReading> = bleManager.glucoseReadings
+
+        /** 패치에서 누적된 혈당 히스토리 (최대 100개, 앱 수명 동안 유지). */
+        val glucoseHistory: StateFlow<List<GlucoseReading>> = bleManager.glucoseHistory
+
+        /** 데이터 처리 설정 스냅샷 (보정값 / 스파이크 임계값 / 출력타입 / 주기평균). */
+        val bleProcessingSettings: StateFlow<BleProcessingSettings> = bleManager.processingSettings
+
+        // ────────────────────────────────────────
+        // BLE 액션 (UI 의 사용자 입력에 의해 호출)
+        // ────────────────────────────────────────
+
+        /** 현재 기기가 BLE 를 지원하는지. */
+        fun isBleSupported(): Boolean = bleManager.isBleSupported()
+
+        /** 블루투스가 켜져 있는지. */
+        fun isBluetoothEnabled(): Boolean = bleManager.isBluetoothEnabled()
+
+        /** 블루투스 활성화 시스템 다이얼로그 띄우기. */
+        fun requestEnableBluetooth() = bleManager.requestEnableBluetooth()
+
+        /** 주변 패치 스캔 시작. */
+        fun startBleScan() = bleManager.startScan()
+
+        /** 진행 중인 스캔 중단. */
+        fun stopBleScan() = bleManager.stopScan()
+
+        /** 선택한 패치에 연결. */
+        fun connectBleDevice(device: ScannedDevice) = bleManager.connect(device)
+
+        /** 현재 연결된 패치와 끊기. */
+        fun disconnectBleDevice() = bleManager.disconnect()
+
+        /** 데이터 처리 설정 변경 (보정값/스파이크 임계값/출력 타입/주기 평균 일괄). */
+        fun updateBleProcessingSettings(settings: BleProcessingSettings) = bleManager.updateProcessingSettings(settings)
+
+        // ────────────────────────────────────────
+        // 정적 조회 (현재 mock — BE 연동 후 교체)
+        // ────────────────────────────────────────
+
+        /** 최근 혈당 흐름. 메인 화면 그래프 초기 로드용. */
+        suspend fun getRecentGlucose(hours: Int = 6): List<GlucoseReading> {
+            // TODO(BE 연동): return healthApi.getRecentGlucose(hours)
+            return MOCK_GLUCOSE_SERIES
+        }
 
         /** 사용자 목표 혈당 범위 (그래프의 회색 박스). */
         suspend fun getGlucoseTargetRange(): GlucoseRange =

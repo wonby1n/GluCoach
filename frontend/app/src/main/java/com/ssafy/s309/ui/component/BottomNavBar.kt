@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -56,6 +57,7 @@ fun BottomNavBar(
         modifier =
             modifier
                 .fillMaxWidth()
+                .navigationBarsPadding()
                 .height(BOTTOM_BAR_HEIGHT)
                 .background(GlucoachColors.Surface)
                 .border(width = 1.dp, color = GlucoachColors.Border)

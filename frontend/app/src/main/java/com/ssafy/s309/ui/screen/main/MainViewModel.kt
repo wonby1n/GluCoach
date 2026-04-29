@@ -2,6 +2,7 @@ package com.ssafy.s309.ui.screen.main
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ssafy.s309.data.ble.BleConnectionState
 import com.ssafy.s309.data.repository.HealthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,12 +12,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * 메인 화면 ViewModel.
- *
- * 현재는 [HealthRepository] 가 mock 데이터를 반환한다. BE 연동 시 Repository 내부만 교체되며
- * 이 ViewModel 은 변경이 불필요하다.
- */
 @HiltViewModel
 class MainViewModel
     @Inject
@@ -28,36 +23,64 @@ class MainViewModel
 
         init {
             loadDashboard()
+            observeBleConnection()
+            observeGlucoseStream()
         }
 
-        /** 메인 화면 초기/갱신 로드. 풀-투-리프레시 등 재사용 가능. */
         fun loadDashboard() {
             viewModelScope.launch {
-                val series = healthRepository.getRecentGlucose()
                 val range = healthRepository.getGlucoseTargetRange()
-                val meals = healthRepository.getTodayMeals()
                 val summary = healthRepository.getTodaySummary()
                 val notifications = healthRepository.getNotifications()
-
-                val current = series.lastOrNull()?.valueMgDl
-                val diff =
-                    if (series.size >= 2 && current != null) {
-                        current - series[series.lastIndex - 1].valueMgDl
-                    } else {
-                        0
-                    }
 
                 _uiState.update { state ->
                     state.copy(
                         isLoading = false,
-                        currentGlucoseMgDl = current,
-                        diffFromPrevious = diff,
-                        glucoseSeries = series,
                         glucoseRange = range,
-                        meals = meals,
                         summary = summary,
                         notifications = notifications,
                     )
+                }
+            }
+        }
+
+        private fun observeBleConnection() {
+            viewModelScope.launch {
+                healthRepository.bleConnectionState.collect { bleState ->
+                    val connected = bleState is BleConnectionState.Connected
+                    _uiState.update { state ->
+                        if (connected) {
+                            state.copy(isDeviceConnected = true)
+                        } else {
+                            state.copy(
+                                isDeviceConnected = false,
+                                glucoseSeries = emptyList(),
+                                currentGlucoseMgDl = null,
+                                diffFromPrevious = 0,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        private fun observeGlucoseStream() {
+            viewModelScope.launch {
+                healthRepository.glucoseHistory.collect { history ->
+                    val current = history.lastOrNull() ?: return@collect
+                    val diff =
+                        if (history.size >= 2) {
+                            current.valueMgDl - history[history.lastIndex - 1].valueMgDl
+                        } else {
+                            0
+                        }
+                    _uiState.update { state ->
+                        state.copy(
+                            glucoseSeries = history,
+                            currentGlucoseMgDl = current.valueMgDl,
+                            diffFromPrevious = diff,
+                        )
+                    }
                 }
             }
         }
@@ -70,8 +93,28 @@ class MainViewModel
             _uiState.update { it.copy(isNotificationPanelOpen = false) }
         }
 
+        fun selectNotification(item: com.ssafy.s309.data.model.NotificationItem) {
+            _uiState.update { it.copy(selectedNotification = item) }
+        }
+
+        fun dismissNotificationDetail() {
+            val selected =
+                _uiState.value.selectedNotification ?: run {
+                    _uiState.update { it.copy(selectedNotification = null) }
+                    return
+                }
+            _uiState.update { state ->
+                state.copy(
+                    selectedNotification = null,
+                    notifications =
+                        state.notifications.map {
+                            if (it.id == selected.id) it.copy(isUnread = false) else it
+                        },
+                )
+            }
+        }
+
         fun clearAllNotifications() {
             _uiState.update { it.copy(notifications = emptyList()) }
-            // TODO(BE 연동): healthRepository 에 clearAll API 추가 후 호출
         }
     }

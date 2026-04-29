@@ -22,12 +22,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.EditNote
-import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Bluetooth
 import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,15 +50,20 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ssafy.s309.ui.component.BottomNavBar
-import com.ssafy.s309.ui.component.BottomNavItem
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ssafy.s309.data.ble.BleConnectionState
+import com.ssafy.s309.ui.screen.ble.BleViewModel
 import com.ssafy.s309.ui.theme.Primary
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Locale
+import java.util.TimeZone
 
 private val dummyGlucoseData = listOf(98f, 112f, 145f, 188f, 210f, 195f, 172f, 150f)
-private val dummyTimeLabels = listOf("12:00", "12:05", "12:10", "12:15", "12:20", "12:25", "12:30", "현재")
 private val yAxisValues = listOf(250, 180, 140, 70, 0)
 private val dayLabels = listOf("월", "화", "수", "목", "금", "토", "일")
 
@@ -75,8 +78,26 @@ private fun glucoseColor(value: Float) =
         else -> colorNormal
     }
 
+private fun getKrTimeLabels(
+    count: Int = 8,
+    intervalMinutes: Int = 5,
+): List<String> {
+    val sdf = SimpleDateFormat("HH:mm", Locale.KOREA)
+    sdf.timeZone = TimeZone.getTimeZone("Asia/Seoul")
+    val cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Seoul"))
+    return (count - 1 downTo 0).map { i ->
+        if (i == 0) {
+            "현재"
+        } else {
+            val c = cal.clone() as Calendar
+            c.add(Calendar.MINUTE, -(i * intervalMinutes))
+            sdf.format(c.time)
+        }
+    }
+}
+
 private fun getCurrentWeekDates(): Pair<List<Int>, Int> {
-    val cal = Calendar.getInstance()
+    val cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Seoul"))
     val todayDow = cal.get(Calendar.DAY_OF_WEEK)
     val offsetToMonday = if (todayDow == Calendar.SUNDAY) -6 else -(todayDow - Calendar.MONDAY)
     cal.add(Calendar.DAY_OF_MONTH, offsetToMonday)
@@ -93,22 +114,27 @@ private fun getCurrentWeekDates(): Pair<List<Int>, Int> {
 @Composable
 fun GraphScreen(
     onBack: () -> Unit = {},
-    onNavigateTo: (String) -> Unit = {},
+    onNavigateToBle: () -> Unit = {},
+    bleViewModel: BleViewModel = hiltViewModel(),
 ) {
+    val connectionState by bleViewModel.connectionState.collectAsStateWithLifecycle()
+    val glucoseReadings by bleViewModel.glucoseReadings.collectAsStateWithLifecycle()
+    val isDeviceConnected = connectionState is BleConnectionState.Connected
+
+    val displayData =
+        if (glucoseReadings.isNotEmpty()) {
+            glucoseReadings.map { it.valueMgDl.toFloat() }
+        } else if (isDeviceConnected) {
+            listOf(0f, 0f)
+        } else {
+            dummyGlucoseData
+        }
+
     val (weekDates, todayIndex) = remember { getCurrentWeekDates() }
     var selectedDay by remember { mutableIntStateOf(todayIndex) }
-    val currentValue = dummyGlucoseData.last()
+    val currentValue = glucoseReadings.lastOrNull()?.valueMgDl?.toFloat() ?: 0f
     val currentColor = glucoseColor(currentValue)
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-    val navItems =
-        listOf(
-            BottomNavItem(id = "home", label = "홈", icon = Icons.Outlined.Home),
-            BottomNavItem(id = "report", label = "리포트", icon = Icons.Outlined.Description),
-            BottomNavItem(id = "add", label = "추가", icon = Icons.Outlined.Add, isCenter = true),
-            BottomNavItem(id = "edit", label = "기록", icon = Icons.Outlined.EditNote),
-            BottomNavItem(id = "profile", label = "마이페이지", icon = Icons.Outlined.Person),
-        )
 
     if (isLandscape) {
         GraphScreenLandscape(
@@ -118,9 +144,10 @@ fun GraphScreen(
             onDaySelect = { selectedDay = it },
             currentValue = currentValue,
             currentColor = currentColor,
-            navItems = navItems,
             onBack = onBack,
-            onNavigateTo = onNavigateTo,
+            onNavigateToBle = onNavigateToBle,
+            isDeviceConnected = isDeviceConnected,
+            chartData = displayData,
         )
     } else {
         GraphScreenPortrait(
@@ -130,9 +157,10 @@ fun GraphScreen(
             onDaySelect = { selectedDay = it },
             currentValue = currentValue,
             currentColor = currentColor,
-            navItems = navItems,
             onBack = onBack,
-            onNavigateTo = onNavigateTo,
+            onNavigateToBle = onNavigateToBle,
+            isDeviceConnected = isDeviceConnected,
+            chartData = displayData,
         )
     }
 }
@@ -147,9 +175,10 @@ private fun GraphScreenPortrait(
     onDaySelect: (Int) -> Unit,
     currentValue: Float,
     currentColor: Color,
-    navItems: List<BottomNavItem>,
     onBack: () -> Unit,
-    onNavigateTo: (String) -> Unit,
+    onNavigateToBle: () -> Unit = {},
+    isDeviceConnected: Boolean = false,
+    chartData: List<Float> = dummyGlucoseData,
 ) {
     Column(
         modifier =
@@ -160,11 +189,10 @@ private fun GraphScreenPortrait(
         Column(
             modifier =
                 Modifier
-                    .weight(1f)
+                    .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 24.dp, vertical = 52.dp),
         ) {
-            // 헤더
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -192,56 +220,56 @@ private fun GraphScreenPortrait(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 현재 혈당 수치
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = "${currentValue.toInt()}",
-                    fontSize = 80.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = currentColor,
-                    lineHeight = 80.sp,
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Column(modifier = Modifier.padding(bottom = 14.dp)) {
-                    Text(text = "mg/dL", fontSize = 18.sp, color = Color(0xFF888888))
-                    Spacer(modifier = Modifier.height(4.dp))
-                    GlucoseStatusBadge(currentValue, currentColor)
+            if (!isDeviceConnected) {
+                DeviceNotConnectedPlaceholder(onNavigateToBle = onNavigateToBle)
+            } else {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = "${currentValue.toInt()}",
+                        fontSize = 80.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = currentColor,
+                        lineHeight = 80.sp,
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.padding(bottom = 14.dp)) {
+                        Text(text = "mg/dL", fontSize = 18.sp, color = Color(0xFF888888))
+                        Spacer(modifier = Modifier.height(4.dp))
+                        GlucoseStatusBadge(currentValue, currentColor)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                GlucoseRangeLegend()
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .shadow(8.dp, RoundedCornerShape(20.dp))
+                            .background(Color.White, RoundedCornerShape(20.dp))
+                            .padding(horizontal = 20.dp, vertical = 24.dp),
+                ) {
+                    DaySelector(
+                        weekDates = weekDates,
+                        todayIndex = todayIndex,
+                        selectedDay = selectedDay,
+                        onDaySelect = onDaySelect,
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    HighLowRow(chartData = chartData)
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    GlucoseCanvas(modifier = Modifier.fillMaxWidth().height(300.dp), data = chartData)
                 }
             }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // 카드
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .shadow(8.dp, RoundedCornerShape(20.dp))
-                        .background(Color.White, RoundedCornerShape(20.dp))
-                        .padding(horizontal = 20.dp, vertical = 24.dp),
-            ) {
-                DaySelector(
-                    weekDates = weekDates,
-                    todayIndex = todayIndex,
-                    selectedDay = selectedDay,
-                    onDaySelect = onDaySelect,
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                HighLowRow()
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                GlucoseCanvas(modifier = Modifier.fillMaxWidth().height(300.dp))
-            }
         }
-
-        BottomNavBar(
-            items = navItems,
-            selectedId = "home",
-            onItemClick = { onNavigateTo(it.id) },
-        )
     }
 }
 
@@ -255,151 +283,221 @@ private fun GraphScreenLandscape(
     onDaySelect: (Int) -> Unit,
     currentValue: Float,
     currentColor: Color,
-    navItems: List<BottomNavItem>,
     onBack: () -> Unit,
-    onNavigateTo: (String) -> Unit,
+    onNavigateToBle: () -> Unit = {},
+    isDeviceConnected: Boolean = false,
+    chartData: List<Float> = dummyGlucoseData,
 ) {
-    Column(
+    Box(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF2F4F5)),
+                .background(Color(0xFFF2F4F5))
+                .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        // 흰 카드
         Box(
             modifier =
                 Modifier
-                    .weight(1f)
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .fillMaxSize()
                     .shadow(8.dp, RoundedCornerShape(20.dp))
                     .background(Color.White, RoundedCornerShape(20.dp)),
+            contentAlignment = Alignment.Center,
         ) {
-            Row(modifier = Modifier.fillMaxSize()) {
-                // ── 왼쪽 패널 ─────────────────────────────────────
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxHeight()
-                            .width(130.dp)
-                            .padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 10.dp),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    // 1) 요일 가로 한 줄
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+            if (!isDeviceConnected) {
+                DeviceNotConnectedPlaceholder(onNavigateToBle = onNavigateToBle)
+            } else {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxHeight()
+                                .width(130.dp)
+                                .padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 10.dp),
+                        verticalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        dayLabels.forEachIndexed { index, day ->
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.clickable { onDaySelect(index) },
-                            ) {
-                                Text(
-                                    text = day,
-                                    fontSize = 9.sp,
-                                    color = if (index == selectedDay) Primary else Color(0xFFBBBBBB),
-                                    fontWeight = if (index == selectedDay) FontWeight.Bold else FontWeight.Normal,
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier =
-                                        Modifier
-                                            .size(18.dp)
-                                            .background(
-                                                if (index == selectedDay) Primary else Color.Transparent,
-                                                CircleShape,
-                                            ),
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            dayLabels.forEachIndexed { index, day ->
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.clickable { onDaySelect(index) },
                                 ) {
                                     Text(
-                                        text = "${weekDates[index]}",
-                                        fontSize = 8.sp,
-                                        color = if (index == selectedDay) Color.White else Color(0xFFBBBBBB),
+                                        text = day,
+                                        fontSize = 9.sp,
+                                        color = if (index == selectedDay) Primary else Color(0xFFBBBBBB),
                                         fontWeight = if (index == selectedDay) FontWeight.Bold else FontWeight.Normal,
                                     )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier =
+                                            Modifier
+                                                .size(18.dp)
+                                                .background(
+                                                    if (index == selectedDay) Primary else Color.Transparent,
+                                                    CircleShape,
+                                                ),
+                                    ) {
+                                        Text(
+                                            text = "${weekDates[index]}",
+                                            fontSize = 8.sp,
+                                            color = if (index == selectedDay) Color.White else Color(0xFFBBBBBB),
+                                            fontWeight = if (index == selectedDay) FontWeight.Bold else FontWeight.Normal,
+                                        )
+                                    }
                                 }
+                            }
+                        }
+
+                        Column {
+                            Text(
+                                text = "${currentValue.toInt()}",
+                                fontSize = 42.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = currentColor,
+                                lineHeight = 42.sp,
+                                maxLines = 1,
+                            )
+                            Text(text = "mg/dL", fontSize = 12.sp, color = Color(0xFF888888))
+                            Spacer(modifier = Modifier.height(4.dp))
+                            GlucoseStatusBadge(currentValue, currentColor)
+                        }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(modifier = Modifier.size(7.dp).background(colorDanger, CircleShape))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(text = "최고 ", fontSize = 11.sp, color = Color(0xFF888888))
+                                Text(
+                                    text = "${(chartData.maxOrNull() ?: 0f).toInt()}",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF333333),
+                                )
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(modifier = Modifier.size(7.dp).background(Primary, CircleShape))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(text = "최저 ", fontSize = 11.sp, color = Color(0xFF888888))
+                                Text(
+                                    text = "${(chartData.minOrNull() ?: 0f).toInt()}",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF333333),
+                                )
                             }
                         }
                     }
 
-                    // 2) 현재 혈당 수치
-                    Column {
-                        Text(
-                            text = "${currentValue.toInt()}",
-                            fontSize = 42.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = currentColor,
-                            lineHeight = 42.sp,
-                            maxLines = 1,
-                        )
-                        Text(
-                            text = "mg/dL",
-                            fontSize = 12.sp,
-                            color = Color(0xFF888888),
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        GlucoseStatusBadge(currentValue, currentColor)
-                    }
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxHeight()
+                                .width(1.dp)
+                                .background(Color(0xFFEEEEEE)),
+                    )
 
-                    // 3) 최고 / 최저
-                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(7.dp).background(colorDanger, CircleShape))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = "최고 ", fontSize = 11.sp, color = Color(0xFF888888))
-                            Text(text = "92", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF333333))
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(7.dp).background(Primary, CircleShape))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = "최저 ", fontSize = 11.sp, color = Color(0xFF888888))
-                            Text(text = "63", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF333333))
-                        }
-                    }
+                    GlucoseCanvas(
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .padding(horizontal = 12.dp, vertical = 12.dp),
+                        data = chartData,
+                    )
                 }
-
-                // 세로 구분선
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxHeight()
-                            .width(1.dp)
-                            .background(Color(0xFFEEEEEE)),
-                )
-
-                // ── 오른쪽: 그래프 ─────────────────────────────────
-                GlucoseCanvas(
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .padding(horizontal = 12.dp, vertical = 12.dp),
-                )
             }
-
-            // 뒤로가기 버튼
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                contentDescription = "뒤로가기",
-                tint = Color(0xFFAAAAAA),
-                modifier =
-                    Modifier
-                        .align(Alignment.TopStart)
-                        .padding(8.dp)
-                        .size(18.dp)
-                        .clickable(onClick = onBack),
-            )
         }
 
-        BottomNavBar(
-            items = navItems,
-            selectedId = "home",
-            onItemClick = { onNavigateTo(it.id) },
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+            contentDescription = "뒤로가기",
+            tint = Color(0xFF333333),
+            modifier =
+                Modifier
+                    .align(Alignment.TopStart)
+                    .padding(10.dp)
+                    .size(22.dp)
+                    .clickable(onClick = onBack),
         )
     }
 }
 
 // ── 공용 컴포넌트 ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun DeviceNotConnectedPlaceholder(onNavigateToBle: () -> Unit = {}) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(72.dp)
+                    .background(Color(0xFFE8F7FA), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Bluetooth,
+                contentDescription = null,
+                tint = Primary,
+                modifier = Modifier.size(36.dp),
+            )
+        }
+        Text(
+            text = "기기가 연동되어 있지 않아요",
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF333333),
+        )
+        Text(
+            text = "기기를 연동하면\n실시간 혈당 추이를 확인할 수 있어요",
+            fontSize = 14.sp,
+            color = Color(0xFF888888),
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Button(
+            onClick = onNavigateToBle,
+            colors = ButtonDefaults.buttonColors(containerColor = Primary),
+            shape = RoundedCornerShape(12.dp),
+        ) {
+            Text(text = "기기 연동하기", fontSize = 15.sp)
+        }
+    }
+}
+
+@Composable
+private fun GlucoseRangeLegend() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        RangeBadge(color = colorNormal, label = "정상  70~140")
+        RangeBadge(color = colorWarning, label = "주의  ~180")
+        RangeBadge(color = colorDanger, label = "위험  <70 / >180")
+    }
+}
+
+@Composable
+private fun RangeBadge(
+    color: Color,
+    label: String,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(text = label, fontSize = 11.sp, color = Color(0xFF888888))
+    }
+}
 
 @Composable
 private fun GlucoseStatusBadge(
@@ -499,82 +597,36 @@ private fun DaySelector(
 }
 
 @Composable
-private fun HighLowRow() {
+private fun HighLowRow(chartData: List<Float> = dummyGlucoseData) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier.size(8.dp).background(colorDanger, CircleShape))
         Spacer(modifier = Modifier.width(6.dp))
         Text(text = "최고 ", fontSize = 15.sp, color = Color(0xFF888888))
-        Text(text = "92", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF333333))
+        Text(
+            text = "${(chartData.maxOrNull() ?: 0f).toInt()}",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF333333),
+        )
         Spacer(modifier = Modifier.width(16.dp))
         Box(modifier = Modifier.size(8.dp).background(Primary, CircleShape))
         Spacer(modifier = Modifier.width(6.dp))
         Text(text = "최저 ", fontSize = 15.sp, color = Color(0xFF888888))
-        Text(text = "63", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF333333))
-    }
-}
-
-// 가로 모드용: 세로 점선 + Y축 레이블 없음
-@Composable
-private fun GlucoseCanvasLandscape(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val yMin = 0f
-        val yMax = 250f
-
-        val data = dummyGlucoseData
-        val n = data.size
-        val stepX = w / (n - 1)
-
-        fun xOf(i: Int) = i * stepX
-
-        fun yOf(v: Float) = h - (v - yMin) / (yMax - yMin) * h
-
-        // 세로 점선 (데이터 포인트마다)
-        for (i in 0 until n) {
-            drawLine(
-                color = Color(0xFFDDDDDD),
-                start = Offset(xOf(i), 0f),
-                end = Offset(xOf(i), h),
-                strokeWidth = 1.5f,
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f)),
-            )
-        }
-
-        // 베지어 곡선
-        val linePath = Path()
-        linePath.moveTo(xOf(0), yOf(data[0]))
-        for (i in 1 until n) {
-            val cpX = (xOf(i - 1) + xOf(i)) / 2f
-            linePath.cubicTo(cpX, yOf(data[i - 1]), cpX, yOf(data[i]), xOf(i), yOf(data[i]))
-        }
-
-        // 라인
-        drawPath(
-            path = linePath,
-            color = Primary,
-            style = Stroke(width = 6f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+        Text(
+            text = "${(chartData.minOrNull() ?: 0f).toInt()}",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF333333),
         )
-
-        // 현재(마지막) 포인트
-        val lastX = xOf(n - 1)
-        val lastY = yOf(data.last())
-        drawCircle(color = Primary.copy(alpha = 0.15f), radius = 18f, center = Offset(lastX, lastY))
-        drawCircle(color = Primary, radius = 7f, center = Offset(lastX, lastY))
-        drawCircle(color = Color.White, radius = 3f, center = Offset(lastX, lastY))
-
-        // 피크 포인트 (빨간 점)
-        val peakIdx = data.indexOf(data.max())
-        val peakX = xOf(peakIdx)
-        val peakY = yOf(data[peakIdx])
-        drawCircle(color = colorDanger.copy(alpha = 0.2f), radius = 14f, center = Offset(peakX, peakY))
-        drawCircle(color = colorDanger, radius = 7f, center = Offset(peakX, peakY))
-        drawCircle(color = Color.White, radius = 3f, center = Offset(peakX, peakY))
     }
 }
 
 @Composable
-private fun GlucoseCanvas(modifier: Modifier = Modifier) {
+private fun GlucoseCanvas(
+    modifier: Modifier = Modifier,
+    data: List<Float> = dummyGlucoseData,
+) {
+    val timeLabels = remember { getKrTimeLabels() }
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
@@ -583,22 +635,20 @@ private fun GlucoseCanvas(modifier: Modifier = Modifier) {
         val leftPad = 48f
         val chartW = w - leftPad
 
-        val data = dummyGlucoseData
         val n = data.size
+        if (n < 2) return@Canvas
         val stepX = chartW / (n - 1)
 
         fun xOf(i: Int) = leftPad + i * stepX
 
         fun yOf(v: Float) = h - (v - yMin) / (yMax - yMin) * h
 
-        // 정상 범위 배경
         drawRect(
             color = Primary.copy(alpha = 0.07f),
             topLeft = Offset(leftPad, yOf(140f)),
             size = Size(chartW, yOf(70f) - yOf(140f)),
         )
 
-        // Y축 레이블 + 가로 점선
         val textPaint =
             Paint().asFrameworkPaint().apply {
                 isAntiAlias = true
@@ -614,12 +664,9 @@ private fun GlucoseCanvas(modifier: Modifier = Modifier) {
                 strokeWidth = 1.5f,
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)),
             )
-            drawIntoCanvas {
-                it.nativeCanvas.drawText("$label", 0f, y + 10f, textPaint)
-            }
+            drawIntoCanvas { it.nativeCanvas.drawText("$label", 0f, y + 10f, textPaint) }
         }
 
-        // 베지어 곡선
         val linePath = Path()
         linePath.moveTo(xOf(0), yOf(data[0]))
         for (i in 1 until n) {
@@ -627,7 +674,6 @@ private fun GlucoseCanvas(modifier: Modifier = Modifier) {
             linePath.cubicTo(cpX, yOf(data[i - 1]), cpX, yOf(data[i]), xOf(i), yOf(data[i]))
         }
 
-        // 그라데이션 채우기
         drawPath(
             path =
                 Path().apply {
@@ -644,14 +690,12 @@ private fun GlucoseCanvas(modifier: Modifier = Modifier) {
                 ),
         )
 
-        // 라인
         drawPath(
             path = linePath,
             color = Primary,
             style = Stroke(width = 7f, cap = StrokeCap.Round, join = StrokeJoin.Round),
         )
 
-        // 현재(마지막) 포인트
         val lastX = xOf(n - 1)
         val lastY = yOf(data.last())
         drawCircle(color = Primary.copy(alpha = 0.15f), radius = 22f, center = Offset(lastX, lastY))
@@ -659,13 +703,11 @@ private fun GlucoseCanvas(modifier: Modifier = Modifier) {
         drawCircle(color = Primary, radius = 8f, center = Offset(lastX, lastY))
         drawCircle(color = Color.White, radius = 4f, center = Offset(lastX, lastY))
 
-        // 피크 포인트
-        val peakIdx = data.indexOf(data.max())
+        val peakIdx = data.indexOf(data.maxOrNull() ?: return@Canvas)
         drawCircle(color = colorDanger.copy(alpha = 0.2f), radius = 18f, center = Offset(xOf(peakIdx), yOf(data[peakIdx])))
         drawCircle(color = colorDanger, radius = 8f, center = Offset(xOf(peakIdx), yOf(data[peakIdx])))
         drawCircle(color = Color.White, radius = 4f, center = Offset(xOf(peakIdx), yOf(data[peakIdx])))
 
-        // X축 시간 레이블
         val xTextPaint =
             Paint().asFrameworkPaint().apply {
                 isAntiAlias = true
@@ -673,7 +715,7 @@ private fun GlucoseCanvas(modifier: Modifier = Modifier) {
                 color = android.graphics.Color.parseColor("#AAAAAA")
                 textAlign = android.graphics.Paint.Align.CENTER
             }
-        dummyTimeLabels.forEachIndexed { i, label ->
+        timeLabels.forEachIndexed { i, label ->
             drawIntoCanvas { it.nativeCanvas.drawText(label, xOf(i), h, xTextPaint) }
         }
     }

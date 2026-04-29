@@ -23,7 +23,10 @@ import com.ssafy.s309.ui.screen.auth.LoginScreen
 import com.ssafy.s309.ui.screen.auth.SignInScreen
 import com.ssafy.s309.ui.screen.auth.SignUpScreen
 import com.ssafy.s309.ui.screen.health.HealthSourceScreen
+import com.ssafy.s309.ui.screen.ble.BleScreen
+import com.ssafy.s309.ui.screen.main.GuardianScreen
 import com.ssafy.s309.ui.screen.main.MainScreen
+import com.ssafy.s309.ui.screen.main.SettingsScreen
 import com.ssafy.s309.ui.screen.onboarding.BasicHealthInfoScreen
 import com.ssafy.s309.ui.screen.onboarding.BloodSugarRangeScreen
 import com.ssafy.s309.ui.screen.onboarding.DiabetesTypeSelectionScreen
@@ -62,6 +65,11 @@ sealed class Screen(val route: String) {
     object Graph : Screen("graph")
 
     object HealthSource : Screen("health_source")
+    object Ble : Screen("ble")
+
+    object Settings : Screen("settings")
+
+    object Guardian : Screen("guardian")
 }
 
 @Composable
@@ -226,13 +234,30 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 onGraphClick = { navController.navigate(Screen.Graph.route) },
                 onConnectedDeviceClick = { navController.navigate(Screen.HealthSource.route) },
                 onLogoutClick = { authViewModel.logout() },
+                onSettingsClick = { navController.navigate(Screen.Settings.route) },
+                onGuardianClick = { navController.navigate(Screen.Guardian.route) },
                 userEmail = authViewModel.userEmail,
             )
         }
         composable(Screen.Graph.route) {
             GraphScreen(
                 onBack = { navController.popBackStack() },
-                onNavigateTo = { navController.popBackStack() },
+                onNavigateToBle = { navController.navigate(Screen.Ble.route) },
+            )
+        }
+        composable(Screen.Ble.route) {
+            BleScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(Screen.Settings.route) {
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(Screen.Guardian.route) {
+            GuardianScreen(
+                onBack = { navController.popBackStack() },
             )
         }
         composable(Screen.HealthSource.route) {

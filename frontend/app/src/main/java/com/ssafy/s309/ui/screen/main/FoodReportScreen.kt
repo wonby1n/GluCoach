@@ -5,9 +5,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -148,10 +146,6 @@ private fun FoodReportMainContent(
 
         Spacer(Modifier.height(GlucoachSpacing.xl))
 
-        GradeSummaryRow()
-
-        Spacer(Modifier.height(GlucoachSpacing.xl))
-
         Text(
             text = "등급별 음식",
             color = GlucoachColors.TextPrimary,
@@ -213,54 +207,6 @@ private fun AIAnalysisCard() {
                 lineHeight = 18.sp,
             )
         }
-    }
-}
-
-// ── 등급 요약 뱃지 행 ──────────────────────────────────────
-
-@Composable
-private fun GradeSummaryRow() {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.sm),
-    ) {
-        FoodReportMockData.gradeInfoList.forEach { info ->
-            GradeSummaryBadge(grade = info.grade, count = info.count)
-        }
-    }
-}
-
-@Composable
-private fun GradeSummaryBadge(
-    grade: String,
-    count: Int,
-) {
-    val color = gradeColor(grade)
-
-    Column(
-        modifier =
-            Modifier
-                .width(56.dp)
-                .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color.White)
-                .padding(vertical = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = "$count",
-            color = color,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = "${grade}등급",
-            color = GlucoachColors.TextSecondary,
-            fontSize = 11.sp,
-        )
     }
 }
 
