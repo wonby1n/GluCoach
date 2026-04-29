@@ -45,6 +45,9 @@ class HealthRepository
         /** 패치에서 도착하는 실시간 혈당 측정 값 (이벤트 스트림). */
         val glucoseStream: SharedFlow<GlucoseReading> = bleManager.glucoseReadings
 
+        /** 패치에서 누적된 혈당 히스토리 (최대 100개, 앱 수명 동안 유지). */
+        val glucoseHistory: StateFlow<List<GlucoseReading>> = bleManager.glucoseHistory
+
         /** 데이터 처리 설정 스냅샷 (보정값 / 스파이크 임계값 / 출력타입 / 주기평균). */
         val bleProcessingSettings: StateFlow<BleProcessingSettings> = bleManager.processingSettings
 

@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.HorizontalDivider
@@ -51,13 +53,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.ssafy.s309.R
 import com.ssafy.s309.ui.component.BottomNavBar
 import com.ssafy.s309.ui.component.BottomNavItem
 import com.ssafy.s309.ui.component.CurrentGlucoseCard
@@ -156,6 +156,7 @@ fun MainScreenContent(
                                 TodayConditionHeader(
                                     onBellClick = onBellClick,
                                     hasUnread = state.notifications.any { it.isUnread },
+                                    bellIcon = bellIcon,
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
 
@@ -183,9 +184,8 @@ fun MainScreenContent(
                                 GlucoseChartCard(
                                     readings = state.glucoseSeries,
                                     range = state.glucoseRange,
-                                    meals = state.meals,
+                                    isDeviceConnected = state.isDeviceConnected,
                                     hoursLabel = "최근 6시간",
-                                    mealPinIcon = mealPinIcon,
                                     timeLabels = chartTimeLabels,
                                     onClick = onGraphClick,
                                 )
@@ -352,6 +352,7 @@ fun MainScreenContent(
 private fun TodayConditionHeader(
     onBellClick: () -> Unit,
     hasUnread: Boolean,
+    bellIcon: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -371,15 +372,25 @@ private fun TodayConditionHeader(
                     .clickable(onClick = onBellClick),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                painter =
-                    painterResource(
-                        id = if (hasUnread) R.drawable.ic_bell_new else R.drawable.ic_bell,
-                    ),
-                contentDescription = if (hasUnread) "새 알림" else "알림",
-                tint = Color.Unspecified,
-                modifier = Modifier.size(24.dp),
-            )
+            if (bellIcon != null) {
+                bellIcon()
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.Notifications,
+                    contentDescription = if (hasUnread) "새 알림" else "알림",
+                    tint = GlucoachColors.Primary,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            if (hasUnread) {
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .size(8.dp)
+                            .background(Color(0xFFE53935), shape = CircleShape),
+                )
+            }
         }
     }
 }

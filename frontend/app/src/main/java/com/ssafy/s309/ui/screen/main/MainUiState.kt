@@ -3,7 +3,6 @@ package com.ssafy.s309.ui.screen.main
 import com.ssafy.s309.data.model.DailyHealthSummary
 import com.ssafy.s309.data.model.GlucoseRange
 import com.ssafy.s309.data.model.GlucoseReading
-import com.ssafy.s309.data.model.MealEvent
 import com.ssafy.s309.data.model.NotificationItem
 
 /**
@@ -23,11 +22,11 @@ import com.ssafy.s309.data.model.NotificationItem
  */
 data class MainUiState(
     val isLoading: Boolean = true,
+    val isDeviceConnected: Boolean = false,
     val currentGlucoseMgDl: Int? = null,
     val diffFromPrevious: Int = 0,
     val glucoseSeries: List<GlucoseReading> = emptyList(),
     val glucoseRange: GlucoseRange = GlucoseRange(90, 180),
-    val meals: List<MealEvent> = emptyList(),
     val summary: DailyHealthSummary = DailyHealthSummary(0, 0),
     val notifications: List<NotificationItem> = emptyList(),
     val isNotificationPanelOpen: Boolean = false,
