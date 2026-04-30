@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.google.firebase.messaging.FirebaseMessaging
 import com.ssafy.s309.data.repository.source.SamsungHealthHolder
 import com.ssafy.s309.navigation.AppNavigation
@@ -25,6 +27,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
@@ -64,6 +68,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         samsungHealthHolder.attach(this)
+        startSamsungHealthPolling()
         requestNotificationPermission()
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (task.isSuccessful) Log.d("FCM", "토큰: ${task.result}")
@@ -114,6 +119,39 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Samsung Health 데이터를 1분마다 폴링한다 (걸음/활동칼로리/수면/혈당/심박).
+     *
+     * - foreground only: [repeatOnLifecycle] STARTED 게이트로 앱이 백그라운드 가면 자동 일시정지,
+     *   다시 켜면 재개. WorkManager 없이 가벼운 디버깅/시연 용도.
+     * - 매니저 null (SDK 미지원/미설치) 또는 권한 미부여 시 SDK 가 예외를 던지며,
+     *   각 함수가 try/catch + 로그를 남기고 0/null 반환하므로 폴 루프가 죽지 않는다.
+     * - 첫 실행은 즉시, 이후 60초 간격.
+     */
+    private fun startSamsungHealthPolling() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (isActive) {
+                    val mgr = samsungHealthHolder.manager
+                    if (mgr == null) {
+                        Log.d(POLL_TAG, "manager null — SDK 미지원/미부착, 폴 스킵")
+                    } else {
+                        Log.i(POLL_TAG, "── Samsung Health poll 시작 ──")
+                        runCatching {
+                            mgr.getTodaySteps()
+                            mgr.getTodayActiveCalories()
+                            mgr.getLastSleepDurationMinutes()
+                            mgr.getLatestBloodGlucose()
+                            mgr.getLatestHeartRate()
+                        }.onFailure { Log.w(POLL_TAG, "poll 중 오류", it) }
+                        Log.i(POLL_TAG, "── Samsung Health poll 완료 ──")
+                    }
+                    delay(60_000L)
+                }
+            }
+        }
+    }
+
     private fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -121,5 +159,9 @@ class MainActivity : ComponentActivity() {
         ) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+    }
+
+    private companion object {
+        const val POLL_TAG = "SHPoller"
     }
 }
