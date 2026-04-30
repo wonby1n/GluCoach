@@ -119,8 +119,6 @@ JWT 병합 시 단수 `/api/user/...` 로 일괄 변경되며, userId는 토큰 
 |------|--------|-----------|------|
 | BE → AI | POST | `{AI_SERVICE_URL}/inference/glucose` | AI 모델 추론 요청. BE가 음식 + 유저 데이터를 조합하여 호출 |
 
-> **⚠️ 주의**: `/api/predict/glucose`(FE→BE)와 `/inference/glucose`(BE→AI)는 서로 다른 서버의 엔드포인트입니다.
-> 상세 인터페이스 정의: [`ai-glucose-predict-api-interface.md`](./ai-glucose-predict-api-interface.md)
 
 ### 식전 예측 vs 식후 기록 역할 구분
 

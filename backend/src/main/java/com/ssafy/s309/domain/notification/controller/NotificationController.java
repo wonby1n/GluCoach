@@ -6,7 +6,6 @@ import com.ssafy.s309.domain.user.repository.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,14 +22,14 @@ public class NotificationController {
   @Operation(summary = "FCM 토큰 등록/갱신")
   @PutMapping
   public ResponseEntity<Void> saveToken(
-      @PathVariable UUID userId, @Valid @RequestBody FcmTokenRequest request) {
+      @PathVariable Long userId, @Valid @RequestBody FcmTokenRequest request) {
     userRepository
         .findById(userId)
         .ifPresent(
             user ->
                 notificationTokenService.saveToken(
                     user,
-                    request.fcmToken(),
+                    request.token(),
                     request.deviceType() != null ? request.deviceType() : "android"));
     return ResponseEntity.ok().build();
   }

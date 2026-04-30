@@ -46,7 +46,7 @@ public class GlucosePredictClientImpl implements GlucosePredictClient {
       throw new AiServiceException(ErrorType.SERVICE_UNAVAILABLE, "AI 서비스에 연결할 수 없습니다", e);
 
     } catch (RestClientResponseException e) {
-      if (e.getStatusCode().value() == 422) {
+      if (e.getStatusCode().value() == 400) {
         throw new AiServiceException(
             ErrorType.INVALID_INPUT, "AI 서비스 입력 데이터 오류: " + e.getMessage(), e);
       }

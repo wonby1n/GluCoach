@@ -1,11 +1,11 @@
-package com.ssafy.s309.domain.prediction.client.dto;
+package com.ssafy.s309.domain.prediction.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-public record FoodNutrition(
-    String foodId,
-    @NotBlank String name,
+public record PredictRequest(
+    Integer foodId,
+    @NotBlank String foodName,
     @NotNull Double carbsG,
     @NotNull Double proteinG,
     @NotNull Double fatG,

@@ -2,8 +2,8 @@ package com.ssafy.s309.domain.user.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.ssafy.s309.domain.user.entity.Guardian;
 import com.ssafy.s309.domain.user.entity.User;
+import com.ssafy.s309.domain.user.entity.WardGuardian;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,68 +18,61 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 class GuardianRepositoryTest {
 
   @Autowired private TestEntityManager em;
-  @Autowired private GuardianRepository guardianRepository;
+  @Autowired private WardGuardianRepository wardGuardianRepository;
 
-  private User user;
+  private User ward;
+  private User g1User;
+  private User g2User;
+  private User g3User;
 
   @BeforeEach
   void setUp() {
-    user = em.persistAndFlush(User.builder().email("guardian-test@example.com").build());
+    ward = em.persistAndFlush(User.builder().email("ward@example.com").build());
+    g1User = em.persistAndFlush(User.builder().email("g1@example.com").build());
+    g2User = em.persistAndFlush(User.builder().email("g2@example.com").build());
+    g3User = em.persistAndFlush(User.builder().email("g3@example.com").build());
   }
 
   @Test
   void 보호자_priority_오름차순_정렬() {
-    // given
     em.persistAndFlush(
-        Guardian.builder().user(user).name("셋째").phone("01033333333").priority(2).build());
+        WardGuardian.builder().ward(ward).guardian(g3User).relation("친척").priority(2).build());
     em.persistAndFlush(
-        Guardian.builder().user(user).name("첫째").phone("01011111111").priority(0).build());
+        WardGuardian.builder().ward(ward).guardian(g1User).relation("부모").priority(0).build());
     em.persistAndFlush(
-        Guardian.builder().user(user).name("둘째").phone("01022222222").priority(1).build());
+        WardGuardian.builder().ward(ward).guardian(g2User).relation("배우자").priority(1).build());
     em.clear();
 
-    // when
-    List<Guardian> result =
-        guardianRepository.findAllByUser_UserIdOrderByPriorityAsc(user.getUserId());
+    List<WardGuardian> result =
+        wardGuardianRepository.findAllByWard_IdOrderByPriorityAsc(ward.getId());
 
-    // then
     assertThat(result).hasSize(3);
-    assertThat(result.get(0).getName()).isEqualTo("첫째");
-    assertThat(result.get(1).getName()).isEqualTo("둘째");
-    assertThat(result.get(2).getName()).isEqualTo("셋째");
+    assertThat(result.get(0).getPriority()).isEqualTo(0);
+    assertThat(result.get(1).getPriority()).isEqualTo(1);
+    assertThat(result.get(2).getPriority()).isEqualTo(2);
   }
 
   @Test
   void 보호자_수_카운트() {
-    // given
-    em.persistAndFlush(
-        Guardian.builder().user(user).name("A").phone("01011111111").priority(0).build());
-    em.persistAndFlush(
-        Guardian.builder().user(user).name("B").phone("01022222222").priority(1).build());
+    em.persistAndFlush(WardGuardian.builder().ward(ward).guardian(g1User).priority(0).build());
+    em.persistAndFlush(WardGuardian.builder().ward(ward).guardian(g2User).priority(1).build());
 
-    // when
-    int count = guardianRepository.countByUser_UserId(user.getUserId());
+    int count = wardGuardianRepository.countByWard_Id(ward.getId());
 
-    // then
     assertThat(count).isEqualTo(2);
   }
 
   @Test
   void 다른_유저의_보호자는_조회되지_않음() {
-    // given
-    User other = em.persistAndFlush(User.builder().email("other@example.com").build());
-    em.persistAndFlush(
-        Guardian.builder().user(user).name("내 보호자").phone("01011111111").priority(0).build());
-    em.persistAndFlush(
-        Guardian.builder().user(other).name("다른 보호자").phone("01099999999").priority(0).build());
+    User otherWard = em.persistAndFlush(User.builder().email("other@example.com").build());
+    em.persistAndFlush(WardGuardian.builder().ward(ward).guardian(g1User).priority(0).build());
+    em.persistAndFlush(WardGuardian.builder().ward(otherWard).guardian(g2User).priority(0).build());
     em.clear();
 
-    // when
-    List<Guardian> result =
-        guardianRepository.findAllByUser_UserIdOrderByPriorityAsc(user.getUserId());
+    List<WardGuardian> result =
+        wardGuardianRepository.findAllByWard_IdOrderByPriorityAsc(ward.getId());
 
-    // then
     assertThat(result).hasSize(1);
-    assertThat(result.get(0).getName()).isEqualTo("내 보호자");
+    assertThat(result.get(0).getGuardian().getId()).isEqualTo(g1User.getId());
   }
 }
