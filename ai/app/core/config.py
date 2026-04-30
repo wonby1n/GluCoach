@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     model_device: str = "cpu"
     model_top_k: int = 5
 
+    yolo_model_path: str = "models/yolo_food/best.pt"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
