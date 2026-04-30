@@ -53,12 +53,13 @@ ERD 기준으로 4개 테이블 모두 `(user_id, time_column)` 복합 인덱스
 
 ### 4-1. 혈당 시계열 (`glucose_records`)
 
+<!--suppress SqlResolve, SqlNoDataSourceInspection -->
 ```sql
 SELECT id, value, measured_at
 FROM glucose_records
 WHERE user_id = ?
   AND measured_at BETWEEN ? AND ?
-ORDER BY measured_at ASC;
+ORDER BY measured_at;
 ```
 
 - 인덱스: `idx_glucose_user_time (user_id, measured_at)` — leftmost 매칭, range scan
@@ -66,12 +67,13 @@ ORDER BY measured_at ASC;
 
 ### 4-2. 식사 핀 (`meal_records`)
 
+<!--suppress SqlResolve, SqlNoDataSourceInspection -->
 ```sql
 SELECT id, food_id, recorded_at, image_storage_key
 FROM meal_records
 WHERE user_id = ?
   AND recorded_at BETWEEN ? AND ?
-ORDER BY recorded_at ASC;
+ORDER BY recorded_at;
 ```
 
 - 인덱스: `idx_meal_user_time (user_id, recorded_at)`
@@ -79,30 +81,32 @@ ORDER BY recorded_at ASC;
 
 ### 4-3. 운동 세션 (`exercise_records`) — 구간 겹침
 
+<!--suppress SqlResolve, SqlNoDataSourceInspection -->
 ```sql
 SELECT id, exercise_type, calories, started_at, ended_at
 FROM exercise_records
 WHERE user_id = ?
   AND started_at <= ?  -- to
   AND ended_at   >= ?  -- from
-ORDER BY started_at ASC;
+ORDER BY started_at;
 ```
 
 겹침 조건의 표준 형태: 두 구간 `[A.start, A.end]`, `[B.start, B.end]`이 겹치려면 `A.start <= B.end AND A.end >= B.start`.
 
 - 인덱스: `idx_ex_user_time (user_id, started_at)` — `started_at <= :to` 부분이 인덱스 사용
-- `ended_at >= :from`은 인덱스 후보에 대한 후속 필터 (Using index condition)
+- `ended_at >= :from`은 인덱스 후보에 대한 후속 필터 (PostgreSQL `Filter:` 노드)
 - 운동 이벤트가 적어(7일에 7~14건) 후속 필터 비용 무시 가능
 
 ### 4-4. 수면 세션 (`sleep_records`) — 구간 겹침
 
+<!--suppress SqlResolve, SqlNoDataSourceInspection -->
 ```sql
 SELECT id, started_at, ended_at
 FROM sleep_records
 WHERE user_id = ?
   AND started_at <= ?  -- to
   AND ended_at   >= ?  -- from
-ORDER BY started_at ASC;
+ORDER BY started_at;
 ```
 
 운동과 동일한 구조. 인덱스 `idx_sleep_user_time (user_id, started_at)` 활용.
@@ -143,7 +147,10 @@ List<ExerciseRecord> findOverlappingByUserId(
        AND s.endedAt   >= :from
      ORDER BY s.startedAt ASC
     """)
-List<SleepRecord> findOverlappingByUserId(...);
+List<SleepRecord> findOverlappingByUserId(
+    @Param("userId") Long userId,
+    @Param("from") LocalDateTime from,
+    @Param("to")   LocalDateTime to);
 ```
 
 > 파생 쿼리(메서드명) vs `@Query` 선택 기준: 단순 BETWEEN은 파생, 두 컬럼 동시 비교(겹침)는 가독성을 위해 `@Query` 사용.
@@ -180,42 +187,36 @@ public class TimelineService {
 
 ## 7. 인덱스 활용 분석 (EXPLAIN 예상)
 
-MySQL 8 기준 예상 출력. 7일 조회, user_id = 1 가정.
+PostgreSQL 16 기준 예상 출력. 7일 조회, user_id = 1 가정.
 
 ### 7-1. 혈당 (5분 간격 2,016행)
 
 ```
-EXPLAIN SELECT * FROM glucose_records
- WHERE user_id = 1 AND measured_at BETWEEN '2026-04-23' AND '2026-04-30';
+Index Scan using idx_glucose_user_time on glucose_records
+  Index Cond: ((user_id = 1) AND (measured_at >= '2026-04-23') AND (measured_at <= '2026-04-30'))
 ```
 
-```
-type: range
-key:  idx_glucose_user_time
-key_len: 9            -- INT(4) + DATETIME(5)
-rows: ~2016
-Extra: Using index condition
-```
+- 복합 인덱스 `(user_id, measured_at)` 양쪽 컬럼 모두 Index Cond에 포함 → 순수 인덱스 범위 스캔
+- 정렬은 인덱스 순서 그대로 → Sort 노드 없음
 
 ### 7-2. 식사 (~30행)
 
 ```
-type: range
-key:  idx_meal_user_time
-rows: ~30
-Extra: Using index condition
+Index Scan using idx_meal_user_time on meal_records
+  Index Cond: ((user_id = 1) AND (recorded_at >= '...') AND (recorded_at <= '...'))
 ```
 
 ### 7-3. 운동/수면 (구간 겹침, ~10행)
 
 ```
-type: range
-key:  idx_ex_user_time   (또는 idx_sleep_user_time)
-rows: 인덱스 prefix 매칭 후보 (≈ to 시점까지의 모든 row, 후속 필터로 축소)
-Extra: Using index condition; Using where
+Index Scan using idx_ex_user_time on exercise_records
+  Index Cond: ((user_id = 1) AND (started_at <= '...'))
+  Filter:    (ended_at >= '...')
 ```
 
-> `started_at <= :to`로 인덱스 prefix 매칭 후, `ended_at >= :from` 필터를 row 단위로 적용. 7일 윈도우에서 후보 row가 ~10건 이내이므로 후속 필터 비용 무시 가능.
+- `(user_id, started_at)` 인덱스로 후보 row 추출 후, `ended_at >= :from`은 Filter 단계에서 적용
+- 7일 윈도우에서 후보 row가 ~10건 이내이므로 Filter 비용 무시 가능
+- 수면도 동일 구조 (`idx_sleep_user_time`)
 
 ---
 
