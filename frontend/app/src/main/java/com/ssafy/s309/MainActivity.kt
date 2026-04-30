@@ -134,27 +134,27 @@ class MainActivity : ComponentActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 while (isActive) {
                     val mgr = samsungHealthHolder.manager
-                    var realGlucose: Float? = null
+                    var realSteps: Long? = null
                     if (mgr == null) {
                         Log.d(POLL_TAG, "manager null — SDK 미지원/미부착, Samsung Health 스킵")
                     } else {
                         Log.i(POLL_TAG, "── Samsung Health poll 시작 ──")
                         runCatching {
-                            mgr.getTodaySteps()
+                            realSteps = mgr.getTodaySteps()
                             mgr.getTodayActiveCalories()
                             mgr.getLastSleepDurationMinutes()
-                            realGlucose = mgr.getLatestBloodGlucose()
+                            mgr.getLatestBloodGlucose()
                             mgr.getLatestHeartRate()
                         }.onFailure { Log.w(POLL_TAG, "poll 중 오류", it) }
                         Log.i(POLL_TAG, "── Samsung Health poll 완료 ──")
                     }
 
-                    // 워치 송신: 진짜 혈당 있으면 그 값, 없으면 100~149 사이 fake 값.
+                    // 워치 송신: 진짜 걸음수 있으면 그 값, 없으면 1000~5999 사이 fake 값.
                     // 워치 ↔ 폰 통신 파이프 자체가 동작하는지 검증하기 위함이라 데이터 출처 무관하게 항상 송신.
                     val toSend =
-                        realGlucose?.toDouble() ?: run {
-                            val fake = 100.0 + ((System.currentTimeMillis() / 1000L) % 50L)
-                            Log.d(POLL_TAG, "진짜 혈당 없음 — fake $fake mg/dL 로 워치 송신 (파이프 검증)")
+                        realSteps?.toDouble() ?: run {
+                            val fake = 1000.0 + ((System.currentTimeMillis() / 1000L) % 5000L)
+                            Log.d(POLL_TAG, "걸음수 없음 — fake $fake 보 로 워치 송신 (파이프 검증)")
                             fake
                         }
                     WearDataSender.send(this@MainActivity, toSend)
