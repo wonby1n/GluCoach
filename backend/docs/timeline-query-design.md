@@ -53,8 +53,8 @@ ERD 기준으로 4개 테이블 모두 `(user_id, time_column)` 복합 인덱스
 
 ### 4-1. 혈당 시계열 (`glucose_records`)
 
-<!--suppress SqlResolve, SqlNoDataSourceInspection -->
 ```sql
+-- noinspection SqlResolveForFile
 SELECT id, value, measured_at
 FROM glucose_records
 WHERE user_id = ?
@@ -67,8 +67,8 @@ ORDER BY measured_at;
 
 ### 4-2. 식사 핀 (`meal_records`)
 
-<!--suppress SqlResolve, SqlNoDataSourceInspection -->
 ```sql
+-- noinspection SqlResolveForFile
 SELECT id, food_id, recorded_at, image_storage_key
 FROM meal_records
 WHERE user_id = ?
@@ -81,8 +81,8 @@ ORDER BY recorded_at;
 
 ### 4-3. 운동 세션 (`exercise_records`) — 구간 겹침
 
-<!--suppress SqlResolve, SqlNoDataSourceInspection -->
 ```sql
+-- noinspection SqlResolveForFile
 SELECT id, exercise_type, calories, started_at, ended_at
 FROM exercise_records
 WHERE user_id = ?
@@ -99,8 +99,8 @@ ORDER BY started_at;
 
 ### 4-4. 수면 세션 (`sleep_records`) — 구간 겹침
 
-<!--suppress SqlResolve, SqlNoDataSourceInspection -->
 ```sql
+-- noinspection SqlResolveForFile
 SELECT id, started_at, ended_at
 FROM sleep_records
 WHERE user_id = ?
