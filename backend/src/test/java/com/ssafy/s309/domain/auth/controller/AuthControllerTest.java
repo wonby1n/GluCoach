@@ -17,7 +17,6 @@ import com.ssafy.s309.domain.auth.dto.*;
 import com.ssafy.s309.domain.auth.principal.CustomUserPrincipal;
 import com.ssafy.s309.domain.auth.service.AuthService;
 import java.util.Collections;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -44,14 +43,12 @@ class AuthControllerTest {
   @Autowired private ObjectMapper objectMapper;
   @MockitoBean private AuthService authService;
 
-  private static final UUID USER_ID = UUID.randomUUID();
+  private static final Long USER_ID = 1L;
 
   private Authentication customAuth() {
     CustomUserPrincipal principal = new CustomUserPrincipal(USER_ID, "test@example.com");
     return new UsernamePasswordAuthenticationToken(principal, null, Collections.emptyList());
   }
-
-  // ── 회원가입 ──────────────────────────────────────────────
 
   @Test
   void 회원가입_201_반환() throws Exception {
@@ -84,8 +81,6 @@ class AuthControllerTest {
         .andExpect(status().isBadRequest());
   }
 
-  // ── 로그인 ──────────────────────────────────────────────
-
   @Test
   void 로그인_200_반환() throws Exception {
     LoginRequest request = new LoginRequest("test@example.com", "password123");
@@ -117,8 +112,6 @@ class AuthControllerTest {
         .andExpect(status().isBadRequest());
   }
 
-  // ── 토큰 재발급 ──────────────────────────────────────────
-
   @Test
   void 토큰_재발급_200_반환() throws Exception {
     ReissueRequest request = new ReissueRequest("valid-refresh-token");
@@ -135,8 +128,6 @@ class AuthControllerTest {
         .andExpect(jsonPath("$.accessToken").value("new-access"));
   }
 
-  // ── 로그아웃 ──────────────────────────────────────────────
-
   @Test
   void 로그아웃_204_반환() throws Exception {
     ReissueRequest request = new ReissueRequest("refresh-token");
@@ -149,8 +140,6 @@ class AuthControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isNoContent());
   }
-
-  // ── 회원탈퇴 ──────────────────────────────────────────────
 
   @Test
   void 회원탈퇴_204_반환() throws Exception {

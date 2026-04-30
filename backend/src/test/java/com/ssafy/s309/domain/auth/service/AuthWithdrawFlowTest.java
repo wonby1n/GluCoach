@@ -11,11 +11,10 @@ import com.ssafy.s309.domain.auth.dto.LoginRequest;
 import com.ssafy.s309.domain.auth.dto.SignupRequest;
 import com.ssafy.s309.domain.auth.dto.TokenResponse;
 import com.ssafy.s309.domain.auth.jwt.JwtProvider;
-import com.ssafy.s309.domain.user.entity.Guardian;
 import com.ssafy.s309.domain.user.entity.User;
+import com.ssafy.s309.domain.user.entity.WardGuardian;
 import com.ssafy.s309.domain.user.repository.UserRepository;
 import java.util.Optional;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,7 +36,7 @@ class AuthWithdrawFlowTest {
   @Mock private PasswordEncoder passwordEncoder;
   @InjectMocks private AuthService authService;
 
-  private static final UUID USER_ID = UUID.randomUUID();
+  private static final Long USER_ID = 1L;
 
   private User user;
 
@@ -51,7 +50,7 @@ class AuthWithdrawFlowTest {
             .height(175f)
             .weight(70f)
             .build();
-    ReflectionTestUtils.setField(user, "userId", USER_ID);
+    ReflectionTestUtils.setField(user, "id", USER_ID);
   }
 
   @Test
@@ -64,7 +63,7 @@ class AuthWithdrawFlowTest {
         .willAnswer(
             inv -> {
               User saved = inv.getArgument(0);
-              ReflectionTestUtils.setField(saved, "userId", USER_ID);
+              ReflectionTestUtils.setField(saved, "id", USER_ID);
               return saved;
             });
     given(jwtProvider.generateAccessToken(any(), anyString())).willReturn("at");
@@ -104,47 +103,41 @@ class AuthWithdrawFlowTest {
   }
 
   @Test
-  @DisplayName("탈퇴 시 보호자 정보도 함께 제거")
-  void 탈퇴시_보호자_정보_클리어() {
-    Guardian guardian =
-        Guardian.builder()
-            .user(user)
-            .name("홍길동")
-            .phone("01012345678")
-            .relation("가족")
-            .priority(0)
-            .build();
-    user.getGuardians().add(guardian);
+  @DisplayName("탈퇴 시 보호자 관계도 함께 제거")
+  void 탈퇴시_보호자_관계_클리어() {
+    User guardianUser = User.builder().email("guardian@glucofit.com").build();
+    ReflectionTestUtils.setField(guardianUser, "id", 2L);
+
+    WardGuardian wg =
+        WardGuardian.builder().ward(user).guardian(guardianUser).relation("가족").priority(0).build();
+    user.getWardGuardians().add(wg);
 
     given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
     given(passwordEncoder.matches("myPassword", "encodedPw")).willReturn(true);
 
     authService.withdraw(USER_ID, "myPassword");
 
-    assertThat(user.getGuardians()).isEmpty();
+    assertThat(user.getWardGuardians()).isEmpty();
   }
 
   @Test
   @DisplayName("탈퇴 후 동일 이메일로 재가입 가능 (이메일 익명화됨)")
   void 탈퇴후_동일_이메일_재가입() {
-    // 탈퇴 처리
     given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
     given(passwordEncoder.matches("myPassword", "encodedPw")).willReturn(true);
 
     authService.withdraw(USER_ID, "myPassword");
 
-    // 이메일이 익명화되었으므로 원래 이메일은 더 이상 존재하지 않음
     assertThat(user.getEmail()).isNotEqualTo("user@glucofit.com");
-    assertThat(user.getEmail()).matches("deleted_[a-f0-9-]+@withdrawn\\.local");
+    assertThat(user.getEmail()).matches("deleted_\\d+@withdrawn\\.local");
 
-    // 재가입 시 이메일 중복 체크 통과
     given(userRepository.existsByEmail("user@glucofit.com")).willReturn(false);
     given(passwordEncoder.encode("newPassword")).willReturn("newEncodedPw");
     given(userRepository.save(any(User.class)))
         .willAnswer(
             inv -> {
               User saved = inv.getArgument(0);
-              ReflectionTestUtils.setField(saved, "userId", UUID.randomUUID());
+              ReflectionTestUtils.setField(saved, "id", 99L);
               return saved;
             });
     given(jwtProvider.generateAccessToken(any(), anyString())).willReturn("new-at");
@@ -178,16 +171,11 @@ class AuthWithdrawFlowTest {
 
     authService.withdraw(USER_ID, "myPassword");
 
-    // 이메일: deleted_{userId}@withdrawn.local
     assertThat(user.getEmail()).isEqualTo("deleted_" + USER_ID + "@withdrawn.local");
-    // 비밀번호: null
     assertThat(user.getPassword()).isNull();
-    // 신체정보: null
     assertThat(user.getHeight()).isNull();
     assertThat(user.getWeight()).isNull();
-    // deletedAt: 설정됨
     assertThat(user.getDeletedAt()).isNotNull();
-    // 설정값은 유지 (당뇨 타입 등은 통계용으로 보존)
-    assertThat(user.getDiabetesType()).isNotNull();
+    assertThat(user.getDiabetesType()).isNull();
   }
 }
