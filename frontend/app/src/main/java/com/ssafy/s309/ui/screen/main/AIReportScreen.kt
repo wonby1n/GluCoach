@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,14 +30,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.TrendingDown
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,8 +61,11 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.s309.R
@@ -75,6 +88,14 @@ private data class ReportFoodCard(
     @DrawableRes val imageResId: Int,
     val grade: String,
     val maxGlucose: Int,
+    val recoveryTime: String,
+)
+
+private data class FoodMealRecord(
+    val date: String,
+    val mealType: String,
+    val foodName: String,
+    val peakGlucose: Int,
     val recoveryTime: String,
 )
 
@@ -106,6 +127,39 @@ private val cautionFoods =
         ReportFoodCard("떡볶이", R.drawable.keto_kimbap, "D", 210, "2시간 40분"),
     )
 
+private val foodMealRecords =
+    mapOf(
+        "연어 샐러드" to
+            listOf(
+                FoodMealRecord("4월 28일", "아침", "연어 샐러드", 122, "58분"),
+                FoodMealRecord("4월 24일", "점심", "연어 샐러드", 128, "1시간 5분"),
+            ),
+        "고등어 구이 정식" to
+            listOf(
+                FoodMealRecord("4월 27일", "저녁", "고등어 구이 정식", 133, "1시간 10분"),
+                FoodMealRecord("4월 25일", "점심", "고등어 구이 정식", 137, "1시간 15분"),
+            ),
+        "키토 김밥" to
+            listOf(
+                FoodMealRecord("4월 26일", "점심", "키토 김밥", 130, "1시간 8분"),
+                FoodMealRecord("4월 23일", "아침", "키토 김밥", 137, "1시간 20분"),
+            ),
+        "짜장면" to
+            listOf(
+                FoodMealRecord("4월 28일", "점심", "짜장면", 185, "2시간 15분"),
+                FoodMealRecord("4월 24일", "저녁", "짜장면", 178, "2시간 5분"),
+            ),
+        "짬뽕" to
+            listOf(
+                FoodMealRecord("4월 27일", "점심", "짬뽕", 165, "1시간 50분"),
+            ),
+        "떡볶이" to
+            listOf(
+                FoodMealRecord("4월 26일", "저녁", "떡볶이", 210, "2시간 40분"),
+                FoodMealRecord("4월 22일", "점심", "떡볶이", 198, "2시간 20분"),
+            ),
+    )
+
 private val weeklyGlucose = listOf(105f, 118f, 110f, 125f, 108f, 132f, 112f)
 
 private val patternItems =
@@ -132,8 +186,11 @@ private val patternItems =
 
 // ── 진입점 ──────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AIReportContent(modifier: Modifier = Modifier) {
+    var selectedFood by remember { mutableStateOf<ReportFoodCard?>(null) }
+
     Column(
         modifier =
             modifier
@@ -182,7 +239,15 @@ fun AIReportContent(modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.height(GlucoachSpacing.md))
         }
 
-        FoodTopWorstSection()
+        FoodTopWorstSection(onFoodClick = { selectedFood = it })
+
+        selectedFood?.let { food ->
+            FoodMealHistorySheet(
+                food = food,
+                records = foodMealRecords[food.name].orEmpty(),
+                onDismiss = { selectedFood = null },
+            )
+        }
 
         Column(modifier = Modifier.padding(horizontal = 22.dp)) {
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
@@ -254,50 +319,69 @@ private fun WeeklySummaryRow() {
         horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.md),
     ) {
         summaryCards.forEach { card ->
-            SummaryStatItem(card)
+            SummaryStatItem(card = card, modifier = Modifier.width(130.dp))
         }
     }
 }
 
 @Composable
-private fun SummaryStatItem(card: SummaryCard) {
+private fun SummaryStatItem(
+    card: SummaryCard,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier =
-            Modifier
-                .width(130.dp)
+            modifier
+                .height(120.dp)
                 .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
                 .clip(RoundedCornerShape(GlucoachCorner.card))
                 .background(GlucoachColors.Surface)
                 .padding(GlucoachSpacing.lg),
     ) {
-        Text(
-            text = card.title,
-            color = GlucoachColors.TextSecondary,
-            fontSize = 12.sp,
-        )
-        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
-        Row(verticalAlignment = Alignment.Bottom) {
+        Box(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentAlignment = Alignment.CenterStart,
+        ) {
             Text(
-                text = card.value,
-                color = GlucoachColors.TextPrimary,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = card.unit,
+                text = card.title,
                 color = GlucoachColors.TextSecondary,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(bottom = 4.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
-        Spacer(modifier = Modifier.height(GlucoachSpacing.xs))
-        Text(
-            text = card.changeText,
-            color = card.changeColor,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
+        Box(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = card.value,
+                    color = GlucoachColors.TextPrimary,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = card.unit,
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 11.sp,
+                )
+            }
+        }
+        Box(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Text(
+                text = card.changeText,
+                color = card.changeColor,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -305,6 +389,12 @@ private fun SummaryStatItem(card: SummaryCard) {
 
 @Composable
 private fun WeeklyGlucoseChart() {
+    var selectedIndex by remember { mutableStateOf<Int?>(null) }
+    val days = listOf("월", "화", "수", "목", "금", "토", "일")
+    val minVal = 50f
+    val maxVal = 200f
+    val range = maxVal - minVal
+
     Column(
         modifier =
             Modifier
@@ -325,18 +415,22 @@ private fun WeeklyGlucoseChart() {
 
         val chartHeight = 150.dp
 
+        var chartWidthPx by remember { mutableIntStateOf(0) }
+        val density = LocalDensity.current
+        val widthDp = with(density) { chartWidthPx.toDp() }
+        val stepDp = if (weeklyGlucose.size > 1 && chartWidthPx > 0) widthDp / (weeklyGlucose.size - 1) else 0.dp
+
         Box(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(chartHeight),
+                    .height(chartHeight)
+                    .padding(horizontal = 14.dp)
+                    .onSizeChanged { chartWidthPx = it.width },
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
-                val minVal = 50f
-                val maxVal = 200f
-                val range = maxVal - minVal
 
                 fun yFor(v: Float) = h - ((v - minVal) / range) * h
 
@@ -369,14 +463,7 @@ private fun WeeklyGlucoseChart() {
                                 val x0 = (i - 1) * step
                                 val x1 = i * step
                                 val cx = (x0 + x1) / 2f
-                                cubicTo(
-                                    cx,
-                                    yFor(points[i - 1]),
-                                    cx,
-                                    yFor(points[i]),
-                                    x1,
-                                    yFor(points[i]),
-                                )
+                                cubicTo(cx, yFor(points[i - 1]), cx, yFor(points[i]), x1, yFor(points[i]))
                             }
                         }
                     drawPath(
@@ -385,22 +472,48 @@ private fun WeeklyGlucoseChart() {
                         style = Stroke(width = 2.5f, cap = StrokeCap.Round),
                     )
 
+                    selectedIndex?.let { idx ->
+                        val cx = idx * step
+                        val cy = yFor(points[idx])
+                        drawLine(
+                            color = GlucoachColors.TextSecondary,
+                            start = Offset(cx, cy + 12f),
+                            end = Offset(cx, h),
+                            strokeWidth = 1.5f,
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)),
+                        )
+                    }
+
                     points.forEachIndexed { i, v ->
                         val cx = i * step
                         val cy = yFor(v)
-                        drawCircle(
-                            color = GlucoachColors.Surface,
-                            radius = 6f,
-                            center = Offset(cx, cy),
-                        )
-                        drawCircle(
-                            color = GlucoachColors.Primary,
-                            radius = 5f,
-                            center = Offset(cx, cy),
-                            style = Stroke(width = 2.5f),
-                        )
+                        if (selectedIndex == i) {
+                            drawCircle(color = GlucoachColors.Primary, radius = 8f, center = Offset(cx, cy))
+                            drawCircle(color = GlucoachColors.Surface, radius = 4f, center = Offset(cx, cy))
+                        } else {
+                            drawCircle(color = GlucoachColors.Surface, radius = 6f, center = Offset(cx, cy))
+                            drawCircle(color = GlucoachColors.Primary, radius = 5f, center = Offset(cx, cy), style = Stroke(width = 2.5f))
+                        }
                     }
                 }
+            }
+
+            selectedIndex?.let { idx ->
+                val v = weeklyGlucose[idx]
+                val text = "${v.toInt()}"
+                val textHalfWidth = (text.length * 3.5f).dp
+                val cx = stepDp * idx
+                val cyRatio = 1f - ((v - minVal) / range)
+                val cy = chartHeight * cyRatio
+                val tipX = (cx - textHalfWidth).coerceIn(0.dp, widthDp - textHalfWidth * 2)
+                val tipY = maxOf(0.dp, cy - 28.dp)
+                Text(
+                    text = text,
+                    color = GlucoachColors.Primary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.offset(x = tipX, y = tipY),
+                )
             }
 
             Text(
@@ -426,12 +539,23 @@ private fun WeeklyGlucoseChart() {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            listOf("월", "화", "수", "목", "금", "토", "일").forEach { day ->
-                Text(
-                    text = day,
-                    color = GlucoachColors.TextSecondary,
-                    fontSize = 12.sp,
-                )
+            days.forEachIndexed { idx, day ->
+                val isSelected = selectedIndex == idx
+                Box(
+                    modifier =
+                        Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(if (isSelected) GlucoachColors.Primary else Color.Transparent)
+                            .clickable { selectedIndex = if (selectedIndex == idx) null else idx },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = day,
+                        color = if (isSelected) Color.White else GlucoachColors.TextSecondary,
+                        fontSize = 12.sp,
+                    )
+                }
             }
         }
     }
@@ -440,7 +564,7 @@ private fun WeeklyGlucoseChart() {
 // ── 음식 선정 TOP / WORST ───────────────────────────────
 
 @Composable
-private fun FoodTopWorstSection() {
+private fun FoodTopWorstSection(onFoodClick: (ReportFoodCard) -> Unit = {}) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val foods = if (selectedTab == 0) stableFoods else cautionFoods
 
@@ -483,7 +607,7 @@ private fun FoodTopWorstSection() {
             horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.md),
         ) {
             items(foods) { food ->
-                FoodGradeCard(food = food)
+                FoodGradeCard(food = food, onClick = { onFoodClick(food) })
             }
         }
 
@@ -525,7 +649,10 @@ private fun FoodTab(
 }
 
 @Composable
-private fun FoodGradeCard(food: ReportFoodCard) {
+private fun FoodGradeCard(
+    food: ReportFoodCard,
+    onClick: () -> Unit = {},
+) {
     val gradeColor =
         when (food.grade) {
             "A" -> GlucoachColors.Primary
@@ -541,6 +668,7 @@ private fun FoodGradeCard(food: ReportFoodCard) {
                 .clip(RoundedCornerShape(GlucoachCorner.card))
                 .border(1.dp, GlucoachColors.Border, RoundedCornerShape(GlucoachCorner.card))
                 .background(GlucoachColors.Surface)
+                .clickable(onClick = onClick)
                 .padding(GlucoachSpacing.md),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -661,6 +789,160 @@ private fun PatternRow(item: PatternItem) {
                 color = GlucoachColors.TextSecondary,
                 fontSize = 13.sp,
                 lineHeight = 18.sp,
+            )
+        }
+    }
+}
+
+// ── 음식 식사 기록 BottomSheet ─────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FoodMealHistorySheet(
+    food: ReportFoodCard,
+    records: List<FoodMealRecord>,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = GlucoachColors.Surface,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = null,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 22.dp)
+                    .padding(top = 24.dp, bottom = 32.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column {
+                    Text(
+                        text = food.name,
+                        color = GlucoachColors.TextSecondary,
+                        fontSize = 13.sp,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "지난 주 식사 기록",
+                        color = GlucoachColors.TextPrimary,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "2026.04.22~2026.04.28",
+                        color = GlucoachColors.TextSecondary,
+                        fontSize = 13.sp,
+                    )
+                }
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = "닫기",
+                        tint = GlucoachColors.TextSecondary,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+            if (records.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "이번 주 식사 기록이 없어요",
+                        color = GlucoachColors.TextSecondary,
+                        fontSize = 14.sp,
+                    )
+                }
+            } else {
+                records.forEachIndexed { index, record ->
+                    if (index == 0 || records[index - 1].date != record.date) {
+                        if (index > 0) Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+                        Text(
+                            text = record.date,
+                            color = GlucoachColors.TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+                    }
+                    MealRecordCard(record)
+                    if (index < records.lastIndex && records[index + 1].date == record.date) {
+                        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MealRecordCard(record: FoodMealRecord) {
+    val icon =
+        when (record.mealType) {
+            "아침" -> Icons.Outlined.WbSunny
+            "점심" -> Icons.Outlined.LightMode
+            else -> Icons.Outlined.DarkMode
+        }
+    val bgColor =
+        when (record.mealType) {
+            "아침" -> Color(0xFFFFF8E1)
+            "점심" -> Color(0xFFDDF3F8)
+            else -> Color(0xFFE8EAF6)
+        }
+
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(GlucoachCorner.card))
+                .background(bgColor)
+                .padding(horizontal = GlucoachSpacing.lg, vertical = GlucoachSpacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = GlucoachColors.TextSecondary,
+            modifier = Modifier.size(24.dp),
+        )
+        Spacer(modifier = Modifier.width(GlucoachSpacing.md))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "${record.mealType} 식사",
+                color = GlucoachColors.TextSecondary,
+                fontSize = 12.sp,
+            )
+            Text(
+                text = record.foodName,
+                color = GlucoachColors.TextPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = "최고 ${record.peakGlucose}mg/dL",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = "복귀 ${record.recoveryTime}",
+                color = GlucoachColors.TextSecondary,
+                fontSize = 11.sp,
             )
         }
     }

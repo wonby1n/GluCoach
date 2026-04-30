@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 public record FoodNutrition(
-    @NotBlank String foodId,
+    String foodId,
     @NotBlank String name,
     @NotNull Double carbsG,
     @NotNull Double proteinG,

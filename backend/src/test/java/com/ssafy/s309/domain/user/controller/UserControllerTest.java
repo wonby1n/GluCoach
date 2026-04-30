@@ -18,7 +18,6 @@ import com.ssafy.s309.domain.user.dto.SettingsUpdateRequest;
 import com.ssafy.s309.domain.user.entity.DiabetesType;
 import com.ssafy.s309.domain.user.service.UserService;
 import java.util.List;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -44,8 +43,8 @@ class UserControllerTest {
   @Autowired private ObjectMapper objectMapper;
   @MockitoBean private UserService userService;
 
-  private static final UUID USER_ID = UUID.randomUUID();
-  private static final UUID GUARDIAN_ID = UUID.randomUUID();
+  private static final Long USER_ID = 1L;
+  private static final Long WG_ID = 10L;
 
   // ── Settings ──────────────────────────────────────────────
 
@@ -54,15 +53,26 @@ class UserControllerTest {
   void 설정_조회_200_반환() throws Exception {
     SettingsResponse response =
         new SettingsResponse(
-            USER_ID, 170f, 65f, DiabetesType.NONE, false, 70, 140, 70, 180, false, "BASIC");
+            USER_ID,
+            "홍길동",
+            30,
+            "male",
+            "01012345678",
+            170f,
+            65f,
+            DiabetesType.NORMAL,
+            false,
+            70,
+            140,
+            1);
     given(userService.getSettings(USER_ID)).willReturn(response);
 
     mockMvc
         .perform(get("/api/users/{userId}/settings", USER_ID))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.userId").value(USER_ID.toString()))
+        .andExpect(jsonPath("$.userId").value(USER_ID))
         .andExpect(jsonPath("$.targetLow").value(70))
-        .andExpect(jsonPath("$.diabetesType").value("NONE"));
+        .andExpect(jsonPath("$.diabetesType").value("NORMAL"));
   }
 
   @Test
@@ -70,10 +80,21 @@ class UserControllerTest {
   void 설정_수정_200_반환() throws Exception {
     SettingsUpdateRequest request =
         new SettingsUpdateRequest(
-            175f, 70f, DiabetesType.TYPE1, true, 80, 150, 75, 190, true, "BASIC");
+            "홍길동", 30, "male", "01012345678", 175f, 70f, DiabetesType.T1D, true, 80, 150, 1);
     SettingsResponse response =
         new SettingsResponse(
-            USER_ID, 175f, 70f, DiabetesType.TYPE1, true, 80, 150, 75, 190, true, "BASIC");
+            USER_ID,
+            "홍길동",
+            30,
+            "male",
+            "01012345678",
+            175f,
+            70f,
+            DiabetesType.T1D,
+            true,
+            80,
+            150,
+            1);
     given(userService.updateSettings(eq(USER_ID), any())).willReturn(response);
 
     mockMvc
@@ -105,24 +126,23 @@ class UserControllerTest {
   void 보호자_목록_조회_200_반환() throws Exception {
     List<GuardianResponse> list =
         List.of(
-            new GuardianResponse(GUARDIAN_ID, "엄마", "01012345678", "부모", true, 0),
-            new GuardianResponse(UUID.randomUUID(), "아빠", "01098765432", "부모", false, 1));
+            new GuardianResponse(WG_ID, USER_ID, 2L, "부모", 0),
+            new GuardianResponse(11L, USER_ID, 3L, "배우자", 1));
     given(userService.getGuardians(USER_ID)).willReturn(list);
 
     mockMvc
         .perform(get("/api/users/{userId}/guardians", USER_ID))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(2))
-        .andExpect(jsonPath("$[0].name").value("엄마"))
+        .andExpect(jsonPath("$[0].guardianId").value(2))
         .andExpect(jsonPath("$[0].priority").value(0));
   }
 
   @Test
   @WithMockUser
   void 보호자_등록_201_반환() throws Exception {
-    GuardianRequest request = new GuardianRequest("엄마", "01012345678", "부모", true);
-    GuardianResponse response =
-        new GuardianResponse(GUARDIAN_ID, "엄마", "01012345678", "부모", true, 0);
+    GuardianRequest request = new GuardianRequest(2L, "부모");
+    GuardianResponse response = new GuardianResponse(WG_ID, USER_ID, 2L, "부모", 0);
     given(userService.createGuardian(eq(USER_ID), any())).willReturn(response);
 
     mockMvc
@@ -132,40 +152,39 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.guardianId").value(GUARDIAN_ID.toString()))
+        .andExpect(jsonPath("$.id").value(WG_ID))
         .andExpect(jsonPath("$.priority").value(0));
   }
 
   @Test
   @WithMockUser
-  void 보호자_등록_전화번호_형식_오류_400_반환() throws Exception {
-    GuardianRequest request = new GuardianRequest("엄마", "invalid-phone", "부모", true);
+  void 보호자_등록_guardianId_누락_400_반환() throws Exception {
+    String body = "{\"relation\":\"부모\"}";
 
     mockMvc
         .perform(
             post("/api/users/{userId}/guardians", USER_ID)
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(body))
         .andExpect(status().isBadRequest());
   }
 
   @Test
   @WithMockUser
   void 보호자_수정_200_반환() throws Exception {
-    GuardianRequest request = new GuardianRequest("어머니", "01012345678", "부모", true);
-    GuardianResponse response =
-        new GuardianResponse(GUARDIAN_ID, "어머니", "01012345678", "부모", true, 0);
-    given(userService.updateGuardian(eq(USER_ID), eq(GUARDIAN_ID), any())).willReturn(response);
+    GuardianRequest request = new GuardianRequest(2L, "가족");
+    GuardianResponse response = new GuardianResponse(WG_ID, USER_ID, 2L, "가족", 0);
+    given(userService.updateGuardian(eq(USER_ID), eq(WG_ID), any())).willReturn(response);
 
     mockMvc
         .perform(
-            put("/api/users/{userId}/guardians/{guardianId}", USER_ID, GUARDIAN_ID)
+            put("/api/users/{userId}/guardians/{wardGuardianId}", USER_ID, WG_ID)
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.name").value("어머니"));
+        .andExpect(jsonPath("$.relation").value("가족"));
   }
 
   @Test
@@ -173,7 +192,7 @@ class UserControllerTest {
   void 보호자_삭제_204_반환() throws Exception {
     mockMvc
         .perform(
-            delete("/api/users/{userId}/guardians/{guardianId}", USER_ID, GUARDIAN_ID).with(csrf()))
+            delete("/api/users/{userId}/guardians/{wardGuardianId}", USER_ID, WG_ID).with(csrf()))
         .andExpect(status().isNoContent());
   }
 
@@ -182,11 +201,11 @@ class UserControllerTest {
   void 다른_유저의_보호자_삭제_400_반환() throws Exception {
     doThrow(new IllegalArgumentException("해당 유저의 보호자가 아닙니다"))
         .when(userService)
-        .deleteGuardian(USER_ID, GUARDIAN_ID);
+        .deleteGuardian(USER_ID, WG_ID);
 
     mockMvc
         .perform(
-            delete("/api/users/{userId}/guardians/{guardianId}", USER_ID, GUARDIAN_ID).with(csrf()))
+            delete("/api/users/{userId}/guardians/{wardGuardianId}", USER_ID, WG_ID).with(csrf()))
         .andExpect(status().isBadRequest());
   }
 }

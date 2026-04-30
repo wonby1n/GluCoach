@@ -15,7 +15,6 @@ import com.ssafy.s309.domain.auth.jwt.JwtProvider;
 import com.ssafy.s309.domain.user.entity.User;
 import com.ssafy.s309.domain.user.repository.UserRepository;
 import java.util.Optional;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,16 +34,14 @@ class AuthServiceTest {
   @Mock private PasswordEncoder passwordEncoder;
   @InjectMocks private AuthService authService;
 
-  private static final UUID USER_ID = UUID.randomUUID();
+  private static final Long USER_ID = 1L;
   private User user;
 
   @BeforeEach
   void setUp() {
     user = User.builder().email("test@example.com").password("encodedPassword").build();
-    ReflectionTestUtils.setField(user, "userId", USER_ID);
+    ReflectionTestUtils.setField(user, "id", USER_ID);
   }
-
-  // ── 회원가입 ──────────────────────────────────────────────
 
   @Test
   void 회원가입_성공() {
@@ -55,7 +52,7 @@ class AuthServiceTest {
         .willAnswer(
             invocation -> {
               User saved = invocation.getArgument(0);
-              ReflectionTestUtils.setField(saved, "userId", USER_ID);
+              ReflectionTestUtils.setField(saved, "id", USER_ID);
               return saved;
             });
     given(jwtProvider.generateAccessToken(any(), anyString())).willReturn("access-token");
@@ -77,8 +74,6 @@ class AuthServiceTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("이미 가입된 이메일");
   }
-
-  // ── 로그인 ──────────────────────────────────────────────
 
   @Test
   void 로그인_성공() {
@@ -117,8 +112,6 @@ class AuthServiceTest {
         .hasMessageContaining("이메일 또는 비밀번호가 올바르지 않습니다");
   }
 
-  // ── 로그아웃 ──────────────────────────────────────────────
-
   @Test
   void 로그아웃_성공_리프레시_토큰_삭제() {
     given(jwtProvider.validate("valid-refresh")).willReturn(true);
@@ -137,8 +130,6 @@ class AuthServiceTest {
 
     verify(refreshTokenService, never()).delete(any());
   }
-
-  // ── 회원탈퇴 ──────────────────────────────────────────────
 
   @Test
   void 회원탈퇴_성공_소프트삭제_및_익명화() {
@@ -192,7 +183,7 @@ class AuthServiceTest {
   @Test
   void 회원탈퇴_OAuth_사용자_비밀번호_없이_성공() {
     User oauthUser = User.builder().email("oauth@example.com").provider("kakao").build();
-    ReflectionTestUtils.setField(oauthUser, "userId", USER_ID);
+    ReflectionTestUtils.setField(oauthUser, "id", USER_ID);
 
     given(userRepository.findById(USER_ID)).willReturn(Optional.of(oauthUser));
 
