@@ -2,6 +2,7 @@ package com.ssafy.s309.data.repository
 
 import com.ssafy.s309.data.api.UserApi
 import com.ssafy.s309.data.local.TokenManager
+import com.ssafy.s309.data.model.FcmTokenRequest
 import com.ssafy.s309.data.model.GuardianCreateRequest
 import com.ssafy.s309.data.model.GuardianItem
 import com.ssafy.s309.data.model.UserSettings
@@ -17,6 +18,12 @@ class UserRepository
         private val tokenManager: TokenManager,
     ) {
         private fun userId(): String = tokenManager.getUserId() ?: error("로그인이 필요합니다")
+
+        suspend fun registerFcmToken(token: String): Result<Unit> =
+            runCatching {
+                val id = tokenManager.getUserId() ?: return@runCatching
+                userApi.registerFcmToken(id, FcmTokenRequest(token))
+            }
 
         suspend fun getSettings(): Result<UserSettings> = runCatching { userApi.getSettings(userId()) }
 
