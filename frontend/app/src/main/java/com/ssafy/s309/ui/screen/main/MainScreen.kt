@@ -10,7 +10,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +36,7 @@ import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.HorizontalDivider
@@ -47,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,6 +79,8 @@ fun MainScreen(
     mealPinIcon: (@Composable () -> Unit)? = null,
     onGraphClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    onGuardianClick: () -> Unit = {},
     userEmail: String = "",
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -87,11 +90,15 @@ fun MainScreen(
         onBellClick = viewModel::openNotificationPanel,
         onNotificationBack = viewModel::closeNotificationPanel,
         onClearAllNotifications = viewModel::clearAllNotifications,
+        onNotificationClick = viewModel::selectNotification,
+        onDismissNotificationDetail = viewModel::dismissNotificationDetail,
         mascotSlot = mascotSlot,
         bellIcon = bellIcon,
         mealPinIcon = mealPinIcon,
         onGraphClick = onGraphClick,
         onLogoutClick = onLogoutClick,
+        onSettingsClick = onSettingsClick,
+        onGuardianClick = onGuardianClick,
         userEmail = userEmail,
     )
 }
@@ -102,14 +109,18 @@ fun MainScreenContent(
     onBellClick: () -> Unit,
     onNotificationBack: () -> Unit,
     onClearAllNotifications: () -> Unit,
+    onNotificationClick: (com.ssafy.s309.data.model.NotificationItem) -> Unit = {},
+    onDismissNotificationDetail: () -> Unit = {},
     mascotSlot: (@Composable () -> Unit)? = null,
     bellIcon: (@Composable () -> Unit)? = null,
     mealPinIcon: (@Composable () -> Unit)? = null,
     onGraphClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    onGuardianClick: () -> Unit = {},
     userEmail: String = "",
 ) {
-    var selectedTab by remember { mutableStateOf("home") }
+    var selectedTab by rememberSaveable { mutableStateOf("home") }
     var showFoodScan by remember { mutableStateOf(false) }
     var showReportSheet by remember { mutableStateOf(false) }
     var showAddSheet by remember { mutableStateOf(false) }
@@ -129,9 +140,14 @@ fun MainScreenContent(
                     label = "tab-crossfade",
                 ) { tab ->
                     when (tab) {
-                        "profile" -> MyPageContent(onLogoutClick = onLogoutClick, userEmail = userEmail)
+                        "profile" ->
+                            MyPageContent(
+                                onLogoutClick = onLogoutClick,
+                                onHealthDetailClick = onSettingsClick,
+                                onGuardianClick = onGuardianClick,
+                                userEmail = userEmail,
+                            )
                         "edit" -> FoodComparisonContent()
-                        "profile" -> MyPageContent()
                         "meallog" ->
                             MealLogContent(
                                 onBackToHome = { selectedTab = "home" },
@@ -151,6 +167,7 @@ fun MainScreenContent(
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
                                 TodayConditionHeader(
                                     onBellClick = onBellClick,
+                                    hasUnread = state.notifications.any { it.isUnread },
                                     bellIcon = bellIcon,
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
@@ -179,9 +196,8 @@ fun MainScreenContent(
                                 GlucoseChartCard(
                                     readings = state.glucoseSeries,
                                     range = state.glucoseRange,
-                                    meals = state.meals,
+                                    isDeviceConnected = state.isDeviceConnected,
                                     hoursLabel = "최근 6시간",
-                                    mealPinIcon = mealPinIcon,
                                     timeLabels = chartTimeLabels,
                                     onClick = onGraphClick,
                                 )
@@ -297,6 +313,20 @@ fun MainScreenContent(
 
         AnimatedVisibility(
             visible = state.isNotificationPanelOpen,
+            enter = fadeIn(animationSpec = tween(durationMillis = 280)),
+            exit = fadeOut(animationSpec = tween(durationMillis = 240)),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.3f))
+                        .clickable(onClick = onNotificationBack),
+            )
+        }
+
+        AnimatedVisibility(
+            visible = state.isNotificationPanelOpen,
             enter =
                 slideInHorizontally(
                     initialOffsetX = { fullWidth -> fullWidth },
@@ -317,6 +347,14 @@ fun MainScreenContent(
                 notifications = state.notifications,
                 onBack = onNotificationBack,
                 onClearAll = onClearAllNotifications,
+                onNotificationClick = onNotificationClick,
+            )
+        }
+
+        if (state.selectedNotification != null) {
+            NotificationDetailOverlay(
+                notification = state.selectedNotification,
+                onDismiss = onDismissNotificationDetail,
             )
         }
     }
@@ -325,7 +363,8 @@ fun MainScreenContent(
 @Composable
 private fun TodayConditionHeader(
     onBellClick: () -> Unit,
-    bellIcon: (@Composable () -> Unit)?,
+    hasUnread: Boolean,
+    bellIcon: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -345,14 +384,25 @@ private fun TodayConditionHeader(
                     .clickable(onClick = onBellClick),
             contentAlignment = Alignment.Center,
         ) {
-            bellIcon?.invoke()
-                ?: Box(
+            if (bellIcon != null) {
+                bellIcon()
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.Notifications,
+                    contentDescription = if (hasUnread) "새 알림" else "알림",
+                    tint = GlucoachColors.Primary,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            if (hasUnread) {
+                Box(
                     modifier =
                         Modifier
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .border(1.dp, GlucoachColors.PrimaryDark, CircleShape),
+                            .align(Alignment.TopEnd)
+                            .size(8.dp)
+                            .background(Color(0xFFE53935), shape = CircleShape),
                 )
+            }
         }
     }
 }

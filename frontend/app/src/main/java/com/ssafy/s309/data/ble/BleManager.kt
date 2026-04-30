@@ -66,6 +66,9 @@ class BleManager
             )
         val glucoseReadings: SharedFlow<GlucoseReading> = _glucoseReadings.asSharedFlow()
 
+        private val _glucoseHistory = MutableStateFlow<List<GlucoseReading>>(emptyList())
+        val glucoseHistory: StateFlow<List<GlucoseReading>> = _glucoseHistory.asStateFlow()
+
         private val _processingSettings = MutableStateFlow(BleProcessingSettings())
         val processingSettings: StateFlow<BleProcessingSettings> = _processingSettings.asStateFlow()
 
@@ -302,6 +305,7 @@ class BleManager
             if (_processingSettings.value.gatherIntervalSeconds == 0) {
                 val reading = parser.applyFilterAndConvert(raw, now) ?: return
                 _glucoseReadings.tryEmit(reading)
+                _glucoseHistory.update { (it + reading).takeLast(100) }
             } else {
                 synchronized(gatherBuffer) {
                     gatherBuffer.addLast(GatherEntry(timestampMillis = now, raw = raw))
@@ -345,6 +349,7 @@ class BleManager
             val firstTimestamp = snapshot.first().timestampMillis
             val reading = parser.applyFilterAndConvert(avgRaw, firstTimestamp) ?: return
             _glucoseReadings.tryEmit(reading)
+            _glucoseHistory.update { (it + reading).takeLast(100) }
         }
 
         // ────────────────────────────────────────

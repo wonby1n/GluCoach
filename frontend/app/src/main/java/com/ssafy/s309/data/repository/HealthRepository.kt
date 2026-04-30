@@ -45,6 +45,9 @@ class HealthRepository
         /** 패치에서 도착하는 실시간 혈당 측정 값 (이벤트 스트림). */
         val glucoseStream: SharedFlow<GlucoseReading> = bleManager.glucoseReadings
 
+        /** 패치에서 누적된 혈당 히스토리 (최대 100개, 앱 수명 동안 유지). */
+        val glucoseHistory: StateFlow<List<GlucoseReading>> = bleManager.glucoseHistory
+
         /** 데이터 처리 설정 스냅샷 (보정값 / 스파이크 임계값 / 출력타입 / 주기평균). */
         val bleProcessingSettings: StateFlow<BleProcessingSettings> = bleManager.processingSettings
 
@@ -83,8 +86,7 @@ class HealthRepository
         /** 최근 혈당 흐름. 메인 화면 그래프 초기 로드용. */
         suspend fun getRecentGlucose(hours: Int = 6): List<GlucoseReading> {
             // TODO(BE 연동): return healthApi.getRecentGlucose(hours)
-            // BLE 미연동 상태에서는 빈 리스트 반환 → 차트에 "기기 연동 없음" UI 표시
-            return emptyList()
+            return MOCK_GLUCOSE_SERIES
         }
 
         /** 사용자 목표 혈당 범위 (그래프의 회색 박스). */
