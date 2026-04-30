@@ -22,8 +22,8 @@ import com.ssafy.s309.ui.screen.auth.LandingScreen
 import com.ssafy.s309.ui.screen.auth.LoginScreen
 import com.ssafy.s309.ui.screen.auth.SignInScreen
 import com.ssafy.s309.ui.screen.auth.SignUpScreen
-import com.ssafy.s309.ui.screen.health.HealthSourceScreen
 import com.ssafy.s309.ui.screen.ble.BleScreen
+import com.ssafy.s309.ui.screen.health.HealthSourceScreen
 import com.ssafy.s309.ui.screen.main.GuardianScreen
 import com.ssafy.s309.ui.screen.main.MainScreen
 import com.ssafy.s309.ui.screen.main.SettingsScreen
@@ -65,6 +65,7 @@ sealed class Screen(val route: String) {
     object Graph : Screen("graph")
 
     object HealthSource : Screen("health_source")
+
     object Ble : Screen("ble")
 
     object Settings : Screen("settings")
