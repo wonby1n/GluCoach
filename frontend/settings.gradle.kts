@@ -23,3 +23,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "S309"
 include(":app")
+include(":feature-glucofit")
+include(":wear")
