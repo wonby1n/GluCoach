@@ -17,16 +17,16 @@ public class NotificationTokenService {
   private final FcmService fcmService;
 
   @Transactional
-  public void saveToken(User user, String fcmToken, String deviceType) {
+  public void saveToken(User user, String token, String deviceType) {
     tokenRepository
         .findByUserAndDeviceType(user, deviceType)
         .ifPresentOrElse(
-            token -> token.updateToken(fcmToken),
+            existing -> existing.updateToken(token),
             () ->
                 tokenRepository.save(
                     NotificationToken.builder()
                         .user(user)
-                        .fcmToken(fcmToken)
+                        .token(token)
                         .deviceType(deviceType)
                         .build()));
   }
@@ -34,7 +34,7 @@ public class NotificationTokenService {
   public void sendAlert(User user, String title, String body) {
     List<String> tokens =
         tokenRepository.findByUserAndIsActiveTrue(user).stream()
-            .map(NotificationToken::getFcmToken)
+            .map(NotificationToken::getToken)
             .toList();
     if (!tokens.isEmpty()) {
       fcmService.sendToTokens(tokens, title, body);

@@ -12,7 +12,6 @@ import io.jsonwebtoken.security.SignatureException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Date;
-import java.util.UUID;
 import javax.crypto.SecretKey;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -31,17 +30,15 @@ public class JwtProvider {
 
   public JwtProvider(JwtProperties properties) {
     this.properties = properties;
-    // secret 문자열을 Base64로 디코딩해도 되고, 바로 바이트로 써도 됨
-    // 여기선 안전하게 UTF-8 바이트 사용 (Base64 여부 자동 판단)
     byte[] keyBytes = toKeyBytes(properties.getSecret());
     this.secretKey = Keys.hmacShaKeyFor(keyBytes);
   }
 
-  public String generateAccessToken(UUID userId, String email) {
+  public String generateAccessToken(Long userId, String email) {
     return buildToken(userId, email, TOKEN_TYPE_ACCESS, properties.getAccessExpirationMs());
   }
 
-  public String generateRefreshToken(UUID userId) {
+  public String generateRefreshToken(Long userId) {
     return buildToken(userId, null, TOKEN_TYPE_REFRESH, properties.getRefreshExpirationMs());
   }
 
@@ -61,7 +58,7 @@ public class JwtProvider {
 
   public CustomUserPrincipal toPrincipal(String token) {
     Claims claims = parseClaims(token);
-    UUID userId = UUID.fromString(claims.getSubject());
+    Long userId = Long.parseLong(claims.getSubject());
     String email = claims.get(CLAIM_EMAIL, String.class);
     return new CustomUserPrincipal(userId, email);
   }
@@ -70,19 +67,19 @@ public class JwtProvider {
     return TOKEN_TYPE_ACCESS.equals(parseClaims(token).get(CLAIM_TOKEN_TYPE, String.class));
   }
 
-  public UUID getUserId(String token) {
-    return UUID.fromString(parseClaims(token).getSubject());
+  public Long getUserId(String token) {
+    return Long.parseLong(parseClaims(token).getSubject());
   }
 
   // ── 내부 헬퍼 ─────────────────────────────────────────────
 
-  private String buildToken(UUID userId, String email, String tokenType, long expirationMs) {
+  private String buildToken(Long userId, String email, String tokenType, long expirationMs) {
     Date now = new Date();
     Date expiry = new Date(now.getTime() + expirationMs);
 
     var builder =
         Jwts.builder()
-            .subject(userId.toString())
+            .subject(String.valueOf(userId))
             .claim(CLAIM_TOKEN_TYPE, tokenType)
             .issuer(properties.getIssuer())
             .issuedAt(now)
@@ -102,15 +99,12 @@ public class JwtProvider {
 
   private static byte[] toKeyBytes(String secret) {
     try {
-      // Base64 인코딩된 값이면 디코딩
       return Decoders.BASE64.decode(secret);
     } catch (IllegalArgumentException e) {
-      // 일반 문자열이면 UTF-8 바이트
       return secret.getBytes(StandardCharsets.UTF_8);
     }
   }
 
-  /** 외부에서 Base64 시크릿 생성 시 참고용 (사용 안 해도 됨) */
   public static String generateBase64Secret(byte[] bytes) {
     return Base64.getEncoder().encodeToString(bytes);
   }

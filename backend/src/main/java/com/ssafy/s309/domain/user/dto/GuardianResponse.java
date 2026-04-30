@@ -1,23 +1,16 @@
 package com.ssafy.s309.domain.user.dto;
 
-import com.ssafy.s309.domain.user.entity.Guardian;
-import java.util.UUID;
+import com.ssafy.s309.domain.user.entity.WardGuardian;
 
 public record GuardianResponse(
-    UUID guardianId,
-    String name,
-    String phone,
-    String relation,
-    Boolean isPrimary,
-    Integer priority) {
+    Long id, Long wardId, Long guardianId, String relation, Integer priority) {
 
-  public static GuardianResponse from(Guardian guardian) {
+  public static GuardianResponse from(WardGuardian wg) {
     return new GuardianResponse(
-        guardian.getGuardianId(),
-        guardian.getName(),
-        guardian.getPhone(),
-        guardian.getRelation(),
-        guardian.getIsPrimary(),
-        guardian.getPriority());
+        wg.getId(),
+        wg.getWard().getId(),
+        wg.getGuardian().getId(),
+        wg.getRelation(),
+        wg.getPriority());
   }
 }

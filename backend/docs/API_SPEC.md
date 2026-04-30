@@ -110,8 +110,8 @@ JWT 병합 시 단수 `/api/user/...` 로 일괄 변경되며, userId는 토큰 
 
 | 기능명 | Method | 엔드포인트 | 상세 설명 | 구현 | 우선순위 |
 |--------|--------|-----------|-----------|------|---------|
-| 식후 혈당 곡선 예측 | POST | `/api/predict/glucose` | 음식 영양 데이터 + 유저 프로필 → AI 예측 모델 호출 → 식후 2시간 혈당 곡선 반환. `cgm_patterns.personalized_at` 유무로 generic/personalized 자동 분기 | ⬜ | 🔴 Highest |
-| A/B 비교 모드 | POST | `/api/predict/glucose/compare` | 2개 음식 동시 입력 → 예측 API 병렬 2회 호출. 동일 시간축 곡선 비교. 최고 혈당 차이 강조 | ⬜ | 🔴 Highest |
+| 식후 혈당 곡선 예측 | POST | `/api/predict/glucose` | 음식 영양 데이터 + 유저 프로필(JWT) → AI 예측 모델 호출 → 식후 2시간 혈당 곡선(5분 간격 25포인트) 반환. 현재 `generic` 모드 고정 (personalized 미구현) | ✅ | 🔴 Highest |
+| A/B 비교 모드 | POST | `/api/predict/glucose/compare` | 2개 음식 동시 입력 → 예측 API 병렬 2회 호출 (`CompletableFuture`). 동일 시간축 곡선 비교. 최고 혈당 차이 강조 | ✅ | 🔴 Highest |
 
 ### AI 서버 호출 (BE → AI 내부 통신)
 
@@ -119,8 +119,6 @@ JWT 병합 시 단수 `/api/user/...` 로 일괄 변경되며, userId는 토큰 
 |------|--------|-----------|------|
 | BE → AI | POST | `{AI_SERVICE_URL}/inference/glucose` | AI 모델 추론 요청. BE가 음식 + 유저 데이터를 조합하여 호출 |
 
-> **⚠️ 주의**: `/api/predict/glucose`(FE→BE)와 `/inference/glucose`(BE→AI)는 서로 다른 서버의 엔드포인트입니다.
-> 상세 인터페이스 정의: [`ai-glucose-predict-api-interface.md`](./ai-glucose-predict-api-interface.md)
 
 ### 식전 예측 vs 식후 기록 역할 구분
 
