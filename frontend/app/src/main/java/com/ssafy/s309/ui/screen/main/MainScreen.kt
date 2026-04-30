@@ -78,6 +78,7 @@ fun MainScreen(
     bellIcon: (@Composable () -> Unit)? = null,
     mealPinIcon: (@Composable () -> Unit)? = null,
     onGraphClick: () -> Unit = {},
+    onConnectedDeviceClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onGuardianClick: () -> Unit = {},
@@ -96,6 +97,7 @@ fun MainScreen(
         bellIcon = bellIcon,
         mealPinIcon = mealPinIcon,
         onGraphClick = onGraphClick,
+        onConnectedDeviceClick = onConnectedDeviceClick,
         onLogoutClick = onLogoutClick,
         onSettingsClick = onSettingsClick,
         onGuardianClick = onGuardianClick,
@@ -115,6 +117,7 @@ fun MainScreenContent(
     bellIcon: (@Composable () -> Unit)? = null,
     mealPinIcon: (@Composable () -> Unit)? = null,
     onGraphClick: () -> Unit = {},
+    onConnectedDeviceClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onGuardianClick: () -> Unit = {},
@@ -143,6 +146,7 @@ fun MainScreenContent(
                         "profile" ->
                             MyPageContent(
                                 onLogoutClick = onLogoutClick,
+                                onDeviceClick = onConnectedDeviceClick,
                                 onHealthDetailClick = onSettingsClick,
                                 onGuardianClick = onGuardianClick,
                                 userEmail = userEmail,

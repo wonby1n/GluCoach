@@ -9,7 +9,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,14 +26,14 @@ public class UserController {
 
   @Operation(summary = "설정 조회")
   @GetMapping("/settings")
-  public ResponseEntity<SettingsResponse> getSettings(@PathVariable UUID userId) {
+  public ResponseEntity<SettingsResponse> getSettings(@PathVariable Long userId) {
     return ResponseEntity.ok(userService.getSettings(userId));
   }
 
   @Operation(summary = "설정 수정")
   @PutMapping("/settings")
   public ResponseEntity<SettingsResponse> updateSettings(
-      @PathVariable UUID userId, @RequestBody SettingsUpdateRequest request) {
+      @PathVariable Long userId, @RequestBody SettingsUpdateRequest request) {
     return ResponseEntity.ok(userService.updateSettings(userId, request));
   }
 
@@ -42,32 +41,32 @@ public class UserController {
 
   @Operation(summary = "보호자 목록 조회")
   @GetMapping("/guardians")
-  public ResponseEntity<List<GuardianResponse>> getGuardians(@PathVariable UUID userId) {
+  public ResponseEntity<List<GuardianResponse>> getGuardians(@PathVariable Long userId) {
     return ResponseEntity.ok(userService.getGuardians(userId));
   }
 
   @Operation(summary = "보호자 추가")
   @PostMapping("/guardians")
   public ResponseEntity<GuardianResponse> createGuardian(
-      @PathVariable UUID userId, @Valid @RequestBody GuardianRequest request) {
+      @PathVariable Long userId, @Valid @RequestBody GuardianRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(userService.createGuardian(userId, request));
   }
 
   @Operation(summary = "보호자 수정")
-  @PutMapping("/guardians/{guardianId}")
+  @PutMapping("/guardians/{wardGuardianId}")
   public ResponseEntity<GuardianResponse> updateGuardian(
-      @PathVariable UUID userId,
-      @PathVariable UUID guardianId,
+      @PathVariable Long userId,
+      @PathVariable Long wardGuardianId,
       @Valid @RequestBody GuardianRequest request) {
-    return ResponseEntity.ok(userService.updateGuardian(userId, guardianId, request));
+    return ResponseEntity.ok(userService.updateGuardian(userId, wardGuardianId, request));
   }
 
   @Operation(summary = "보호자 삭제")
-  @DeleteMapping("/guardians/{guardianId}")
+  @DeleteMapping("/guardians/{wardGuardianId}")
   public ResponseEntity<Void> deleteGuardian(
-      @PathVariable UUID userId, @PathVariable UUID guardianId) {
-    userService.deleteGuardian(userId, guardianId);
+      @PathVariable Long userId, @PathVariable Long wardGuardianId) {
+    userService.deleteGuardian(userId, wardGuardianId);
     return ResponseEntity.noContent().build();
   }
 }

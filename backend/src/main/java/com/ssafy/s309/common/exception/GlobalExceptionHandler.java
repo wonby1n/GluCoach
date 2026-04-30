@@ -1,5 +1,6 @@
 package com.ssafy.s309.common.exception;
 
+import com.ssafy.s309.domain.food.exception.FoodApiException;
 import com.ssafy.s309.domain.prediction.exception.AiServiceException;
 import com.ssafy.s309.domain.prediction.exception.AiServiceException.ErrorType;
 import java.util.Map;
@@ -25,6 +26,12 @@ public class GlobalExceptionHandler {
             .findFirst()
             .orElse("입력값이 올바르지 않습니다");
     return ResponseEntity.badRequest().body(Map.of("message", message));
+  }
+
+  @ExceptionHandler(FoodApiException.class)
+  public ResponseEntity<Map<String, String>> handleFoodApi(FoodApiException e) {
+    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+        .body(Map.of("message", e.getMessage()));
   }
 
   @ExceptionHandler(AiServiceException.class)

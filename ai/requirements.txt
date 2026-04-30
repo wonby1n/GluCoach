@@ -1,5 +1,6 @@
 fastapi>=0.115.0
 uvicorn[standard]>=0.34.0
+python-multipart>=0.0.9
 pydantic>=2.10.0
 pydantic-settings>=2.7.0
 
@@ -7,6 +8,7 @@ pydantic-settings>=2.7.0
 torch>=2.2.0
 torchvision>=0.17.0
 Pillow>=10.0.0
+ultralytics>=8.0.0
 
 # 학습 유틸
 matplotlib>=3.8.0

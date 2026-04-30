@@ -2,6 +2,7 @@ package com.ssafy.s309.data.ble
 
 import android.app.Application
 import android.bluetooth.BluetoothGatt
+import android.util.Log
 import com.clj.fastble.callback.BleGattCallback
 import com.clj.fastble.callback.BleNotifyCallback
 import com.clj.fastble.callback.BleScanCallback
@@ -104,6 +105,10 @@ class BleManager
         private val gatherBuffer = ArrayDeque<GatherEntry>()
 
         /** 표시 주기 평균 타이머 코루틴. gatherIntervalSeconds 변경 시 재시작. */
+        /** 패치 패킷 도착 빈도 측정용 — 직전 패킷 timestamp. */
+        private var lastArrivalMs: Long? = null
+
+        /** 주기 평균 타이머 코루틴. gatherIntervalSeconds 변경 시 재시작. */
         private var gatherJob: Job? = null
 
         /** DB 저장용 5분 평균 raw 값 버퍼. 표시 주기와 무관하게 항상 누적. */
@@ -354,8 +359,14 @@ class BleManager
          * 평균값에 대해 spike 필터를 적용하는 기존 동작 유지.
          */
         private fun handleIncomingPacket(data: ByteArray) {
+            // 패치 도착 빈도 측정용 로그. logcat -s BleRate 로 두 timestamp 차이 보면 곧 패치 송신 주기.
+            val arrivalMs = System.currentTimeMillis()
+            val gap = lastArrivalMs?.let { arrivalMs - it }
+            lastArrivalMs = arrivalMs
+            Log.d("BleRate", "packet @ $arrivalMs ${data.size}B" + (gap?.let { " (+${it}ms)" } ?: ""))
+
             val raw = parser.extractRaw(data) ?: return
-            val now = System.currentTimeMillis()
+            val now = arrivalMs
 
             parser.trackMovingAverage(raw)
 

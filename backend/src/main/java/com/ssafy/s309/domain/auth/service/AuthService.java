@@ -6,7 +6,6 @@ import com.ssafy.s309.domain.auth.dto.TokenResponse;
 import com.ssafy.s309.domain.auth.jwt.JwtProvider;
 import com.ssafy.s309.domain.user.entity.User;
 import com.ssafy.s309.domain.user.repository.UserRepository;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -38,7 +37,7 @@ public class AuthService {
 
     userRepository.save(user);
 
-    return issueTokens(user.getUserId(), user.getEmail());
+    return issueTokens(user.getId(), user.getEmail());
   }
 
   public TokenResponse login(LoginRequest request) {
@@ -52,7 +51,7 @@ public class AuthService {
       throw new IllegalArgumentException("이메일 또는 비밀번호가 올바르지 않습니다");
     }
 
-    return issueTokens(user.getUserId(), user.getEmail());
+    return issueTokens(user.getId(), user.getEmail());
   }
 
   public TokenResponse reissue(String refreshToken) {
@@ -60,9 +59,8 @@ public class AuthService {
       throw new IllegalArgumentException("유효하지 않은 리프레시 토큰입니다");
     }
 
-    UUID userId = jwtProvider.getUserId(refreshToken);
+    Long userId = jwtProvider.getUserId(refreshToken);
 
-    // Rotation: 저장된 토큰과 비교 — 불일치 시 재사용 감지
     if (!refreshTokenService.matches(userId, refreshToken)) {
       refreshTokenService.delete(userId);
       log.warn("Refresh Token 재사용 감지 — 모든 토큰 무효화. userId={}", userId);
@@ -74,18 +72,18 @@ public class AuthService {
             .findById(userId)
             .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다"));
 
-    return issueTokens(user.getUserId(), user.getEmail());
+    return issueTokens(user.getId(), user.getEmail());
   }
 
   public void logout(String refreshToken) {
     if (jwtProvider.validate(refreshToken)) {
-      UUID userId = jwtProvider.getUserId(refreshToken);
+      Long userId = jwtProvider.getUserId(refreshToken);
       refreshTokenService.delete(userId);
     }
   }
 
   @Transactional
-  public void withdraw(UUID userId, String password) {
+  public void withdraw(Long userId, String password) {
     User user =
         userRepository
             .findById(userId)
@@ -105,7 +103,7 @@ public class AuthService {
     refreshTokenService.delete(userId);
   }
 
-  private TokenResponse issueTokens(UUID userId, String email) {
+  private TokenResponse issueTokens(Long userId, String email) {
     String accessToken = jwtProvider.generateAccessToken(userId, email);
     String refreshToken = jwtProvider.generateRefreshToken(userId);
 

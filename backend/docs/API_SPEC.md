@@ -78,7 +78,7 @@ JWT 병합 시 단수 `/api/user/...` 로 일괄 변경되며, userId는 토큰 
 | 기능명 | Method | 엔드포인트 | 상세 설명 | 구현 | 우선순위 |
 |--------|--------|-----------|-----------|------|---------|
 | 실시간 혈당 표시 | (로컬) | BLE 로컬 수신 | BLE 수신 주기마다 UI 갱신. 추세 최근 15분 기준 4단계 | ⬜ | 🔴 Highest |
-| 타임라인 통합 조회 | GET | `/api/timeline?range={range}` | X축 0~24h 혈당 곡선 + 식사/운동/수면 이벤트 핀 | ⬜ | 🔴 Highest |
+| 타임라인 통합 조회 | GET | `/api/timeline?range={1d\|7d\|30d}` | 혈당 시계열 + 식사/운동/수면 이벤트 핀을 한 번에 반환. range 기본값 `1d`. JWT에서 userId 추출. 4쿼리 `CompletableFuture` 병렬 실행. 응답: `{range, from, to, glucosePoints[], meals[], exercises[], sleeps[]}` | 🟩 | 🔴 Highest |
 | 대시보드 요약 지표 | GET | `/api/stats/summary?range=1d` | 실시간 대시보드용 요약(평균, TIR, 최고/최저, 변동폭) | ⬜ | 🔴 Highest |
 | 디지털 트윈 아바타 상태 | GET | `/api/avatar/state` | 현재 혈당 기반 아바타 표정·혈관색·애니메이션 매핑. FE 렌더링용 | ⬜ | 🟠 High |
 | 혈당 패턴 비교 조회 | GET | `/api/stats/compare?mode={daily\|weekly}&base={date}&compare={date}` | 기준일/비교일의 혈당 곡선·평균·TIR 동시 반환. `delta`로 증감 강조 | ⬜ | 🟡 Medium |
@@ -110,8 +110,8 @@ JWT 병합 시 단수 `/api/user/...` 로 일괄 변경되며, userId는 토큰 
 
 | 기능명 | Method | 엔드포인트 | 상세 설명 | 구현 | 우선순위 |
 |--------|--------|-----------|-----------|------|---------|
-| 식후 혈당 곡선 예측 | POST | `/api/predict/glucose` | 음식 영양 데이터 + 유저 프로필 → AI 예측 모델 호출 → 식후 2시간 혈당 곡선 반환. `cgm_patterns.personalized_at` 유무로 generic/personalized 자동 분기 | ⬜ | 🔴 Highest |
-| A/B 비교 모드 | POST | `/api/predict/glucose/compare` | 2개 음식 동시 입력 → 예측 API 병렬 2회 호출. 동일 시간축 곡선 비교. 최고 혈당 차이 강조 | ⬜ | 🔴 Highest |
+| 식후 혈당 곡선 예측 | POST | `/api/predict/glucose` | 음식 영양 데이터 + 유저 프로필(JWT) → AI 예측 모델 호출 → 식후 2시간 혈당 곡선(5분 간격 25포인트) 반환. 현재 `generic` 모드 고정 (personalized 미구현) | ✅ | 🔴 Highest |
+| A/B 비교 모드 | POST | `/api/predict/glucose/compare` | 2개 음식 동시 입력 → 예측 API 병렬 2회 호출 (`CompletableFuture`). 동일 시간축 곡선 비교. 최고 혈당 차이 강조 | ✅ | 🔴 Highest |
 
 ### AI 서버 호출 (BE → AI 내부 통신)
 
@@ -119,8 +119,6 @@ JWT 병합 시 단수 `/api/user/...` 로 일괄 변경되며, userId는 토큰 
 |------|--------|-----------|------|
 | BE → AI | POST | `{AI_SERVICE_URL}/inference/glucose` | AI 모델 추론 요청. BE가 음식 + 유저 데이터를 조합하여 호출 |
 
-> **⚠️ 주의**: `/api/predict/glucose`(FE→BE)와 `/inference/glucose`(BE→AI)는 서로 다른 서버의 엔드포인트입니다.
-> 상세 인터페이스 정의: [`ai-glucose-predict-api-interface.md`](./ai-glucose-predict-api-interface.md)
 
 ### 식전 예측 vs 식후 기록 역할 구분
 

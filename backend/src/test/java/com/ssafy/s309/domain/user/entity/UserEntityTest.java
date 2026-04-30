@@ -10,27 +10,24 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@SuppressWarnings("NonAsciiCharacters") // 테스트 메소드명은 한글 사용
+@SuppressWarnings("NonAsciiCharacters")
 class UserEntityTest {
 
   @Autowired private TestEntityManager em;
 
   @Test
   void 유저_저장_및_기본값_확인() {
-    // given
     User user = User.builder().email("test@example.com").build();
 
-    // when
     em.persistAndFlush(user);
     em.clear();
 
-    User found = em.find(User.class, user.getUserId());
+    User found = em.find(User.class, user.getId());
 
-    // then
-    assertThat(found.getDiabetesType()).isEqualTo(DiabetesType.NONE);
-    assertThat(found.getIsMedicated()).isFalse();
-    assertThat(found.getNightWatch()).isFalse();
-    assertThat(found.getTargetLow()).isEqualTo(70);
-    assertThat(found.getTargetHigh()).isEqualTo(140);
+    assertThat(found.getDiabetesType()).isNull();
+    assertThat(found.getIsMedicated()).isNull();
+    assertThat(found.getWeekStartDay()).isEqualTo(1);
+    assertThat(found.getTargetLow()).isNull();
+    assertThat(found.getTargetHigh()).isNull();
   }
 }
