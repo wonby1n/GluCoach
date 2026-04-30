@@ -70,6 +70,7 @@ class HealthDebugActivity : Activity() {
             withContext(Dispatchers.IO) {
                 Log.i(tag, "── Samsung Health 데이터 fetch 시작 ──")
                 samsungHealth.getLatestBloodGlucose()
+                samsungHealth.getTodayActiveCalories()
                 samsungHealth.getTodayExerciseCalories()
                 samsungHealth.getLastSleepDurationMinutes()
                 samsungHealth.getLatestHeartRate()

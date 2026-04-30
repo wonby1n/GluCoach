@@ -36,7 +36,7 @@ class SamsungHealthDataSource
         override suspend fun getTodaySummary(): DailyHealthSummary? {
             val mgr = holder.manager ?: return null
             return try {
-                val calories = mgr.getTodayExerciseCalories()
+                val calories = mgr.getTodayActiveCalories()
                 val sleep = mgr.getLastSleepDurationMinutes()
                 // 권한 미부여 / 데이터 없음 시 둘 다 0 → 데이터 없음으로 간주 → mock fallback
                 if (calories == 0 && sleep == 0) {

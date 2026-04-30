@@ -25,7 +25,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,12 +68,13 @@ fun HealthSourceScreen(
     // 시스템 설정 다녀온 후 ON_RESUME 시점에 상태 갱신 (오버레이/IME 등).
     // 권한 자동 요청은 앱 실행 시 MainActivity 에서만 1회 트리거되며, 이 화면에서는
     // 사용자가 직접 "권한 요청" 버튼을 탭했을 때만 요청한다.
-    LaunchedEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner) {
         val observer =
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
             }
         lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Column(
