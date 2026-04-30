@@ -40,18 +40,20 @@ public class GlucosePredictClientImpl implements GlucosePredictClient {
         return doPredict(request, correlationId, attempt);
       } catch (AiServiceException e) {
         lastException = e;
-        if (!isRetryable(e) || attempt == MAX_ATTEMPTS) {
-          break;
+        if (!isRetryable(e)) {
+          throw e;
         }
-        log.warn(
-            "[{}] AI 호출 실패 (attempt={}/{}, errorType={}) — {}ms 후 재시도",
-            correlationId,
-            attempt,
-            MAX_ATTEMPTS,
-            e.getErrorType(),
-            backoffMs);
-        sleep(backoffMs);
-        backoffMs = (long) (backoffMs * BACKOFF_MULTIPLIER);
+        if (attempt < MAX_ATTEMPTS) {
+          log.warn(
+              "[{}] AI 호출 실패 (attempt={}/{}, errorType={}) — {}ms 후 재시도",
+              correlationId,
+              attempt,
+              MAX_ATTEMPTS,
+              e.getErrorType(),
+              backoffMs);
+          sleep(backoffMs);
+          backoffMs = (long) (backoffMs * BACKOFF_MULTIPLIER);
+        }
       }
     }
     throw lastException;
