@@ -26,7 +26,7 @@ class UserRepositoryTest {
 
     // then
     assertThat(found).isPresent();
-    assertThat(found.get().getUserId()).isEqualTo(saved.getUserId());
+    assertThat(found.get().getId()).isEqualTo(saved.getId());
   }
 
   @Test
