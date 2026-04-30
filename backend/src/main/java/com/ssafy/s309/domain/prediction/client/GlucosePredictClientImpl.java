@@ -5,8 +5,10 @@ import com.ssafy.s309.domain.prediction.client.dto.GlucosePredictResponse;
 import com.ssafy.s309.domain.prediction.exception.AiServiceException;
 import com.ssafy.s309.domain.prediction.exception.AiServiceException.ErrorType;
 import java.net.SocketTimeoutException;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
@@ -19,20 +21,58 @@ import org.springframework.web.client.RestClientResponseException;
 public class GlucosePredictClientImpl implements GlucosePredictClient {
 
   private static final String PREDICT_PATH = "/inference/glucose";
+  static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
+  static final String CORRELATION_ID_MDC_KEY = "correlationId";
+  static final int MAX_ATTEMPTS = 3;
+  static final long INITIAL_BACKOFF_MS = 200L;
+  static final double BACKOFF_MULTIPLIER = 2.0;
 
   private final RestClient aiRestClient;
 
   @Override
   public GlucosePredictResponse predict(GlucosePredictRequest request) {
+    String correlationId = ensureCorrelationId();
+    long backoffMs = INITIAL_BACKOFF_MS;
+    AiServiceException lastException = null;
+
+    for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        return doPredict(request, correlationId, attempt);
+      } catch (AiServiceException e) {
+        lastException = e;
+        if (!isRetryable(e) || attempt == MAX_ATTEMPTS) {
+          break;
+        }
+        log.warn(
+            "[{}] AI 호출 실패 (attempt={}/{}, errorType={}) — {}ms 후 재시도",
+            correlationId,
+            attempt,
+            MAX_ATTEMPTS,
+            e.getErrorType(),
+            backoffMs);
+        sleep(backoffMs);
+        backoffMs = (long) (backoffMs * BACKOFF_MULTIPLIER);
+      }
+    }
+    throw lastException;
+  }
+
+  GlucosePredictResponse doPredict(
+      GlucosePredictRequest request, String correlationId, int attempt) {
+    long startMs = System.currentTimeMillis();
     try {
       GlucosePredictResponse response =
           aiRestClient
               .post()
               .uri(PREDICT_PATH)
               .contentType(MediaType.APPLICATION_JSON)
+              .header(CORRELATION_ID_HEADER, correlationId)
               .body(request)
               .retrieve()
               .body(GlucosePredictResponse.class);
+
+      long elapsedMs = System.currentTimeMillis() - startMs;
+      log.info("[{}] AI 호출 성공 (attempt={}, elapsedMs={})", correlationId, attempt, elapsedMs);
 
       if (response == null) {
         throw new AiServiceException(ErrorType.MODEL_ERROR, "AI 서비스로부터 빈 응답을 받았습니다");
@@ -40,18 +80,58 @@ public class GlucosePredictClientImpl implements GlucosePredictClient {
       return response;
 
     } catch (ResourceAccessException e) {
+      long elapsedMs = System.currentTimeMillis() - startMs;
       if (e.getCause() instanceof SocketTimeoutException) {
+        log.warn("[{}] AI 호출 타임아웃 (attempt={}, elapsedMs={})", correlationId, attempt, elapsedMs);
         throw new AiServiceException(ErrorType.TIMEOUT, "AI 서비스 응답 시간 초과", e);
       }
+      log.warn(
+          "[{}] AI 호출 연결 실패 (attempt={}, elapsedMs={}): {}",
+          correlationId,
+          attempt,
+          elapsedMs,
+          e.getMessage());
       throw new AiServiceException(ErrorType.SERVICE_UNAVAILABLE, "AI 서비스에 연결할 수 없습니다", e);
 
     } catch (RestClientResponseException e) {
-      if (e.getStatusCode().value() == 400) {
+      long elapsedMs = System.currentTimeMillis() - startMs;
+      int status = e.getStatusCode().value();
+      log.warn(
+          "[{}] AI 호출 HTTP 오류 (attempt={}, elapsedMs={}, status={}): {}",
+          correlationId,
+          attempt,
+          elapsedMs,
+          status,
+          e.getMessage());
+      if (status == 400) {
         throw new AiServiceException(
             ErrorType.INVALID_INPUT, "AI 서비스 입력 데이터 오류: " + e.getMessage(), e);
       }
-      throw new AiServiceException(
-          ErrorType.MODEL_ERROR, "AI 서비스 오류 (HTTP " + e.getStatusCode().value() + ")", e);
+      throw new AiServiceException(ErrorType.MODEL_ERROR, "AI 서비스 오류 (HTTP " + status + ")", e);
+    }
+  }
+
+  private boolean isRetryable(AiServiceException e) {
+    return e.getErrorType() == ErrorType.TIMEOUT
+        || e.getErrorType() == ErrorType.SERVICE_UNAVAILABLE;
+  }
+
+  private String ensureCorrelationId() {
+    String existing = MDC.get(CORRELATION_ID_MDC_KEY);
+    if (existing != null && !existing.isBlank()) {
+      return existing;
+    }
+    String generated = UUID.randomUUID().toString();
+    MDC.put(CORRELATION_ID_MDC_KEY, generated);
+    return generated;
+  }
+
+  private static void sleep(long ms) {
+    try {
+      Thread.sleep(ms);
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+      throw new AiServiceException(ErrorType.SERVICE_UNAVAILABLE, "재시도 대기 중 인터럽트됨", ie);
     }
   }
 }
