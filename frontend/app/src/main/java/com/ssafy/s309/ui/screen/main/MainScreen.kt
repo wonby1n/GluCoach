@@ -146,7 +146,6 @@ fun MainScreenContent(
                         "profile" ->
                             MyPageContent(
                                 onLogoutClick = onLogoutClick,
-                                userEmail = userEmail,
                                 onDeviceClick = onConnectedDeviceClick,
                                 onHealthDetailClick = onSettingsClick,
                                 onGuardianClick = onGuardianClick,
