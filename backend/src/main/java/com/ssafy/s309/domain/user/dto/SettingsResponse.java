@@ -6,7 +6,7 @@ import com.ssafy.s309.domain.user.entity.User;
 public record SettingsResponse(
     Long userId,
     String name,
-    Integer age,
+    Short age,
     String gender,
     String phone,
     Float height,
@@ -15,7 +15,7 @@ public record SettingsResponse(
     Boolean isMedicated,
     Integer targetLow,
     Integer targetHigh,
-    Integer weekStartDay) {
+    Short weekStartDay) {
 
   public static SettingsResponse from(User user) {
     return new SettingsResponse(

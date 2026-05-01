@@ -33,7 +33,7 @@ public class User extends BaseEntity {
   private String name;
 
   @Column(columnDefinition = "TINYINT")
-  private Integer age;
+  private Short age;
 
   @Column(length = 6)
   private String gender;
@@ -56,7 +56,7 @@ public class User extends BaseEntity {
   private Integer targetHigh;
 
   @Column(nullable = false, columnDefinition = "TINYINT DEFAULT 1")
-  private Integer weekStartDay = 1;
+  private Short weekStartDay = 1;
 
   private LocalDateTime deletedAt;
 
@@ -100,7 +100,7 @@ public class User extends BaseEntity {
 
   public void updateSettings(
       String name,
-      Integer age,
+      Short age,
       String gender,
       String phone,
       Float height,
@@ -109,7 +109,7 @@ public class User extends BaseEntity {
       Boolean isMedicated,
       Integer targetLow,
       Integer targetHigh,
-      Integer weekStartDay) {
+      Short weekStartDay) {
     if (name != null) this.name = name;
     if (age != null) this.age = age;
     if (gender != null) this.gender = gender;

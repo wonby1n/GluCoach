@@ -33,10 +33,10 @@ public class WardGuardian {
   private String relation;
 
   @Column(nullable = false, columnDefinition = "TINYINT")
-  private Integer priority = 0;
+  private Short priority = 0;
 
   @Builder
-  private WardGuardian(User ward, User guardian, String relation, Integer priority) {
+  private WardGuardian(User ward, User guardian, String relation, Short priority) {
     this.ward = ward;
     this.guardian = guardian;
     this.relation = relation;
@@ -47,7 +47,7 @@ public class WardGuardian {
     if (relation != null) this.relation = relation;
   }
 
-  public void updatePriority(int priority) {
+  public void updatePriority(Short priority) {
     this.priority = priority;
   }
 }
