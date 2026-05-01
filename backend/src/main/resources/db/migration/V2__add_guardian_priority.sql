@@ -1,7 +1,2 @@
--- guardians 테이블에 SOS 연락 순서 컬럼 추가
-ALTER TABLE guardians
-    ADD COLUMN priority INT NOT NULL DEFAULT 0;
-
-COMMENT ON COLUMN guardians.priority IS 'SOS 연락 순서 (낮을수록 먼저 연락, 0부터 시작)';
-
-CREATE INDEX idx_guardian_priority ON guardians (user_id, priority);
+-- V2: ward_guardian 테이블로 전환되어 priority는 V1에서 이미 포함됨 (no-op)
+DO $$ BEGIN END $$;
