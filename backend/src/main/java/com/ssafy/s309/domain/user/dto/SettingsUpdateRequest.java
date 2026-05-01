@@ -4,7 +4,7 @@ import com.ssafy.s309.domain.user.entity.DiabetesType;
 
 public record SettingsUpdateRequest(
     String name,
-    Short age,
+    Integer age,
     String gender,
     String phone,
     Float height,
@@ -13,4 +13,4 @@ public record SettingsUpdateRequest(
     Boolean isMedicated,
     Integer targetLow,
     Integer targetHigh,
-    Short weekStartDay) {}
+    Integer weekStartDay) {}
