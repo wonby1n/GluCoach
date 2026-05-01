@@ -60,7 +60,7 @@ public class UserService {
   public GuardianResponse createGuardian(Long wardId, GuardianRequest request) {
     User ward = findUserById(wardId);
     User guardian = findUserById(request.guardianId());
-    int nextPriority = wardGuardianRepository.countByWard_Id(wardId);
+    short nextPriority = wardGuardianRepository.countByWard_Id(wardId);
     WardGuardian wg =
         WardGuardian.builder()
             .ward(ward)
@@ -90,7 +90,7 @@ public class UserService {
         wardGuardianRepository.findAllByWard_IdOrderByPriorityAsc(wardId);
     remaining.stream()
         .filter(g -> g.getPriority() > deletedPriority)
-        .forEach(g -> g.updatePriority(g.getPriority() - 1));
+        .forEach(g -> g.updatePriority((short) (g.getPriority() - 1));
   }
 
   // ── 내부 헬퍼 ─────────────────────────────────────────────
