@@ -302,7 +302,7 @@ def load_torch_model(
     """
     path = Path(path)
     model = model_class(**init_kwargs)
-    model.load_state_dict(torch.load(path, map_location="cpu"))
+    model.load_state_dict(torch.load(path, map_location="cpu", weights_only=True))
     model.eval()
     meta_path = path.with_suffix(path.suffix + ".meta.json")
     meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}

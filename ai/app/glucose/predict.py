@@ -90,11 +90,22 @@ def _inverse_bg(y_normalized: np.ndarray, bg_scaler: Any) -> np.ndarray:
 
 
 class MealPredictor:
-    """Model 1 추론. ridge / mlp / lstm 중 선택."""
+    """Model 1 추론. ridge / mlp / lstm 중 선택.
 
-    def __init__(self, model_type: str = "lstm", models_dir: str | Path = DEFAULT_MODELS_DIR) -> None:
+    user_id 가 주어지면 lstm_meal_personalized_{user_id}.pt 를 우선 로드.
+    개인화 파일 없으면 베이스 모델로 폴백.
+    """
+
+    def __init__(
+        self,
+        model_type: str = "lstm",
+        models_dir: str | Path = DEFAULT_MODELS_DIR,
+        user_id: str | None = None,
+    ) -> None:
         self.model_type = model_type
         self.models_dir = Path(models_dir)
+        self.user_id = user_id
+        self.mode = "base"
         self.scaler: dict[str, Any] | None = None
         self.model: Any | None = None
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -115,6 +126,13 @@ class MealPredictor:
                 m, _ = load_torch_model(path, MealMLP)
                 self.model = m.to(self._device)
             elif self.model_type == "lstm":
+                if self.user_id:
+                    p_path = self.models_dir / f"lstm_meal_personalized_{self.user_id}.pt"
+                    if p_path.exists():
+                        m, _ = load_torch_model(p_path, MealLSTMDecoder)
+                        self.model = m.to(self._device)
+                        self.mode = "personalized"
+                        return
                 path = self.models_dir / "lstm_meal.pt"
                 if not path.exists():
                     raise RuntimeError(f"{path} 없음 — Model 1 학습 필요")
@@ -240,16 +258,25 @@ class NowPredictor:
 
 _meal_predictor: MealPredictor | None = None
 _now_predictor: NowPredictor | None = None
+_personalized_predictors: dict[str, MealPredictor] = {}
 _lock = threading.Lock()
 
 
-def get_meal_predictor(model_type: str = "lstm") -> MealPredictor:
+def get_meal_predictor(model_type: str = "lstm", user_id: str | None = None) -> MealPredictor:
+    """user_id 가 있으면 개인화 모델 캐시에서, 없으면 베이스 싱글톤에서 반환."""
     global _meal_predictor
+    if user_id:
+        with _lock:
+            if user_id not in _personalized_predictors:
+                p = MealPredictor(model_type=model_type, user_id=user_id)
+                p._ensure_loaded()
+                _personalized_predictors[user_id] = p
+            return _personalized_predictors[user_id]
     with _lock:
         if _meal_predictor is None or _meal_predictor.model_type != model_type:
             _meal_predictor = MealPredictor(model_type=model_type)
             _meal_predictor._ensure_loaded()
-    return _meal_predictor
+        return _meal_predictor
 
 
 def get_now_predictor() -> NowPredictor:
@@ -263,7 +290,8 @@ def get_now_predictor() -> NowPredictor:
 
 def reset_predictors() -> None:
     """테스트/재로드 용. 모델 파일 갱신 후 호출."""
-    global _meal_predictor, _now_predictor
+    global _meal_predictor, _now_predictor, _personalized_predictors
     with _lock:
         _meal_predictor = None
         _now_predictor = None
+        _personalized_predictors = {}

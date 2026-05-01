@@ -42,6 +42,7 @@ from app.glucose.seed import set_seed
 
 
 _PERSONALIZED_MAX_AGE_DAYS = 90
+_FINETUNE_RECENT_N = 42  # 최근 N개 식사만 사용 (≒14일치, 백엔드 트리거 주기와 일치)
 KEY_HORIZONS = [30, 60, 120]
 
 
@@ -56,8 +57,11 @@ def cleanup_old_personalized_models(
 ) -> list[str]:
     """마지막 수정 후 max_age_days 이상 지난 개인화 모델 파일을 삭제한다."""
     removed: list[str] = []
+    dir_path = Path(models_dir)
+    if not dir_path.exists():
+        return removed
     cutoff = time.time() - max_age_days * 86400
-    for pt_file in Path(models_dir).glob("lstm_meal_personalized_*.pt"):
+    for pt_file in dir_path.glob("lstm_meal_personalized_*.pt"):
         if pt_file.stat().st_mtime < cutoff:
             meta_file = pt_file.with_suffix(pt_file.suffix + ".meta.json")
             pt_file.unlink()
@@ -149,9 +153,13 @@ def _train_eval_save_or_reject(
     batch_size: int = 16,
     device: str = "cuda",
     seed: int = 42,
+    chronological: bool = False,
 ) -> dict[str, Any]:
     """공통 학습 로직. 자동 폐기 포함.
 
+    Args:
+        chronological: True면 앞 70%를 학습, 뒤 30%를 검증 (시간순 정렬된 데이터 전제).
+                       False면 랜덤 분할 (기본, CLI 경로).
     Returns:
         dict {status, n_samples, base_rmse_30min, personalized_rmse_30min,
               improvement_percent, save_path}
@@ -168,12 +176,16 @@ def _train_eval_save_or_reject(
     scaler = load_scaler()
     bg_scaler = scaler["bg_target"]
 
-    # 70/30 split
-    rng = np.random.default_rng(seed)
-    indices = rng.permutation(len(df_user))
+    # split: 시간순이면 앞=학습/뒤=검증, 아니면 랜덤
     n_ft = int(len(df_user) * finetune_ratio)
-    df_ft = df_user.iloc[indices[:n_ft]].reset_index(drop=True)
-    df_val = df_user.iloc[indices[n_ft:]].reset_index(drop=True)
+    if chronological:
+        df_ft = df_user.iloc[:n_ft].reset_index(drop=True)
+        df_val = df_user.iloc[n_ft:].reset_index(drop=True)
+    else:
+        rng = np.random.default_rng(seed)
+        indices = rng.permutation(len(df_user))
+        df_ft = df_user.iloc[indices[:n_ft]].reset_index(drop=True)
+        df_val = df_user.iloc[indices[n_ft:]].reset_index(drop=True)
     print(f"  finetune={len(df_ft)}, val={len(df_val)}")
 
     ft_loader = DataLoader(_PerUserMealDataset(df_ft), batch_size=batch_size, shuffle=True)
@@ -244,17 +256,14 @@ def _train_eval_save_or_reject(
     sign = "↓" if delta_30 > 0 else "↑"
     print(f"  Δ@30min = {abs(delta_30):.2f} mg/dL {sign}  ({pct:+.1f}%)")
 
-    # 자동 폐기: personalized 가 base 보다 안 좋으면 저장 X
+    # 자동 폐기: 새 fine-tune 이 base 보다 안 좋으면 저장 X
+    # 기존 personalized 파일은 건드리지 않음 — 재개인화 실패 시 기존 모델 유지
     if delta_30 <= 0:
+        kept_existing = save_path.exists()
         print(
-            f"\n  ✗ rejected: base 보다 RMSE 개선 없음. 모델 저장 안 함, base 그대로 사용."
+            f"\n  ✗ rejected: base 보다 RMSE 개선 없음. 새 모델 저장 안 함."
+            + (f" 기존 개인화 모델 유지." if kept_existing else " base 그대로 사용.")
         )
-        # 기존 personalized 파일이 있으면 삭제 (이전 학습 결과 유지하지 않음)
-        if save_path.exists():
-            save_path.unlink()
-            meta_path = save_path.with_suffix(save_path.suffix + ".meta.json")
-            if meta_path.exists():
-                meta_path.unlink()
         return {
             "status": "rejected",
             "n_samples": int(len(df_user)),
@@ -372,8 +381,12 @@ def finetune_from_history(
     fasting_bg = float(user_profile["fasting_bg"])
     weight_kg = float(user_profile["weight_kg"])
 
+    # 최신순 정렬 후 최근 N개만 사용 (구식 패턴 노이즈 방지, 학습 시간 제한)
+    history_sorted = sorted(history, key=lambda x: x["meal_time_iso"])
+    history_sorted = history_sorted[-_FINETUNE_RECENT_N:]
+
     rows: list[dict[str, Any]] = []
-    for item in history:
+    for item in history_sorted:
         carbs = float(item["carbs"])
         current_glucose = float(item["current_glucose"])
         bg_curve = list(item["bg_curve"])
@@ -421,6 +434,7 @@ def finetune_from_history(
         batch_size=batch_size,
         device=device,
         seed=seed,
+        chronological=True,
     )
 
 
