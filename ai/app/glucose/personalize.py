@@ -25,10 +25,12 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 
+from app.glucose import config as _cfg
 from app.glucose.constants import (
     ACTIVITY_MAP,
     DEFAULT_MODELS_DIR,
     DEFAULT_PROCESSED_DIR,
+    DEFAULT_SCALER_PATH,
     DIABETES_TYPE_MAP,
     LABEL_COLS,
     LABEL_STEPS,
@@ -41,8 +43,6 @@ from app.glucose.model import MealLSTMDecoder, load_torch_model, save_torch_mode
 from app.glucose.seed import set_seed
 
 
-_PERSONALIZED_MAX_AGE_DAYS = 90
-_FINETUNE_RECENT_N = 42  # 최근 N개 식사만 사용 (≒14일치, 백엔드 트리거 주기와 일치)
 KEY_HORIZONS = [30, 60, 120]
 
 
@@ -52,8 +52,8 @@ KEY_HORIZONS = [30, 60, 120]
 
 
 def cleanup_old_personalized_models(
-    models_dir: str = DEFAULT_MODELS_DIR,
-    max_age_days: int = _PERSONALIZED_MAX_AGE_DAYS,
+    models_dir: str = _cfg.MODELS_DIR,
+    max_age_days: int = _cfg.PERSONALIZED_MAX_AGE_DAYS,
 ) -> list[str]:
     """마지막 수정 후 max_age_days 이상 지난 개인화 모델 파일을 삭제한다."""
     removed: list[str] = []
@@ -147,8 +147,8 @@ def _train_eval_save_or_reject(
     user_id: str,
     base_model_path: Path,
     save_path: Path,
-    epochs: int = 15,
-    lr: float = 1e-4,
+    epochs: int = 30,
+    lr: float = 3e-4,
     finetune_ratio: float = 0.7,
     batch_size: int = 16,
     device: str = "cuda",
@@ -261,7 +261,7 @@ def _train_eval_save_or_reject(
     if delta_30 <= 0:
         kept_existing = save_path.exists()
         print(
-            f"\n  ✗ rejected: base 보다 RMSE 개선 없음. 새 모델 저장 안 함."
+            f"\n  [REJECTED] base 보다 RMSE 개선 없음. 새 모델 저장 안 함."
             + (f" 기존 개인화 모델 유지." if kept_existing else " base 그대로 사용.")
         )
         return {
@@ -289,8 +289,9 @@ def _train_eval_save_or_reject(
             "personalized_val_rmse_per_horizon": final_rmse.tolist(),
             "improvement_30min_mg_dl": delta_30,
         },
+        scaler_path=_cfg.SCALER_PATH,
     )
-    print(f"\n  ✓ saved: {save_path}")
+    print(f"\n  [OK] saved: {save_path}")
     return {
         "status": "personalized",
         "n_samples": int(len(df_user)),
@@ -311,8 +312,8 @@ def finetune_meal(
     csv_with_user_id: Path,
     target_user_id: str,
     save_path: Path,
-    epochs: int = 15,
-    lr: float = 1e-4,
+    epochs: int = 30,
+    lr: float = 3e-4,
     finetune_ratio: float = 0.7,
     batch_size: int = 16,
     device: str = "cuda",
@@ -349,8 +350,8 @@ def finetune_from_history(
     user_profile: dict[str, Any],
     base_model_path: Path,
     save_path: Path,
-    epochs: int = 15,
-    lr: float = 1e-4,
+    epochs: int = 30,
+    lr: float = 3e-4,
     finetune_ratio: float = 0.7,
     batch_size: int = 16,
     device: str = "cuda",
@@ -383,7 +384,7 @@ def finetune_from_history(
 
     # 최신순 정렬 후 최근 N개만 사용 (구식 패턴 노이즈 방지, 학습 시간 제한)
     history_sorted = sorted(history, key=lambda x: x["meal_time_iso"])
-    history_sorted = history_sorted[-_FINETUNE_RECENT_N:]
+    history_sorted = history_sorted[-_cfg.FINETUNE_RECENT_N:]
 
     rows: list[dict[str, Any]] = []
     for item in history_sorted:
@@ -453,8 +454,8 @@ def main() -> None:
         help="환자 데이터 CSV (user_id 컬럼 필수)",
     )
     parser.add_argument("--user", required=True, help="대상 환자 user_id")
-    parser.add_argument("--epochs", type=int, default=15)
-    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--epochs", type=int, default=30)
+    parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--out-dir", default=DEFAULT_MODELS_DIR)
     parser.add_argument("--device", default="cuda")

@@ -54,11 +54,13 @@ ai/
 ## 3. 개인화 흐름
 
 ```
-[백엔드] 유저 14일 경과 감지
+[백엔드] 유저 식후 혈당 기록 10건 이상 감지
     ↓
 POST /api/predict/glucose/personalize
     ↓
-personalize.py: base 모델 로드 → 유저 history로 fine-tuning (15 epoch)
+personalize.py: base 모델 로드 → 유저 history로 fine-tuning (30 epoch, lr=3e-4)
+    → 최근 42건만 사용 (오래된 데이터 영향 최소화)
+    → 임베딩 레이어 동결, LSTM 가중치만 업데이트
     ↓
 새 모델 RMSE@30min < base RMSE@30min?
     ├── YES → models/lstm_meal_personalized_{user_id}.pt 저장
@@ -69,16 +71,32 @@ personalize.py: base 모델 로드 → 유저 history로 fine-tuning (15 epoch)
               이후 /meal 호출 시 기존 개인화 또는 베이스 모델 사용
 ```
 
+**개인화 효과 (상하이 실환자 85명 기준):**
+- 95%에서 성능 개선
+- 평균 RMSE@30: 39.71 mg/dL → 21.97 mg/dL (약 45% 개선)
+- base 모델과 personalized 모델은 **별도 파일**로 관리 — base는 절대 덮어씌워지지 않음
+
 **중요**: rejected 후 재시도 정책은 백엔드 팀 재량. 현재 미정의 (CROSS_TEAM_DISCUSSIONS.md 참고).
+개인화 모델은 **90일 미사용 시 자동 삭제** → 이후 다시 /personalize 호출로 갱신.
 
 ---
 
 ## 4. 모델 파일 관리
 
-- 위치: `ai/models/` (서버 로컬, gitignore)
-- 파일: `lstm_meal.pt`, `lstm_now.pt`, `scaler.pkl`, `ridge_meal.pkl`, `mlp_meal.pt`
+**Production 파일 (서버에 올려야 하는 것들):**
+```
+ai/models/
+├── lstm_meal.pt              Model 1 베이스 (sim RMSE@30 = 10.2 mg/dL)
+├── lstm_now.pt               Model 2 베이스
+├── scaler.pkl                정규화 기준값 — 절대 변경/교체 금지
+├── ridge_meal.pkl            비교용 (서버 배포 불필요)
+├── mlp_meal.pt               비교용 (서버 배포 불필요)
+└── *.meta.json               학습 파라미터, RMSE, scaler hash 기록
+```
+
 - 유저 개인화: `lstm_meal_personalized_{user_id}.pt` — 90일 미사용 시 자동 삭제됨
 - 배포 시 모델 파일을 서버에 직접 복사해야 함 (S3 같은 공유 스토리지 미사용)
+- **scaler.pkl 교체 금지**: 모든 모델과 개인화 로직이 동일 scaler 기준으로 작동. 교체하면 전체 재학습 필요.
 
 **재학습이 필요하면:**
 ```bash
@@ -88,6 +106,10 @@ python scripts/prepare_timeseries.py  # Model 2 데이터
 python scripts/train.py --model lstm  # Model 1 LSTM 학습
 python -m app.glucose.train_timeseries  # Model 2 학습
 ```
+
+**실 데이터 충분히 쌓인 후 베이스 재학습 권장:**
+실 사용자 데이터(CGM + 식사 기록)가 충분히 누적되면 해당 데이터로 베이스 모델 재학습.
+시뮬 데이터 기반 현재 베이스의 실환자 RMSE@30 ≈ 40 mg/dL → 실 데이터 재학습 시 크게 개선 예상.
 
 ---
 
@@ -103,11 +125,13 @@ python -m app.glucose.train_timeseries  # Model 2 학습
 개선 방법: S3 등 공유 스토리지로 이전.
 
 ### 5-3. 개인화 학습이 동기(blocking) 처리
-`/personalize` 요청 중 학습(15 epoch)이 진행되는 동안 별도 스레드에서 실행되나,
+`/personalize` 요청 중 학습(30 epoch)이 진행되는 동안 별도 스레드에서 실행되나,
 완전한 비동기(Celery + Redis)는 미구현. 동시 개인화 요청 다수 시 스레드풀 포화 가능.
 
-### 5-4. 시뮬레이터 데이터만 사용
-실제 임상 데이터 없이 simglucose 기반 시뮬레이터 데이터로만 학습됨.
+### 5-4. 시뮬레이터 데이터만으로 학습된 베이스 모델
+실제 임상 데이터 없이 simglucose 기반 시뮬레이터 데이터로만 베이스 학습됨.
+→ 시뮬 내 RMSE@30 = 10.2 mg/dL (우수), 실환자 기준 RMSE@30 ≈ 40 mg/dL (사용 가능 수준이나 개인화 필요)
+→ 개인화 후 실환자 RMSE@30 ≈ 22 mg/dL로 개선 (45% 향상)
 실제 환자 데이터로 재학습 시 전처리 스키마(DATA_SPEC.md) 확인 후 진행.
 
 ### 5-5. 노이즈 필터링 프론트 단독
@@ -116,7 +140,42 @@ BLE raw signal → BG 변환 및 이상값 필터링이 Android 앱에서만 수
 
 ---
 
-## 6. 환경 설정
+## 6. 실 배포 전 체크리스트
+
+| 항목 | 담당 | 상태 |
+|------|------|------|
+| AI API 코드 완성 | AI | ✅ 완료 |
+| 베이스 모델 학습 완료 | AI | ✅ 완료 (sim 기반) |
+| 개인화 파이프라인 | AI | ✅ 완료 |
+| 모델 파일 서버 배포 | AI/인프라 | ❌ 미완 (서버에 직접 복사 필요) |
+| CGM 혈당 데이터 DB 연동 | Backend | ❌ 미완 |
+| /personalize 호출 스케줄러 구현 | Backend | ❌ 미완 (Java 쪽) |
+| 실 데이터로 베이스 재학습 | AI | ⏳ 데이터 누적 후 진행 |
+
+**Model 2 (NowLSTM)** 는 연속 CGM 데이터(12개, 5분 간격) 없이는 실전 검증 불가.
+→ CGM 연동 후 검증 필요.
+
+---
+
+## 7. 코드 수정 가이드
+
+**예측 모델 타입 변경 (lstm → ridge 또는 mlp):**
+[interface.py:69](../app/glucose/interface.py) 에서 `model_type="lstm"` 을 변경.
+단, 현재 production 권장은 LSTM (성능: LSTM > MLP >> Ridge).
+
+**파인튜닝 강도 조절:**
+[personalize.py](../app/glucose/personalize.py) 상단 상수:
+- `_FINETUNE_EPOCHS = 30` — epoch 수
+- `_FINETUNE_LR = 3e-4` — learning rate
+- `_FINETUNE_RECENT_N = 42` — 최근 몇 건까지 사용
+- `_PERSONALIZED_MAX_AGE_DAYS = 90` — 개인화 모델 보존 기간
+
+**모델 경로 변경:**
+[constants.py](../app/glucose/constants.py) 의 `DEFAULT_MODELS_DIR`, `DEFAULT_SCALER_PATH` 수정.
+
+---
+
+## 9. 환경 설정
 
 ```bash
 # 의존성
@@ -136,7 +195,7 @@ python scripts/check_env.py
 
 ---
 
-## 7. 주요 설계 결정 및 이유
+## 10. 주요 설계 결정 및 이유
 
 | 결정 | 이유 |
 |------|------|
@@ -148,7 +207,7 @@ python scripts/check_env.py
 
 ---
 
-## 8. 참고 문서
+## 11. 참고 문서
 
 | 문서 | 위치 | 내용 |
 |------|------|------|

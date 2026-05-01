@@ -254,7 +254,7 @@ def main(args: argparse.Namespace) -> int:
     print(f"  meta {len(meta)}, train/val/test 환자 = "
           f"{len(user_split['train'])}/{len(user_split['val'])}/{len(user_split['test'])}")
 
-    print("\n[Step 2] 환자 파일 순회 → sliding window 추출")
+    print("\n[Step 2] 환자 파일 순회 - sliding window 추출")
     files = list_patient_files(t1d_dir, t2d_dir)
     print(f"  대상 파일 {len(files)}개")
 
@@ -305,7 +305,7 @@ def main(args: argparse.Namespace) -> int:
 
     total_windows = sum(len(v) for v in samples_by_patient.values())
     if total_windows == 0:
-        print("\n✗ 유효 윈도우 0건. STRIDE / 식사 빈도 확인.")
+        print("\n[ERROR] 유효 윈도우 0건. STRIDE / 식사 빈도 확인.")
         return 1
 
     print(f"\n  총 윈도우: {total_windows}")
@@ -332,7 +332,7 @@ def main(args: argparse.Namespace) -> int:
                 for x_seq, x_profile, y in samples_by_patient[pid]:
                     sub.append((x_seq, x_profile, y, pid))
         if not sub:
-            print(f"  ⚠ {split}: 0 sample")
+            print(f"  [WARNING] {split}: 0 sample")
             counts[split] = 0
             continue
 
@@ -350,7 +350,7 @@ def main(args: argparse.Namespace) -> int:
             user_ids=user_ids_arr,
         )
         counts[split] = len(sub)
-        print(f"  {split}: {len(sub)} 윈도우 → {out_path}")
+        print(f"  {split}: {len(sub)} 윈도우 -> {out_path}")
 
     print("\n[Step 5] split 무결성 검증")
     for split, n in counts.items():
@@ -361,11 +361,11 @@ def main(args: argparse.Namespace) -> int:
         expected = set(user_split[split])
         leaks = actual_users - expected
         if leaks:
-            print(f"  ✗ {split} leakage: {leaks}")
+            print(f"  [ERROR] {split} leakage: {leaks}")
             return 1
-        print(f"  ✓ {split}: {n} 윈도우, 환자 {len(actual_users)}명, leakage 0")
+        print(f"  [OK] {split}: {n} 윈도우, 환자 {len(actual_users)}명, leakage 0")
 
-    print("\n✓ 완료")
+    print("\n[완료]")
     return 0
 
 

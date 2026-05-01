@@ -76,12 +76,12 @@ def main(argv=None):
     if args.mode == "full_matrix":
         total = len(categories) * args.per_category * len(MEAL_PATTERNS)
         print(f"Mode: full_matrix")
-        print(f"  {len(categories)} categories × {args.per_category} blueprints × "
+        print(f"  {len(categories)} categories x {args.per_category} blueprints x "
               f"{len(MEAL_PATTERNS)} meal_patterns = {total:,} simulations")
     else:
         total = len(categories) * args.per_category
         print(f"Mode: random_pattern")
-        print(f"  {len(categories)} categories × {args.per_category} personas = "
+        print(f"  {len(categories)} categories x {args.per_category} personas = "
               f"{total:,} simulations")
     print(f"  Workers: {args.workers}, seed: {args.seed}")
     print(f"  Output: {args.output_dir} "
@@ -106,9 +106,9 @@ def main(argv=None):
     if args.single_folder:
         paths = save_dataset(result, args.output_dir)
         print()
-        print(f"Wrote {len(result['glucose_df']):,} glucose readings  → {paths['glucose_readings.csv']}")
-        print(f"Wrote {len(result['meal_df']):,} meal events  → {paths['meal_events.csv']}")
-        print(f"Wrote {len(result['users_df']):,} users  → {paths['users.csv']}")
+        print(f"Wrote {len(result['glucose_df']):,} glucose readings  -> {paths['glucose_readings.csv']}")
+        print(f"Wrote {len(result['meal_df']):,} meal events  -> {paths['meal_events.csv']}")
+        print(f"Wrote {len(result['users_df']):,} users  -> {paths['users.csv']}")
     else:
         folders = save_dataset_per_category(result, args.output_dir)
         print()

@@ -149,10 +149,10 @@ def run_scenario(
 ) -> dict[str, Any] | None:
     print(f"\n[{scenario_id}] {model_type}  test={test_path}")
     if not model_path.exists():
-        print(f"  ⚠ 모델 파일 없음: {model_path} → skip")
+        print(f"  [WARNING] 모델 파일 없음: {model_path} - skip")
         return None
     if not test_path.exists():
-        print(f"  ⚠ 테스트 데이터 없음: {test_path} → skip")
+        print(f"  [WARNING] 테스트 데이터 없음: {test_path} - skip")
         return None
 
     if model_type == "now_lstm":
@@ -393,7 +393,7 @@ def main() -> int:
             print(f"  BASELINE-Last  RMSE@30={res_lv['rmse_per_horizon'][LABEL_STEPS.index(30)]:.2f}")
             print(f"  BASELINE-Heur  RMSE@30={res_h['rmse_per_horizon'][LABEL_STEPS.index(30)]:.2f}")
         except FileNotFoundError as e:
-            print(f"  ⚠ test_csv 없음 → skip: {e}")
+            print(f"  [WARNING] test_csv 없음 - skip: {e}")
 
     # ── Model 1 ──────────────────────────────────────────────────────
     print("\n=== Model 1 ===")
@@ -420,7 +420,7 @@ def main() -> int:
             results.append(res_b)
             print(f"  BASELINE-LastSeq RMSE@30={res_b['rmse_per_horizon'][LABEL_STEPS.index(30)]:.2f}")
         except FileNotFoundError as e:
-            print(f"  ⚠ test_npz 없음 → skip: {e}")
+            print(f"  [WARNING] test_npz 없음 - skip: {e}")
 
     # ── Model 2 ──────────────────────────────────────────────────────
     print("\n=== Model 2 ===")
@@ -439,7 +439,7 @@ def main() -> int:
             per_type_results.extend(per_type_metrics(y_true, y_pred, diabetes_now, sid))
 
     if not results:
-        print("\n✗ 평가 결과 없음. 모델/데이터 확인.")
+        print("\n[ERROR] 평가 결과 없음. 모델/데이터 확인.")
         return 1
 
     print("\n[비교 표 생성]")
@@ -477,7 +477,7 @@ def main() -> int:
             f"{r['rmse_per_horizon'][i120]:>7.2f}"
         )
 
-    print("\n✓ 평가 완료")
+    print("\n[완료] 평가 완료")
     return 0
 
 

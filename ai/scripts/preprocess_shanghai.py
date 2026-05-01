@@ -90,7 +90,7 @@ def load_summaries(t1d_path: Path, t2d_path: Path) -> dict[str, dict[str, Any]]:
     meta: dict[str, dict[str, Any]] = {}
     for path, dtype in [(t1d_path, "T1DM"), (t2d_path, "T2DM")]:
         if not path.exists():
-            print(f"  ⚠ {path} 없음 → skip")
+            print(f"  [WARNING] {path} 없음 - skip")
             continue
         df = pd.read_excel(path)
         for _, row in df.iterrows():
@@ -407,6 +407,7 @@ def normalize(
     val: pd.DataFrame,
     test: pd.DataFrame,
     models_dir: Path,
+    save_scaler: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     train = train.copy()
     val = val.copy()
@@ -436,9 +437,10 @@ def normalize(
         "bg_target": bg_scaler,
         "profile": profile_scaler,
     }
-    models_dir.mkdir(parents=True, exist_ok=True)
-    with open(models_dir / "scaler.pkl", "wb") as f:
-        pickle.dump(scaler_dict, f)
+    if save_scaler:
+        models_dir.mkdir(parents=True, exist_ok=True)
+        with open(models_dir / "scaler.pkl", "wb") as f:
+            pickle.dump(scaler_dict, f)
 
     return train, val, test
 
@@ -489,7 +491,7 @@ def main(args: argparse.Namespace) -> int:
         print(f"    {k}: {v}")
 
     if not all_records:
-        print("\n✗ 유효 record 0건. 데이터/경로 확인.")
+        print("\n[ERROR] 유효 record 0건. 데이터/경로 확인.")
         return 1
 
     df = pd.DataFrame(all_records)
@@ -515,9 +517,9 @@ def main(args: argparse.Namespace) -> int:
     te_set = set(user_split["test"])
     overlaps = (tr_set & va_set) | (tr_set & te_set) | (va_set & te_set)
     if overlaps:
-        print(f"  ✗ 환자 split overlap: {overlaps}")
+        print(f"  [ERROR] 환자 split overlap: {overlaps}")
         return 1
-    print("  ✓ 환자 단위 disjoint OK")
+    print("  [OK] 환자 단위 disjoint OK")
 
     # user_split.json
     models_dir.mkdir(parents=True, exist_ok=True)
@@ -525,8 +527,11 @@ def main(args: argparse.Namespace) -> int:
         json.dump(user_split, f, indent=2)
 
     print("\n[Step 5] 정규화 + scaler 저장")
-    train, val, test = normalize(train, val, test, models_dir)
-    print(f"  scaler.pkl 키: model1_features, bg_target, profile")
+    train, val, test = normalize(train, val, test, models_dir, save_scaler=not args.no_save_scaler)
+    if args.no_save_scaler:
+        print(f"  scaler 저장 skip (--no-save-scaler)")
+    else:
+        print(f"  scaler.pkl 키: model1_features, bg_target, profile")
 
     print("\n[Step 6] CSV 저장")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -538,21 +543,23 @@ def main(args: argparse.Namespace) -> int:
 
     # 분포 검증
     print("\n[Step 7] 정규화 결과 검증")
-    print(f"  features (train) mean ≈ 0:")
+    print(f"  features (train) mean ~= 0:")
     for c in MODEL1_SCALE_COLS:
         print(f"    {c}: mean={train[c].mean():+.3f}, std={train[c].std():.3f}")
     bg_flat = train[LABEL_COLS].values.flatten()
     print(f"  BG target (train flat): mean={bg_flat.mean():+.3f}, std={bg_flat.std():.3f}")
 
-    print("\n✓ 완료")
+    print("\n[완료]")
     return 0
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Shanghai → canonical schema")
     parser.add_argument("--shanghai-dir", default="data/glucose_data/Shanghai")
-    parser.add_argument("--output-dir", default="data/processed")
-    parser.add_argument("--models-dir", default="models")
+    parser.add_argument("--output-dir", default="data/processed/shanghai")
+    parser.add_argument("--models-dir", default="models/shanghai")
+    parser.add_argument("--no-save-scaler", action="store_true",
+                        help="scaler.pkl 저장 생략 (기존 scaler 보호용)")
     args = parser.parse_args()
     os.chdir(Path(__file__).resolve().parent.parent)
     sys.exit(main(args))

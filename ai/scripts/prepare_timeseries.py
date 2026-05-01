@@ -1,11 +1,8 @@
 """Model 2 시계열 데이터 추출 스크립트.
 
-전제 (데이터 담당자가 채워둠):
-    simuldate_params/simulate/glucose_readings.csv
-    simuldate_params/simulate/meal_events.csv
-    simuldate_params/simulate/users.csv
-    ai/models/scaler.pkl       (bg_target, profile 키)
-    ai/models/user_split.json  (Model 1 의 환자 분할)
+전제:
+    ai/models/scaler.pkl       (preprocess.py 가 생성)
+    ai/models/user_split.json  (preprocess.py 가 생성)
 
 출력:
     ai/data/processed/timeseries/{train,val,test}.npz
@@ -22,6 +19,7 @@
 사용법:
     cd ai/
     python scripts/prepare_timeseries.py
+    python scripts/prepare_timeseries.py --max-categories 5  # 빠른 테스트용
 """
 
 from __future__ import annotations
@@ -52,10 +50,31 @@ STRIDE = 6        # 30min
 # ─────────────────────────────────────────────────────────────────────
 
 
-def load_data(data_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    users = pd.read_csv(data_dir / "users.csv")
-    meals = pd.read_csv(data_dir / "meal_events.csv")
-    glucose = pd.read_csv(data_dir / "glucose_readings.csv")
+def load_data(
+    data_dir: Path,
+    max_categories: int | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """sim_v3 서브폴더 구조 또는 단일 폴더 모두 지원."""
+    subdirs = sorted([d for d in data_dir.iterdir() if d.is_dir()])
+
+    if subdirs and (subdirs[0] / "users.csv").exists():
+        if max_categories:
+            subdirs = subdirs[:max_categories]
+        print(f"  멀티 디렉토리 모드: {len(subdirs)}개 카테고리")
+        users_list, meals_list, glucose_list = [], [], []
+        for subdir in subdirs:
+            users_list.append(pd.read_csv(subdir / "users.csv"))
+            meals_list.append(pd.read_csv(subdir / "meal_events.csv"))
+            glucose_list.append(pd.read_csv(subdir / "glucose_readings.csv"))
+        users = pd.concat(users_list, ignore_index=True)
+        meals = pd.concat(meals_list, ignore_index=True)
+        glucose = pd.concat(glucose_list, ignore_index=True)
+    else:
+        print("  단일 디렉토리 모드")
+        users = pd.read_csv(data_dir / "users.csv")
+        meals = pd.read_csv(data_dir / "meal_events.csv")
+        glucose = pd.read_csv(data_dir / "glucose_readings.csv")
+
     meals["time"] = pd.to_datetime(meals["time"])
     glucose["time"] = pd.to_datetime(glucose["time"])
     return users, meals, glucose
@@ -178,7 +197,7 @@ def main(args: argparse.Namespace) -> int:
     user_split_path = Path(args.user_split)
 
     print("[Step 1] 데이터 로드")
-    users, meals, glucose = load_data(data_dir)
+    users, meals, glucose = load_data(data_dir, max_categories=args.max_categories)
     print(f"  users={len(users)}명  meals={len(meals)}건  glucose={len(glucose)}건")
 
     print("[Step 2] scaler + user_split 로드")
@@ -210,7 +229,7 @@ def main(args: argparse.Namespace) -> int:
         try:
             profile = build_profile(user_features.loc[uid], scaler["profile"])
         except ValueError as e:
-            print(f"  ⚠ user {uid} skip: {e}")
+            print(f"  [WARNING] user {uid} skip: {e}")
             continue
         for s in samples:
             s["X_profile"] = profile
@@ -218,7 +237,7 @@ def main(args: argparse.Namespace) -> int:
 
     print(f"  유효 윈도우: {len(all_samples)}건  (skip user {skipped_users})")
     if not all_samples:
-        print("  ✗ 유효 윈도우 0건. 데이터 길이 또는 식사 빈도 확인.")
+        print("  [ERROR] 유효 윈도우 0건. 데이터 길이 또는 식사 빈도 확인.")
         return 1
 
     print("[Step 5] BG 정규화")
@@ -233,7 +252,7 @@ def main(args: argparse.Namespace) -> int:
         user_set = set(user_split[split])
         sub = [s for s in all_samples if s["user_id"] in user_set]
         if not sub:
-            print(f"  ⚠ {split}: 0 sample")
+            print(f"  [WARNING] {split}: 0 sample")
             counts[split] = 0
             continue
         x_seq = np.stack([s["X_seq"] for s in sub], axis=0)
@@ -249,13 +268,13 @@ def main(args: argparse.Namespace) -> int:
             user_ids=user_ids,
         )
         counts[split] = len(sub)
-        print(f"  {split}: {len(sub)} sample → {out_path}")
+        print(f"  {split}: {len(sub)} sample -> {out_path}")
 
     print("\n[검증]")
     for split, n in counts.items():
         print(f"  {split}: {n}")
 
-    print("\n✓ 완료")
+    print("\n[완료]")
     return 0
 
 
@@ -263,8 +282,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Model 2 시계열 데이터 추출")
     parser.add_argument(
         "--data-dir",
-        default="../simuldate_params/simulate",
-        help="시뮬레이터 데이터 폴더",
+        default="data/glucose_data/sim_data/sim_v3",
+        help="시뮬레이터 데이터 폴더 (서브폴더 구조 또는 단일 폴더)",
+    )
+    parser.add_argument(
+        "--max-categories",
+        type=int,
+        default=None,
+        help="테스트용: 처음 N개 카테고리만 처리",
     )
     parser.add_argument(
         "--output-dir",

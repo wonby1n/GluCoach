@@ -15,8 +15,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from app.glucose import interface, personalize
-from app.glucose.constants import DEFAULT_MODELS_DIR
+from app.glucose import config, interface, personalize
 from app.glucose.predict import reset_predictors
 from app.schemas.glucose import (
     HealthResponse,
@@ -59,13 +58,13 @@ async def predict_now(req: NowPredictRequest) -> PredictResponse:
 @router.post("/personalize", response_model=PersonalizeResponse)
 async def personalize_user(req: PersonalizeRequest) -> PersonalizeResponse:
     """환자별 fine-tune. base 보다 개선 없으면 자동 폐기 (rejected)."""
-    base_path = Path(DEFAULT_MODELS_DIR) / "lstm_meal.pt"
+    base_path = Path(config.MODELS_DIR) / "lstm_meal.pt"
     if not base_path.exists():
         raise HTTPException(
             status_code=503,
             detail="base 모델 (lstm_meal.pt) 미존재. 학습 필요.",
         )
-    save_path = Path(DEFAULT_MODELS_DIR) / f"lstm_meal_personalized_{req.user_id}.pt"
+    save_path = Path(config.MODELS_DIR) / f"lstm_meal_personalized_{req.user_id}.pt"
 
     personalize.cleanup_old_personalized_models()
 
@@ -89,8 +88,8 @@ async def personalize_user(req: PersonalizeRequest) -> PersonalizeResponse:
         logger.exception("personalize failed")
         raise HTTPException(status_code=500, detail="internal error")
 
-    # personalized 모델 변경됐으니 추론 캐시 초기화
-    reset_predictors()
+    # 해당 사용자 캐시만 초기화 (다른 사용자 캐시 유지)
+    reset_predictors(user_id=req.user_id)
 
     if result["status"] == "rejected":
         message = (

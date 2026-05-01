@@ -19,6 +19,7 @@ from typing import Any
 import numpy as np
 import torch
 
+from app.glucose import config as _cfg
 from app.glucose.constants import (
     ACTIVITY_MAP,
     DEFAULT_MODELS_DIR,
@@ -262,19 +263,19 @@ _personalized_predictors: dict[str, MealPredictor] = {}
 _lock = threading.Lock()
 
 
-def get_meal_predictor(model_type: str = "lstm", user_id: str | None = None) -> MealPredictor:
+def get_meal_predictor(model_type: str = _cfg.MEAL_MODEL_TYPE, user_id: str | None = None) -> MealPredictor:
     """user_id 가 있으면 개인화 모델 캐시에서, 없으면 베이스 싱글톤에서 반환."""
     global _meal_predictor
     if user_id:
         with _lock:
             if user_id not in _personalized_predictors:
-                p = MealPredictor(model_type=model_type, user_id=user_id)
+                p = MealPredictor(model_type=model_type, models_dir=_cfg.MODELS_DIR, user_id=user_id)
                 p._ensure_loaded()
                 _personalized_predictors[user_id] = p
             return _personalized_predictors[user_id]
     with _lock:
         if _meal_predictor is None or _meal_predictor.model_type != model_type:
-            _meal_predictor = MealPredictor(model_type=model_type)
+            _meal_predictor = MealPredictor(model_type=model_type, models_dir=_cfg.MODELS_DIR)
             _meal_predictor._ensure_loaded()
         return _meal_predictor
 
@@ -283,15 +284,22 @@ def get_now_predictor() -> NowPredictor:
     global _now_predictor
     with _lock:
         if _now_predictor is None:
-            _now_predictor = NowPredictor()
+            _now_predictor = NowPredictor(models_dir=_cfg.MODELS_DIR)
             _now_predictor._ensure_loaded()
     return _now_predictor
 
 
-def reset_predictors() -> None:
-    """테스트/재로드 용. 모델 파일 갱신 후 호출."""
+def reset_predictors(user_id: str | None = None) -> None:
+    """모델 파일 갱신 후 캐시 초기화.
+
+    user_id 지정 시 해당 사용자 캐시만 제거.
+    None 이면 전체 초기화 (테스트/서버 재시작 용).
+    """
     global _meal_predictor, _now_predictor, _personalized_predictors
     with _lock:
-        _meal_predictor = None
-        _now_predictor = None
-        _personalized_predictors = {}
+        if user_id is not None:
+            _personalized_predictors.pop(user_id, None)
+        else:
+            _meal_predictor = None
+            _now_predictor = None
+            _personalized_predictors = {}

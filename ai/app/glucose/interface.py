@@ -12,8 +12,8 @@ from typing import Any
 
 import torch
 
-from app.glucose import predict
-from app.glucose.constants import DEFAULT_MODELS_DIR, DEFAULT_SCALER_PATH, LABEL_STEPS
+from app.glucose import config, predict
+from app.glucose.constants import LABEL_STEPS
 from app.schemas.glucose import HealthResponse, PredictResponse
 
 logger = logging.getLogger(__name__)
@@ -66,7 +66,7 @@ def predict_meal_response(request: dict[str, Any]) -> PredictResponse:
     mode = "base"
     used_dummy = False
     try:
-        predictor = predict.get_meal_predictor(model_type="lstm", user_id=user_id)
+        predictor = predict.get_meal_predictor(model_type=config.MEAL_MODEL_TYPE, user_id=user_id)
         predicted = predictor.predict(request)
         mode = predictor.mode
     except (RuntimeError, FileNotFoundError) as e:
@@ -110,13 +110,13 @@ def predict_now(request: dict[str, Any]) -> PredictResponse:
 
 def health_check() -> HealthResponse:
     """모델/scaler 파일 존재 여부 + GPU 가용성."""
-    models_dir = Path(DEFAULT_MODELS_DIR)
+    models_dir = Path(config.MODELS_DIR)
     meal_loaded = any(
         (models_dir / name).exists()
         for name in ("lstm_meal.pt", "mlp_meal.pt", "ridge_meal.pkl")
     )
     now_loaded = (models_dir / "lstm_now.pt").exists()
-    scaler_loaded = Path(DEFAULT_SCALER_PATH).exists()
+    scaler_loaded = Path(config.SCALER_PATH).exists()
 
     if meal_loaded and now_loaded and scaler_loaded:
         status = "UP"

@@ -25,6 +25,7 @@ from torch.utils.data import DataLoader
 from app.glucose.constants import (
     DEFAULT_MODELS_DIR,
     DEFAULT_PROCESSED_DIR,
+    DEFAULT_SCALER_PATH,
     LABEL_STEPS,
 )
 from app.glucose.data_loader import MealDataset, get_dataloader, load_scaler
@@ -60,7 +61,7 @@ def _print_horizon_table(rmse: np.ndarray, mae: np.ndarray) -> None:
     print(f"  {'horizon':>10} | {'RMSE':>8} | {'MAE':>8}")
     print(f"  {'-' * 10}-+-{'-' * 8}-+-{'-' * 8}")
     for i, h in enumerate(LABEL_STEPS):
-        marker = " ⭐" if h in KEY_HORIZONS else ""
+        marker = " *" if h in KEY_HORIZONS else ""
         print(f"  {h:>7}min | {rmse[i]:>8.2f} | {mae[i]:>8.2f}{marker}")
 
 
@@ -74,10 +75,11 @@ def train_ridge(
     val_csv: Path,
     save_path: Path,
     alpha_candidates: list[float] | None = None,
+    scaler_path: str | None = None,
 ) -> None:
     # 표준 sklearn 권장 범위: 로그 스케일 7개
     alpha_candidates = alpha_candidates or np.logspace(-3, 3, 7).tolist()
-    scaler = load_scaler()
+    scaler = load_scaler(scaler_path) if scaler_path else load_scaler()
     bg_scaler = scaler["bg_target"]
 
     train_ds = MealDataset(train_csv, return_categorical_separately=True)
@@ -156,11 +158,12 @@ def train_torch_meal(
     lr: float = 1e-3,
     device: str = "cuda",
     early_stopping_patience: int = 5,
+    scaler_path: str | None = None,
 ) -> None:
     device_t = torch.device(device if torch.cuda.is_available() else "cpu")
     print(f"  device: {device_t}")
 
-    scaler = load_scaler()
+    scaler = load_scaler(scaler_path) if scaler_path else load_scaler()
     bg_scaler = scaler["bg_target"]
 
     train_ds = MealDataset(train_csv, return_categorical_separately=True)
@@ -229,6 +232,7 @@ def train_torch_meal(
             "val_rmse_per_horizon": rmse_all.tolist(),
             "val_mae_per_horizon": mae_all.tolist(),
         },
+        scaler_path=scaler_path or DEFAULT_SCALER_PATH,
     )
     print(f"\n  saved: {save_path}")
 
@@ -254,6 +258,7 @@ def main() -> None:
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--out", default=DEFAULT_MODELS_DIR)
+    parser.add_argument("--scaler", default=None, help="scaler.pkl 경로 (기본: models/scaler.pkl)")
     args = parser.parse_args()
 
     train_csv = Path(args.train)
@@ -264,7 +269,7 @@ def main() -> None:
     print(f"[Model 1: {args.model.upper()}]")
 
     if args.model == "ridge":
-        train_ridge(train_csv, val_csv, out_dir / "ridge_meal.pkl")
+        train_ridge(train_csv, val_csv, out_dir / "ridge_meal.pkl", scaler_path=args.scaler)
     elif args.model == "mlp":
         train_torch_meal(
             MealMLP,
@@ -275,6 +280,7 @@ def main() -> None:
             batch_size=args.batch_size,
             lr=args.lr,
             device=args.device,
+            scaler_path=args.scaler,
         )
     elif args.model == "lstm":
         train_torch_meal(
@@ -286,6 +292,7 @@ def main() -> None:
             batch_size=args.batch_size,
             lr=args.lr,
             device=args.device,
+            scaler_path=args.scaler,
         )
 
 

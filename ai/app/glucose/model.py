@@ -77,12 +77,15 @@ class MealRidge:
 
     def save(self, path: str | Path, scaler_path: str | Path = DEFAULT_SCALER_PATH) -> None:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
+        scaler_stats = _extract_scaler_stats(scaler_path)
         with open(path, "wb") as f:
             pickle.dump(
                 {
                     "alpha": self.alpha,
                     "model": self.model,
                     "scaler_hash": compute_scaler_hash(scaler_path),
+                    "scaler_path": str(scaler_path),
+                    "scaler_stats": scaler_stats,
                 },
                 f,
             )
@@ -109,7 +112,7 @@ class MealRidge:
                 if strict_scaler:
                     raise RuntimeError(msg)
                 else:
-                    print(f"  ⚠ {msg}")
+                    print(f"  [WARNING] {msg}")
         return m
 
 
@@ -272,18 +275,38 @@ def compute_scaler_hash(scaler_path: str | Path = DEFAULT_SCALER_PATH) -> str | 
     return h.hexdigest()
 
 
+def _extract_scaler_stats(scaler_path: str | Path) -> dict[str, Any] | None:
+    """scaler.pkl 에서 사람이 읽을 수 있는 통계 추출."""
+    path = Path(scaler_path)
+    if not path.exists():
+        return None
+    try:
+        with open(path, "rb") as f:
+            scaler = pickle.load(f)
+        return {
+            "bg_mean": float(scaler["bg_target"].mean_[0]),
+            "bg_std": float(scaler["bg_target"].scale_[0]),
+        }
+    except Exception:
+        return None
+
+
 def save_torch_model(
     model: nn.Module,
     path: str | Path,
     meta: dict[str, Any],
     scaler_path: str | Path = DEFAULT_SCALER_PATH,
 ) -> None:
-    """모델 + meta 저장. meta 에 scaler hash 자동 기록."""
+    """모델 + meta 저장. meta 에 scaler hash 및 통계 자동 기록."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), path)
     meta = dict(meta)
     meta["scaler_hash"] = compute_scaler_hash(scaler_path)
+    meta["scaler_path"] = str(scaler_path)
+    scaler_stats = _extract_scaler_stats(scaler_path)
+    if scaler_stats:
+        meta["scaler_stats"] = scaler_stats
     with open(path.with_suffix(path.suffix + ".meta.json"), "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)
 
@@ -319,7 +342,7 @@ def load_torch_model(
             if strict_scaler:
                 raise RuntimeError(msg)
             else:
-                print(f"  ⚠ {msg}")
+                print(f"  [WARNING] {msg}")
 
     return model, meta
 
@@ -373,7 +396,7 @@ def _smoke_test() -> None:
     print(f"  output shape: {tuple(out.shape)}  (expected [{batch}, {OUTPUT_DIM}])")
     print(f"  parameters: {n_params:,}")
 
-    print("\n✓ 4 모델 모두 forward 통과")
+    print("\n[OK] 4 모델 모두 forward 통과")
 
 
 if __name__ == "__main__":

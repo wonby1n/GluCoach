@@ -22,6 +22,7 @@ from torch.utils.data import DataLoader
 
 from app.glucose.constants import (
     DEFAULT_MODELS_DIR,
+    DEFAULT_SCALER_PATH,
     DEFAULT_TIMESERIES_DIR,
     LABEL_STEPS,
 )
@@ -46,7 +47,7 @@ def _print_horizon_table(rmse: np.ndarray, mae: np.ndarray) -> None:
     print(f"  {'horizon':>10} | {'RMSE':>8} | {'MAE':>8}")
     print(f"  {'-' * 10}-+-{'-' * 8}-+-{'-' * 8}")
     for i, h in enumerate(LABEL_STEPS):
-        marker = " ⭐" if h in KEY_HORIZONS else ""
+        marker = " *" if h in KEY_HORIZONS else ""
         print(f"  {h:>7}min | {rmse[i]:>8.2f} | {mae[i]:>8.2f}{marker}")
 
 
@@ -84,11 +85,12 @@ def train_now_lstm(
     lr: float = 1e-3,
     device: str = "cuda",
     early_stopping_patience: int = 5,
+    scaler_path: str | None = None,
 ) -> None:
     device_t = torch.device(device if torch.cuda.is_available() else "cpu")
     print(f"  device: {device_t}")
 
-    scaler = load_scaler()
+    scaler = load_scaler(scaler_path) if scaler_path else load_scaler()
     bg_scaler = scaler["bg_target"]
 
     train_ds = TimeseriesDataset(train_npz)
@@ -159,6 +161,7 @@ def train_now_lstm(
             "val_rmse_per_horizon": rmse_all.tolist(),
             "val_mae_per_horizon": mae_all.tolist(),
         },
+        scaler_path=scaler_path or DEFAULT_SCALER_PATH,
     )
     print(f"\n  saved: {save_path}")
 
