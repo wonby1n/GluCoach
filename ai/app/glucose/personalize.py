@@ -41,7 +41,32 @@ from app.glucose.model import MealLSTMDecoder, load_torch_model, save_torch_mode
 from app.glucose.seed import set_seed
 
 
+_PERSONALIZED_MAX_AGE_DAYS = 90
 KEY_HORIZONS = [30, 60, 120]
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 파일 정리
+# ─────────────────────────────────────────────────────────────────────
+
+
+def cleanup_old_personalized_models(
+    models_dir: str = DEFAULT_MODELS_DIR,
+    max_age_days: int = _PERSONALIZED_MAX_AGE_DAYS,
+) -> list[str]:
+    """마지막 수정 후 max_age_days 이상 지난 개인화 모델 파일을 삭제한다."""
+    removed: list[str] = []
+    cutoff = time.time() - max_age_days * 86400
+    for pt_file in Path(models_dir).glob("lstm_meal_personalized_*.pt"):
+        if pt_file.stat().st_mtime < cutoff:
+            meta_file = pt_file.with_suffix(pt_file.suffix + ".meta.json")
+            pt_file.unlink()
+            if meta_file.exists():
+                meta_file.unlink()
+            removed.append(pt_file.name)
+    if removed:
+        print(f"  [cleanup] 삭제된 개인화 모델: {removed}")
+    return removed
 
 
 # ─────────────────────────────────────────────────────────────────────

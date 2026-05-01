@@ -9,6 +9,7 @@ prefix: /api/predict/glucose
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from pathlib import Path
 
@@ -66,13 +67,19 @@ async def personalize_user(req: PersonalizeRequest) -> PersonalizeResponse:
         )
     save_path = Path(DEFAULT_MODELS_DIR) / f"lstm_meal_personalized_{req.user_id}.pt"
 
+    personalize.cleanup_old_personalized_models()
+
+    loop = asyncio.get_event_loop()
     try:
-        result = personalize.finetune_from_history(
-            user_id=req.user_id,
-            history=[item.model_dump() for item in req.history],
-            user_profile=req.user_profile.model_dump(),
-            base_model_path=base_path,
-            save_path=save_path,
+        result = await loop.run_in_executor(
+            None,
+            lambda: personalize.finetune_from_history(
+                user_id=req.user_id,
+                history=[item.model_dump() for item in req.history],
+                user_profile=req.user_profile.model_dump(),
+                base_model_path=base_path,
+                save_path=save_path,
+            ),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
