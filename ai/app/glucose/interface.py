@@ -54,17 +54,21 @@ def _dummy_curve_from_recent(recent_values: list[float]) -> list[float]:
 def predict_meal_response(request: dict[str, Any]) -> PredictResponse:
     """Model 1: 식사 시점 → 식후 120분 BG.
 
+    user_id 에 개인화 모델이 있으면 자동 사용, 없으면 베이스 모델.
     실제 모델 시도 → 실패 시 dummy 폴백.
     """
     recent: list[float] = request.get("recent_values") or []
     if not recent:
         raise ValueError("recent_values is required (>=1)")
 
+    user_id: str | None = request.get("user_id")
     predicted: list[float]
+    mode = "base"
     used_dummy = False
     try:
-        predictor = predict.get_meal_predictor(model_type="lstm")
+        predictor = predict.get_meal_predictor(model_type="lstm", user_id=user_id)
         predicted = predictor.predict(request)
+        mode = predictor.mode
     except (RuntimeError, FileNotFoundError) as e:
         logger.warning(f"meal model not loaded → dummy fallback: {e}")
         used_dummy = True
@@ -72,7 +76,6 @@ def predict_meal_response(request: dict[str, Any]) -> PredictResponse:
         current_glucose = float(recent[-1])
         predicted = _dummy_curve_from_meal(carbs, current_glucose)
 
-    mode = "personalized" if _has_personalized_model(request.get("user_id")) else "base"
     return PredictResponse(
         horizons_min=LABEL_STEPS,
         predicted=predicted,
@@ -131,13 +134,3 @@ def health_check() -> HealthResponse:
     )
 
 
-# ─────────────────────────────────────────────────────────────────────
-# 내부
-# ─────────────────────────────────────────────────────────────────────
-
-
-def _has_personalized_model(user_id: str | None) -> bool:
-    if not user_id:
-        return False
-    path = Path(DEFAULT_MODELS_DIR) / f"lstm_meal_personalized_{user_id}.pt"
-    return path.exists()

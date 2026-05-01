@@ -10,9 +10,7 @@ app = FastAPI(
     version=settings.app_version,
 )
 
-<<<<<<< HEAD
 app.include_router(glucose_router.router)
-=======
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,15 +19,9 @@ app.add_middleware(
 )
 
 app.include_router(food_router, prefix="/api/v1")
->>>>>>> a3ff86eef5523743ba6b4efe11a5c3b0822610fc
 
 
 @app.get("/health")
 async def health():
     return {"status": "UP"}
-<<<<<<< HEAD
 
-
-# TODO: CORS 미들웨어 설정 (백엔드 호출 시 필요하면 추가)
-=======
->>>>>>> a3ff86eef5523743ba6b4efe11a5c3b0822610fc
