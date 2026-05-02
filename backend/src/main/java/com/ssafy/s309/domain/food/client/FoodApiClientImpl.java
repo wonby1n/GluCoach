@@ -49,17 +49,17 @@ public class FoodApiClientImpl implements FoodApiClient {
       long elapsedMs = System.currentTimeMillis() - startMs;
       log.info("[식약처API] 검색 완료 query={} elapsedMs={}", query, elapsedMs);
 
-      if (response == null || response.response() == null) {
+      if (response == null) {
         return Collections.emptyList();
       }
 
-      FoodApiResponse.Header header = response.response().header();
+      FoodApiResponse.Header header = response.header();
       if (header != null && !SUCCESS_CODE.equals(header.resultCode())) {
         log.warn("[식약처API] 비정상 응답 code={} msg={}", header.resultCode(), header.resultMsg());
         return Collections.emptyList();
       }
 
-      FoodApiResponse.Body body = response.response().body();
+      FoodApiResponse.Body body = response.body();
       if (body == null || body.items() == null) {
         return Collections.emptyList();
       }

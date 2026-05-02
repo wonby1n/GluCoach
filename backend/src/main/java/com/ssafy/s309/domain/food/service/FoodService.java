@@ -53,12 +53,17 @@ public class FoodService {
   }
 
   private Food upsert(FoodApiItem item, LocalDateTime cacheThreshold) {
+    BigDecimal servingSize = parseServingSize(item.servingSize());
+    if (servingSize == null) {
+      servingSize = DEFAULT_SERVING_SIZE;
+    }
+    BigDecimal finalServingSize = servingSize;
     return foodRepository
         .findByFoodApiId(item.foodCd())
         .map(
             existing -> {
               existing.refresh(
-                  item.category(),
+                  item.categoryNm(),
                   parseBigDecimal(item.kcal()),
                   parseBigDecimal(item.carbsG()),
                   parseBigDecimal(item.sugarG()),
@@ -77,7 +82,7 @@ public class FoodService {
                     Food.builder()
                         .foodApiId(item.foodCd())
                         .name(item.foodNm())
-                        .category(item.category())
+                        .category(item.categoryNm())
                         .kcal(parseBigDecimal(item.kcal()))
                         .carbsG(parseBigDecimal(item.carbsG()))
                         .sugarG(parseBigDecimal(item.sugarG()))
@@ -88,7 +93,7 @@ public class FoodService {
                         .transFatG(parseBigDecimal(item.transFatG()))
                         .cholesterolMg(parseBigDecimal(item.cholesterolMg()))
                         .sodiumMg(parseBigDecimal(item.sodiumMg()))
-                        .servingSize(DEFAULT_SERVING_SIZE)
+                        .servingSize(finalServingSize)
                         .isCustomized(false)
                         .searchCount(0)
                         .cachedAt(LocalDateTime.now())
@@ -99,6 +104,17 @@ public class FoodService {
     if (value == null || value.isBlank()) return null;
     try {
       return new BigDecimal(value.trim());
+    } catch (NumberFormatException e) {
+      return null;
+    }
+  }
+
+  private BigDecimal parseServingSize(String raw) {
+    if (raw == null || raw.isBlank()) return null;
+    String numeric = raw.replaceAll("[^0-9.]", "");
+    if (numeric.isBlank()) return null;
+    try {
+      return new BigDecimal(numeric);
     } catch (NumberFormatException e) {
       return null;
     }

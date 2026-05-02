@@ -44,30 +44,30 @@ class FoodApiClientImplTest {
     String body =
         """
         {
-          "response": {
-            "header": { "resultCode": "00", "resultMsg": "NORMAL SERVICE." },
-            "body": {
-              "pageNo": 1,
-              "numOfRows": 20,
-              "totalCount": 1,
-              "items": [
-                {
-                  "foodCd": "D000001",
-                  "foodNm": "흰쌀밥",
-                  "foodLv3Nm": "밥류",
-                  "enerc": "143.00",
-                  "chocdf": "31.70",
-                  "sugar": "0.10",
-                  "prot": "2.50",
-                  "fatce": "0.40",
-                  "fibtg": "0.30",
-                  "fasat": "0.10",
-                  "fatrn": "0.00",
-                  "chole": "0.00",
-                  "nat": "1.00"
-                }
-              ]
-            }
+          "header": { "resultCode": "00", "resultMsg": "NORMAL SERVICE." },
+          "body": {
+            "pageNo": 1,
+            "totalCount": 1,
+            "numOfRows": 1,
+            "items": [
+              {
+                "NUM": "1",
+                "FOOD_CD": "D101-004160000-0001",
+                "FOOD_NM_KR": "국밥_돼지머리",
+                "FOOD_CAT1_NM": "밥류",
+                "SERVING_SIZE": "100g",
+                "AMT_NUM1": "137.000",
+                "AMT_NUM3": "6.70",
+                "AMT_NUM4": "5.16",
+                "AMT_NUM6": "15.94",
+                "AMT_NUM7": "0.16",
+                "AMT_NUM8": "0.70",
+                "AMT_NUM13": "181.000",
+                "AMT_NUM23": "23.82",
+                "AMT_NUM24": "1.47",
+                "AMT_NUM25": "0.03"
+              }
+            ]
           }
         }
         """;
@@ -80,26 +80,27 @@ class FoodApiClientImplTest {
         .andExpect(queryParam("type", "json"))
         .andExpect(queryParam("pageNo", "1"))
         .andExpect(queryParam("numOfRows", "20"))
-        .andExpect(queryParam("foodNm", "%ED%9D%B0%EC%8C%80%EB%B0%A5"))
+        .andExpect(queryParam("foodNm", "%EA%B5%AD%EB%B0%A5"))
         .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
 
-    List<FoodApiItem> items = client.search("흰쌀밥");
+    List<FoodApiItem> items = client.search("국밥");
 
     assertThat(items).hasSize(1);
     FoodApiItem item = items.get(0);
-    assertThat(item.foodCd()).isEqualTo("D000001");
-    assertThat(item.foodNm()).isEqualTo("흰쌀밥");
-    assertThat(item.category()).isEqualTo("밥류");
-    assertThat(item.kcal()).isEqualTo("143.00");
-    assertThat(item.carbsG()).isEqualTo("31.70");
-    assertThat(item.sugarG()).isEqualTo("0.10");
-    assertThat(item.proteinG()).isEqualTo("2.50");
-    assertThat(item.fatG()).isEqualTo("0.40");
-    assertThat(item.fiberG()).isEqualTo("0.30");
-    assertThat(item.saturatedFatG()).isEqualTo("0.10");
-    assertThat(item.transFatG()).isEqualTo("0.00");
-    assertThat(item.cholesterolMg()).isEqualTo("0.00");
-    assertThat(item.sodiumMg()).isEqualTo("1.00");
+    assertThat(item.foodCd()).isEqualTo("D101-004160000-0001");
+    assertThat(item.foodNm()).isEqualTo("국밥_돼지머리");
+    assertThat(item.categoryNm()).isEqualTo("밥류");
+    assertThat(item.servingSize()).isEqualTo("100g");
+    assertThat(item.kcal()).isEqualTo("137.000");
+    assertThat(item.proteinG()).isEqualTo("6.70");
+    assertThat(item.fatG()).isEqualTo("5.16");
+    assertThat(item.carbsG()).isEqualTo("15.94");
+    assertThat(item.sugarG()).isEqualTo("0.16");
+    assertThat(item.fiberG()).isEqualTo("0.70");
+    assertThat(item.sodiumMg()).isEqualTo("181.000");
+    assertThat(item.cholesterolMg()).isEqualTo("23.82");
+    assertThat(item.saturatedFatG()).isEqualTo("1.47");
+    assertThat(item.transFatG()).isEqualTo("0.03");
   }
 
   @Test
@@ -107,10 +108,8 @@ class FoodApiClientImplTest {
     String body =
         """
         {
-          "response": {
-            "header": { "resultCode": "99", "resultMsg": "UNKNOWN ERROR" },
-            "body": null
-          }
+          "header": { "resultCode": "99", "resultMsg": "UNKNOWN ERROR" },
+          "body": null
         }
         """;
 
@@ -129,14 +128,12 @@ class FoodApiClientImplTest {
     String body =
         """
         {
-          "response": {
-            "header": { "resultCode": "00", "resultMsg": "NORMAL SERVICE." },
-            "body": {
-              "pageNo": 1,
-              "numOfRows": 20,
-              "totalCount": 0,
-              "items": []
-            }
+          "header": { "resultCode": "00", "resultMsg": "NORMAL SERVICE." },
+          "body": {
+            "pageNo": 1,
+            "totalCount": 0,
+            "numOfRows": 20,
+            "items": []
           }
         }
         """;
