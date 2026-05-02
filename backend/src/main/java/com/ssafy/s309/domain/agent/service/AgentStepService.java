@@ -1,7 +1,7 @@
 package com.ssafy.s309.domain.agent.service;
 
 import com.ssafy.s309.domain.agent.dto.AgentStepResponse;
-import com.ssafy.s309.domain.health.repository.StepRecordRepository;
+import com.ssafy.s309.domain.health.repository.HealthSnapshotRepository;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -11,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AgentStepService {
 
-  private final StepRecordRepository repo;
+  private final HealthSnapshotRepository repo;
 
   @Transactional(readOnly = true)
   public AgentStepResponse getWindowSteps(Integer userId, LocalDateTime start, LocalDateTime end) {
