@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class FoodService {
 
   private static final int CACHE_TTL_DAYS = 30;
+  private static final BigDecimal DEFAULT_SERVING_SIZE = new BigDecimal("100");
 
   private final FoodRepository foodRepository;
   private final FoodApiClient foodApiClient;
@@ -37,7 +38,7 @@ public class FoodService {
       return cached.stream().map(FoodSearchResult::from).toList();
     }
 
-    log.debug("[FoodSearch] 캐시 미스 — 식품안전처 API 호출 query={}", query);
+    log.debug("[FoodSearch] 캐시 미스 — 식약처 API 호출 query={}", query);
     try {
       List<FoodApiItem> items = foodApiClient.search(query);
       List<Food> saved = items.stream().map(item -> upsert(item, cacheThreshold)).toList();
@@ -57,11 +58,17 @@ public class FoodService {
         .map(
             existing -> {
               existing.refresh(
+                  item.category(),
                   parseBigDecimal(item.kcal()),
                   parseBigDecimal(item.carbsG()),
                   parseBigDecimal(item.sugarG()),
                   parseBigDecimal(item.proteinG()),
-                  parseBigDecimal(item.fatG()));
+                  parseBigDecimal(item.fatG()),
+                  parseBigDecimal(item.fiberG()),
+                  parseBigDecimal(item.saturatedFatG()),
+                  parseBigDecimal(item.transFatG()),
+                  parseBigDecimal(item.cholesterolMg()),
+                  parseBigDecimal(item.sodiumMg()));
               return existing;
             })
         .orElseGet(
@@ -69,12 +76,20 @@ public class FoodService {
                 foodRepository.save(
                     Food.builder()
                         .foodApiId(item.foodCd())
-                        .name(item.nameKor())
+                        .name(item.foodNm())
+                        .category(item.category())
                         .kcal(parseBigDecimal(item.kcal()))
                         .carbsG(parseBigDecimal(item.carbsG()))
                         .sugarG(parseBigDecimal(item.sugarG()))
                         .proteinG(parseBigDecimal(item.proteinG()))
                         .fatG(parseBigDecimal(item.fatG()))
+                        .fiberG(parseBigDecimal(item.fiberG()))
+                        .saturatedFatG(parseBigDecimal(item.saturatedFatG()))
+                        .transFatG(parseBigDecimal(item.transFatG()))
+                        .cholesterolMg(parseBigDecimal(item.cholesterolMg()))
+                        .sodiumMg(parseBigDecimal(item.sodiumMg()))
+                        .servingSize(DEFAULT_SERVING_SIZE)
+                        .isCustomized(false)
                         .searchCount(0)
                         .cachedAt(LocalDateTime.now())
                         .build()));

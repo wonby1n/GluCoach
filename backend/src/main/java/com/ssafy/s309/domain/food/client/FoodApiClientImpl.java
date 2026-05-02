@@ -18,51 +18,66 @@ import org.springframework.web.client.RestClientResponseException;
 @RequiredArgsConstructor
 public class FoodApiClientImpl implements FoodApiClient {
 
+  private static final String SEARCH_PATH = "/FoodNtrCpntDbInfo02/getFoodNtrCpntDbInq02";
   private static final int PAGE_SIZE = 20;
-  private static final String SUCCESS_CODE = "INFO-000";
+  private static final String SUCCESS_CODE = "00";
 
   private final RestClient foodRestClient;
   private final FoodApiProperties properties;
 
   @Override
   public List<FoodApiItem> search(String query) {
-    String uri =
-        String.format("/%s/I2790/json/1/%d/DESC_KOR=%s", properties.serviceKey(), PAGE_SIZE, query);
     long startMs = System.currentTimeMillis();
 
     try {
       FoodApiResponse response =
-          foodRestClient.get().uri(uri).retrieve().body(FoodApiResponse.class);
+          foodRestClient
+              .get()
+              .uri(
+                  uriBuilder ->
+                      uriBuilder
+                          .path(SEARCH_PATH)
+                          .queryParam("serviceKey", properties.serviceKey())
+                          .queryParam("type", "json")
+                          .queryParam("pageNo", 1)
+                          .queryParam("numOfRows", PAGE_SIZE)
+                          .queryParam("foodNm", query)
+                          .build())
+              .retrieve()
+              .body(FoodApiResponse.class);
 
       long elapsedMs = System.currentTimeMillis() - startMs;
-      log.info("[식품안전처API] 검색 완료 query={} elapsedMs={}", query, elapsedMs);
+      log.info("[식약처API] 검색 완료 query={} elapsedMs={}", query, elapsedMs);
 
-      if (response == null || response.i2790() == null) {
+      if (response == null || response.response() == null) {
         return Collections.emptyList();
       }
 
-      FoodApiResponse.Result result = response.i2790().result();
-      if (result != null && !SUCCESS_CODE.equals(result.code())) {
-        log.warn("[식품안전처API] 비정상 응답 code={} msg={}", result.code(), result.msg());
+      FoodApiResponse.Header header = response.response().header();
+      if (header != null && !SUCCESS_CODE.equals(header.resultCode())) {
+        log.warn("[식약처API] 비정상 응답 code={} msg={}", header.resultCode(), header.resultMsg());
         return Collections.emptyList();
       }
 
-      List<FoodApiItem> rows = response.i2790().rows();
-      return rows != null ? rows : Collections.emptyList();
+      FoodApiResponse.Body body = response.response().body();
+      if (body == null || body.items() == null) {
+        return Collections.emptyList();
+      }
+      return body.items();
 
     } catch (ResourceAccessException e) {
       long elapsedMs = System.currentTimeMillis() - startMs;
-      log.warn("[식품안전처API] 연결 실패 query={} elapsedMs={}: {}", query, elapsedMs, e.getMessage());
-      throw new FoodApiException("식품안전처 API 연결 실패", e);
+      log.warn("[식약처API] 연결 실패 query={} elapsedMs={}: {}", query, elapsedMs, e.getMessage());
+      throw new FoodApiException("식약처 API 연결 실패", e);
 
     } catch (RestClientResponseException e) {
       long elapsedMs = System.currentTimeMillis() - startMs;
       log.warn(
-          "[식품안전처API] HTTP 오류 query={} status={} elapsedMs={}",
+          "[식약처API] HTTP 오류 query={} status={} elapsedMs={}",
           query,
           e.getStatusCode().value(),
           elapsedMs);
-      throw new FoodApiException("식품안전처 API 오류 (HTTP " + e.getStatusCode().value() + ")", e);
+      throw new FoodApiException("식약처 API 오류 (HTTP " + e.getStatusCode().value() + ")", e);
     }
   }
 }

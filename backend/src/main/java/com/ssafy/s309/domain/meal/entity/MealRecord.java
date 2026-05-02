@@ -41,6 +41,9 @@ public class MealRecord extends BaseEntity {
   @Column(name = "is_processed", nullable = false)
   private Boolean isProcessed;
 
+  @Column(name = "memo", length = 255)
+  private String memo;
+
   @Column(name = "recorded_at", nullable = false)
   private LocalDateTime recordedAt;
 }
