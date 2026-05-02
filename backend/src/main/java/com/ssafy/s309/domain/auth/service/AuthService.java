@@ -33,6 +33,8 @@ public class AuthService {
             .email(request.email())
             .password(passwordEncoder.encode(request.password()))
             .provider("email")
+            .name(request.name())
+            .phone(request.phone())
             .build();
 
     userRepository.save(user);

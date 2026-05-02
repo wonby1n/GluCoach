@@ -71,7 +71,8 @@ class AuthWithdrawFlowTest {
     given(jwtProvider.generateRefreshToken(any())).willReturn("rt");
 
     TokenResponse signupResp =
-        authService.signup(new SignupRequest("user@glucofit.com", "myPassword"));
+        authService.signup(
+            new SignupRequest("user@glucofit.com", "myPassword", "테스트유저", "010-0000-0000"));
     assertThat(signupResp.accessToken()).isNotNull();
 
     // 2) 로그인 성공
@@ -150,7 +151,8 @@ class AuthWithdrawFlowTest {
     given(jwtProvider.generateRefreshToken(any())).willReturn("new-rt");
 
     TokenResponse reSignup =
-        authService.signup(new SignupRequest("user@glucofit.com", "newPassword"));
+        authService.signup(
+            new SignupRequest("user@glucofit.com", "newPassword", "테스트유저", "010-0000-0000"));
     assertThat(reSignup.accessToken()).isEqualTo("new-at");
   }
 

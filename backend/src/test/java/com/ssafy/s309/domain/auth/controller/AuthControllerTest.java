@@ -52,7 +52,8 @@ class AuthControllerTest {
 
   @Test
   void 회원가입_201_반환() throws Exception {
-    SignupRequest request = new SignupRequest("test@example.com", "password123");
+    SignupRequest request =
+        new SignupRequest("test@example.com", "password123", "테스트유저", "010-0000-0000");
     TokenResponse response = new TokenResponse("access-token", "refresh-token");
     given(authService.signup(any())).willReturn(response);
 
@@ -69,7 +70,8 @@ class AuthControllerTest {
 
   @Test
   void 회원가입_이메일_중복_400_반환() throws Exception {
-    SignupRequest request = new SignupRequest("dup@example.com", "password123");
+    SignupRequest request =
+        new SignupRequest("dup@example.com", "password123", "테스트유저", "010-0000-0000");
     given(authService.signup(any())).willThrow(new IllegalArgumentException("이미 가입된 이메일입니다"));
 
     mockMvc
