@@ -32,14 +32,14 @@ public class PredictionService {
   private final ObjectMapper objectMapper;
 
   @Transactional
-  public PredictResponse predict(Long userId, PredictRequest request) {
+  public PredictResponse predict(Integer userId, PredictRequest request) {
     User user = findUser(userId);
     GlucosePredictResponse aiResponse = glucosePredictClient.predict(buildAiRequest(user, request));
     GlucosePrediction saved = savePrediction(user, request, aiResponse);
-    return toResponse(saved.getId().longValue(), aiResponse);
+    return toResponse(saved.getId(), aiResponse);
   }
 
-  public AbPredictResponse comparePredict(Long userId, AbPredictRequest request) {
+  public AbPredictResponse comparePredict(Integer userId, AbPredictRequest request) {
     User user = findUser(userId);
 
     CompletableFuture<PredictResponse> futureA =
@@ -48,7 +48,7 @@ public class PredictionService {
               GlucosePredictResponse r =
                   glucosePredictClient.predict(buildAiRequest(user, request.foodA()));
               GlucosePrediction saved = savePrediction(user, request.foodA(), r);
-              return toResponse(saved.getId().longValue(), r);
+              return toResponse(saved.getId(), r);
             });
 
     CompletableFuture<PredictResponse> futureB =
@@ -57,13 +57,13 @@ public class PredictionService {
               GlucosePredictResponse r =
                   glucosePredictClient.predict(buildAiRequest(user, request.foodB()));
               GlucosePrediction saved = savePrediction(user, request.foodB(), r);
-              return toResponse(saved.getId().longValue(), r);
+              return toResponse(saved.getId(), r);
             });
 
     return new AbPredictResponse(futureA.join(), futureB.join());
   }
 
-  private User findUser(Long userId) {
+  private User findUser(Integer userId) {
     return userRepository
         .findById(userId)
         .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저: " + userId));
@@ -112,7 +112,7 @@ public class PredictionService {
             .build());
   }
 
-  private PredictResponse toResponse(Long predictionId, GlucosePredictResponse aiResponse) {
+  private PredictResponse toResponse(Integer predictionId, GlucosePredictResponse aiResponse) {
     return new PredictResponse(
         predictionId,
         aiResponse.curve(),

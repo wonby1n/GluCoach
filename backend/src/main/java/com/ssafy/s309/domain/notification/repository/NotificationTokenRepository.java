@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface NotificationTokenRepository extends JpaRepository<NotificationToken, Long> {
+public interface NotificationTokenRepository extends JpaRepository<NotificationToken, Integer> {
 
   List<NotificationToken> findByUserAndIsActiveTrue(User user);
 

@@ -59,7 +59,7 @@ public class AuthService {
       throw new IllegalArgumentException("유효하지 않은 리프레시 토큰입니다");
     }
 
-    Long userId = jwtProvider.getUserId(refreshToken);
+    Integer userId = jwtProvider.getUserId(refreshToken);
 
     if (!refreshTokenService.matches(userId, refreshToken)) {
       refreshTokenService.delete(userId);
@@ -77,13 +77,13 @@ public class AuthService {
 
   public void logout(String refreshToken) {
     if (jwtProvider.validate(refreshToken)) {
-      Long userId = jwtProvider.getUserId(refreshToken);
+      Integer userId = jwtProvider.getUserId(refreshToken);
       refreshTokenService.delete(userId);
     }
   }
 
   @Transactional
-  public void withdraw(Long userId, String password) {
+  public void withdraw(Integer userId, String password) {
     User user =
         userRepository
             .findById(userId)
@@ -103,7 +103,7 @@ public class AuthService {
     refreshTokenService.delete(userId);
   }
 
-  private TokenResponse issueTokens(Long userId, String email) {
+  private TokenResponse issueTokens(Integer userId, String email) {
     String accessToken = jwtProvider.generateAccessToken(userId, email);
     String refreshToken = jwtProvider.generateRefreshToken(userId);
 

@@ -45,7 +45,7 @@ class TimelineControllerTest {
   @Autowired private MockMvc mockMvc;
   @MockitoBean private TimelineService timelineService;
 
-  private static final Long USER_ID = 1L;
+  private static final Integer USER_ID = 1;
 
   private final RequestPostProcessor authedUser =
       authentication(
@@ -63,15 +63,11 @@ class TimelineControllerTest {
             List.of(
                 new GlucosePoint(now.minusHours(1), new BigDecimal("105.00")),
                 new GlucosePoint(now.minusMinutes(30), new BigDecimal("112.50"))),
-            List.of(new MealPin(10L, 100L, now.minusHours(2), "s3-key-1")),
+            List.of(new MealPin(10, 100, now.minusHours(2), "s3-key-1")),
             List.of(
                 new ExercisePin(
-                    20L,
-                    "WALKING",
-                    new BigDecimal("150.00"),
-                    now.minusHours(3),
-                    now.minusHours(2))),
-            List.of(new SleepPin(30L, now.minusHours(10), now.minusHours(2))));
+                    20, "WALKING", new BigDecimal("150.00"), now.minusHours(3), now.minusHours(2))),
+            List.of(new SleepPin(30, now.minusHours(10), now.minusHours(2))));
     given(timelineService.getTimeline(eq(USER_ID), eq(TimelineRange.D7))).willReturn(response);
 
     mockMvc

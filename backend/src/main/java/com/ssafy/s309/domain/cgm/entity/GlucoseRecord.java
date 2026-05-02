@@ -31,7 +31,7 @@ public class GlucoseRecord {
   private Long id;
 
   @Column(name = "user_id", nullable = false)
-  private Long userId;
+  private Integer userId;
 
   @Column(name = "value", nullable = false, precision = 5, scale = 2)
   private BigDecimal value;

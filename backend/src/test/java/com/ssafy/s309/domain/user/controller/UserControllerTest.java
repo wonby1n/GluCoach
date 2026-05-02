@@ -43,8 +43,8 @@ class UserControllerTest {
   @Autowired private ObjectMapper objectMapper;
   @MockitoBean private UserService userService;
 
-  private static final Long USER_ID = 1L;
-  private static final Long WG_ID = 10L;
+  private static final Integer USER_ID = 1;
+  private static final Integer WG_ID = 10;
 
   // ── Settings ──────────────────────────────────────────────
 
@@ -126,8 +126,8 @@ class UserControllerTest {
   void 보호자_목록_조회_200_반환() throws Exception {
     List<GuardianResponse> list =
         List.of(
-            new GuardianResponse(WG_ID, USER_ID, 2L, "부모", 0),
-            new GuardianResponse(11L, USER_ID, 3L, "배우자", 1));
+            new GuardianResponse(WG_ID, USER_ID, 2, "부모", 0),
+            new GuardianResponse(11, USER_ID, 3, "배우자", 1));
     given(userService.getGuardians(USER_ID)).willReturn(list);
 
     mockMvc
@@ -141,8 +141,8 @@ class UserControllerTest {
   @Test
   @WithMockUser
   void 보호자_등록_201_반환() throws Exception {
-    GuardianRequest request = new GuardianRequest(2L, "부모");
-    GuardianResponse response = new GuardianResponse(WG_ID, USER_ID, 2L, "부모", 0);
+    GuardianRequest request = new GuardianRequest(2, "부모");
+    GuardianResponse response = new GuardianResponse(WG_ID, USER_ID, 2, "부모", 0);
     given(userService.createGuardian(eq(USER_ID), any())).willReturn(response);
 
     mockMvc
@@ -173,8 +173,8 @@ class UserControllerTest {
   @Test
   @WithMockUser
   void 보호자_수정_200_반환() throws Exception {
-    GuardianRequest request = new GuardianRequest(2L, "가족");
-    GuardianResponse response = new GuardianResponse(WG_ID, USER_ID, 2L, "가족", 0);
+    GuardianRequest request = new GuardianRequest(2, "가족");
+    GuardianResponse response = new GuardianResponse(WG_ID, USER_ID, 2, "가족", 0);
     given(userService.updateGuardian(eq(USER_ID), eq(WG_ID), any())).willReturn(response);
 
     mockMvc

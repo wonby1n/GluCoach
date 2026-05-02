@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface SleepRecordRepository extends JpaRepository<SleepRecord, Long> {
+public interface SleepRecordRepository extends JpaRepository<SleepRecord, Integer> {
 
   @Query(
       """
@@ -18,7 +18,7 @@ public interface SleepRecordRepository extends JpaRepository<SleepRecord, Long> 
        ORDER BY s.startedAt ASC
       """)
   List<SleepRecord> findOverlappingByUserId(
-      @Param("userId") Long userId,
+      @Param("userId") Integer userId,
       @Param("from") LocalDateTime from,
       @Param("to") LocalDateTime to);
 }

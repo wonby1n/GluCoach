@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface ExerciseRecordRepository extends JpaRepository<ExerciseRecord, Long> {
+public interface ExerciseRecordRepository extends JpaRepository<ExerciseRecord, Integer> {
 
   @Query(
       """
@@ -18,7 +18,7 @@ public interface ExerciseRecordRepository extends JpaRepository<ExerciseRecord, 
        ORDER BY e.startedAt ASC
       """)
   List<ExerciseRecord> findOverlappingByUserId(
-      @Param("userId") Long userId,
+      @Param("userId") Integer userId,
       @Param("from") LocalDateTime from,
       @Param("to") LocalDateTime to);
 }

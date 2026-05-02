@@ -26,14 +26,14 @@ public class UserController {
 
   @Operation(summary = "설정 조회")
   @GetMapping("/settings")
-  public ResponseEntity<SettingsResponse> getSettings(@PathVariable Long userId) {
+  public ResponseEntity<SettingsResponse> getSettings(@PathVariable Integer userId) {
     return ResponseEntity.ok(userService.getSettings(userId));
   }
 
   @Operation(summary = "설정 수정")
   @PutMapping("/settings")
   public ResponseEntity<SettingsResponse> updateSettings(
-      @PathVariable Long userId, @RequestBody SettingsUpdateRequest request) {
+      @PathVariable Integer userId, @RequestBody SettingsUpdateRequest request) {
     return ResponseEntity.ok(userService.updateSettings(userId, request));
   }
 
@@ -41,14 +41,14 @@ public class UserController {
 
   @Operation(summary = "보호자 목록 조회")
   @GetMapping("/guardians")
-  public ResponseEntity<List<GuardianResponse>> getGuardians(@PathVariable Long userId) {
+  public ResponseEntity<List<GuardianResponse>> getGuardians(@PathVariable Integer userId) {
     return ResponseEntity.ok(userService.getGuardians(userId));
   }
 
   @Operation(summary = "보호자 추가")
   @PostMapping("/guardians")
   public ResponseEntity<GuardianResponse> createGuardian(
-      @PathVariable Long userId, @Valid @RequestBody GuardianRequest request) {
+      @PathVariable Integer userId, @Valid @RequestBody GuardianRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(userService.createGuardian(userId, request));
   }
@@ -56,8 +56,8 @@ public class UserController {
   @Operation(summary = "보호자 수정")
   @PutMapping("/guardians/{wardGuardianId}")
   public ResponseEntity<GuardianResponse> updateGuardian(
-      @PathVariable Long userId,
-      @PathVariable Long wardGuardianId,
+      @PathVariable Integer userId,
+      @PathVariable Integer wardGuardianId,
       @Valid @RequestBody GuardianRequest request) {
     return ResponseEntity.ok(userService.updateGuardian(userId, wardGuardianId, request));
   }
@@ -65,7 +65,7 @@ public class UserController {
   @Operation(summary = "보호자 삭제")
   @DeleteMapping("/guardians/{wardGuardianId}")
   public ResponseEntity<Void> deleteGuardian(
-      @PathVariable Long userId, @PathVariable Long wardGuardianId) {
+      @PathVariable Integer userId, @PathVariable Integer wardGuardianId) {
     userService.deleteGuardian(userId, wardGuardianId);
     return ResponseEntity.noContent().build();
   }

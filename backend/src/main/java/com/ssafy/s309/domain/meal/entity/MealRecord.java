@@ -24,13 +24,13 @@ public class MealRecord extends BaseEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Long id;
+  private Integer id;
 
   @Column(name = "user_id", nullable = false)
-  private Long userId;
+  private Integer userId;
 
   @Column(name = "food_id")
-  private Long foodId;
+  private Integer foodId;
 
   @Column(name = "image_origin_name", length = 255)
   private String imageOriginName;

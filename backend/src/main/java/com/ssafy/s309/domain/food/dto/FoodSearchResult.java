@@ -4,7 +4,7 @@ import com.ssafy.s309.domain.food.entity.Food;
 import java.math.BigDecimal;
 
 public record FoodSearchResult(
-    Long id,
+    Integer id,
     String name,
     BigDecimal kcal,
     BigDecimal carbsG,

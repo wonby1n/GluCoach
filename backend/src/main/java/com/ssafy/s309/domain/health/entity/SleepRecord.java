@@ -27,10 +27,10 @@ public class SleepRecord {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Long id;
+  private Integer id;
 
   @Column(name = "user_id", nullable = false)
-  private Long userId;
+  private Integer userId;
 
   @Column(name = "started_at", nullable = false)
   private LocalDateTime startedAt;

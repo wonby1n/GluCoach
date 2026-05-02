@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public record ExercisePin(
-    Long id,
+    Integer id,
     String exerciseType,
     BigDecimal calories,
     LocalDateTime startedAt,

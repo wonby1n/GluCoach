@@ -4,7 +4,7 @@ import com.ssafy.s309.domain.user.entity.DiabetesType;
 import com.ssafy.s309.domain.user.entity.User;
 
 public record SettingsResponse(
-    Long userId,
+    Integer userId,
     String name,
     Integer age,
     String gender,

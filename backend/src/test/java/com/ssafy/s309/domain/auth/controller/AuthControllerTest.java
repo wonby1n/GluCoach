@@ -43,7 +43,7 @@ class AuthControllerTest {
   @Autowired private ObjectMapper objectMapper;
   @MockitoBean private AuthService authService;
 
-  private static final Long USER_ID = 1L;
+  private static final Integer USER_ID = 1;
 
   private Authentication customAuth() {
     CustomUserPrincipal principal = new CustomUserPrincipal(USER_ID, "test@example.com");

@@ -8,5 +8,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface GlucoseRecordRepository extends JpaRepository<GlucoseRecord, Long> {
 
   List<GlucoseRecord> findByUserIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(
-      Long userId, LocalDateTime from, LocalDateTime to);
+      Integer userId, LocalDateTime from, LocalDateTime to);
 }

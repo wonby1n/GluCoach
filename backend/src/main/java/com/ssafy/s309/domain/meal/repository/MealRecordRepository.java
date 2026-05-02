@@ -5,8 +5,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface MealRecordRepository extends JpaRepository<MealRecord, Long> {
+public interface MealRecordRepository extends JpaRepository<MealRecord, Integer> {
 
   List<MealRecord> findByUserIdAndRecordedAtBetweenOrderByRecordedAtAsc(
-      Long userId, LocalDateTime from, LocalDateTime to);
+      Integer userId, LocalDateTime from, LocalDateTime to);
 }

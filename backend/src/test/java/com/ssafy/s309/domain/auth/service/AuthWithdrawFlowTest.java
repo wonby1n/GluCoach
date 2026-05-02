@@ -36,7 +36,7 @@ class AuthWithdrawFlowTest {
   @Mock private PasswordEncoder passwordEncoder;
   @InjectMocks private AuthService authService;
 
-  private static final Long USER_ID = 1L;
+  private static final Integer USER_ID = 1;
 
   private User user;
 
@@ -106,7 +106,7 @@ class AuthWithdrawFlowTest {
   @DisplayName("탈퇴 시 보호자 관계도 함께 제거")
   void 탈퇴시_보호자_관계_클리어() {
     User guardianUser = User.builder().email("guardian@glucofit.com").build();
-    ReflectionTestUtils.setField(guardianUser, "id", 2L);
+    ReflectionTestUtils.setField(guardianUser, "id", 2);
 
     WardGuardian wg =
         WardGuardian.builder().ward(user).guardian(guardianUser).relation("가족").priority(0).build();
@@ -137,7 +137,7 @@ class AuthWithdrawFlowTest {
         .willAnswer(
             inv -> {
               User saved = inv.getArgument(0);
-              ReflectionTestUtils.setField(saved, "id", 99L);
+              ReflectionTestUtils.setField(saved, "id", 99);
               return saved;
             });
     given(jwtProvider.generateAccessToken(any(), anyString())).willReturn("new-at");

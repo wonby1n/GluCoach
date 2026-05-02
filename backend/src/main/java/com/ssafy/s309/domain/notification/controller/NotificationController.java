@@ -22,7 +22,7 @@ public class NotificationController {
   @Operation(summary = "FCM 토큰 등록/갱신")
   @PutMapping
   public ResponseEntity<Void> saveToken(
-      @PathVariable Long userId, @Valid @RequestBody FcmTokenRequest request) {
+      @PathVariable Integer userId, @Valid @RequestBody FcmTokenRequest request) {
     userRepository
         .findById(userId)
         .ifPresent(

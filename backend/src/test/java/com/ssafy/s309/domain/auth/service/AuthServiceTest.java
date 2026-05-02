@@ -34,7 +34,7 @@ class AuthServiceTest {
   @Mock private PasswordEncoder passwordEncoder;
   @InjectMocks private AuthService authService;
 
-  private static final Long USER_ID = 1L;
+  private static final Integer USER_ID = 1;
   private User user;
 
   @BeforeEach

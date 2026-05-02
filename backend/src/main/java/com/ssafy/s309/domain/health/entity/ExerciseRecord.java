@@ -28,10 +28,10 @@ public class ExerciseRecord {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Long id;
+  private Integer id;
 
   @Column(name = "user_id", nullable = false)
-  private Long userId;
+  private Integer userId;
 
   @Column(name = "exercise_type", nullable = false, length = 20)
   private String exerciseType;

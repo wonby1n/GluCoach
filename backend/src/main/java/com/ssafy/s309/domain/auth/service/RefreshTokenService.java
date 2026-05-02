@@ -15,22 +15,22 @@ public class RefreshTokenService {
   private final StringRedisTemplate redisTemplate;
   private final JwtProperties jwtProperties;
 
-  public void save(Long userId, String refreshToken) {
+  public void save(Integer userId, String refreshToken) {
     String key = KEY_PREFIX + userId;
     redisTemplate
         .opsForValue()
         .set(key, refreshToken, jwtProperties.getRefreshExpirationMs(), TimeUnit.MILLISECONDS);
   }
 
-  public String find(Long userId) {
+  public String find(Integer userId) {
     return redisTemplate.opsForValue().get(KEY_PREFIX + userId);
   }
 
-  public void delete(Long userId) {
+  public void delete(Integer userId) {
     redisTemplate.delete(KEY_PREFIX + userId);
   }
 
-  public boolean matches(Long userId, String refreshToken) {
+  public boolean matches(Integer userId, String refreshToken) {
     String stored = find(userId);
     return refreshToken.equals(stored);
   }

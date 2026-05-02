@@ -27,7 +27,7 @@ public class TimelineService {
   private final SleepRecordRepository sleepRepo;
 
   @Transactional(readOnly = true)
-  public TimelineResponse getTimeline(Long userId, TimelineRange range) {
+  public TimelineResponse getTimeline(Integer userId, TimelineRange range) {
     LocalDateTime to = LocalDateTime.now();
     LocalDateTime from = range.computeFrom(to);
 
