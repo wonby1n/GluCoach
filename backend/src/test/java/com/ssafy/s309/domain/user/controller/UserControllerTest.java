@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -11,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.s309.config.SecurityConfig;
 import com.ssafy.s309.config.TestSecurityConfig;
+import com.ssafy.s309.domain.auth.principal.CustomUserPrincipal;
 import com.ssafy.s309.domain.user.dto.GuardianRequest;
 import com.ssafy.s309.domain.user.dto.GuardianResponse;
 import com.ssafy.s309.domain.user.dto.SettingsResponse;
@@ -26,9 +28,10 @@ import org.springframework.context.annotation.ComponentScan.Filter;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @WebMvcTest(
     controllers = UserController.class,
@@ -47,10 +50,14 @@ class UserControllerTest {
   private static final Integer USER_ID = 1;
   private static final Integer WG_ID = 10;
 
+  private final RequestPostProcessor authedUser =
+      authentication(
+          new UsernamePasswordAuthenticationToken(
+              new CustomUserPrincipal(USER_ID, "test@example.com"), null, List.of()));
+
   // ── Settings ──────────────────────────────────────────────
 
   @Test
-  @WithMockUser
   void 설정_조회_200_반환() throws Exception {
     SettingsResponse response =
         new SettingsResponse(
@@ -69,7 +76,7 @@ class UserControllerTest {
     given(userService.getSettings(USER_ID)).willReturn(response);
 
     mockMvc
-        .perform(get("/api/users/{userId}/settings", USER_ID))
+        .perform(get("/api/user/settings").with(authedUser))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.userId").value(USER_ID))
         .andExpect(jsonPath("$.targetLow").value(70.00))
@@ -77,7 +84,6 @@ class UserControllerTest {
   }
 
   @Test
-  @WithMockUser
   void 설정_수정_200_반환() throws Exception {
     SettingsUpdateRequest request =
         new SettingsUpdateRequest(
@@ -110,7 +116,8 @@ class UserControllerTest {
 
     mockMvc
         .perform(
-            put("/api/users/{userId}/settings", USER_ID)
+            put("/api/user/settings")
+                .with(authedUser)
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -120,20 +127,16 @@ class UserControllerTest {
   }
 
   @Test
-  @WithMockUser
   void 존재하지_않는_유저_설정_조회_400_반환() throws Exception {
     given(userService.getSettings(USER_ID))
         .willThrow(new IllegalArgumentException("존재하지 않는 유저입니다"));
 
-    mockMvc
-        .perform(get("/api/users/{userId}/settings", USER_ID))
-        .andExpect(status().isBadRequest());
+    mockMvc.perform(get("/api/user/settings").with(authedUser)).andExpect(status().isBadRequest());
   }
 
   // ── Guardian ──────────────────────────────────────────────
 
   @Test
-  @WithMockUser
   void 보호자_목록_조회_200_반환() throws Exception {
     List<GuardianResponse> list =
         List.of(
@@ -142,7 +145,7 @@ class UserControllerTest {
     given(userService.getGuardians(USER_ID)).willReturn(list);
 
     mockMvc
-        .perform(get("/api/users/{userId}/guardians", USER_ID))
+        .perform(get("/api/user/guardians").with(authedUser))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(2))
         .andExpect(jsonPath("$[0].guardianId").value(2))
@@ -150,7 +153,6 @@ class UserControllerTest {
   }
 
   @Test
-  @WithMockUser
   void 보호자_등록_201_반환() throws Exception {
     GuardianRequest request = new GuardianRequest(2, "부모");
     GuardianResponse response = new GuardianResponse(WG_ID, USER_ID, 2, "부모", (short) 0);
@@ -158,7 +160,8 @@ class UserControllerTest {
 
     mockMvc
         .perform(
-            post("/api/users/{userId}/guardians", USER_ID)
+            post("/api/user/guardians")
+                .with(authedUser)
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -168,13 +171,13 @@ class UserControllerTest {
   }
 
   @Test
-  @WithMockUser
   void 보호자_등록_guardianId_누락_400_반환() throws Exception {
     String body = "{\"relation\":\"부모\"}";
 
     mockMvc
         .perform(
-            post("/api/users/{userId}/guardians", USER_ID)
+            post("/api/user/guardians")
+                .with(authedUser)
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
@@ -182,7 +185,6 @@ class UserControllerTest {
   }
 
   @Test
-  @WithMockUser
   void 보호자_수정_200_반환() throws Exception {
     GuardianRequest request = new GuardianRequest(2, "가족");
     GuardianResponse response = new GuardianResponse(WG_ID, USER_ID, 2, "가족", (short) 0);
@@ -190,7 +192,8 @@ class UserControllerTest {
 
     mockMvc
         .perform(
-            put("/api/users/{userId}/guardians/{wardGuardianId}", USER_ID, WG_ID)
+            put("/api/user/guardians/{wardGuardianId}", WG_ID)
+                .with(authedUser)
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -199,16 +202,14 @@ class UserControllerTest {
   }
 
   @Test
-  @WithMockUser
   void 보호자_삭제_204_반환() throws Exception {
     mockMvc
         .perform(
-            delete("/api/users/{userId}/guardians/{wardGuardianId}", USER_ID, WG_ID).with(csrf()))
+            delete("/api/user/guardians/{wardGuardianId}", WG_ID).with(authedUser).with(csrf()))
         .andExpect(status().isNoContent());
   }
 
   @Test
-  @WithMockUser
   void 다른_유저의_보호자_삭제_400_반환() throws Exception {
     doThrow(new IllegalArgumentException("해당 유저의 보호자가 아닙니다"))
         .when(userService)
@@ -216,7 +217,7 @@ class UserControllerTest {
 
     mockMvc
         .perform(
-            delete("/api/users/{userId}/guardians/{wardGuardianId}", USER_ID, WG_ID).with(csrf()))
+            delete("/api/user/guardians/{wardGuardianId}", WG_ID).with(authedUser).with(csrf()))
         .andExpect(status().isBadRequest());
   }
 }
