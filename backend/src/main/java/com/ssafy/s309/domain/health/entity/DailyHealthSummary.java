@@ -43,12 +43,6 @@ public class DailyHealthSummary {
   @Column(name = "calories_burned", precision = 6, scale = 2)
   private BigDecimal caloriesBurned;
 
-  @Column(name = "sleep_start")
-  private LocalDateTime sleepStart;
-
-  @Column(name = "sleep_end")
-  private LocalDateTime sleepEnd;
-
   @Column(name = "sleep_minutes")
   private Integer sleepMinutes;
 
@@ -60,16 +54,9 @@ public class DailyHealthSummary {
   private LocalDateTime updatedAt;
 
   public void updateSummary(
-      Integer steps,
-      BigDecimal caloriesBurned,
-      LocalDateTime sleepStart,
-      LocalDateTime sleepEnd,
-      Integer sleepMinutes,
-      BigDecimal avgHeartRate) {
+      Integer steps, BigDecimal caloriesBurned, Integer sleepMinutes, BigDecimal avgHeartRate) {
     if (steps != null) this.steps = steps;
     if (caloriesBurned != null) this.caloriesBurned = caloriesBurned;
-    if (sleepStart != null) this.sleepStart = sleepStart;
-    if (sleepEnd != null) this.sleepEnd = sleepEnd;
     if (sleepMinutes != null) this.sleepMinutes = sleepMinutes;
     if (avgHeartRate != null) this.avgHeartRate = avgHeartRate;
   }

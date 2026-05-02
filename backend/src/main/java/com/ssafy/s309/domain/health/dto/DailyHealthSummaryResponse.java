@@ -9,8 +9,6 @@ public record DailyHealthSummaryResponse(
     LocalDate date,
     Integer steps,
     BigDecimal caloriesBurned,
-    LocalDateTime sleepStart,
-    LocalDateTime sleepEnd,
     Integer sleepMinutes,
     BigDecimal avgHeartRate,
     LocalDateTime updatedAt) {
@@ -20,8 +18,6 @@ public record DailyHealthSummaryResponse(
         e.getDate(),
         e.getSteps(),
         e.getCaloriesBurned(),
-        e.getSleepStart(),
-        e.getSleepEnd(),
         e.getSleepMinutes(),
         e.getAvgHeartRate(),
         e.getUpdatedAt());

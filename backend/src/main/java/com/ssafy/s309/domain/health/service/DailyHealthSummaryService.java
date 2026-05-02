@@ -23,12 +23,7 @@ public class DailyHealthSummaryService {
             .map(
                 existing -> {
                   existing.updateSummary(
-                      req.steps(),
-                      req.caloriesBurned(),
-                      req.sleepStart(),
-                      req.sleepEnd(),
-                      req.sleepMinutes(),
-                      req.avgHeartRate());
+                      req.steps(), req.caloriesBurned(), req.sleepMinutes(), req.avgHeartRate());
                   return existing;
                 })
             .orElseGet(
@@ -39,8 +34,6 @@ public class DailyHealthSummaryService {
                             .date(req.date())
                             .steps(req.steps())
                             .caloriesBurned(req.caloriesBurned())
-                            .sleepStart(req.sleepStart())
-                            .sleepEnd(req.sleepEnd())
                             .sleepMinutes(req.sleepMinutes())
                             .avgHeartRate(req.avgHeartRate())
                             .build()));
