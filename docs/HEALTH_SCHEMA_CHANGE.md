@@ -23,14 +23,14 @@ daily_health_summaries (
     user_id, date,
     steps,
     calories_burned,
-    sleep_start, sleep_end, sleep_minutes,
+    sleep_minutes,
     avg_heart_rate,
     updated_at
 )
 PRIMARY KEY (user_id, date)
 ```
 
-수면만 시작/종료 시각을 보존 — 추후 타임라인 핀에 활용.
+수면은 분 단위만 보관. 시작/종료 시각은 `getLastSleepDurationMinutes()`가 SDK 안에서 이미 분으로 변환하므로 프론트가 보낼 일이 없고, Agent도 분만 요구함. 향후 타임라인 핀이 시각을 요구하면 별도 마이그레이션으로 추가.
 
 ## 헬스 데이터 저장 흐름
 
@@ -40,7 +40,7 @@ PRIMARY KEY (user_id, date)
 삼성 헬스 SDK
   - getTodaySteps()
   - getTodayActiveCalories()
-  - getLastSleepDurationMinutes() / sleep.startTime, sleep.endTime
+  - getLastSleepDurationMinutes()
   - getLatestHeartRate()
     ↓
 POST /api/health/daily-summary  (오늘 날짜로 upsert)
@@ -65,7 +65,7 @@ daily_health_summaries
 
 ```
 POST /api/health/daily-summary
-  body: { date, steps, caloriesBurned, sleepStart, sleepEnd, sleepMinutes, avgHeartRate }
+  body: { date, steps, caloriesBurned, sleepMinutes, avgHeartRate }
   → upsert by (user_id, date)
 
 GET /api/health/daily-summary?from=YYYY-MM-DD&to=YYYY-MM-DD
