@@ -1,8 +1,6 @@
 package com.ssafy.s309.domain.timeline.service;
 
 import com.ssafy.s309.domain.cgm.repository.GlucoseRecordRepository;
-import com.ssafy.s309.domain.health.repository.ExerciseRecordRepository;
-import com.ssafy.s309.domain.health.repository.SleepRecordRepository;
 import com.ssafy.s309.domain.meal.repository.MealRecordRepository;
 import com.ssafy.s309.domain.timeline.dto.ExercisePin;
 import com.ssafy.s309.domain.timeline.dto.GlucosePoint;
@@ -23,8 +21,6 @@ public class TimelineService {
 
   private final GlucoseRecordRepository glucoseRepo;
   private final MealRecordRepository mealRepo;
-  private final ExerciseRecordRepository exerciseRepo;
-  private final SleepRecordRepository sleepRepo;
 
   @Transactional(readOnly = true)
   public TimelineResponse getTimeline(Integer userId, TimelineRange range) {
@@ -49,27 +45,10 @@ public class TimelineService {
                     .map(MealPin::from)
                     .toList());
 
-    CompletableFuture<List<ExercisePin>> exerciseFuture =
-        CompletableFuture.supplyAsync(
-            () ->
-                exerciseRepo.findOverlappingByUserId(userId, from, to).stream()
-                    .map(ExercisePin::from)
-                    .toList());
-
-    CompletableFuture<List<SleepPin>> sleepFuture =
-        CompletableFuture.supplyAsync(
-            () ->
-                sleepRepo.findOverlappingByUserId(userId, from, to).stream()
-                    .map(SleepPin::from)
-                    .toList());
+    List<ExercisePin> exercises = List.of();
+    List<SleepPin> sleeps = List.of();
 
     return new TimelineResponse(
-        range.token(),
-        from,
-        to,
-        glucoseFuture.join(),
-        mealFuture.join(),
-        exerciseFuture.join(),
-        sleepFuture.join());
+        range.token(), from, to, glucoseFuture.join(), mealFuture.join(), exercises, sleeps);
   }
 }
