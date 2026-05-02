@@ -110,7 +110,12 @@ class AuthWithdrawFlowTest {
     ReflectionTestUtils.setField(guardianUser, "id", 2);
 
     WardGuardian wg =
-        WardGuardian.builder().ward(user).guardian(guardianUser).relation("가족").priority(0).build();
+        WardGuardian.builder()
+            .ward(user)
+            .guardian(guardianUser)
+            .relation("가족")
+            .priority((short) 0)
+            .build();
     user.getWardGuardians().add(wg);
 
     given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));

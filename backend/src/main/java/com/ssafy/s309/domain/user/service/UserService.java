@@ -66,7 +66,7 @@ public class UserService {
             .ward(ward)
             .guardian(guardian)
             .relation(request.relation())
-            .priority(nextPriority)
+            .priority((short) nextPriority)
             .build();
     return GuardianResponse.from(wardGuardianRepository.save(wg));
   }

@@ -54,7 +54,7 @@ class UserServiceTest {
 
     assertThat(response.userId()).isEqualTo(USER_ID);
     assertThat(response.diabetesType()).isNull();
-    assertThat(response.weekStartDay()).isEqualTo(1);
+    assertThat(response.weekStartDay()).isEqualTo((short) 1);
   }
 
   @Test
@@ -64,7 +64,7 @@ class UserServiceTest {
     SettingsUpdateRequest request =
         new SettingsUpdateRequest(
             "홍길동",
-            30,
+            (short) 30,
             "male",
             "01012345678",
             new BigDecimal("170.0"),
@@ -73,7 +73,7 @@ class UserServiceTest {
             true,
             new BigDecimal("80.00"),
             new BigDecimal("160.00"),
-            1);
+            (short) 1);
 
     SettingsResponse response = userService.updateSettings(USER_ID, request);
 
@@ -94,7 +94,7 @@ class UserServiceTest {
     SettingsResponse response = userService.updateSettings(USER_ID, request);
 
     assertThat(response.height()).isEqualByComparingTo(new BigDecimal("175.0"));
-    assertThat(response.weekStartDay()).isEqualTo(1);
+    assertThat(response.weekStartDay()).isEqualTo((short) 1);
   }
 
   @Test
@@ -116,9 +116,9 @@ class UserServiceTest {
     ReflectionTestUtils.setField(g2, "id", 3);
 
     WardGuardian wg1 =
-        WardGuardian.builder().ward(ward).guardian(g1).relation("부모").priority(0).build();
+        WardGuardian.builder().ward(ward).guardian(g1).relation("부모").priority((short) 0).build();
     WardGuardian wg2 =
-        WardGuardian.builder().ward(ward).guardian(g2).relation("배우자").priority(1).build();
+        WardGuardian.builder().ward(ward).guardian(g2).relation("배우자").priority((short) 1).build();
     ReflectionTestUtils.setField(wg1, "id", 10);
     ReflectionTestUtils.setField(wg2, "id", 11);
 
@@ -129,9 +129,9 @@ class UserServiceTest {
     List<GuardianResponse> result = userService.getGuardians(USER_ID);
 
     assertThat(result).hasSize(2);
-    assertThat(result.get(0).priority()).isEqualTo(0);
+    assertThat(result.get(0).priority()).isEqualTo((short) 0);
     assertThat(result.get(0).relation()).isEqualTo("부모");
-    assertThat(result.get(1).priority()).isEqualTo(1);
+    assertThat(result.get(1).priority()).isEqualTo((short) 1);
   }
 
   @Test
@@ -140,7 +140,12 @@ class UserServiceTest {
     ReflectionTestUtils.setField(guardian, "id", 2);
 
     WardGuardian saved =
-        WardGuardian.builder().ward(ward).guardian(guardian).relation("부모").priority(2).build();
+        WardGuardian.builder()
+            .ward(ward)
+            .guardian(guardian)
+            .relation("부모")
+            .priority((short) 2)
+            .build();
     ReflectionTestUtils.setField(saved, "id", 10);
 
     given(userRepository.findById(USER_ID)).willReturn(Optional.of(ward));
@@ -151,7 +156,7 @@ class UserServiceTest {
     GuardianResponse response = userService.createGuardian(USER_ID, new GuardianRequest(2, "부모"));
 
     assertThat(response.guardianId()).isEqualTo(2);
-    assertThat(response.priority()).isEqualTo(2);
+    assertThat(response.priority()).isEqualTo((short) 2);
   }
 
   @Test
@@ -160,7 +165,12 @@ class UserServiceTest {
     ReflectionTestUtils.setField(guardian, "id", 2);
 
     WardGuardian wg =
-        WardGuardian.builder().ward(ward).guardian(guardian).relation("부모").priority(0).build();
+        WardGuardian.builder()
+            .ward(ward)
+            .guardian(guardian)
+            .relation("부모")
+            .priority((short) 0)
+            .build();
     ReflectionTestUtils.setField(wg, "id", 10);
 
     given(wardGuardianRepository.findById(10)).willReturn(Optional.of(wg));
@@ -179,7 +189,8 @@ class UserServiceTest {
     User guardian = User.builder().email("guardian@example.com").build();
     ReflectionTestUtils.setField(guardian, "id", 2);
 
-    WardGuardian wg = WardGuardian.builder().ward(otherWard).guardian(guardian).priority(0).build();
+    WardGuardian wg =
+        WardGuardian.builder().ward(otherWard).guardian(guardian).priority((short) 0).build();
     ReflectionTestUtils.setField(wg, "id", 10);
 
     given(wardGuardianRepository.findById(10)).willReturn(Optional.of(wg));
@@ -198,9 +209,9 @@ class UserServiceTest {
     ReflectionTestUtils.setField(g2, "id", 3);
     ReflectionTestUtils.setField(g3, "id", 4);
 
-    WardGuardian wg0 = WardGuardian.builder().ward(ward).guardian(g1).priority(0).build();
-    WardGuardian wg1 = WardGuardian.builder().ward(ward).guardian(g2).priority(1).build();
-    WardGuardian wg2 = WardGuardian.builder().ward(ward).guardian(g3).priority(2).build();
+    WardGuardian wg0 = WardGuardian.builder().ward(ward).guardian(g1).priority((short) 0).build();
+    WardGuardian wg1 = WardGuardian.builder().ward(ward).guardian(g2).priority((short) 1).build();
+    WardGuardian wg2 = WardGuardian.builder().ward(ward).guardian(g3).priority((short) 2).build();
     ReflectionTestUtils.setField(wg1, "id", 11);
 
     given(wardGuardianRepository.findById(11)).willReturn(Optional.of(wg1));
@@ -210,7 +221,7 @@ class UserServiceTest {
     userService.deleteGuardian(USER_ID, 11);
 
     verify(wardGuardianRepository).delete(wg1);
-    assertThat(wg2.getPriority()).isEqualTo(1);
-    assertThat(wg0.getPriority()).isEqualTo(0);
+    assertThat(wg2.getPriority()).isEqualTo((short) 1);
+    assertThat(wg0.getPriority()).isEqualTo((short) 0);
   }
 }

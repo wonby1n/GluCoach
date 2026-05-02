@@ -56,7 +56,7 @@ class UserControllerTest {
         new SettingsResponse(
             USER_ID,
             "홍길동",
-            30,
+            (short) 30,
             "male",
             "01012345678",
             new BigDecimal("170.0"),
@@ -65,7 +65,7 @@ class UserControllerTest {
             false,
             new BigDecimal("70.00"),
             new BigDecimal("140.00"),
-            1);
+            (short) 1);
     given(userService.getSettings(USER_ID)).willReturn(response);
 
     mockMvc
@@ -82,7 +82,7 @@ class UserControllerTest {
     SettingsUpdateRequest request =
         new SettingsUpdateRequest(
             "홍길동",
-            30,
+            (short) 30,
             "male",
             "01012345678",
             new BigDecimal("175.0"),
@@ -91,12 +91,12 @@ class UserControllerTest {
             true,
             new BigDecimal("80.00"),
             new BigDecimal("150.00"),
-            1);
+            (short) 1);
     SettingsResponse response =
         new SettingsResponse(
             USER_ID,
             "홍길동",
-            30,
+            (short) 30,
             "male",
             "01012345678",
             new BigDecimal("175.0"),
@@ -105,7 +105,7 @@ class UserControllerTest {
             true,
             new BigDecimal("80.00"),
             new BigDecimal("150.00"),
-            1);
+            (short) 1);
     given(userService.updateSettings(eq(USER_ID), any())).willReturn(response);
 
     mockMvc
@@ -137,8 +137,8 @@ class UserControllerTest {
   void 보호자_목록_조회_200_반환() throws Exception {
     List<GuardianResponse> list =
         List.of(
-            new GuardianResponse(WG_ID, USER_ID, 2, "부모", 0),
-            new GuardianResponse(11, USER_ID, 3, "배우자", 1));
+            new GuardianResponse(WG_ID, USER_ID, 2, "부모", (short) 0),
+            new GuardianResponse(11, USER_ID, 3, "배우자", (short) 1));
     given(userService.getGuardians(USER_ID)).willReturn(list);
 
     mockMvc
@@ -153,7 +153,7 @@ class UserControllerTest {
   @WithMockUser
   void 보호자_등록_201_반환() throws Exception {
     GuardianRequest request = new GuardianRequest(2, "부모");
-    GuardianResponse response = new GuardianResponse(WG_ID, USER_ID, 2, "부모", 0);
+    GuardianResponse response = new GuardianResponse(WG_ID, USER_ID, 2, "부모", (short) 0);
     given(userService.createGuardian(eq(USER_ID), any())).willReturn(response);
 
     mockMvc
@@ -185,7 +185,7 @@ class UserControllerTest {
   @WithMockUser
   void 보호자_수정_200_반환() throws Exception {
     GuardianRequest request = new GuardianRequest(2, "가족");
-    GuardianResponse response = new GuardianResponse(WG_ID, USER_ID, 2, "가족", 0);
+    GuardianResponse response = new GuardianResponse(WG_ID, USER_ID, 2, "가족", (short) 0);
     given(userService.updateGuardian(eq(USER_ID), eq(WG_ID), any())).willReturn(response);
 
     mockMvc

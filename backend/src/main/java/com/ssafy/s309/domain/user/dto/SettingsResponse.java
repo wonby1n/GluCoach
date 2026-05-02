@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 public record SettingsResponse(
     Integer userId,
     String name,
-    Integer age,
+    Short age,
     String gender,
     String phone,
     BigDecimal height,
@@ -16,7 +16,7 @@ public record SettingsResponse(
     Boolean isMedicated,
     BigDecimal targetLow,
     BigDecimal targetHigh,
-    Integer weekStartDay) {
+    Short weekStartDay) {
 
   public static SettingsResponse from(User user) {
     return new SettingsResponse(
