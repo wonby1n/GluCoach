@@ -18,6 +18,7 @@ import com.ssafy.s309.domain.prediction.client.dto.GlucosePredictResponse;
 import com.ssafy.s309.domain.prediction.client.dto.UserProfile;
 import com.ssafy.s309.domain.prediction.exception.AiServiceException;
 import com.ssafy.s309.domain.prediction.exception.AiServiceException.ErrorType;
+import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +39,16 @@ class GlucosePredictClientImplTest {
 
   @BeforeEach
   void setUp() {
-    FoodNutrition food = new FoodNutrition("1", "흰쌀밥", 56.0, 4.4, 0.5, 250.0, 0.3, 86);
+    FoodNutrition food =
+        new FoodNutrition(
+            "1",
+            "흰쌀밥",
+            new BigDecimal("56.00"),
+            new BigDecimal("4.40"),
+            new BigDecimal("0.50"),
+            new BigDecimal("250.00"),
+            new BigDecimal("0.30"),
+            86);
     UserProfile profile = new UserProfile("T2D", true, 175f, 70f, 105.0);
     request = new GlucosePredictRequest(food, profile, "generic");
     response = new GlucosePredictResponse(List.of(), 168.0, 45, 95, "generic", 0.82);
