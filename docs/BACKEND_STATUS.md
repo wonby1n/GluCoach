@@ -31,8 +31,8 @@
 | glucose_records | V1 | `GlucoseRecord` | ✅ (테이블·엔티티만) |
 | meal_records | V1 | `MealRecord` | ✅ (테이블·엔티티만) |
 | foods | V1 | `Food` | ✅ |
-| daily_health_summaries | **V2** | `DailyHealthSummary` | ✅ **(API 구현 완료, 다음 PR)** |
-| step_records | **V3** | `StepRecord` | ✅ **(POST batch + Agent 조회 구현, 본 PR)** |
+| daily_health_summaries | **V2** | `DailyHealthSummary` | ✅ **(API 구현 완료, 944 PR)** |
+| health_snapshots | **V3** | `HealthSnapshot` | ✅ **(wide-format 시계열, 948 PR — steps/calories/heart_rate)** |
 | **alerts** | ❌ | ❌ | **누락** |
 | **guardian_notifications** | ❌ | ❌ | **누락** |
 | **meal_glucose_responses** | ❌ | ❌ | **누락** (식후 추적의 핵심) |
@@ -46,7 +46,7 @@
 ```
 V1: init schema (인증 + 예측 + glucose/meal/foods 등 팀 공통 V1으로 통합 가정)
 V2: sleep_records, exercise_records DROP → daily_health_summaries 신설 (1분 폴링 upsert)
-V3: step_records 추가 (5분 batch append, Agent 시간윈도우 조회용)
+V3: health_snapshots 추가 (5분 batch append, 1분 polling 메트릭 4종 wide-format 시계열)
 ```
 
 > 알림·식후추적·성적표·주간보고서 도메인은 여전히 미착수.
@@ -74,7 +74,7 @@ V3: step_records 추가 (5분 batch append, Agent 시간윈도우 조회용)
 - `Auth /api/auth/withdraw` — 회원 탈퇴 (소프트 삭제 + 익명화)
 - `POST /api/health/daily-summary` (944 PR) — 일별 헬스 요약 upsert (대시보드 + Agent 일별 조회)
 - `GET /api/health/daily-summary?from=&to=` (944 PR) — 기간 조회
-- `POST /api/step-records` (948 PR) — 걸음수 시계열 batch INSERT (멱등, ON CONFLICT)
+- `POST /api/health/snapshots` (948 PR) — 1분 폴링 메트릭(steps/calories/HR) 5분 batch INSERT (멱등, ON CONFLICT)
 - `GET /api/agent/steps` (948 PR) — Agent 전용, MAX-MIN 윈도우 쿼리, X-Agent-Api-Key 인증
 
 ---
