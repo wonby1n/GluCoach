@@ -74,11 +74,11 @@ public class PredictionService {
         new FoodNutrition(
             request.foodId() != null ? String.valueOf(request.foodId()) : null,
             request.foodName(),
-            request.carbsG(),
-            request.proteinG(),
-            request.fatG(),
-            request.kcal(),
-            request.sugarG(),
+            request.carbsG() != null ? request.carbsG().doubleValue() : null,
+            request.proteinG() != null ? request.proteinG().doubleValue() : null,
+            request.fatG() != null ? request.fatG().doubleValue() : null,
+            request.kcal() != null ? request.kcal().doubleValue() : null,
+            request.sugarG() != null ? request.sugarG().doubleValue() : null,
             request.giScore());
 
     UserProfile profile =

@@ -1,6 +1,7 @@
 package com.ssafy.s309.domain.notification.controller;
 
 import com.ssafy.s309.domain.notification.dto.FcmTokenRequest;
+import com.ssafy.s309.domain.notification.entity.DeviceType;
 import com.ssafy.s309.domain.notification.service.NotificationTokenService;
 import com.ssafy.s309.domain.user.repository.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,7 +31,7 @@ public class NotificationController {
                 notificationTokenService.saveToken(
                     user,
                     request.token(),
-                    request.deviceType() != null ? request.deviceType() : "android"));
+                    request.deviceType() != null ? request.deviceType() : DeviceType.ANDROID));
     return ResponseEntity.ok().build();
   }
 }

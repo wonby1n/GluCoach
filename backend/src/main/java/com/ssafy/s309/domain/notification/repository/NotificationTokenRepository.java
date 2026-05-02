@@ -1,5 +1,6 @@
 package com.ssafy.s309.domain.notification.repository;
 
+import com.ssafy.s309.domain.notification.entity.DeviceType;
 import com.ssafy.s309.domain.notification.entity.NotificationToken;
 import com.ssafy.s309.domain.user.entity.User;
 import java.util.List;
@@ -10,5 +11,5 @@ public interface NotificationTokenRepository extends JpaRepository<NotificationT
 
   List<NotificationToken> findByUserAndIsActiveTrue(User user);
 
-  Optional<NotificationToken> findByUserAndDeviceType(User user, String deviceType);
+  Optional<NotificationToken> findByUserAndDeviceType(User user, DeviceType deviceType);
 }

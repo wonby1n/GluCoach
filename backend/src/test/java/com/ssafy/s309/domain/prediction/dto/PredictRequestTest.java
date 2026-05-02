@@ -48,13 +48,32 @@ class PredictRequestTest {
   }
 
   @Test
-  void 모든_영양소_null_허용() {
+  void sugarG_null_허용() {
     PredictRequest request =
-        new PredictRequest(null, "수동입력_음식", null, null, null, null, null, null);
+        new PredictRequest(
+            1,
+            "현미밥",
+            new BigDecimal("35.50"),
+            new BigDecimal("4.20"),
+            new BigDecimal("0.80"),
+            new BigDecimal("180.00"),
+            null,
+            65);
 
     Set<ConstraintViolation<PredictRequest>> violations = validator.validate(request);
 
     assertThat(violations).isEmpty();
+  }
+
+  @Test
+  void 필수_영양소_null_거부() {
+    PredictRequest request = new PredictRequest(null, "음식", null, null, null, null, null, null);
+
+    Set<ConstraintViolation<PredictRequest>> violations = validator.validate(request);
+
+    assertThat(violations)
+        .extracting(v -> v.getPropertyPath().toString())
+        .contains("carbsG", "proteinG", "fatG", "kcal");
   }
 
   @Test
@@ -84,7 +103,7 @@ class PredictRequestTest {
         new PredictRequest(
             1,
             "음식",
-            new BigDecimal("1000.00"),
+            new BigDecimal("1000.01"),
             new BigDecimal("10.00"),
             new BigDecimal("10.00"),
             new BigDecimal("100.00"),
@@ -105,31 +124,13 @@ class PredictRequestTest {
             new BigDecimal("10.00"),
             new BigDecimal("10.00"),
             new BigDecimal("10.00"),
-            new BigDecimal("10000.00"),
+            new BigDecimal("10000.01"),
             new BigDecimal("10.00"),
             50);
 
     Set<ConstraintViolation<PredictRequest>> violations = validator.validate(request);
 
     assertThat(violations).extracting(v -> v.getPropertyPath().toString()).contains("kcal");
-  }
-
-  @Test
-  void 소수점_셋째_자리_거부() {
-    PredictRequest request =
-        new PredictRequest(
-            1,
-            "음식",
-            new BigDecimal("35.555"),
-            new BigDecimal("10.00"),
-            new BigDecimal("10.00"),
-            new BigDecimal("100.00"),
-            new BigDecimal("10.00"),
-            50);
-
-    Set<ConstraintViolation<PredictRequest>> violations = validator.validate(request);
-
-    assertThat(violations).extracting(v -> v.getPropertyPath().toString()).contains("carbsG");
   }
 
   @Test
