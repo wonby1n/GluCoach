@@ -2,6 +2,7 @@ package com.ssafy.s309.domain.user.entity;
 
 import com.ssafy.s309.common.entity.BaseEntity;
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,9 +42,11 @@ public class User extends BaseEntity {
   @Column(length = 20)
   private String phone;
 
-  private Float height;
+  @Column(precision = 4, scale = 1)
+  private BigDecimal height;
 
-  private Float weight;
+  @Column(precision = 4, scale = 1)
+  private BigDecimal weight;
 
   @Enumerated(EnumType.STRING)
   @Column(length = 10)
@@ -51,9 +54,11 @@ public class User extends BaseEntity {
 
   private Boolean isMedicated;
 
-  private Integer targetLow;
+  @Column(precision = 5, scale = 2)
+  private BigDecimal targetLow;
 
-  private Integer targetHigh;
+  @Column(precision = 5, scale = 2)
+  private BigDecimal targetHigh;
 
   @Column(nullable = false, columnDefinition = "TINYINT DEFAULT 1")
   private Integer weekStartDay = 1;
@@ -70,8 +75,8 @@ public class User extends BaseEntity {
       String provider,
       String name,
       String phone,
-      Float height,
-      Float weight) {
+      BigDecimal height,
+      BigDecimal weight) {
     this.email = email;
     this.password = password;
     if (provider != null) this.provider = provider;
@@ -103,12 +108,12 @@ public class User extends BaseEntity {
       Integer age,
       String gender,
       String phone,
-      Float height,
-      Float weight,
+      BigDecimal height,
+      BigDecimal weight,
       DiabetesType diabetesType,
       Boolean isMedicated,
-      Integer targetLow,
-      Integer targetHigh,
+      BigDecimal targetLow,
+      BigDecimal targetHigh,
       Integer weekStartDay) {
     if (name != null) this.name = name;
     if (age != null) this.age = age;

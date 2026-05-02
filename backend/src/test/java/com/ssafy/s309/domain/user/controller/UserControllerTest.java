@@ -17,6 +17,7 @@ import com.ssafy.s309.domain.user.dto.SettingsResponse;
 import com.ssafy.s309.domain.user.dto.SettingsUpdateRequest;
 import com.ssafy.s309.domain.user.entity.DiabetesType;
 import com.ssafy.s309.domain.user.service.UserService;
+import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,12 +59,12 @@ class UserControllerTest {
             30,
             "male",
             "01012345678",
-            170f,
-            65f,
+            new BigDecimal("170.0"),
+            new BigDecimal("65.0"),
             DiabetesType.NORMAL,
             false,
-            70,
-            140,
+            new BigDecimal("70.00"),
+            new BigDecimal("140.00"),
             1);
     given(userService.getSettings(USER_ID)).willReturn(response);
 
@@ -71,7 +72,7 @@ class UserControllerTest {
         .perform(get("/api/users/{userId}/settings", USER_ID))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.userId").value(USER_ID))
-        .andExpect(jsonPath("$.targetLow").value(70))
+        .andExpect(jsonPath("$.targetLow").value(70.00))
         .andExpect(jsonPath("$.diabetesType").value("NORMAL"));
   }
 
@@ -80,7 +81,17 @@ class UserControllerTest {
   void 설정_수정_200_반환() throws Exception {
     SettingsUpdateRequest request =
         new SettingsUpdateRequest(
-            "홍길동", 30, "male", "01012345678", 175f, 70f, DiabetesType.T1D, true, 80, 150, 1);
+            "홍길동",
+            30,
+            "male",
+            "01012345678",
+            new BigDecimal("175.0"),
+            new BigDecimal("70.0"),
+            DiabetesType.T1D,
+            true,
+            new BigDecimal("80.00"),
+            new BigDecimal("150.00"),
+            1);
     SettingsResponse response =
         new SettingsResponse(
             USER_ID,
@@ -88,12 +99,12 @@ class UserControllerTest {
             30,
             "male",
             "01012345678",
-            175f,
-            70f,
+            new BigDecimal("175.0"),
+            new BigDecimal("70.0"),
             DiabetesType.T1D,
             true,
-            80,
-            150,
+            new BigDecimal("80.00"),
+            new BigDecimal("150.00"),
             1);
     given(userService.updateSettings(eq(USER_ID), any())).willReturn(response);
 
@@ -104,7 +115,7 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.height").value(175f))
+        .andExpect(jsonPath("$.height").value(175.0))
         .andExpect(jsonPath("$.isMedicated").value(true));
   }
 

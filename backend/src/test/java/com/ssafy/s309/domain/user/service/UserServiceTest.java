@@ -15,6 +15,7 @@ import com.ssafy.s309.domain.user.entity.User;
 import com.ssafy.s309.domain.user.entity.WardGuardian;
 import com.ssafy.s309.domain.user.repository.UserRepository;
 import com.ssafy.s309.domain.user.repository.WardGuardianRepository;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,11 +63,21 @@ class UserServiceTest {
 
     SettingsUpdateRequest request =
         new SettingsUpdateRequest(
-            "홍길동", 30, "male", "01012345678", 170f, 65f, DiabetesType.T2D, true, 80, 160, 1);
+            "홍길동",
+            30,
+            "male",
+            "01012345678",
+            new BigDecimal("170.0"),
+            new BigDecimal("65.0"),
+            DiabetesType.T2D,
+            true,
+            new BigDecimal("80.00"),
+            new BigDecimal("160.00"),
+            1);
 
     SettingsResponse response = userService.updateSettings(USER_ID, request);
 
-    assertThat(response.height()).isEqualTo(170f);
+    assertThat(response.height()).isEqualByComparingTo(new BigDecimal("170.0"));
     assertThat(response.diabetesType()).isEqualTo(DiabetesType.T2D);
     assertThat(response.isMedicated()).isTrue();
     assertThat(response.name()).isEqualTo("홍길동");
@@ -77,11 +88,12 @@ class UserServiceTest {
     given(userRepository.findById(USER_ID)).willReturn(Optional.of(ward));
 
     SettingsUpdateRequest request =
-        new SettingsUpdateRequest(null, null, null, null, 175f, null, null, null, null, null, null);
+        new SettingsUpdateRequest(
+            null, null, null, null, new BigDecimal("175.0"), null, null, null, null, null, null);
 
     SettingsResponse response = userService.updateSettings(USER_ID, request);
 
-    assertThat(response.height()).isEqualTo(175f);
+    assertThat(response.height()).isEqualByComparingTo(new BigDecimal("175.0"));
     assertThat(response.weekStartDay()).isEqualTo(1);
   }
 

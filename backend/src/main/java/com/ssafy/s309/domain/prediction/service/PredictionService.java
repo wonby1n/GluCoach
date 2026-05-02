@@ -85,8 +85,8 @@ public class PredictionService {
         new UserProfile(
             user.getDiabetesType() != null ? user.getDiabetesType().name() : null,
             user.getIsMedicated(),
-            user.getHeight(),
-            user.getWeight(),
+            user.getHeight() != null ? user.getHeight().floatValue() : null,
+            user.getWeight() != null ? user.getWeight().floatValue() : null,
             null); // currentGlucose: CGM 미구현
 
     return new GlucosePredictRequest(food, profile, "generic");

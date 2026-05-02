@@ -14,6 +14,7 @@ import com.ssafy.s309.domain.auth.jwt.JwtProvider;
 import com.ssafy.s309.domain.user.entity.User;
 import com.ssafy.s309.domain.user.entity.WardGuardian;
 import com.ssafy.s309.domain.user.repository.UserRepository;
+import java.math.BigDecimal;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -47,8 +48,8 @@ class AuthWithdrawFlowTest {
             .email("user@glucofit.com")
             .password("encodedPw")
             .provider("email")
-            .height(175f)
-            .weight(70f)
+            .height(new BigDecimal("175.0"))
+            .weight(new BigDecimal("70.0"))
             .build();
     ReflectionTestUtils.setField(user, "id", USER_ID);
   }
