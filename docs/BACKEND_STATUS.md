@@ -33,8 +33,8 @@
 | foods | V1 | `Food` | ✅ |
 | daily_health_summaries | **V2** | `DailyHealthSummary` | ✅ **(API 구현 완료, 944 PR)** |
 | health_snapshots | **V3** | `HealthSnapshot` | ✅ **(wide-format 시계열, 948 PR — steps/calories/heart_rate)** |
-| **alerts** | ❌ | ❌ | **누락** |
-| **guardian_notifications** | ❌ | ❌ | **누락** |
+| alerts | **V4** | `Alert` | ✅ **(948 PR — Agent #6/#7 입구 + dedup 공용 인프라)** |
+| **guardian_notifications** | ❌ | ❌ | **누락** (M2) |
 | **meal_glucose_responses** | ❌ | ❌ | **누락** (식후 추적의 핵심) |
 | **user_food_grades** | ❌ | ❌ | **누락** (성적표의 핵심) |
 | **weekly_reports** | ❌ | ❌ | **누락** |
@@ -47,9 +47,11 @@
 V1: init schema (인증 + 예측 + glucose/meal/foods 등 팀 공통 V1으로 통합 가정)
 V2: sleep_records, exercise_records DROP → daily_health_summaries 신설 (1분 폴링 upsert)
 V3: health_snapshots 추가 (5분 batch append, 1분 polling 메트릭 4종 wide-format 시계열)
+V4: alerts 추가 (Agent #6/#7 입구 + AlertCreationService 30분 dedup 공용 인프라)
+    — guardian_notifications/agent_pending_triggers/sleep_sessions/meal_glucose_responses 등은 M2
 ```
 
-> 알림·식후추적·성적표·주간보고서 도메인은 여전히 미착수.
+> 식후추적·성적표·주간보고서 도메인 + alerts 룰 트리거(HIGH/LOW)는 M2 이후.
 
 ---
 
@@ -61,7 +63,7 @@ V3: health_snapshots 추가 (5분 batch append, 1분 polling 메트릭 4종 wide
 | ② | **로그인** | email + 카카오 소셜 + refresh + logout | `/api/auth/login·/refresh·/logout·/withdraw` ✅, `/auth/social` ❌ | 🟡 **이메일만** — 카카오 소셜 미구현 |
 | ③ | **대시보드** | `GET /api/v1/dashboard` 통합(현재혈당+TIR+식사+알림+보고서) | `GET /api/timeline?range=1d/7d/30d` (혈당+식사/운동/수면 이벤트만) | 🟡 **변형 구현** — TIR·알림뱃지·grade·보고서 한줄 미포함 |
 | ④ | **혈당 수신** | `POST /api/v1/glucose-records` (5분 주기) + Spring Event + HIGH/LOW 트리거 | `GlucoseRecord` 엔티티+레포만, **컨트롤러 없음** | 🔴 **미구현** — CGM 데이터 인입 경로 자체가 없음 |
-| ⑤ | **알림** | alerts 테이블 + HIGH/LOW/SOS/WEEKLY_REPORT FCM + 에스컬레이션 + 목록/읽음 | `PUT /fcm-token` (토큰 등록뿐) | 🔴 **거의 미구현** — alerts 도메인 전체 부재 |
+| ⑤ | **알림** | alerts 테이블 + HIGH/LOW/SOS/WEEKLY_REPORT FCM + 에스컬레이션 + 목록/읽음 | `PUT /fcm-token` (토큰 등록) + alerts 테이블/엔티티 + AlertCreationService(30분 dedup) + Agent #6/#7 입구 + FcmService channel 분기 (948 PR) | 🟡 **부분 구현** — agent 발송 입구만 + 룰 HIGH/LOW/SOS/사용자 GET·PATCH/에스컬레이션은 M2 |
 | ⑥ | **식사 예측** | `/predictions/image`(이미지+AI인식+S3) + `/predictions/text` + Bergman 시뮬 | `POST /api/predict/glucose` (텍스트만) + `GlucosePredictClient`(AI 호출) | 🟡 **텍스트만** — 이미지·S3·AI 음식인식 부재 |
 | ⑦ | **음식 비교** | `POST /predictions/compare` + 병렬 AI | `POST /api/predict/glucose/compare` (CompletableFuture 병렬) | 🟢 **구현** |
 | ⑧ | **식사 기록** | `POST /meal-records` + S3 + 식후 2.5h 스케줄러 + slope 계산 | 엔티티+레포만, 컨트롤러/서비스/스케줄러 부재 | 🔴 **미구현** (테이블만) |
@@ -80,8 +82,10 @@ V3: health_snapshots 추가 (5분 batch append, 1분 polling 메트릭 4종 wide
 - `GET /api/agent/glucose` (948 PR, **#972/#978/#979/#980**) — Agent #2, 시계열 혈당 raw
 - `GET /api/agent/sleep` (948 PR, **#973/#981/#982/#983**) — Agent #3, 일별 sleep + 7일 평균
 - `GET /api/agent/meals` (948 PR, **#974/#984/#985/#986/#987**) — Agent #4, 일별 식사 + 영양 (theta join)
+- `GET /api/agent/notifications` (948 PR, **#997/#1001**) — Agent #6, 최근 N시간 알림 이력 (notification_history)
+- `POST /api/agent/notifications` (948 PR, **#997/#1000/#1001/#1002**) — Agent #7, 30분 dedup + FCM 발사 (channel D7 매핑)
 
-### Agent API 진행 상황 (총 8개 명세, 6개 구현 + 2개 보류)
+### Agent API 진행 상황 (총 8개 명세, 7개 구현 + 1개 보류)
 
 | # | 엔드포인트 | 상태 |
 |---|---|---|
@@ -90,8 +94,8 @@ V3: health_snapshots 추가 (5분 batch append, 1분 polling 메트릭 4종 wide
 | 3 | GET /api/agent/sleep | ✅ 948 |
 | 4 | GET /api/agent/meals | ✅ 948 |
 | 5 | GET /api/agent/steps | ✅ 948 |
-| 6 | GET /api/agent/notifications | 🔴 alerts 도메인 의존 (M2) |
-| 7 | POST /api/agent/notifications | 🔴 alerts 도메인 의존 (M2) |
+| 6 | GET /api/agent/notifications | ✅ 948 (alerts 인프라 minimum) |
+| 7 | POST /api/agent/notifications | ✅ 948 (30분 dedup + AGENT_ prefix 검증) |
 | 8 | schedule_followup | ⏸ 메커니즘 별도 설계 (`agent_pending_triggers` 큐, M2) |
 
 ---
