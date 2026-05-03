@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,6 +41,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -71,27 +73,49 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.ssafy.s309.R
+import com.ssafy.s309.data.model.FoodSearchItem
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
+import com.ssafy.s309.ui.viewmodel.FoodSearchViewModel
 import kotlinx.coroutines.delay
 
 // ── 데이터 ──────────────────────────────────────────────
 
 internal data class FoodItem(
+    val id: Long = 0,
     val name: String,
-    @DrawableRes val imageResId: Int,
-    val isStable: Boolean,
-    val maxGlucose: Int,
-    val recoveryTimeText: String,
-    val calories: Int,
-    val gi: Int,
-    val carbs: Int,
-    val protein: Int,
-    val fat: Int,
-    val glucoseCurve: List<Float>,
+    val category: String = "",
+    @DrawableRes val imageResId: Int = R.drawable.kiki_main,
+    val isStable: Boolean = true,
+    val maxGlucose: Int = 0,
+    val recoveryTimeText: String = "",
+    val calories: Int = 0,
+    val gi: Int = 0,
+    val carbs: Int = 0,
+    val sugar: Int = 0,
+    val protein: Int = 0,
+    val fat: Int = 0,
+    val fiber: Int = 0,
+    val servingSize: Int = 0,
+    val glucoseCurve: List<Float> = emptyList(),
 )
+
+private fun FoodSearchItem.toFoodItem() =
+    FoodItem(
+        id = id,
+        name = name,
+        category = category,
+        calories = kcal,
+        carbs = carbsG,
+        sugar = sugarG,
+        protein = proteinG,
+        fat = fatG,
+        fiber = fiberG,
+        servingSize = servingSize,
+    )
 
 private val allFoods =
     listOf(
@@ -205,6 +229,7 @@ private val allFoods =
 
 @Composable
 fun FoodComparisonContent(modifier: Modifier = Modifier) {
+    val foodSearchViewModel: FoodSearchViewModel = hiltViewModel()
     var foodA by remember { mutableStateOf<FoodItem?>(null) }
     var foodB by remember { mutableStateOf<FoodItem?>(null) }
 
@@ -229,6 +254,7 @@ fun FoodComparisonContent(modifier: Modifier = Modifier) {
             },
             onFoodARemoved = { foodA = null },
             onFoodBRemoved = { foodB = null },
+            foodSearchViewModel = foodSearchViewModel,
             modifier = modifier,
         )
     }
@@ -243,6 +269,7 @@ private fun FoodSelectionContent(
     onFoodSelected: (FoodItem) -> Unit,
     onFoodARemoved: () -> Unit,
     onFoodBRemoved: () -> Unit,
+    foodSearchViewModel: FoodSearchViewModel,
     modifier: Modifier = Modifier,
 ) {
     var showSearchDialog by remember { mutableStateOf(false) }
@@ -353,12 +380,16 @@ private fun FoodSelectionContent(
 
         if (showSearchDialog) {
             FoodSearchDialog(
+                foodSearchViewModel = foodSearchViewModel,
                 recentKeywords = recentKeywords,
                 onFoodSelected = { food ->
                     onFoodSelected(food)
                     showSearchDialog = false
                 },
-                onDismiss = { showSearchDialog = false },
+                onDismiss = {
+                    foodSearchViewModel.clearSearch()
+                    showSearchDialog = false
+                },
             )
         }
 
@@ -610,6 +641,7 @@ private fun EmptyChartPlaceholder() {
 
 @Composable
 private fun FoodSearchDialog(
+    foodSearchViewModel: FoodSearchViewModel,
     recentKeywords: MutableList<String>,
     onFoodSelected: (FoodItem) -> Unit,
     onDismiss: () -> Unit,
@@ -619,14 +651,9 @@ private fun FoodSearchDialog(
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    val filteredFoods =
-        if (searchQuery.text.isBlank()) {
-            emptyList()
-        } else {
-            allFoods.filter {
-                it.name.contains(searchQuery.text, ignoreCase = true)
-            }
-        }
+    val searchResults by foodSearchViewModel.results.collectAsState()
+    val isSearchLoading by foodSearchViewModel.isLoading.collectAsState()
+    val searchError by foodSearchViewModel.error.collectAsState()
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -676,7 +703,10 @@ private fun FoodSearchDialog(
                 0 -> {
                     OutlinedTextField(
                         value = searchQuery,
-                        onValueChange = { searchQuery = it },
+                        onValueChange = {
+                            searchQuery = it
+                            foodSearchViewModel.onQueryChanged(it.text)
+                        },
                         singleLine = true,
                         keyboardOptions =
                             KeyboardOptions(
@@ -707,7 +737,10 @@ private fun FoodSearchDialog(
                             if (searchQuery.text.isNotEmpty()) {
                                 {
                                     IconButton(
-                                        onClick = { searchQuery = TextFieldValue("") },
+                                        onClick = {
+                                            searchQuery = TextFieldValue("")
+                                            foodSearchViewModel.clearSearch()
+                                        },
                                     ) {
                                         Icon(
                                             imageVector = Icons.Outlined.Clear,
@@ -755,7 +788,34 @@ private fun FoodSearchDialog(
                                 fontSize = 14.sp,
                             )
                         }
-                    } else if (filteredFoods.isEmpty()) {
+                    } else if (isSearchLoading) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(
+                                color = GlucoachColors.Primary,
+                                modifier = Modifier.size(32.dp),
+                            )
+                        }
+                    } else if (searchError != null) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = searchError ?: "검색 실패",
+                                color = GlucoachColors.TextSecondary,
+                                fontSize = 14.sp,
+                            )
+                        }
+                    } else if (searchResults.isEmpty()) {
                         Box(
                             modifier =
                                 Modifier
@@ -771,22 +831,41 @@ private fun FoodSearchDialog(
                         }
                     } else {
                         Column {
-                            filteredFoods.forEach { food ->
-                                Text(
-                                    text = food.name,
-                                    color = GlucoachColors.TextPrimary,
-                                    fontSize = 15.sp,
+                            searchResults.forEach { item ->
+                                Row(
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
                                             .padding(vertical = GlucoachSpacing.md)
                                             .clickable {
-                                                if (!recentKeywords.contains(food.name)) {
-                                                    recentKeywords.add(0, food.name)
+                                                if (!recentKeywords.contains(item.name)) {
+                                                    recentKeywords.add(0, item.name)
                                                 }
-                                                onFoodSelected(food)
+                                                onFoodSelected(item.toFoodItem())
                                             },
-                                )
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = item.name,
+                                            color = GlucoachColors.TextPrimary,
+                                            fontSize = 15.sp,
+                                        )
+                                        if (item.category.isNotBlank()) {
+                                            Text(
+                                                text = item.category,
+                                                color = GlucoachColors.TextSecondary,
+                                                fontSize = 12.sp,
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = "${item.kcal}kcal",
+                                        color = GlucoachColors.TextSecondary,
+                                        fontSize = 13.sp,
+                                    )
+                                }
                                 HorizontalDivider(color = GlucoachColors.Border.copy(alpha = 0.5f))
                             }
                         }
@@ -817,16 +896,9 @@ private fun FoodSearchDialog(
                                             .fillMaxWidth()
                                             .padding(vertical = GlucoachSpacing.md)
                                             .clickable {
-                                                val food =
-                                                    allFoods.find {
-                                                        it.name == keyword
-                                                    }
-                                                if (food != null) {
-                                                    onFoodSelected(food)
-                                                } else {
-                                                    selectedTab = 0
-                                                    searchQuery = TextFieldValue(keyword)
-                                                }
+                                                selectedTab = 0
+                                                searchQuery = TextFieldValue(keyword)
+                                                foodSearchViewModel.onQueryChanged(keyword)
                                             },
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween,
