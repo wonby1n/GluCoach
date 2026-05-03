@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface AlertRepository extends JpaRepository<Alert, Long> {
+public interface AlertRepository extends JpaRepository<Alert, Integer> {
 
   /** 30분 dedup 윈도우 검사: 같은 user/alert_type, 미해결, 최근 30분 내 alert이 있는지. */
   boolean existsByUserIdAndAlertTypeAndResolvedAtIsNullAndCreatedAtAfter(

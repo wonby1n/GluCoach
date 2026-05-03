@@ -7,6 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -27,7 +28,7 @@ public class Alert {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Long id;
+  private Integer id;
 
   @Column(name = "user_id", nullable = false)
   private Integer userId;
@@ -39,7 +40,7 @@ public class Alert {
   private Long glucoseRecordId;
 
   @Column(name = "weekly_report_id")
-  private Long weeklyReportId;
+  private Integer weeklyReportId;
 
   @Column(name = "message", length = 500)
   private String message;
@@ -47,11 +48,11 @@ public class Alert {
   @Column(name = "source", nullable = false, length = 20)
   private String source;
 
-  @Column(name = "latitude")
-  private Double latitude;
+  @Column(name = "latitude", precision = 9, scale = 6)
+  private BigDecimal latitude;
 
-  @Column(name = "longitude")
-  private Double longitude;
+  @Column(name = "longitude", precision = 9, scale = 6)
+  private BigDecimal longitude;
 
   @Column(name = "is_read", nullable = false)
   private Boolean isRead;

@@ -4,7 +4,7 @@ import com.ssafy.s309.domain.alert.entity.Alert;
 import java.time.LocalDateTime;
 
 public record AgentNotificationItem(
-    Long alertId,
+    Integer alertId,
     String alertType,
     String message,
     String source,

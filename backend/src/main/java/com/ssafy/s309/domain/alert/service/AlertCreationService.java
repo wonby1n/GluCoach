@@ -76,8 +76,8 @@ public class AlertCreationService {
     fcmService.sendToTokens(tokens, title, message, channelId);
   }
 
-  public record CreationResult(boolean created, Long alertId) {
-    public static CreationResult created(Long id) {
+  public record CreationResult(boolean created, Integer alertId) {
+    public static CreationResult created(Integer id) {
       return new CreationResult(true, id);
     }
 
@@ -85,7 +85,7 @@ public class AlertCreationService {
       return new CreationResult(false, null);
     }
 
-    public Optional<Long> alertIdOptional() {
+    public Optional<Integer> alertIdOptional() {
       return Optional.ofNullable(alertId);
     }
   }
