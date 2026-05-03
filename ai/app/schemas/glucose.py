@@ -1,9 +1,9 @@
 """혈당 예측 API 요청/응답 스키마.
 
 엔드포인트:
-- POST /api/predict/glucose/meal  (Model 1)
-- POST /api/predict/glucose/now   (Model 2)
-- GET  /api/predict/glucose/health
+- POST /inference/glucose/meal  (Model 1)
+- POST /inference/glucose/now   (Model 2)
+- GET  /inference/glucose/health
 """
 
 from __future__ import annotations

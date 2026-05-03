@@ -168,10 +168,10 @@ def health_check() -> HealthResponse:
 
     if meal_loaded and now_loaded and scaler_loaded:
         status = "UP"
-    elif scaler_loaded and (meal_loaded or now_loaded):
+    elif meal_loaded or now_loaded or scaler_loaded:
         status = "DEGRADED"
     else:
-        status = "DEGRADED"
+        status = "DOWN"
 
     return HealthResponse(
         status=status,
@@ -180,5 +180,3 @@ def health_check() -> HealthResponse:
         scaler_loaded=scaler_loaded,
         cuda_available=torch.cuda.is_available(),
     )
-
-
