@@ -29,7 +29,7 @@ build/
 *.egg-info/
 
 # ============================================
-# 음식 분류 모델 
+# 음식 분류 모델
 # ============================================
 outputs/
 *.pt
@@ -47,8 +47,11 @@ data/processed/
 data/glucose_sample_data.csv
 data/demo/*.json
 
-# 모델 가중치 + scaler + split 메타
-models/
+# 모델 가중치: 실험용/개인화 파일은 제외, 운영 3종만 추적
+models/*
+!models/scaler.pkl
+!models/lstm_meal.pt
+!models/lstm_now.pt
 
 # 평가 결과 (발표 자료라 시연 후 별도 관리)
 reports/

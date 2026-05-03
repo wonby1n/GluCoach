@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 COPY --from=builder /install /usr/local
 COPY app app
+COPY models models
 
 EXPOSE 8000
 
