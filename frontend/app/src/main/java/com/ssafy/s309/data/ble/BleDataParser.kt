@@ -34,7 +34,7 @@ class BleDataParser
 
         /** 이동평균과 차이가 이 값 이상이면 노이즈로 간주해 버린다. */
         @Volatile
-        var spikeThreshold: Int = DEFAULT_SPIKE_THRESHOLD
+        var spikeThreshold: Int = BleConfig.Processing.DEFAULT_SPIKE_THRESHOLD_RAW
 
         /** raw / mg-dL 출력 모드. */
         @Volatile
@@ -44,7 +44,7 @@ class BleDataParser
         // 이동평균 상태 (연결 단위)
         // ────────────────────────────────────────
 
-        private val recentRawValues = ArrayDeque<Int>(MAX_HISTORY)
+        private val recentRawValues = ArrayDeque<Int>(BleConfig.Processing.MOVING_AVERAGE_WINDOW)
 
         @Volatile
         private var movingAverage: Int = 0
@@ -66,19 +66,24 @@ class BleDataParser
          * 길이가 [PACKET_SIZE] 가 아니거나 헤더(`0x2F 0xFF`)가 다르면 null.
          */
         fun extractRaw(bytes: ByteArray): Int? {
-            if (bytes.size != PACKET_SIZE) return null
-            if (bytes[0] != HEADER_BYTE_0 || bytes[1] != HEADER_BYTE_1) return null
+            if (bytes.size != BleConfig.Protocol.PACKET_SIZE) return null
+            if (bytes[0] != BleConfig.Protocol.HEADER_BYTE_0 ||
+                bytes[1] != BleConfig.Protocol.HEADER_BYTE_1
+            ) {
+                return null
+            }
             return ((bytes[2].toInt() and BYTE_MASK) shl Byte.SIZE_BITS) or
                 (bytes[3].toInt() and BYTE_MASK)
         }
 
         /**
          * raw 값을 이동평균에 반영한다.
-         * 첫 [MAX_HISTORY] 개 샘플은 산술 평균, 그 이후는 (새 값 + 직전 평균) / 2 로 갱신.
+         * 첫 [BleConfig.Processing.MOVING_AVERAGE_WINDOW] 개 샘플은 산술 평균,
+         * 그 이후는 (새 값 + 직전 평균) / 2 로 갱신.
          */
         @Synchronized
         fun trackMovingAverage(raw: Int) {
-            if (recentRawValues.size < MAX_HISTORY) {
+            if (recentRawValues.size < BleConfig.Processing.MOVING_AVERAGE_WINDOW) {
                 recentRawValues.addFirst(raw)
                 movingAverage = recentRawValues.average().toInt()
             } else {
@@ -110,7 +115,10 @@ class BleDataParser
                 when (outputType) {
                     GlucoseOutputType.RAW -> raw
                     GlucoseOutputType.MG_DL ->
-                        ((RAW_TO_MGDL_SLOPE * raw) - RAW_TO_MGDL_OFFSET).toInt() + correctVal
+                        (
+                            (BleConfig.Protocol.RAW_TO_MGDL_SLOPE * raw) -
+                                BleConfig.Protocol.RAW_TO_MGDL_OFFSET
+                        ).toInt() + correctVal
                 }
 
             return GlucoseReading(
@@ -145,13 +153,7 @@ class BleDataParser
         }
 
         private companion object {
-            private const val PACKET_SIZE = 4
-            private const val HEADER_BYTE_0: Byte = 0x2F
-            private const val HEADER_BYTE_1: Byte = -1 // 0xFF (signed byte)
+            /** 비트 마스크 (signed byte → unsigned int 변환용). 파서 내부 전용 상수. */
             private const val BYTE_MASK = 0xFF
-            private const val MAX_HISTORY = 3
-            private const val DEFAULT_SPIKE_THRESHOLD = 300
-            private const val RAW_TO_MGDL_SLOPE = 0.048f
-            private const val RAW_TO_MGDL_OFFSET = 37.93f
         }
     }
