@@ -74,7 +74,6 @@ class PredictResponse(BaseModel):
 
     - curve: 5~120분 24개 시점 예측 BG 곡선
     - peak_mgdl / peak_minute: 예측 곡선 내 피크값 및 발생 시점
-    - return_minute: 피크 상승분의 80% 이상 복귀되는 첫 시점
     - model_type: "base" | "personalized" — Model 2 는 항상 "base"
     - confidence: 임시 0.85 고정 (추후 model uncertainty 로 대체)
 
@@ -85,7 +84,6 @@ class PredictResponse(BaseModel):
     curve: list[GlucosePoint] = Field(description="예측 BG 곡선, 24개 시점")
     peak_mgdl: float = Field(description="예측 피크 BG mg/dL")
     peak_minute: int = Field(description="피크 발생 시점 (분)")
-    return_minute: int = Field(description="피크 상승분의 80% 복귀 시점 (분)")
     model_type: str = Field(description="base | personalized")
     confidence: float = Field(ge=0, le=1)
 

@@ -72,19 +72,10 @@ def _build_predict_response(
     peak_idx = predicted.index(peak_mgdl) if predicted else 0
     peak_minute = horizons[peak_idx] if predicted else horizons[-1]
 
-    rise = peak_mgdl - baseline
-    return_threshold = baseline + rise * 0.2  # 80% 복귀 = 상승분의 20%만 남은 시점
-    return_minute = horizons[-1]
-    for i in range(peak_idx, len(predicted)):
-        if predicted[i] <= return_threshold:
-            return_minute = horizons[i]
-            break
-
     return PredictResponse(
         curve=curve,
         peak_mgdl=round(peak_mgdl, 2),
         peak_minute=peak_minute,
-        return_minute=return_minute,
         model_type=model_type,
         confidence=confidence,
     )
