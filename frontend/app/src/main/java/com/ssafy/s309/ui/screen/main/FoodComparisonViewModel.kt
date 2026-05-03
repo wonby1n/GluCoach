@@ -64,7 +64,7 @@ class FoodComparisonViewModel
 
         private fun FoodItem.toCompareItem() =
             FoodCompareItem(
-                foodId = 0L,
+                foodId = id,
                 foodName = name,
                 carbsG = carbs,
                 proteinG = protein,
