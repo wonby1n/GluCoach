@@ -13,9 +13,9 @@ package com.ssafy.s309.data.ble
  */
 data class BleProcessingSettings(
     val correctVal: Int = 0,
-    val spikeThreshold: Int = 300,
+    val spikeThreshold: Int = BleConfig.Processing.DEFAULT_SPIKE_THRESHOLD_RAW,
     val outputType: GlucoseOutputType = GlucoseOutputType.MG_DL,
-    val gatherIntervalSeconds: Int = 0,
+    val gatherIntervalSeconds: Int = BleConfig.Processing.DEFAULT_DISPLAY_GATHER_SECONDS,
 )
 
 /**
