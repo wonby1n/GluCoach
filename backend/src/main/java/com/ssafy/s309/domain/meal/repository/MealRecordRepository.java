@@ -14,17 +14,16 @@ public interface MealRecordRepository extends JpaRepository<MealRecord, Integer>
       Integer userId, LocalDateTime from, LocalDateTime to);
 
   /**
-   * Agent #4 meals: meal_records ⨝ foods (theta join, foodId 매개) constructor projection으로 단건당 7필드만
-   * 한 쿼리로 매핑. food_id가 null/매칭 안 되는 meal은 자동 제외 (theta join 특성).
+   * Agent #4 meals: MealRecord.food (@ManyToOne readonly) 관계로 정통 JPQL. ERD(real_end(MVP).sql) 기준
+   * food_id NOT NULL이라 inner join 안전. constructor projection으로 단건당 7필드 한 쿼리로 매핑.
    */
   @Query(
       """
       SELECT new com.ssafy.s309.domain.agent.dto.AgentMealItem(
-        m.id, m.recordedAt, f.name, f.carbsG, f.proteinG, f.fatG, f.kcal
+        m.id, m.recordedAt, m.food.name, m.food.carbsG, m.food.proteinG, m.food.fatG, m.food.kcal
       )
-      FROM MealRecord m, com.ssafy.s309.domain.food.entity.Food f
-      WHERE m.foodId = f.id
-        AND m.userId = :userId
+      FROM MealRecord m
+      WHERE m.userId = :userId
         AND m.recordedAt BETWEEN :from AND :to
       ORDER BY m.recordedAt ASC
       """)
