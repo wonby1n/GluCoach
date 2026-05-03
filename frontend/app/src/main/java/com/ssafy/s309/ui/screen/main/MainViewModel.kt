@@ -3,7 +3,9 @@ package com.ssafy.s309.ui.screen.main
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ssafy.s309.data.ble.BleConnectionState
+import com.ssafy.s309.data.local.TokenManager
 import com.ssafy.s309.data.repository.HealthRepository
+import com.ssafy.s309.data.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +19,8 @@ class MainViewModel
     @Inject
     constructor(
         private val healthRepository: HealthRepository,
+        private val userRepository: UserRepository,
+        private val tokenManager: TokenManager,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(MainUiState())
         val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
@@ -25,6 +29,8 @@ class MainViewModel
             loadDashboard()
             observeBleConnection()
             observeGlucoseStream()
+            observeGlucoseAlerts()
+            registerPendingFcmToken()
         }
 
         fun loadDashboard() {
@@ -41,6 +47,29 @@ class MainViewModel
                         notifications = notifications,
                     )
                 }
+
+                // 사용자 알림 임계값(alertLow/alertHigh)으로 갱신
+                userRepository.getSettings()
+                    .onSuccess { settings ->
+                        healthRepository.updateAlertThresholds(settings.alertLow, settings.alertHigh)
+                    }
+            }
+        }
+
+        private fun observeGlucoseAlerts() {
+            viewModelScope.launch {
+                healthRepository.glucoseAlertStream.collect { alert ->
+                    _uiState.update { state ->
+                        state.copy(notifications = listOf(alert) + state.notifications)
+                    }
+                }
+            }
+        }
+
+        private fun registerPendingFcmToken() {
+            val token = tokenManager.getFcmToken() ?: return
+            viewModelScope.launch {
+                userRepository.registerFcmToken(token)
             }
         }
 

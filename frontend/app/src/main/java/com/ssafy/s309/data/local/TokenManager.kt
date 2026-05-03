@@ -52,6 +52,12 @@ class TokenManager
                 null
             }
 
+        fun saveFcmToken(token: String) {
+            prefs.edit().putString(KEY_FCM_TOKEN, token).apply()
+        }
+
+        fun getFcmToken(): String? = prefs.getString(KEY_FCM_TOKEN, null)
+
         fun clearTokens() {
             prefs.edit().clear().apply()
         }
@@ -61,5 +67,6 @@ class TokenManager
             const val KEY_REFRESH = "refresh_token"
             const val KEY_EMAIL = "user_email"
             const val KEY_USER_ID = "user_id"
+            const val KEY_FCM_TOKEN = "fcm_token"
         }
     }
