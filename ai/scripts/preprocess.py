@@ -1,14 +1,16 @@
 """
-혈당 예측 모델 학습용 전처리 스크립트
+혈당 예측 모델 학습용 전처리 스크립트 (Model 1)
 
-입력:  simuldate_params/simulate/ 폴더의 세 CSV
+입력:  sim_v3 구조 — data_dir 아래 카테고리별 서브폴더
+       또는 구버전 단일 폴더 (users.csv / meal_events.csv / glucose_readings.csv 직접 보유)
 출력:  ai/data/processed/{train,val,test}.csv   ← Model 1용 (33컬럼)
        ai/models/scaler.pkl                      ← dict 형태
        ai/models/user_split.json                 ← 환자 분할 메타
 
 사용법 (ai/ 폴더 기준):
     python scripts/preprocess.py
-    python scripts/preprocess.py --data-dir <경로>
+    python scripts/preprocess.py --data-dir data/glucose_data/sim_data/sim_v3
+    python scripts/preprocess.py --max-categories 10   # 빠른 테스트용
 """
 
 import argparse
@@ -44,61 +46,79 @@ MEAL_PATTERN_MAP = {
 LABEL_STEPS = list(range(5, 125, 5))               # [5, 10, ..., 120]
 LABEL_COLS = [f"BG_{t}min" for t in LABEL_STEPS]   # 24개
 
-# meal_time은 sin/cos 두 컬럼으로 대체 (정규화 불필요)
 FEATURE_COLS = [
     "carbs", "meal_time_sin", "meal_time_cos", "current_glucose",
     "fasting_bg", "weight_kg", "activity", "diabetes_type", "meal_pattern",
 ]
-
-# z-score 정규화 대상 (meal_time_sin/cos, 정수 인코딩 컬럼 제외)
 MODEL1_FEATURE_SCALE_COLS = ["carbs", "current_glucose", "fasting_bg", "weight_kg"]
 
 
 # ── 1. 데이터 로드 ────────────────────────────────────────────────────────────
 
-def load_data(data_dir: Path):
-    users = pd.read_csv(data_dir / "users.csv")
-    meals = pd.read_csv(data_dir / "meal_events.csv")
-    glucose = pd.read_csv(data_dir / "glucose_readings.csv")
+def load_data(data_dir: Path, max_categories: Optional[int] = None):
+    """
+    sim_v3 구조(서브폴더 108개) 또는 단일 폴더 모두 지원.
+    max_categories: 테스트용 — 처음 N개 카테고리만 로드.
+    """
+    subdirs = sorted([d for d in data_dir.iterdir() if d.is_dir()])
+
+    if subdirs and (subdirs[0] / "users.csv").exists():
+        # sim_v3 구조: 카테고리별 서브폴더
+        if max_categories:
+            subdirs = subdirs[:max_categories]
+        print(f"   멀티 디렉토리 모드: {len(subdirs)}개 카테고리 로드 중...")
+        users_list, meals_list, glucose_list = [], [], []
+        for subdir in subdirs:
+            users_list.append(pd.read_csv(subdir / "users.csv"))
+            meals_list.append(pd.read_csv(subdir / "meal_events.csv"))
+            glucose_list.append(pd.read_csv(subdir / "glucose_readings.csv"))
+        users = pd.concat(users_list, ignore_index=True)
+        meals = pd.concat(meals_list, ignore_index=True)
+        glucose = pd.concat(glucose_list, ignore_index=True)
+    else:
+        # 단일 폴더 구조 (구버전 호환)
+        print("   단일 디렉토리 모드")
+        users = pd.read_csv(data_dir / "users.csv")
+        meals = pd.read_csv(data_dir / "meal_events.csv")
+        glucose = pd.read_csv(data_dir / "glucose_readings.csv")
 
     meals["time"] = pd.to_datetime(meals["time"])
     glucose["time"] = pd.to_datetime(glucose["time"])
-
     return users, meals, glucose
 
 
-# ── 2. glucose forward fill ───────────────────────────────────────────────────
+# ── 2. glucose forward fill + 인덱스 변환 ─────────────────────────────────────
 
-def apply_forward_fill(glucose: pd.DataFrame) -> pd.DataFrame:
-    """유저별 5분 간격 glucose 시계열에서 빠진 값을 앞의 값으로 채움"""
-    filled = []
+def build_glucose_index(glucose: pd.DataFrame) -> dict[str, pd.Series]:
+    """
+    유저별 5분 grid ffill 후 시간 인덱스 Series dict 반환.
+    조회 속도: O(log n) — 선형 탐색 대비 ~100배 빠름.
+    """
+    result = {}
     for user_id, grp in glucose.groupby("user_id"):
-        grp = grp.sort_values("time").set_index("time")
+        grp = grp.sort_values("time").set_index("time")["glucose"]
         full_index = pd.date_range(grp.index.min(), grp.index.max(), freq="5min")
         grp = grp.reindex(full_index).ffill()
-        grp.index.name = "time"
-        grp["user_id"] = user_id
-        grp = grp.reset_index()[["user_id", "time", "glucose"]]
-        filled.append(grp)
-    return pd.concat(filled, ignore_index=True)
+        result[user_id] = grp
+    return result
 
-
-# ── 3. snapshot 추출 헬퍼 ──────────────────────────────────────────────────────
 
 def get_glucose_at(
-    user_glucose: pd.DataFrame,
+    user_series: pd.Series,
     target_time,
     tolerance_sec: int = 150,
 ) -> Optional[float]:
-    """target_time 기준 tolerance 내 가장 가까운 glucose 반환. 없으면 None"""
-    diff = (user_glucose["time"] - target_time).abs()
-    min_diff = diff.min()
-    if min_diff.total_seconds() > tolerance_sec:
+    """시간 인덱스 Series에서 target_time ±tolerance_sec 이내 가장 가까운 값 반환."""
+    idx = user_series.index.get_indexer([target_time], method="nearest")[0]
+    if idx < 0:
         return None
-    return float(user_glucose.loc[diff.idxmin(), "glucose"])
+    nearest_time = user_series.index[idx]
+    if abs((nearest_time - target_time).total_seconds()) > tolerance_sec:
+        return None
+    return float(user_series.iloc[idx])
 
 
-# ── 4. 레코드 생성 (세 파일 병합 + snapshot) ───────────────────────────────────
+# ── 3. 레코드 생성 ─────────────────────────────────────────────────────────────
 
 def build_records(users: pd.DataFrame, meals: pd.DataFrame, glucose: pd.DataFrame) -> pd.DataFrame:
     """
@@ -112,8 +132,8 @@ def build_records(users: pd.DataFrame, meals: pd.DataFrame, glucose: pd.DataFram
         .set_index("user_id")
     )
 
-    glucose = apply_forward_fill(glucose)
-    glucose_by_user = {uid: grp.reset_index(drop=True) for uid, grp in glucose.groupby("user_id")}
+    print("   glucose 인덱스 구축 중...")
+    glucose_by_user = build_glucose_index(glucose)
 
     records = []
     skipped = 0
@@ -129,13 +149,11 @@ def build_records(users: pd.DataFrame, meals: pd.DataFrame, glucose: pd.DataFram
 
         ug = glucose_by_user[user_id]
 
-        # 식사 시점 혈당
         current_glucose = get_glucose_at(ug, meal_time)
         if current_glucose is None:
             skipped += 1
             continue
 
-        # 식사 후 5분 ~ 120분 혈당 (120분치 없으면 제외)
         labels = {}
         valid = True
         for t in LABEL_STEPS:
@@ -149,7 +167,6 @@ def build_records(users: pd.DataFrame, meals: pd.DataFrame, glucose: pd.DataFram
             skipped += 1
             continue
 
-        # meal_time → sin/cos (circular encoding)
         hour_float = meal_time.hour + meal_time.minute / 60.0
         meal_time_sin = np.sin(2 * np.pi * hour_float / 24)
         meal_time_cos = np.cos(2 * np.pi * hour_float / 24)
@@ -174,7 +191,7 @@ def build_records(users: pd.DataFrame, meals: pd.DataFrame, glucose: pd.DataFram
     return pd.DataFrame(records)
 
 
-# ── 5. 인코딩 ─────────────────────────────────────────────────────────────────
+# ── 4. 인코딩 ─────────────────────────────────────────────────────────────────
 
 def encode(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
@@ -184,7 +201,7 @@ def encode(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ── 6. 환자 단위 분할 ─────────────────────────────────────────────────────────
+# ── 5. 환자 단위 분할 ─────────────────────────────────────────────────────────
 
 def split_by_patient(df: pd.DataFrame, train_ratio=0.7, val_ratio=0.15, seed=42):
     user_ids = np.array(df["user_id"].unique())
@@ -206,39 +223,34 @@ def split_by_patient(df: pd.DataFrame, train_ratio=0.7, val_ratio=0.15, seed=42)
     return train, val, test, {"train": train_users, "val": val_users, "test": test_users}
 
 
-# ── 7. 정규화 + scaler 저장 ───────────────────────────────────────────────────
+# ── 6. 정규화 + scaler 저장 ───────────────────────────────────────────────────
 
 def normalize(train, val, test, models_dir: Path):
-    # Model 1 feature scaler (carbs, current_glucose, fasting_bg, weight_kg)
     scaler_features = StandardScaler()
-    # BG 라벨 scaler (BG_5min ~ BG_120min 24개 통합)
     scaler_bg = StandardScaler()
-    # Model 2 profile scaler (weight_kg, fasting_bg)
     scaler_profile = StandardScaler()
-    scaler_profile.fit(train[["weight_kg", "fasting_bg"]].values)
 
     train = train.copy()
     val = val.copy()
     test = test.copy()
 
-    # feature 정규화
     train[MODEL1_FEATURE_SCALE_COLS] = scaler_features.fit_transform(train[MODEL1_FEATURE_SCALE_COLS])
     val[MODEL1_FEATURE_SCALE_COLS] = scaler_features.transform(val[MODEL1_FEATURE_SCALE_COLS])
     test[MODEL1_FEATURE_SCALE_COLS] = scaler_features.transform(test[MODEL1_FEATURE_SCALE_COLS])
 
-    # BG 라벨 정규화 (24개 flatten 통합 fit)
+    scaler_profile.fit(train[["weight_kg", "fasting_bg"]].values)
+
+    # BG 라벨 24개 flatten 통합 fit
     train_bg_flat = train[LABEL_COLS].values.reshape(-1, 1)
     scaler_bg.fit(train_bg_flat)
-
     train[LABEL_COLS] = scaler_bg.transform(train[LABEL_COLS].values.reshape(-1, 1)).reshape(-1, len(LABEL_COLS))
     val[LABEL_COLS] = scaler_bg.transform(val[LABEL_COLS].values.reshape(-1, 1)).reshape(-1, len(LABEL_COLS))
     test[LABEL_COLS] = scaler_bg.transform(test[LABEL_COLS].values.reshape(-1, 1)).reshape(-1, len(LABEL_COLS))
 
-    # scaler dict 저장
     scaler_dict = {
-        "model1_features": scaler_features,  # carbs, current_glucose, fasting_bg, weight_kg
-        "bg_target": scaler_bg,              # BG 24개 통합
-        "profile": scaler_profile,           # weight_kg, fasting_bg (Model 2용)
+        "model1_features": scaler_features,
+        "bg_target": scaler_bg,
+        "profile": scaler_profile,
     }
     models_dir.mkdir(parents=True, exist_ok=True)
     with open(models_dir / "scaler.pkl", "wb") as f:
@@ -256,7 +268,7 @@ def main(args):
     models_dir = Path(args.models_dir)
 
     print("Step 1. 데이터 로드")
-    users, meals, glucose = load_data(data_dir)
+    users, meals, glucose = load_data(data_dir, max_categories=args.max_categories)
     print(f"   users={len(users)}명  meals={len(meals)}건  glucose={len(glucose)}건")
 
     print("Step 2. 레코드 생성 (forward fill + snapshot 추출)")
@@ -273,7 +285,6 @@ def main(args):
     train, val, test, user_split = split_by_patient(df)
     print(f"   train={len(train)}건  val={len(val)}건  test={len(test)}건")
 
-    # user_split.json 저장
     models_dir.mkdir(parents=True, exist_ok=True)
     with open(models_dir / "user_split.json", "w") as f:
         json.dump(user_split, f, indent=2)
@@ -283,22 +294,25 @@ def main(args):
     train, val, test = normalize(train, val, test, models_dir)
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    train.to_csv(output_dir / "train.csv", index=False)
-    val.to_csv(output_dir / "val.csv", index=False)
-    test.to_csv(output_dir / "test.csv", index=False)
+    train.drop(columns=["user_id"]).to_csv(output_dir / "train.csv", index=False)
+    val.drop(columns=["user_id"]).to_csv(output_dir / "val.csv", index=False)
+    test.drop(columns=["user_id"]).to_csv(output_dir / "test.csv", index=False)
+
+    # user_id별 split 정보 포함 버전도 별도 저장 (평가/개인화용)
+    train.to_csv(output_dir / "train_with_uid.csv", index=False)
+    val.to_csv(output_dir / "val_with_uid.csv", index=False)
+    test.to_csv(output_dir / "test_with_uid.csv", index=False)
 
     print(f"Step 6. 저장 완료: {output_dir}")
-    print(f"   feature 컬럼 (9개): {FEATURE_COLS}")
-    print(f"   label  컬럼 (24개): BG_5min ~ BG_120min  ← z-score 정규화 적용")
-    print(f"   총 컬럼: {len(FEATURE_COLS) + len(LABEL_COLS)}개")
+    print(f"   총 컬럼: {len(FEATURE_COLS) + len(LABEL_COLS)}개  (feature 9 + label 24)")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="혈당 예측 모델 전처리")
+    parser = argparse.ArgumentParser(description="혈당 예측 모델 전처리 (sim_v3)")
     parser.add_argument(
         "--data-dir",
-        default="../../simuldate_params/simulate",
-        help="시뮬레이터 데이터 폴더 경로",
+        default="data/glucose_data/sim_data/sim_v3",
+        help="시뮬레이터 데이터 폴더 (서브폴더 구조 또는 단일 폴더)",
     )
     parser.add_argument(
         "--output-dir",
@@ -309,5 +323,11 @@ if __name__ == "__main__":
         "--models-dir",
         default="models",
         help="scaler, user_split 저장 경로",
+    )
+    parser.add_argument(
+        "--max-categories",
+        type=int,
+        default=None,
+        help="테스트용: 처음 N개 카테고리만 처리",
     )
     main(parser.parse_args())

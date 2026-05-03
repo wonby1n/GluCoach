@@ -19,7 +19,7 @@ public class WardGuardian {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Long id;
+  private Integer id;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "ward_id", nullable = false)
@@ -32,11 +32,11 @@ public class WardGuardian {
   @Column(length = 10)
   private String relation;
 
-  @Column(nullable = false, columnDefinition = "TINYINT")
-  private Integer priority = 0;
+  @Column(nullable = false)
+  private Short priority = (short) 0;
 
   @Builder
-  private WardGuardian(User ward, User guardian, String relation, Integer priority) {
+  private WardGuardian(User ward, User guardian, String relation, Short priority) {
     this.ward = ward;
     this.guardian = guardian;
     this.relation = relation;
@@ -48,6 +48,6 @@ public class WardGuardian {
   }
 
   public void updatePriority(int priority) {
-    this.priority = priority;
+    this.priority = (short) priority;
   }
 }

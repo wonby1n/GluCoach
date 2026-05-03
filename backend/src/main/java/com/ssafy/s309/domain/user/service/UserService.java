@@ -24,13 +24,13 @@ public class UserService {
 
   // ── Settings ──────────────────────────────────────────────
 
-  public SettingsResponse getSettings(Long userId) {
+  public SettingsResponse getSettings(Integer userId) {
     User user = findUserById(userId);
     return SettingsResponse.from(user);
   }
 
   @Transactional
-  public SettingsResponse updateSettings(Long userId, SettingsUpdateRequest request) {
+  public SettingsResponse updateSettings(Integer userId, SettingsUpdateRequest request) {
     User user = findUserById(userId);
     user.updateSettings(
         request.name(),
@@ -49,7 +49,7 @@ public class UserService {
 
   // ── Guardian ──────────────────────────────────────────────
 
-  public List<GuardianResponse> getGuardians(Long wardId) {
+  public List<GuardianResponse> getGuardians(Integer wardId) {
     findUserById(wardId);
     return wardGuardianRepository.findAllByWard_IdOrderByPriorityAsc(wardId).stream()
         .map(GuardianResponse::from)
@@ -57,7 +57,7 @@ public class UserService {
   }
 
   @Transactional
-  public GuardianResponse createGuardian(Long wardId, GuardianRequest request) {
+  public GuardianResponse createGuardian(Integer wardId, GuardianRequest request) {
     User ward = findUserById(wardId);
     User guardian = findUserById(request.guardianId());
     int nextPriority = wardGuardianRepository.countByWard_Id(wardId);
@@ -66,21 +66,21 @@ public class UserService {
             .ward(ward)
             .guardian(guardian)
             .relation(request.relation())
-            .priority(nextPriority)
+            .priority((short) nextPriority)
             .build();
     return GuardianResponse.from(wardGuardianRepository.save(wg));
   }
 
   @Transactional
   public GuardianResponse updateGuardian(
-      Long wardId, Long wardGuardianId, GuardianRequest request) {
+      Integer wardId, Integer wardGuardianId, GuardianRequest request) {
     WardGuardian wg = findWardGuardianByIdAndWardId(wardGuardianId, wardId);
     wg.updateRelation(request.relation());
     return GuardianResponse.from(wg);
   }
 
   @Transactional
-  public void deleteGuardian(Long wardId, Long wardGuardianId) {
+  public void deleteGuardian(Integer wardId, Integer wardGuardianId) {
     WardGuardian wg = findWardGuardianByIdAndWardId(wardGuardianId, wardId);
     int deletedPriority = wg.getPriority();
     wardGuardianRepository.delete(wg);
@@ -95,13 +95,13 @@ public class UserService {
 
   // ── 내부 헬퍼 ─────────────────────────────────────────────
 
-  private User findUserById(Long userId) {
+  private User findUserById(Integer userId) {
     return userRepository
         .findById(userId)
         .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다: " + userId));
   }
 
-  private WardGuardian findWardGuardianByIdAndWardId(Long wardGuardianId, Long wardId) {
+  private WardGuardian findWardGuardianByIdAndWardId(Integer wardGuardianId, Integer wardId) {
     WardGuardian wg =
         wardGuardianRepository
             .findById(wardGuardianId)

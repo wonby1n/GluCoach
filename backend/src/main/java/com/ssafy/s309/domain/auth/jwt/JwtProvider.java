@@ -34,11 +34,11 @@ public class JwtProvider {
     this.secretKey = Keys.hmacShaKeyFor(keyBytes);
   }
 
-  public String generateAccessToken(Long userId, String email) {
+  public String generateAccessToken(Integer userId, String email) {
     return buildToken(userId, email, TOKEN_TYPE_ACCESS, properties.getAccessExpirationMs());
   }
 
-  public String generateRefreshToken(Long userId) {
+  public String generateRefreshToken(Integer userId) {
     return buildToken(userId, null, TOKEN_TYPE_REFRESH, properties.getRefreshExpirationMs());
   }
 
@@ -58,7 +58,7 @@ public class JwtProvider {
 
   public CustomUserPrincipal toPrincipal(String token) {
     Claims claims = parseClaims(token);
-    Long userId = Long.parseLong(claims.getSubject());
+    Integer userId = Integer.parseInt(claims.getSubject());
     String email = claims.get(CLAIM_EMAIL, String.class);
     return new CustomUserPrincipal(userId, email);
   }
@@ -67,13 +67,13 @@ public class JwtProvider {
     return TOKEN_TYPE_ACCESS.equals(parseClaims(token).get(CLAIM_TOKEN_TYPE, String.class));
   }
 
-  public Long getUserId(String token) {
-    return Long.parseLong(parseClaims(token).getSubject());
+  public Integer getUserId(String token) {
+    return Integer.parseInt(parseClaims(token).getSubject());
   }
 
   // ── 내부 헬퍼 ─────────────────────────────────────────────
 
-  private String buildToken(Long userId, String email, String tokenType, long expirationMs) {
+  private String buildToken(Integer userId, String email, String tokenType, long expirationMs) {
     Date now = new Date();
     Date expiry = new Date(now.getTime() + expirationMs);
 

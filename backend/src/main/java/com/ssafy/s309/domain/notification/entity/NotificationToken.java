@@ -18,7 +18,7 @@ public class NotificationToken extends BaseEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Long id;
+  private Integer id;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "user_id", nullable = false)
@@ -27,14 +27,15 @@ public class NotificationToken extends BaseEntity {
   @Column(nullable = false, length = 200)
   private String token;
 
+  @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 10)
-  private String deviceType = "android";
+  private DeviceType deviceType = DeviceType.ANDROID;
 
   @Column(nullable = false)
   private Boolean isActive = true;
 
   @Builder
-  public NotificationToken(User user, String token, String deviceType) {
+  public NotificationToken(User user, String token, DeviceType deviceType) {
     this.user = user;
     this.token = token;
     if (deviceType != null) this.deviceType = deviceType;

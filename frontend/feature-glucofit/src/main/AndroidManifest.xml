@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- 모듈은 minSdk 24지만 Health Connect/Samsung Health 라이브러리는 26+/29+ 요구.
+         앱 minSdk를 올리지 않고 라이브러리 충돌만 무시하도록 명시. 호출부에서 SDK_INT로 가드. -->
+    <uses-sdk tools:overrideLibrary="
+        androidx.health.connect.client,
+        androidx.health.platform.client,
+        com.samsung.android.sdk.healthdata.privileged,
+        com.samsung.android.sdk.health.data" />
+
+    <!-- 오버레이 배너 (다른 앱 위에 표시) -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!-- Health Connect 권한 -->
+    <uses-permission android:name="android.permission.health.READ_BLOOD_GLUCOSE" />
+    <uses-permission android:name="android.permission.health.WRITE_BLOOD_GLUCOSE" />
+    <uses-permission android:name="android.permission.health.READ_NUTRITION" />
+
+    <!-- Health Connect / Samsung Health 패키지 쿼리 -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+        <package android:name="com.sec.android.app.shealth" />
+    </queries>
+
+    <application>
+
+        <!-- 디버그용 Health 트리거 Activity (런처에 노출 안됨, adb로 실행) -->
+        <activity
+            android:name=".HealthDebugActivity"
+            android:exported="true"
+            android:label="GlucoFit Health Debug"
+            android:theme="@android:style/Theme.Material.Light" />
+
+        <!-- Health Connect 권한 사유 화면 (Health Connect 앱 목록에 표시되려면 필수) -->
+        <activity-alias
+            android:name=".PermissionRationaleActivity"
+            android:exported="true"
+            android:targetActivity=".HealthDebugActivity">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- 커스텀 IME -->
+        <service
+            android:name=".keyboard.GlucoseKeyboard"
+            android:label="GlucoFit 키보드"
+            android:permission="android.permission.BIND_INPUT_METHOD"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/method" />
+        </service>
+
+    </application>
+</manifest>
