@@ -549,7 +549,7 @@ CREATE TABLE alerts (
   glucose_record_id BIGINT REFERENCES glucose_records(id),
   weekly_report_id BIGINT,                      -- V7에서 FK 추가
   message VARCHAR(500),
-  source VARCHAR(20) NOT NULL DEFAULT 'rule',   -- 'rule' | 'agent'
+  source VARCHAR(20) NOT NULL DEFAULT 'be',     -- 'be' | 'agent' (be=BE INSERT, agent=Agent 호출)
   latitude DOUBLE PRECISION,
   longitude DOUBLE PRECISION,
   is_read BOOLEAN NOT NULL DEFAULT FALSE,

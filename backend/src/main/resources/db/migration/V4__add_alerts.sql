@@ -16,12 +16,16 @@
 -- │   예: "기상 후 30분이에요. 어제 수면이 6시간 30분으로 짧았는데, 오늘은 점심 후 가벼운 산책으로 혈당 안정 도와봐요."
 -- │       (78자 — 한국어는 1자=3바이트라 VARCHAR 길이 여유 필요)
 -- │
--- ├─[3] source VARCHAR(20) NOT NULL DEFAULT 'rule' 컬럼 신설 + CHECK(rule|agent)
--- │   왜: 같은 alerts 테이블에 BE 룰 트리거와 agent send_notification 둘 다 INSERT.
--- │       어느 쪽이 만든 알림인지 구분하면 통계/디버깅/추후 다른 정책 분기에 유용
--- │   예: SELECT alert_type, source, COUNT(*) FROM alerts GROUP BY ... 로 출처별 통계
--- │       SELECT * FROM alerts WHERE source='agent' AND created_at > NOW()-INTERVAL '1 day'
--- │   기존 row는 모두 룰이라 DEFAULT 'rule'로 자연스럽게 채워짐 (ALTER 안전)
+-- ├─[3] source VARCHAR(20) NOT NULL DEFAULT 'be' 컬럼 신설 + CHECK(be|agent)
+-- │   왜: 같은 alerts 테이블에 BE가 만든 알림(룰 트리거 + SOS + WEEKLY_REPORT 스케줄러 등)과
+-- │       AI Agent가 send_notification으로 만든 알림이 섞임. 출처 구분이 필요
+-- │       (룰만이 아니라 SOS/스케줄러도 BE가 INSERT하므로 'rule'보다 'be'가 정확)
+-- │   값:
+-- │     'be'    — Spring BE가 INSERT (룰 트리거 / SOS / WEEKLY_REPORT 스케줄러 등 모두 포함)
+-- │     'agent' — 외부 Agent가 POST /api/agent/notifications 호출로 INSERT
+-- │   예: SELECT alert_type, source, COUNT(*) FROM alerts GROUP BY 1, 2;  -- 출처별 통계
+-- │       SELECT * FROM alerts WHERE source='agent' AND created_at > NOW()-INTERVAL '1 day';
+-- │   기존 row는 모두 BE 룰 발송이라 DEFAULT 'be'로 자연스럽게 채워짐 (ALTER 안전)
 -- │
 -- ├─[4] 기존 ck_alerts_type (CHECK alert_type IN ('HIGH','LOW','SOS','WEEKLY_REPORT')) 제거
 -- │   왜: AGENT_* 무한 종류(AGENT_GLUCOSE_HIGH, AGENT_MEAL_FOLLOWUP, AGENT_WAKE_UP, AGENT_SLEEP_INSIGHT,
@@ -52,12 +56,12 @@ ALTER TABLE alerts
 ALTER TABLE alerts
   DROP CONSTRAINT IF EXISTS ck_alerts_type;
 
--- 3. source 컬럼 추가 (default 'rule', NOT NULL, rule|agent CHECK)
+-- 3. source 컬럼 추가 (default 'be', NOT NULL, be|agent CHECK)
 ALTER TABLE alerts
-  ADD COLUMN source VARCHAR(20) NOT NULL DEFAULT 'rule';
+  ADD COLUMN source VARCHAR(20) NOT NULL DEFAULT 'be';
 
 ALTER TABLE alerts
-  ADD CONSTRAINT chk_alerts_source CHECK (source IN ('rule', 'agent'));
+  ADD CONSTRAINT chk_alerts_source CHECK (source IN ('be', 'agent'));
 
 -- 4. 인덱스 신설 — 대시보드 unread + 30분 dedup 윈도우
 CREATE INDEX IF NOT EXISTS idx_alerts_user_unread
@@ -66,4 +70,4 @@ CREATE INDEX IF NOT EXISTS idx_alerts_user_unread
 CREATE INDEX IF NOT EXISTS idx_alerts_dedup_window
   ON alerts (user_id, alert_type, resolved_at, created_at);
 
-COMMENT ON COLUMN alerts.source IS 'rule=BE 룰 트리거, agent=Agent send_notification 호출';
+COMMENT ON COLUMN alerts.source IS 'be=Spring BE INSERT(룰/SOS/스케줄러), agent=Agent send_notification 호출';
