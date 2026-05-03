@@ -76,6 +76,23 @@ V3: health_snapshots 추가 (5분 batch append, 1분 polling 메트릭 4종 wide
 - `GET /api/health/daily-summary?from=&to=` (944 PR) — 기간 조회
 - `POST /api/health/snapshots` (948 PR) — 1분 폴링 메트릭(steps/calories/HR) 5분 batch INSERT (멱등, ON CONFLICT)
 - `GET /api/agent/steps` (948 PR) — Agent 전용, MAX-MIN 윈도우 쿼리, X-Agent-Api-Key 인증
+- `GET /api/agent/user-profile` (948 PR, **#971/#976/#977**) — Agent #1, users 프로필(diabetes_type/target_low/target_high)
+- `GET /api/agent/glucose` (948 PR, **#972/#978/#979/#980**) — Agent #2, 시계열 혈당 raw
+- `GET /api/agent/sleep` (948 PR, **#973/#981/#982/#983**) — Agent #3, 일별 sleep + 7일 평균
+- `GET /api/agent/meals` (948 PR, **#974/#984/#985/#986/#987**) — Agent #4, 일별 식사 + 영양 (theta join)
+
+### Agent API 진행 상황 (총 8개 명세, 6개 구현 + 2개 보류)
+
+| # | 엔드포인트 | 상태 |
+|---|---|---|
+| 1 | GET /api/agent/user-profile | ✅ 948 |
+| 2 | GET /api/agent/glucose | ✅ 948 |
+| 3 | GET /api/agent/sleep | ✅ 948 |
+| 4 | GET /api/agent/meals | ✅ 948 |
+| 5 | GET /api/agent/steps | ✅ 948 |
+| 6 | GET /api/agent/notifications | 🔴 alerts 도메인 의존 (M2) |
+| 7 | POST /api/agent/notifications | 🔴 alerts 도메인 의존 (M2) |
+| 8 | schedule_followup | ⏸ 메커니즘 별도 설계 (`agent_pending_triggers` 큐, M2) |
 
 ---
 
