@@ -60,6 +60,16 @@ object BleConfig {
          * 표시 주기에 따라 시간 길이가 달라짐 (1초 주기면 100초, 60초 주기면 100분).
          */
         const val IN_MEMORY_HISTORY_SIZE = 100
+
+        /**
+         * 생리학적으로 유효한 raw 값 범위 (correctVal 미반영).
+         * 변환식 `mgDl = SLOPE * raw - OFFSET` 기준:
+         * - MIN: 20 mg/dL → raw ≈ 1_207
+         * - MAX: 600 mg/dL → raw ≈ 13_290
+         * 이 범위를 벗어나면 센서 오류로 판단해 이동평균 반영 전에 드롭한다.
+         */
+        const val MIN_VALID_RAW = 1_207
+        const val MAX_VALID_RAW = 13_290
     }
 
     /** FastBLE 라이브러리 동작 파라미터. */

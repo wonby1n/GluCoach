@@ -104,7 +104,6 @@ class BleManager
         /** 표시 주기 평균 모드의 raw 값 버퍼 (timestamp, raw). */
         private val gatherBuffer = ArrayDeque<GatherEntry>()
 
-        /** 표시 주기 평균 타이머 코루틴. gatherIntervalSeconds 변경 시 재시작. */
         /** 패치 패킷 도착 빈도 측정용 — 직전 패킷 timestamp. */
         private var lastArrivalMs: Long? = null
 
