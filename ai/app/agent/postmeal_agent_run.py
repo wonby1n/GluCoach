@@ -1,13 +1,12 @@
 """
-Glucoach Agent — 오늘의 혈당 전략 agent
-========================================
-Claude API에 시스템 프롬프트 + TOOL_SCHEMAS를 전달하고,
-Claude가 도구를 호출하면 TOOL_MAP으로 실행 → 결과를 다시 보내는
-agentic loop 구현.
+Glucoach Agent — 식후 활동 유도 agent
+======================================
+식사 기록 후 60분에 트리거되어 혈당 흐름·활동량을 확인하고
+가벼운 활동을 권유하는 알림 1개를 발송한다.
 
 실행 방법:
     cd ai
-    python -m app.agent.agent_run
+    python -m app.agent.postmeal_agent_run
 """
 
 import json
@@ -18,7 +17,7 @@ from dotenv import load_dotenv
 import anthropic
 
 from app.agent.tools import TOOL_SCHEMAS, TOOL_MAP
-from app.agent.prompts import build_morning_prompt
+from app.agent.prompts import build_postmeal_prompt
 from app.agent.trace_writer import save_trace
 
 # ── 환경 설정 ─────────────────────────────────────────────
@@ -49,20 +48,26 @@ def execute_tool(name: str, tool_input: dict) -> str:
 
 # ── Agentic Loop ──────────────────────────────────────────
 
-def run_agent():
-    """Claude API를 호출하고, 도구 호출이 끝날 때까지 루프를 돈다."""
+def run_postmeal_agent(trigger: dict):
+    """
+    trigger: agent를 깨운 이유와 컨텍스트
+        - reason   : "meal_recorded" | "schedule_followup" | "user_response"
+        - meal_time: 식사 시각 (예: "2026-05-04 12:00")
+        - user_reply: 사용자 응답 텍스트 (재트리거 시)
+    """
     client = anthropic.Anthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
         base_url=BASE_URL,
     )
 
     messages = [
-        {"role": "user", "content": "오늘 아침 혈당 관리 브리핑 해줘."}
+        {"role": "user", "content": "식후 활동 체크해줘."}
     ]
 
     turn = 0
-    sent_message = None   # send_notification으로 보낸 메시지
-    tool_call_details = []  # 도구 호출 이력 (815 reasoning trace용)
+    sent_message = None
+    tool_call_details = []
+    scheduled_followup = None
 
     while turn < MAX_TURNS:
         turn += 1
@@ -73,7 +78,7 @@ def run_agent():
         response = client.messages.create(
             model=MODEL,
             max_tokens=MAX_TOKENS,
-            system=build_morning_prompt(),
+            system=build_postmeal_prompt(trigger),
             tools=TOOL_SCHEMAS,
             messages=messages,
         )
@@ -115,6 +120,9 @@ def run_agent():
             if block.name == "send_notification":
                 sent_message = block.input.get("message")
 
+            if block.name == "schedule_followup":
+                scheduled_followup = block.input
+
             tool_results.append({
                 "type": "tool_result",
                 "tool_use_id": block.id,
@@ -133,17 +141,25 @@ def run_agent():
     print(f"\n[토큰 사용량] input={response.usage.input_tokens}, output={response.usage.output_tokens}")
 
     return {
-        "message":          sent_message,
-        "turns":            turn,
+        "message":           sent_message,
+        "turns":             turn,
         "tool_call_details": tool_call_details,
-        "messages":         messages,
+        "messages":          messages,
+        "scheduled_followup": scheduled_followup,
+        "trigger":           trigger,
     }
 
 
 # ── 실행 ──────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    result = run_agent()
+    trigger = {
+        "reason":    "meal_recorded",
+        "meal_time": "2026-05-04 12:00",
+    }
+
+    result = run_postmeal_agent(trigger)
     print(f"\n[최종 결과] message={result['message']}")
-    filepath = save_trace(result, agent_type="morning")
+    print(f"[followup]  {result['scheduled_followup']}")
+    filepath = save_trace(result, agent_type="postmeal")
     print(f"[trace 저장] {filepath}")
