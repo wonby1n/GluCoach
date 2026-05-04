@@ -19,7 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class FoodService {
 
-  private static final int CACHE_TTL_DAYS = 30;
+  static final int CACHE_TTL_DAYS = 30;
+  private static final LocalDateTime EPOCH_THRESHOLD = LocalDateTime.of(2000, 1, 1, 0, 0);
   private static final BigDecimal DEFAULT_SERVING_SIZE = new BigDecimal("100");
 
   private final FoodRepository foodRepository;
@@ -27,32 +28,48 @@ public class FoodService {
 
   @Transactional
   public List<FoodSearchResult> search(String query) {
+    String normalized = query.trim();
+    long startMs = System.currentTimeMillis();
     LocalDateTime cacheThreshold = LocalDateTime.now().minusDays(CACHE_TTL_DAYS);
+
     List<Food> cached =
         foodRepository.findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
-            query, cacheThreshold);
+            normalized, cacheThreshold);
 
     if (!cached.isEmpty()) {
-      log.debug("[FoodSearch] 캐시 히트 query={} count={}", query, cached.size());
       cached.forEach(Food::incrementSearchCount);
+      log.info(
+          "[FoodSearch] cache=HIT query={} count={} elapsedMs={}",
+          normalized,
+          cached.size(),
+          System.currentTimeMillis() - startMs);
       return cached.stream().map(FoodSearchResult::from).toList();
     }
 
-    log.debug("[FoodSearch] 캐시 미스 — 식약처 API 호출 query={}", query);
     try {
-      List<FoodApiItem> items = foodApiClient.search(query);
-      List<Food> saved = items.stream().map(item -> upsert(item, cacheThreshold)).toList();
+      List<FoodApiItem> items = foodApiClient.search(normalized);
+      List<Food> saved = items.stream().map(this::upsert).toList();
+      log.info(
+          "[FoodSearch] cache=MISS query={} count={} elapsedMs={}",
+          normalized,
+          saved.size(),
+          System.currentTimeMillis() - startMs);
       return saved.stream().map(FoodSearchResult::from).toList();
     } catch (FoodApiException e) {
-      log.warn("[FoodSearch] API 장애 — 만료 캐시 fallback query={}: {}", query, e.getMessage());
       List<Food> stale =
           foodRepository.findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
-              query, LocalDateTime.of(2000, 1, 1, 0, 0));
+              normalized, EPOCH_THRESHOLD);
+      log.warn(
+          "[FoodSearch] cache=FALLBACK query={} count={} elapsedMs={} reason={}",
+          normalized,
+          stale.size(),
+          System.currentTimeMillis() - startMs,
+          e.getMessage());
       return stale.stream().map(FoodSearchResult::from).toList();
     }
   }
 
-  private Food upsert(FoodApiItem item, LocalDateTime cacheThreshold) {
+  private Food upsert(FoodApiItem item) {
     BigDecimal servingSize = parseServingSize(item.servingSize());
     if (servingSize == null) {
       servingSize = DEFAULT_SERVING_SIZE;
