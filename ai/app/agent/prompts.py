@@ -86,6 +86,37 @@ def build_postmeal_prompt(trigger: dict) -> str:
     t = GLUCOSE_THRESHOLD
     reason = trigger.get("reason", "meal_recorded")
     meal_time = trigger.get("meal_time", DEMO_DATE["today"] + " 12:00")
+    user_reply = trigger.get("user_reply", "")
+    prev_sent_at = trigger.get("previous_notification_sent_at", "")
+
+    # 트리거별 동적 섹션
+    if reason == "user_response":
+        trigger_section = f"""[트리거 정보]
+- 실행 이유: {reason}
+- 식사 시각: {meal_time}
+- 이전 알림 발송 시각: {prev_sent_at}
+- 사용자 응답: {user_reply}"""
+
+        role_section = """[역할]
+사용자가 식후 활동 알림에 응답했습니다.
+사용자 응답 내용을 파악하고 적절히 처리하세요."""
+
+        extra_section = """
+[사용자 응답 처리 지침]
+- "회의 중", "바빠요", "잠깐만" 등 지금 불가 응답 → schedule_followup(delay_minutes=30) 호출 후 재확인 예약 메시지 발송
+- "알겠어요", "나갔다 올게요" 등 수락 응답 → 격려 메시지만 발송, followup 없음
+- "괜찮아요", "됐어요" 등 거절 응답 → 조용히 종료 (알림/followup 없음)
+"""
+    else:
+        trigger_section = f"""[트리거 정보]
+- 실행 이유: {reason}
+- 식사 시각: {meal_time}"""
+
+        role_section = """[역할]
+식사 기록 후 약 60분에 실행되는 agent입니다.
+식후 혈당 흐름과 활동량을 확인하고, 가벼운 활동을 권유하는 알림 1개를 보내세요."""
+
+        extra_section = ""
 
     return f"""당신은 당뇨 환자의 혈당 관리를 돕는 AI 코치입니다.
 
@@ -96,13 +127,10 @@ def build_postmeal_prompt(trigger: dict) -> str:
 - 식후 2시간 목표: {t["after_meal_2h"]["max"]} mg/dL 미만
 - 고혈당 기준: {t["hyper_caution"]} mg/dL 초과
 
-[트리거 정보]
-- 실행 이유: {reason}
-- 식사 시각: {meal_time}
+{trigger_section}
 
-[역할]
-식사 기록 후 약 60분에 실행되는 agent입니다.
-식후 혈당 흐름과 활동량을 확인하고, 가벼운 활동을 권유하는 알림 1개를 보내세요.
+{role_section}
+{extra_section}
 
 [사용 가능한 도구]
 - get_meals(date): 식사 기록 조회
