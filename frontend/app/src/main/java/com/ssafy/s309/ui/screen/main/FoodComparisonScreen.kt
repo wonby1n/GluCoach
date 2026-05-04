@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,6 +41,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -71,27 +73,51 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.ssafy.s309.R
+import com.ssafy.s309.data.model.FoodSearchItem
+import com.ssafy.s309.data.model.GlucoseCompareResponse
+import com.ssafy.s309.data.model.GlucosePrediction
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
+import com.ssafy.s309.ui.viewmodel.FoodSearchViewModel
 import kotlinx.coroutines.delay
 
 // ── 데이터 ──────────────────────────────────────────────
 
 internal data class FoodItem(
+    val id: Long = 0,
     val name: String,
-    @DrawableRes val imageResId: Int,
-    val isStable: Boolean,
-    val maxGlucose: Int,
-    val recoveryTimeText: String,
-    val calories: Int,
-    val gi: Int,
-    val carbs: Int,
-    val protein: Int,
-    val fat: Int,
-    val glucoseCurve: List<Float>,
+    val category: String = "",
+    @DrawableRes val imageResId: Int = R.drawable.kiki_main,
+    val isStable: Boolean = true,
+    val maxGlucose: Int = 0,
+    val recoveryTimeText: String = "",
+    val calories: Int = 0,
+    val gi: Int = 0,
+    val carbs: Int = 0,
+    val sugar: Int = 0,
+    val protein: Int = 0,
+    val fat: Int = 0,
+    val fiber: Int = 0,
+    val servingSize: Int = 0,
+    val glucoseCurve: List<Float> = emptyList(),
 )
+
+private fun FoodSearchItem.toFoodItem() =
+    FoodItem(
+        id = id,
+        name = name,
+        category = category,
+        calories = kcal,
+        carbs = carbsG,
+        sugar = sugarG,
+        protein = proteinG,
+        fat = fatG,
+        fiber = fiberG,
+        servingSize = servingSize,
+    )
 
 private val allFoods =
     listOf(
@@ -205,30 +231,50 @@ private val allFoods =
 
 @Composable
 fun FoodComparisonContent(modifier: Modifier = Modifier) {
+    val foodSearchViewModel: FoodSearchViewModel = hiltViewModel()
+    val viewModel: FoodComparisonViewModel = hiltViewModel()
     var foodA by remember { mutableStateOf<FoodItem?>(null) }
     var foodB by remember { mutableStateOf<FoodItem?>(null) }
+    val uiState by viewModel.uiState.collectAsState()
 
-    if (foodA != null && foodB != null) {
+    if (uiState.result != null && foodA != null && foodB != null) {
         FoodComparisonResultContent(
             foodA = foodA!!,
             foodB = foodB!!,
+            compareResult = uiState.result!!,
             onResetSelection = {
                 foodA = null
                 foodB = null
+                viewModel.resetResult()
             },
-            onFoodARemoved = { foodA = null },
-            onFoodBRemoved = { foodB = null },
+            onFoodARemoved = {
+                foodA = null
+                viewModel.resetResult()
+            },
+            onFoodBRemoved = {
+                foodB = null
+                viewModel.resetResult()
+            },
             modifier = modifier,
         )
     } else {
         FoodSelectionContent(
             foodA = foodA,
             foodB = foodB,
+            isLoading = uiState.isLoading,
+            error = uiState.error,
             onFoodSelected = { food ->
                 if (foodA == null) foodA = food else foodB = food
             },
+            onCompareClick = {
+                if (foodA != null && foodB != null) {
+                    viewModel.compareGlucose(foodA!!, foodB!!)
+                }
+            },
+            onErrorDismiss = { viewModel.clearError() },
             onFoodARemoved = { foodA = null },
             onFoodBRemoved = { foodB = null },
+            foodSearchViewModel = foodSearchViewModel,
             modifier = modifier,
         )
     }
@@ -240,15 +286,21 @@ fun FoodComparisonContent(modifier: Modifier = Modifier) {
 private fun FoodSelectionContent(
     foodA: FoodItem?,
     foodB: FoodItem?,
+    isLoading: Boolean,
+    error: String?,
     onFoodSelected: (FoodItem) -> Unit,
+    onCompareClick: () -> Unit,
+    onErrorDismiss: () -> Unit,
     onFoodARemoved: () -> Unit,
     onFoodBRemoved: () -> Unit,
+    foodSearchViewModel: FoodSearchViewModel,
     modifier: Modifier = Modifier,
 ) {
     var showSearchDialog by remember { mutableStateOf(false) }
     var showNutritionDialog by remember { mutableStateOf(false) }
     var nutritionFood by remember { mutableStateOf<FoodItem?>(null) }
     val recentKeywords = remember { mutableStateListOf("연어(조리전)", "연어구이", "연어회", "훈제연어") }
+    val bothSelected = foodA != null && foodB != null
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -327,25 +379,56 @@ private fun FoodSelectionContent(
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
+            if (error != null) {
+                Text(
+                    text = error,
+                    color = GlucoachColors.SpikeBadgeText,
+                    fontSize = 13.sp,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(GlucoachColors.SpikeBadgeBg)
+                            .padding(GlucoachSpacing.md)
+                            .clickable(onClick = onErrorDismiss),
+                )
+                Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+            }
+
             Button(
-                onClick = { },
+                onClick = onCompareClick,
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .height(48.dp),
                 shape = RoundedCornerShape(24.dp),
                 colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor = GlucoachColors.Border,
-                        contentColor = GlucoachColors.TextSecondary,
-                    ),
-                enabled = false,
+                    if (bothSelected) {
+                        ButtonDefaults.buttonColors(
+                            containerColor = GlucoachColors.Primary,
+                            contentColor = Color.White,
+                        )
+                    } else {
+                        ButtonDefaults.buttonColors(
+                            containerColor = GlucoachColors.Border,
+                            contentColor = GlucoachColors.TextSecondary,
+                        )
+                    },
+                enabled = bothSelected && !isLoading,
             ) {
-                Text(
-                    text = "선택된 음식이 없어요",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text(
+                        text = if (bothSelected) "비교 시작하기" else "선택된 음식이 없어요",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
@@ -353,12 +436,16 @@ private fun FoodSelectionContent(
 
         if (showSearchDialog) {
             FoodSearchDialog(
+                foodSearchViewModel = foodSearchViewModel,
                 recentKeywords = recentKeywords,
                 onFoodSelected = { food ->
                     onFoodSelected(food)
                     showSearchDialog = false
                 },
-                onDismiss = { showSearchDialog = false },
+                onDismiss = {
+                    foodSearchViewModel.clearSearch()
+                    showSearchDialog = false
+                },
             )
         }
 
@@ -610,6 +697,7 @@ private fun EmptyChartPlaceholder() {
 
 @Composable
 private fun FoodSearchDialog(
+    foodSearchViewModel: FoodSearchViewModel,
     recentKeywords: MutableList<String>,
     onFoodSelected: (FoodItem) -> Unit,
     onDismiss: () -> Unit,
@@ -619,14 +707,9 @@ private fun FoodSearchDialog(
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    val filteredFoods =
-        if (searchQuery.text.isBlank()) {
-            emptyList()
-        } else {
-            allFoods.filter {
-                it.name.contains(searchQuery.text, ignoreCase = true)
-            }
-        }
+    val searchResults by foodSearchViewModel.results.collectAsState()
+    val isSearchLoading by foodSearchViewModel.isLoading.collectAsState()
+    val searchError by foodSearchViewModel.error.collectAsState()
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -676,7 +759,10 @@ private fun FoodSearchDialog(
                 0 -> {
                     OutlinedTextField(
                         value = searchQuery,
-                        onValueChange = { searchQuery = it },
+                        onValueChange = {
+                            searchQuery = it
+                            foodSearchViewModel.onQueryChanged(it.text)
+                        },
                         singleLine = true,
                         keyboardOptions =
                             KeyboardOptions(
@@ -707,7 +793,10 @@ private fun FoodSearchDialog(
                             if (searchQuery.text.isNotEmpty()) {
                                 {
                                     IconButton(
-                                        onClick = { searchQuery = TextFieldValue("") },
+                                        onClick = {
+                                            searchQuery = TextFieldValue("")
+                                            foodSearchViewModel.clearSearch()
+                                        },
                                     ) {
                                         Icon(
                                             imageVector = Icons.Outlined.Clear,
@@ -755,7 +844,34 @@ private fun FoodSearchDialog(
                                 fontSize = 14.sp,
                             )
                         }
-                    } else if (filteredFoods.isEmpty()) {
+                    } else if (isSearchLoading) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(
+                                color = GlucoachColors.Primary,
+                                modifier = Modifier.size(32.dp),
+                            )
+                        }
+                    } else if (searchError != null) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = searchError ?: "검색 실패",
+                                color = GlucoachColors.TextSecondary,
+                                fontSize = 14.sp,
+                            )
+                        }
+                    } else if (searchResults.isEmpty()) {
                         Box(
                             modifier =
                                 Modifier
@@ -771,22 +887,41 @@ private fun FoodSearchDialog(
                         }
                     } else {
                         Column {
-                            filteredFoods.forEach { food ->
-                                Text(
-                                    text = food.name,
-                                    color = GlucoachColors.TextPrimary,
-                                    fontSize = 15.sp,
+                            searchResults.forEach { item ->
+                                Row(
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
                                             .padding(vertical = GlucoachSpacing.md)
                                             .clickable {
-                                                if (!recentKeywords.contains(food.name)) {
-                                                    recentKeywords.add(0, food.name)
+                                                if (!recentKeywords.contains(item.name)) {
+                                                    recentKeywords.add(0, item.name)
                                                 }
-                                                onFoodSelected(food)
+                                                onFoodSelected(item.toFoodItem())
                                             },
-                                )
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = item.name,
+                                            color = GlucoachColors.TextPrimary,
+                                            fontSize = 15.sp,
+                                        )
+                                        if (item.category.isNotBlank()) {
+                                            Text(
+                                                text = item.category,
+                                                color = GlucoachColors.TextSecondary,
+                                                fontSize = 12.sp,
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = "${item.kcal}kcal",
+                                        color = GlucoachColors.TextSecondary,
+                                        fontSize = 13.sp,
+                                    )
+                                }
                                 HorizontalDivider(color = GlucoachColors.Border.copy(alpha = 0.5f))
                             }
                         }
@@ -817,16 +952,9 @@ private fun FoodSearchDialog(
                                             .fillMaxWidth()
                                             .padding(vertical = GlucoachSpacing.md)
                                             .clickable {
-                                                val food =
-                                                    allFoods.find {
-                                                        it.name == keyword
-                                                    }
-                                                if (food != null) {
-                                                    onFoodSelected(food)
-                                                } else {
-                                                    selectedTab = 0
-                                                    searchQuery = TextFieldValue(keyword)
-                                                }
+                                                selectedTab = 0
+                                                searchQuery = TextFieldValue(keyword)
+                                                foodSearchViewModel.onQueryChanged(keyword)
                                             },
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -883,6 +1011,7 @@ private fun SearchTab(
 private fun FoodComparisonResultContent(
     foodA: FoodItem,
     foodB: FoodItem,
+    compareResult: GlucoseCompareResponse,
     onResetSelection: () -> Unit,
     onFoodARemoved: () -> Unit,
     onFoodBRemoved: () -> Unit,
@@ -892,6 +1021,7 @@ private fun FoodComparisonResultContent(
     var showNutritionDialog by remember { mutableStateOf(false) }
     var nutritionDialogFoodIndex by remember { mutableIntStateOf(0) }
     val foods = listOf(foodA, foodB)
+    val predictions = listOf(compareResult.foodA, compareResult.foodB)
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -920,6 +1050,7 @@ private fun FoodComparisonResultContent(
                 foods.forEachIndexed { index, food ->
                     FoodCard(
                         food = food,
+                        prediction = predictions[index],
                         isSelected = index == selectedFoodIndex,
                         onSelect = { selectedFoodIndex = index },
                         onInfoClick = {
@@ -934,7 +1065,12 @@ private fun FoodComparisonResultContent(
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
-            GlucoseComparisonChart(foodA = foodA, foodB = foodB)
+            GlucoseComparisonChart(
+                foodA = foodA,
+                foodB = foodB,
+                predictionA = compareResult.foodA,
+                predictionB = compareResult.foodB,
+            )
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
 
@@ -1004,6 +1140,7 @@ private fun FoodComparisonResultContent(
 @Composable
 private fun FoodCard(
     food: FoodItem,
+    prediction: GlucosePrediction,
     isSelected: Boolean,
     onSelect: () -> Unit,
     onInfoClick: () -> Unit,
@@ -1011,6 +1148,8 @@ private fun FoodCard(
     modifier: Modifier = Modifier,
 ) {
     val borderColor = if (isSelected) GlucoachColors.Primary else GlucoachColors.Border
+    val isStable = prediction.peakMgdl < 140f
+    val recoveryText = formatMinutes(prediction.returnMinute)
 
     Column(
         modifier =
@@ -1073,7 +1212,7 @@ private fun FoodCard(
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
 
-        SpikeStatusBadge(isStable = food.isStable)
+        SpikeStatusBadge(isStable = isStable)
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.md))
 
@@ -1086,7 +1225,7 @@ private fun FoodCard(
         ) {
             StatCell(
                 label = "최고 혈당",
-                value = "${food.maxGlucose}",
+                value = "${prediction.peakMgdl.toInt()}",
                 unit = "mg/dL",
                 modifier = Modifier.weight(1f),
             )
@@ -1099,11 +1238,21 @@ private fun FoodCard(
             )
             StatCell(
                 label = "정상 복귀",
-                value = food.recoveryTimeText,
+                value = recoveryText,
                 unit = "",
                 modifier = Modifier.weight(1f),
             )
         }
+    }
+}
+
+private fun formatMinutes(minutes: Int): String {
+    val hours = minutes / 60
+    val mins = minutes % 60
+    return when {
+        hours > 0 && mins > 0 -> "${hours}시간 ${mins}분"
+        hours > 0 -> "${hours}시간"
+        else -> "${mins}분"
     }
 }
 
@@ -1169,7 +1318,15 @@ private fun StatCell(
 private fun GlucoseComparisonChart(
     foodA: FoodItem,
     foodB: FoodItem,
+    predictionA: GlucosePrediction,
+    predictionB: GlucosePrediction,
 ) {
+    val curveA = predictionA.curve.map { it.glucoseMgdl }
+    val curveB = predictionB.curve.map { it.glucoseMgdl }
+    val allValues = curveA + curveB
+    val maxVal = (allValues.maxOrNull() ?: 200f).coerceAtLeast(170f) + 10f
+    val minVal = (allValues.minOrNull() ?: 70f).coerceAtMost(90f) - 10f
+
     Column(
         modifier =
             Modifier
@@ -1211,8 +1368,6 @@ private fun GlucoseComparisonChart(
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
-                val minVal = 70f
-                val maxVal = 200f
                 val rangeVal = maxVal - minVal
 
                 fun yFor(v: Float) = h - ((v - minVal) / rangeVal) * h
@@ -1277,8 +1432,8 @@ private fun GlucoseComparisonChart(
                     )
                 }
 
-                drawCurve(foodA.glucoseCurve, GlucoachColors.ChartLineInactive)
-                drawCurve(foodB.glucoseCurve, GlucoachColors.Primary)
+                drawCurve(curveA, GlucoachColors.ChartLineInactive)
+                drawCurve(curveB, GlucoachColors.Primary)
             }
 
             Text(
@@ -1300,11 +1455,18 @@ private fun GlucoseComparisonChart(
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
 
+        val maxMinute =
+            maxOf(
+                predictionA.curve.lastOrNull()?.minuteOffset ?: 120,
+                predictionB.curve.lastOrNull()?.minuteOffset ?: 120,
+            )
+        val timeLabels = buildTimeLabels(maxMinute)
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            listOf("식사 직후", "30분", "1시간", "2시간").forEach { label ->
+            timeLabels.forEach { label ->
                 Text(
                     text = label,
                     color = GlucoachColors.TextSecondary,
@@ -1313,6 +1475,28 @@ private fun GlucoseComparisonChart(
             }
         }
     }
+}
+
+private fun buildTimeLabels(maxMinute: Int): List<String> {
+    val labels = mutableListOf("식사 직후")
+    val step =
+        when {
+            maxMinute <= 60 -> 15
+            maxMinute <= 120 -> 30
+            else -> 60
+        }
+    var m = step
+    while (m <= maxMinute) {
+        labels.add(
+            when {
+                m < 60 -> "${m}분"
+                m % 60 == 0 -> "${m / 60}시간"
+                else -> "${m / 60}시간 ${m % 60}분"
+            },
+        )
+        m += step
+    }
+    return labels
 }
 
 @Composable
