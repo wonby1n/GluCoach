@@ -5,6 +5,7 @@ import com.ssafy.s309.domain.user.dto.GuardianRequest;
 import com.ssafy.s309.domain.user.dto.GuardianResponse;
 import com.ssafy.s309.domain.user.dto.SettingsResponse;
 import com.ssafy.s309.domain.user.dto.SettingsUpdateRequest;
+import com.ssafy.s309.domain.user.dto.UserSearchResponse;
 import com.ssafy.s309.domain.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -15,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/user")
@@ -23,6 +25,21 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
   private final UserService userService;
+
+  // ── User Search ───────────────────────────────────────────
+
+  @Operation(summary = "사용자 검색", description = "이메일 또는 전화번호로 사용자 검색. 보호자 추가 전 userId 조회용.")
+  @GetMapping("/search")
+  public ResponseEntity<UserSearchResponse> search(
+      @RequestParam(required = false) String email, @RequestParam(required = false) String phone) {
+    if (email != null) {
+      return ResponseEntity.ok(userService.searchByEmail(email));
+    }
+    if (phone != null) {
+      return ResponseEntity.ok(userService.searchByPhone(phone));
+    }
+    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "email 또는 phone 중 하나는 필수입니다.");
+  }
 
   // ── Settings ──────────────────────────────────────────────
 
