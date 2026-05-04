@@ -160,10 +160,10 @@ NOTIFICATION_HISTORY = [
         "message":     "10분만 걸어볼까요?",
         "user_action": "ignored",
     },
-    # 오늘 아침 알림 — 식후 agent가 중복 여부 확인 시 참고
+    # 어제 아침 알림 — 식후 agent가 중복 여부 확인 시 참고
     {
         "id":          "notif_003",
-        "sent_at":     "2026-05-04 07:10",
+        "sent_at":     "2026-05-03 07:10",
         "type":        "오늘의 혈당 전략",
         "message":     "어제 잠이 조금 부족했어요. 오늘 점심은 메뉴를 한 번 확인해볼까요? 🍃",
         "user_action": "clicked",
