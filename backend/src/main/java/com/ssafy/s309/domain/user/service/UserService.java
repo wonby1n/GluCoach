@@ -4,6 +4,7 @@ import com.ssafy.s309.domain.user.dto.GuardianRequest;
 import com.ssafy.s309.domain.user.dto.GuardianResponse;
 import com.ssafy.s309.domain.user.dto.SettingsResponse;
 import com.ssafy.s309.domain.user.dto.SettingsUpdateRequest;
+import com.ssafy.s309.domain.user.dto.UserSearchResponse;
 import com.ssafy.s309.domain.user.entity.User;
 import com.ssafy.s309.domain.user.entity.WardGuardian;
 import com.ssafy.s309.domain.user.repository.UserRepository;
@@ -11,8 +12,10 @@ import com.ssafy.s309.domain.user.repository.WardGuardianRepository;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -91,6 +94,26 @@ public class UserService {
     remaining.stream()
         .filter(g -> g.getPriority() > deletedPriority)
         .forEach(g -> g.updatePriority(g.getPriority() - 1));
+  }
+
+  // ── User Search ───────────────────────────────────────────
+
+  public UserSearchResponse searchByEmail(String email) {
+    User user =
+        userRepository
+            .findByEmailAndDeletedAtIsNull(email)
+            .orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+    return UserSearchResponse.from(user);
+  }
+
+  public UserSearchResponse searchByPhone(String phone) {
+    User user =
+        userRepository
+            .findByPhoneAndDeletedAtIsNull(phone)
+            .orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+    return UserSearchResponse.from(user);
   }
 
   // ── 내부 헬퍼 ─────────────────────────────────────────────
