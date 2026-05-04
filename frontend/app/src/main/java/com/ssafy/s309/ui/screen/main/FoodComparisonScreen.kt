@@ -68,6 +68,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -86,19 +87,19 @@ import kotlinx.coroutines.delay
 // ── 데이터 ──────────────────────────────────────────────
 
 internal data class FoodItem(
-    val id: Long = 0L,
+    val id: Long = 0,
     val name: String,
     val category: String = "",
-    @DrawableRes val imageResId: Int = R.drawable.jjajangmyeon,
-    val isStable: Boolean = false,
+    @DrawableRes val imageResId: Int = R.drawable.kiki_main,
+    val isStable: Boolean = true,
     val maxGlucose: Int = 0,
     val recoveryTimeText: String = "",
-    val calories: Int,
-    val gi: Int,
-    val carbs: Int,
-    val protein: Int,
-    val fat: Int,
+    val calories: Int = 0,
+    val gi: Int = 0,
+    val carbs: Int = 0,
     val sugar: Int = 0,
+    val protein: Int = 0,
+    val fat: Int = 0,
     val fiber: Int = 0,
     val servingSize: Int = 0,
     val glucoseCurve: List<Float> = emptyList(),
@@ -110,7 +111,6 @@ private fun FoodSearchItem.toFoodItem() =
         name = name,
         category = category,
         calories = kcal,
-        gi = 0,
         carbs = carbsG,
         sugar = sugarG,
         protein = proteinG,
@@ -119,14 +119,120 @@ private fun FoodSearchItem.toFoodItem() =
         servingSize = servingSize,
     )
 
+private val allFoods =
+    listOf(
+        FoodItem(
+            name = "짜장면",
+            imageResId = R.drawable.jjajangmyeon,
+            isStable = false,
+            maxGlucose = 185,
+            recoveryTimeText = "2시간 15분",
+            calories = 700,
+            gi = 80,
+            carbs = 150,
+            protein = 20,
+            fat = 25,
+            glucoseCurve = listOf(90f, 155f, 175f, 185f, 178f, 165f, 145f, 130f, 120f),
+        ),
+        FoodItem(
+            name = "짬뽕",
+            imageResId = R.drawable.jjambbong,
+            isStable = true,
+            maxGlucose = 140,
+            recoveryTimeText = "1시간 10분",
+            calories = 630,
+            gi = 70,
+            carbs = 130,
+            protein = 30,
+            fat = 20,
+            glucoseCurve = listOf(90f, 125f, 140f, 138f, 128f, 115f, 105f, 98f, 95f),
+        ),
+        FoodItem(
+            name = "연어샐러드",
+            imageResId = R.drawable.jjajangmyeon,
+            isStable = true,
+            maxGlucose = 125,
+            recoveryTimeText = "1시간",
+            calories = 350,
+            gi = 40,
+            carbs = 20,
+            protein = 35,
+            fat = 15,
+            glucoseCurve = listOf(90f, 110f, 125f, 120f, 112f, 105f, 98f, 93f, 90f),
+        ),
+        FoodItem(
+            name = "연어(조리전)",
+            imageResId = R.drawable.jjajangmyeon,
+            isStable = true,
+            maxGlucose = 110,
+            recoveryTimeText = "50분",
+            calories = 208,
+            gi = 0,
+            carbs = 0,
+            protein = 40,
+            fat = 6,
+            glucoseCurve = listOf(90f, 100f, 110f, 108f, 102f, 97f, 93f, 91f, 90f),
+        ),
+        FoodItem(
+            name = "연어회",
+            imageResId = R.drawable.jjajangmyeon,
+            isStable = true,
+            maxGlucose = 105,
+            recoveryTimeText = "45분",
+            calories = 180,
+            gi = 0,
+            carbs = 2,
+            protein = 38,
+            fat = 5,
+            glucoseCurve = listOf(90f, 98f, 105f, 103f, 99f, 95f, 92f, 91f, 90f),
+        ),
+        FoodItem(
+            name = "연어구이",
+            imageResId = R.drawable.jjajangmyeon,
+            isStable = true,
+            maxGlucose = 115,
+            recoveryTimeText = "55분",
+            calories = 250,
+            gi = 5,
+            carbs = 5,
+            protein = 42,
+            fat = 8,
+            glucoseCurve = listOf(90f, 105f, 115f, 112f, 106f, 100f, 95f, 92f, 90f),
+        ),
+        FoodItem(
+            name = "훈제연어",
+            imageResId = R.drawable.jjajangmyeon,
+            isStable = true,
+            maxGlucose = 108,
+            recoveryTimeText = "50분",
+            calories = 190,
+            gi = 0,
+            carbs = 1,
+            protein = 36,
+            fat = 7,
+            glucoseCurve = listOf(90f, 100f, 108f, 105f, 100f, 96f, 93f, 91f, 90f),
+        ),
+        FoodItem(
+            name = "고등어구이",
+            imageResId = R.drawable.jjambbong,
+            isStable = true,
+            maxGlucose = 118,
+            recoveryTimeText = "55분",
+            calories = 305,
+            gi = 0,
+            carbs = 0,
+            protein = 38,
+            fat = 18,
+            glucoseCurve = listOf(90f, 106f, 118f, 115f, 108f, 101f, 96f, 92f, 90f),
+        ),
+    )
+
 // ── 진입점: 선택 ↔ 결과 상태 관리 ────────────────────────
 
 @Composable
-fun FoodComparisonContent(
-    modifier: Modifier = Modifier,
-    viewModel: FoodComparisonViewModel = hiltViewModel(),
-    foodSearchViewModel: FoodSearchViewModel = hiltViewModel(),
-) {
+fun FoodComparisonContent(modifier: Modifier = Modifier) {
+    val foodSearchViewModel: FoodSearchViewModel = hiltViewModel()
+    val viewModel: FoodComparisonViewModel = hiltViewModel()
     var foodA by remember { mutableStateOf<FoodItem?>(null) }
     var foodB by remember { mutableStateOf<FoodItem?>(null) }
     val uiState by viewModel.uiState.collectAsState()
@@ -193,7 +299,7 @@ private fun FoodSelectionContent(
     var showSearchDialog by remember { mutableStateOf(false) }
     var showNutritionDialog by remember { mutableStateOf(false) }
     var nutritionFood by remember { mutableStateOf<FoodItem?>(null) }
-    val recentKeywords = remember { mutableStateListOf<String>() }
+    val recentKeywords = remember { mutableStateListOf("연어(조리전)", "연어구이", "연어회", "훈제연어") }
     val bothSelected = foodA != null && foodB != null
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -597,10 +703,10 @@ private fun FoodSearchDialog(
     onDismiss: () -> Unit,
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
+    var searchQuery by remember { mutableStateOf(TextFieldValue("")) }
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    val searchQuery by foodSearchViewModel.query.collectAsState()
     val searchResults by foodSearchViewModel.results.collectAsState()
     val isSearchLoading by foodSearchViewModel.isLoading.collectAsState()
     val searchError by foodSearchViewModel.error.collectAsState()
@@ -653,7 +759,10 @@ private fun FoodSearchDialog(
                 0 -> {
                     OutlinedTextField(
                         value = searchQuery,
-                        onValueChange = { foodSearchViewModel.onQueryChanged(it) },
+                        onValueChange = {
+                            searchQuery = it
+                            foodSearchViewModel.onQueryChanged(it.text)
+                        },
                         singleLine = true,
                         keyboardOptions =
                             KeyboardOptions(
@@ -681,10 +790,13 @@ private fun FoodSearchDialog(
                             )
                         },
                         trailingIcon =
-                            if (searchQuery.isNotEmpty()) {
+                            if (searchQuery.text.isNotEmpty()) {
                                 {
                                     IconButton(
-                                        onClick = { foodSearchViewModel.clearSearch() },
+                                        onClick = {
+                                            searchQuery = TextFieldValue("")
+                                            foodSearchViewModel.clearSearch()
+                                        },
                                     ) {
                                         Icon(
                                             imageVector = Icons.Outlined.Clear,
@@ -718,7 +830,21 @@ private fun FoodSearchDialog(
 
                     Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
 
-                    if (isSearchLoading) {
+                    if (searchQuery.text.isBlank()) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = "검색된 내역이 없어요",
+                                color = GlucoachColors.TextSecondary,
+                                fontSize = 14.sp,
+                            )
+                        }
+                    } else if (isSearchLoading) {
                         Box(
                             modifier =
                                 Modifier
@@ -727,9 +853,8 @@ private fun FoodSearchDialog(
                             contentAlignment = Alignment.Center,
                         ) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
                                 color = GlucoachColors.Primary,
-                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(32.dp),
                             )
                         }
                     } else if (searchError != null) {
@@ -742,20 +867,6 @@ private fun FoodSearchDialog(
                         ) {
                             Text(
                                 text = searchError ?: "검색 실패",
-                                color = GlucoachColors.SpikeBadgeText,
-                                fontSize = 14.sp,
-                            )
-                        }
-                    } else if (searchQuery.isBlank()) {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .height(200.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = "검색된 내역이 없어요",
                                 color = GlucoachColors.TextSecondary,
                                 fontSize = 14.sp,
                             )
@@ -776,22 +887,41 @@ private fun FoodSearchDialog(
                         }
                     } else {
                         Column {
-                            searchResults.forEach { foodSearchItem ->
-                                Text(
-                                    text = foodSearchItem.name,
-                                    color = GlucoachColors.TextPrimary,
-                                    fontSize = 15.sp,
+                            searchResults.forEach { item ->
+                                Row(
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
                                             .padding(vertical = GlucoachSpacing.md)
                                             .clickable {
-                                                if (!recentKeywords.contains(foodSearchItem.name)) {
-                                                    recentKeywords.add(0, foodSearchItem.name)
+                                                if (!recentKeywords.contains(item.name)) {
+                                                    recentKeywords.add(0, item.name)
                                                 }
-                                                onFoodSelected(foodSearchItem.toFoodItem())
+                                                onFoodSelected(item.toFoodItem())
                                             },
-                                )
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = item.name,
+                                            color = GlucoachColors.TextPrimary,
+                                            fontSize = 15.sp,
+                                        )
+                                        if (item.category.isNotBlank()) {
+                                            Text(
+                                                text = item.category,
+                                                color = GlucoachColors.TextSecondary,
+                                                fontSize = 12.sp,
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = "${item.kcal}kcal",
+                                        color = GlucoachColors.TextSecondary,
+                                        fontSize = 13.sp,
+                                    )
+                                }
                                 HorizontalDivider(color = GlucoachColors.Border.copy(alpha = 0.5f))
                             }
                         }
@@ -823,6 +953,7 @@ private fun FoodSearchDialog(
                                             .padding(vertical = GlucoachSpacing.md)
                                             .clickable {
                                                 selectedTab = 0
+                                                searchQuery = TextFieldValue(keyword)
                                                 foodSearchViewModel.onQueryChanged(keyword)
                                             },
                                     verticalAlignment = Alignment.CenterVertically,
