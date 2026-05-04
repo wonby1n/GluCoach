@@ -34,6 +34,7 @@ import com.ssafy.s309.ui.screen.onboarding.SignupDoneScreen
 import com.ssafy.s309.ui.screen.onboarding.TreatmentPillsScreen
 import com.ssafy.s309.ui.screen.onboarding.TreatmentSelectionScreen
 import com.ssafy.s309.ui.screen.onboarding.TreatmentTimeScreen
+import com.ssafy.s309.ui.screen.projector.ProjectorScreen
 import com.ssafy.s309.ui.viewmodel.AuthUiState
 import com.ssafy.s309.ui.viewmodel.AuthViewModel
 
@@ -71,6 +72,8 @@ sealed class Screen(val route: String) {
     object Settings : Screen("settings")
 
     object Guardian : Screen("guardian")
+
+    object Projector : Screen("projector")
 }
 
 @Composable
@@ -253,6 +256,12 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         }
         composable(Screen.Settings.route) {
             SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onProjectorClick = { navController.navigate(Screen.Projector.route) },
+            )
+        }
+        composable(Screen.Projector.route) {
+            ProjectorScreen(
                 onBack = { navController.popBackStack() },
             )
         }

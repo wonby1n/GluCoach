@@ -59,6 +59,7 @@ import com.ssafy.s309.ui.theme.TextSecondary
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
     onBack: () -> Unit = {},
+    onProjectorClick: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -110,6 +111,7 @@ fun SettingsScreen(
                     isSaving = uiState.isSaving,
                     error = uiState.error,
                     onSave = viewModel::saveSettings,
+                    onProjectorClick = onProjectorClick,
                 )
             }
             else -> {
@@ -140,6 +142,7 @@ private fun SettingsForm(
     isSaving: Boolean,
     error: String?,
     onSave: (UserSettingsUpdateRequest) -> Unit,
+    onProjectorClick: () -> Unit = {},
 ) {
     var height by remember(settings) { mutableStateOf(settings.height?.toString() ?: "") }
     var weight by remember(settings) { mutableStateOf(settings.weight?.toString() ?: "") }
@@ -279,7 +282,18 @@ private fun SettingsForm(
             Text(text = error, color = com.ssafy.s309.ui.theme.Error, fontSize = 13.sp)
         }
 
-        Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+        Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+
+        Button(
+            onClick = onProjectorClick,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.ui.graphics.Color(0xFF5C6BC0)),
+        ) {
+            Text(text = "프로젝터 제어", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.md))
 
         Button(
             onClick = {
