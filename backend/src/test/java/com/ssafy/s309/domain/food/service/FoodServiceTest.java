@@ -36,7 +36,7 @@ class FoodServiceTest {
   @InjectMocks private FoodService foodService;
 
   private static Food food(
-      Long id, String apiId, String name, int searchCount, LocalDateTime cachedAt) {
+      Integer id, String apiId, String name, int searchCount, LocalDateTime cachedAt) {
     Food f =
         Food.builder()
             .foodApiId(apiId)
@@ -55,7 +55,7 @@ class FoodServiceTest {
 
   @Test
   void 캐시_히트_시_API_호출_없이_결과_반환() {
-    Food cached = food(1L, "D000006", "밥, 흰쌀", 5, LocalDateTime.now().minusDays(3));
+    Food cached = food(1, "D000006", "밥, 흰쌀", 5, LocalDateTime.now().minusDays(3));
     given(
             foodRepository
                 .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
@@ -77,7 +77,10 @@ class FoodServiceTest {
                 .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
                     anyString(), any(LocalDateTime.class)))
         .willReturn(List.of());
-    FoodApiItem apiItem = new FoodApiItem("D000007", "현미밥", "150", "5.0", "1.0", "32.0", "0.2");
+    FoodApiItem apiItem =
+        new FoodApiItem(
+            "D000007", "현미밥", null, null, "150", "5.0", "1.0", "32.0", "0.2", null, null, null,
+            null, null);
     given(foodApiClient.search("현미밥")).willReturn(List.of(apiItem));
     given(foodRepository.findByFoodApiId("D000007")).willReturn(Optional.empty());
     given(foodRepository.save(any(Food.class))).willAnswer(inv -> inv.getArgument(0));
@@ -96,13 +99,16 @@ class FoodServiceTest {
 
   @Test
   void 캐시_미스_기존_entity_있으면_refresh() {
-    Food existing = food(2L, "D000007", "현미밥", 10, LocalDateTime.now().minusDays(40));
+    Food existing = food(2, "D000007", "현미밥", 10, LocalDateTime.now().minusDays(40));
     given(
             foodRepository
                 .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
                     anyString(), any(LocalDateTime.class)))
         .willReturn(List.of());
-    FoodApiItem apiItem = new FoodApiItem("D000007", "현미밥", "155", "5.5", "1.1", "33.0", "0.3");
+    FoodApiItem apiItem =
+        new FoodApiItem(
+            "D000007", "현미밥", null, null, "155", "5.5", "1.1", "33.0", "0.3", null, null, null,
+            null, null);
     given(foodApiClient.search("현미밥")).willReturn(List.of(apiItem));
     given(foodRepository.findByFoodApiId("D000007")).willReturn(Optional.of(existing));
 
@@ -123,7 +129,7 @@ class FoodServiceTest {
                     anyString(), any(LocalDateTime.class)))
         .willReturn(List.of()) // 첫 호출(유효 캐시) — 미스
         .willReturn(
-            List.of(food(3L, "D000008", "잡곡밥", 1, LocalDateTime.now().minusDays(60)))); // fallback
+            List.of(food(3, "D000008", "잡곡밥", 1, LocalDateTime.now().minusDays(60)))); // fallback
     given(foodApiClient.search("잡곡밥")).willThrow(new FoodApiException("식품안전처 API 연결 실패"));
 
     List<FoodSearchResult> results = foodService.search("잡곡밥");

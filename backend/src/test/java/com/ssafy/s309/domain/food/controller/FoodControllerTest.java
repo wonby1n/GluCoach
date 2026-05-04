@@ -39,13 +39,21 @@ class FoodControllerTest {
   void 검색_200_반환() throws Exception {
     FoodSearchResult result =
         new FoodSearchResult(
-            1L,
+            1,
             "밥, 흰쌀",
+            null,
             new BigDecimal("143.00"),
             new BigDecimal("31.50"),
             new BigDecimal("0.10"),
             new BigDecimal("2.60"),
-            new BigDecimal("0.30"));
+            new BigDecimal("0.30"),
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            false);
     given(foodService.search("밥")).willReturn(List.of(result));
 
     mockMvc

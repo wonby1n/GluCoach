@@ -19,7 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class FoodService {
 
-  private static final int CACHE_TTL_DAYS = 30;
+  static final int CACHE_TTL_DAYS = 30;
+  private static final LocalDateTime EPOCH_THRESHOLD = LocalDateTime.of(2000, 1, 1, 0, 0);
   private static final BigDecimal DEFAULT_SERVING_SIZE = new BigDecimal("100");
 
   private final FoodRepository foodRepository;
@@ -45,7 +46,6 @@ public class FoodService {
       return cached.stream().map(FoodSearchResult::from).toList();
     }
 
-    log.debug("[FoodSearch] 캐시 미스 — 식약처 API 호출 query={}", query);
     try {
       List<FoodApiItem> items = foodApiClient.search(normalized);
       List<Food> saved = items.stream().map(this::upsert).toList();
@@ -69,7 +69,7 @@ public class FoodService {
     }
   }
 
-  private Food upsert(FoodApiItem item, LocalDateTime cacheThreshold) {
+  private Food upsert(FoodApiItem item) {
     BigDecimal servingSize = parseServingSize(item.servingSize());
     if (servingSize == null) {
       servingSize = DEFAULT_SERVING_SIZE;
