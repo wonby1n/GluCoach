@@ -24,9 +24,11 @@ class AuthRepository
         suspend fun signup(
             email: String,
             password: String,
+            name: String,
+            phone: String,
         ): Result<TokenResponse> =
             runCatching {
-                val response = authApi.signup(SignupRequest(email, password))
+                val response = authApi.signup(SignupRequest(email, password, name, phone))
                 tokenManager.saveTokens(response.accessToken, response.refreshToken)
                 tokenManager.saveEmail(email)
                 tokenManager.parseUserIdFromJwt(response.accessToken)?.let { tokenManager.saveUserId(it) }

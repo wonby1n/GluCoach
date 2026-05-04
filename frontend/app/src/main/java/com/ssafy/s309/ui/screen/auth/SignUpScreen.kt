@@ -4,7 +4,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,8 +13,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,20 +52,28 @@ import com.ssafy.s309.ui.theme.TextPlaceholder
 
 @Composable
 fun SignUpScreen(
-    onSignUpClick: (String, String, String) -> Unit,
+    onSignUpClick: (String, String, String, String, String) -> Unit,
     onAlreadyMemberClick: () -> Unit,
     onBackClick: () -> Unit,
+    initialEmail: String = "",
+    initialPassword: String = "",
+    initialName: String = "",
+    initialPhone: String = "",
     isLoading: Boolean = false,
     errorMessage: String? = null,
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf(initialEmail) }
+    var password by remember { mutableStateOf(initialPassword) }
+    var confirmPassword by remember { mutableStateOf(initialPassword) }
+    var name by remember { mutableStateOf(initialName) }
+    var phone by remember { mutableStateOf(initialPhone) }
 
-    val isEmailValid = email.isNotEmpty() && email.contains("@")
+    val isEmailValid = email.isNotEmpty() && email.contains("@") && email.length <= 255
     val isPasswordValid = password.length >= 6
     val isPasswordMatch = password.isNotEmpty() && confirmPassword.isNotEmpty() && password == confirmPassword
-    val isFormValid = isEmailValid && isPasswordValid && isPasswordMatch
+    val isNameValid = name.isNotEmpty() && name.length <= 20
+    val isPhoneValid = phone.isNotEmpty() && phone.length <= 20
+    val isFormValid = isEmailValid && isPasswordValid && isPasswordMatch && isNameValid && isPhoneValid
 
     Column(
         modifier =
@@ -72,9 +81,9 @@ fun SignUpScreen(
                 .fillMaxSize()
                 .background(Background)
                 .statusBarsPadding()
-                .padding(horizontal = 32.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 32.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
     ) {
         Image(
             painter = painterResource(id = R.drawable.ic_glucoach_logo),
@@ -146,7 +155,7 @@ fun SignUpScreen(
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions =
                     KeyboardOptions(
-                        keyboardType = KeyboardType.Text,
+                        keyboardType = KeyboardType.Password,
                         imeAction = ImeAction.Next,
                     ),
                 colors =
@@ -184,8 +193,8 @@ fun SignUpScreen(
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions =
                     KeyboardOptions(
-                        keyboardType = KeyboardType.Text,
-                        imeAction = ImeAction.Done,
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Next,
                     ),
                 colors =
                     OutlinedTextFieldDefaults.colors(
@@ -198,6 +207,80 @@ fun SignUpScreen(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "비밀번호가 일치하지 않습니다",
+                    fontSize = 12.sp,
+                    color = Error,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "이름",
+                fontSize = 13.sp,
+                color = TextLabel,
+                fontWeight = FontWeight.Medium,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                placeholder = { Text("이름을 입력하세요", color = TextPlaceholder) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                singleLine = true,
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Next,
+                    ),
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Primary,
+                        unfocusedBorderColor = BorderLight,
+                    ),
+            )
+
+            if (name.isNotEmpty() && name.length > 20) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "형식에 맞도록 값을 입력해주세요",
+                    fontSize = 12.sp,
+                    color = Error,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "전화번호",
+                fontSize = 13.sp,
+                color = TextLabel,
+                fontWeight = FontWeight.Medium,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            OutlinedTextField(
+                value = phone,
+                onValueChange = { phone = it },
+                placeholder = { Text("010-0000-0000", color = TextPlaceholder) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                singleLine = true,
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = KeyboardType.Phone,
+                        imeAction = ImeAction.Done,
+                    ),
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Primary,
+                        unfocusedBorderColor = BorderLight,
+                    ),
+            )
+
+            if (phone.isNotEmpty() && phone.length > 20) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "형식에 맞도록 값을 입력해주세요",
                     fontSize = 12.sp,
                     color = Error,
                 )
@@ -226,7 +309,7 @@ fun SignUpScreen(
             }
 
             Button(
-                onClick = { onSignUpClick(email, password, confirmPassword) },
+                onClick = { onSignUpClick(email, password, confirmPassword, name, phone) },
                 modifier =
                     Modifier
                         .fillMaxWidth()

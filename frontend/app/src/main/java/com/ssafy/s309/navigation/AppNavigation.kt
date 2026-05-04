@@ -115,6 +115,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     authViewModel.login(email, password)
                 },
                 onForgotPasswordClick = {},
+                onSignUpClick = { navController.navigate(Screen.SignUp.route) },
                 onBackClick = { navController.popBackStack() },
                 isLoading = authState is AuthUiState.Loading,
                 errorMessage = (authState as? AuthUiState.Error)?.message,
@@ -125,36 +126,32 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             enterTransition = { fadeIn() },
             exitTransition = { fadeOut() },
         ) {
-            LaunchedEffect(authState) {
-                if (authState is AuthUiState.LoginSuccess &&
-                    (authState as AuthUiState.LoginSuccess).isNewUser
-                ) {
-                    authViewModel.resetState()
-                    navController.navigate(Screen.BasicHealthInfo.route)
-                }
-            }
-
             SignUpScreen(
-                onSignUpClick = { email, password, _ ->
-                    authViewModel.signup(email, password)
+                onSignUpClick = { email, password, _, name, phone ->
+                    authViewModel.saveSignupData(email, password, name, phone)
+                    navController.navigate(Screen.BasicHealthInfo.route)
                 },
                 onAlreadyMemberClick = { navController.navigate(Screen.SignIn.route) },
                 onBackClick = { navController.popBackStack() },
-                isLoading = authState is AuthUiState.Loading,
-                errorMessage = (authState as? AuthUiState.Error)?.message,
+                initialEmail = authViewModel.pendingEmail,
+                initialPassword = authViewModel.pendingPassword,
+                initialName = authViewModel.pendingName,
+                initialPhone = authViewModel.pendingPhone,
             )
         }
         composable(Screen.BasicHealthInfo.route) {
             BasicHealthInfoScreen(
-                onNextClick = { _, _, _ ->
+                onNextClick = { birthDate, height, weight ->
+                    authViewModel.saveHealthData(birthDate, height, weight)
                     navController.navigate(Screen.DiabetesTypeSelection.route)
                 },
                 onSkipClick = {
-                    navController.navigate(Screen.Main.route) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
-                    }
+                    navController.navigate(Screen.SignupDone.route)
                 },
                 onBackClick = { navController.popBackStack() },
+                initialAge = authViewModel.pendingAge,
+                initialHeight = authViewModel.pendingHeight,
+                initialWeight = authViewModel.pendingWeight,
             )
         }
         composable(Screen.DiabetesTypeSelection.route) {
@@ -206,12 +203,24 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             )
         }
         composable(Screen.SignupDone.route) {
-            SignupDoneScreen(
-                onNextClick = {
+            LaunchedEffect(Unit) {
+                authViewModel.performPendingSignup()
+            }
+
+            LaunchedEffect(authState) {
+                if (authState is AuthUiState.LoginSuccess) {
+                    kotlinx.coroutines.delay(2000L)
+                    authViewModel.resetState()
                     navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
-                },
+                }
+            }
+
+            SignupDoneScreen(
+                isLoading = authState is AuthUiState.Loading,
+                errorMessage = (authState as? AuthUiState.Error)?.message,
+                onRetryClick = { authViewModel.performPendingSignup() },
             )
         }
         composable(Screen.Main.route) {

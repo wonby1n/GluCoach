@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
@@ -43,6 +45,7 @@ import com.ssafy.s309.ui.component.onboarding.ProgressIndicator
 import com.ssafy.s309.ui.theme.Background
 import com.ssafy.s309.ui.theme.BorderLight
 import com.ssafy.s309.ui.theme.Disabled
+import com.ssafy.s309.ui.theme.Error
 import com.ssafy.s309.ui.theme.Primary
 import com.ssafy.s309.ui.theme.TextHint
 import com.ssafy.s309.ui.theme.TextLabel
@@ -54,13 +57,20 @@ fun BasicHealthInfoScreen(
     onNextClick: (String, String, String) -> Unit,
     onSkipClick: () -> Unit,
     onBackClick: () -> Unit,
+    initialAge: String = "",
+    initialHeight: String = "",
+    initialWeight: String = "",
 ) {
-    var birthDate by remember { mutableStateOf("") }
-    var height by remember { mutableStateOf("") }
-    var weight by remember { mutableStateOf("") }
+    var age by remember { mutableStateOf(initialAge) }
+    var height by remember { mutableStateOf(initialHeight) }
+    var weight by remember { mutableStateOf(initialWeight) }
     var isAgreed by remember { mutableStateOf(false) }
 
-    val isFormValid = birthDate.isNotEmpty() && height.isNotEmpty() && weight.isNotEmpty() && isAgreed
+    val isAgeValid = age.isNotEmpty() && age.toIntOrNull()?.let { it in 1..127 } == true
+    val decimalPattern = Regex("^\\d{1,3}(\\.\\d)?$")
+    val isHeightValid = height.isNotEmpty() && height.matches(decimalPattern)
+    val isWeightValid = weight.isNotEmpty() && weight.matches(decimalPattern)
+    val isFormValid = isAgeValid && isHeightValid && isWeightValid && isAgreed
 
     Column(
         modifier =
@@ -68,6 +78,7 @@ fun BasicHealthInfoScreen(
                 .fillMaxSize()
                 .background(Background)
                 .statusBarsPadding()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 16.dp),
     ) {
         Row(
@@ -105,16 +116,18 @@ fun BasicHealthInfoScreen(
                     .padding(horizontal = 20.dp, vertical = 24.dp),
         ) {
             Text(
-                text = "생년월일",
+                text = "나이",
                 fontSize = 13.sp,
                 color = TextLabel,
                 fontWeight = FontWeight.Medium,
             )
             Spacer(modifier = Modifier.height(6.dp))
             OutlinedTextField(
-                value = birthDate,
-                onValueChange = { birthDate = it },
-                placeholder = { Text("YYYY.MM.DD.", color = TextPlaceholder) },
+                value = age,
+                onValueChange = { newValue ->
+                    age = newValue.filter { it.isDigit() }.take(3)
+                },
+                placeholder = { Text("만 00세", color = TextPlaceholder) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true,
@@ -125,6 +138,15 @@ fun BasicHealthInfoScreen(
                         unfocusedBorderColor = BorderLight,
                     ),
             )
+
+            if (age.isNotEmpty() && !isAgeValid) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "형식에 맞도록 값을 입력해주세요",
+                    fontSize = 12.sp,
+                    color = Error,
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -137,18 +159,31 @@ fun BasicHealthInfoScreen(
             Spacer(modifier = Modifier.height(6.dp))
             OutlinedTextField(
                 value = height,
-                onValueChange = { height = it },
-                placeholder = { Text("Value", color = TextPlaceholder) },
+                onValueChange = { newValue ->
+                    if (newValue.isEmpty() || newValue.matches(Regex("^\\d{0,3}(\\.\\d{0,1})?$"))) {
+                        height = newValue
+                    }
+                },
+                placeholder = { Text("000.0", color = TextPlaceholder) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 colors =
                     OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Primary,
                         unfocusedBorderColor = BorderLight,
                     ),
             )
+
+            if (height.isNotEmpty() && !isHeightValid) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "형식에 맞도록 값을 입력해주세요",
+                    fontSize = 12.sp,
+                    color = Error,
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -161,18 +196,31 @@ fun BasicHealthInfoScreen(
             Spacer(modifier = Modifier.height(6.dp))
             OutlinedTextField(
                 value = weight,
-                onValueChange = { weight = it },
-                placeholder = { Text("Value", color = TextPlaceholder) },
+                onValueChange = { newValue ->
+                    if (newValue.isEmpty() || newValue.matches(Regex("^\\d{0,3}(\\.\\d{0,1})?$"))) {
+                        weight = newValue
+                    }
+                },
+                placeholder = { Text("000.0", color = TextPlaceholder) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 colors =
                     OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Primary,
                         unfocusedBorderColor = BorderLight,
                     ),
             )
+
+            if (weight.isNotEmpty() && !isWeightValid) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "형식에 맞도록 값을 입력해주세요",
+                    fontSize = 12.sp,
+                    color = Error,
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -219,11 +267,11 @@ fun BasicHealthInfoScreen(
                     .clickable { onSkipClick() },
         )
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(32.dp))
 
         OnboardingButton(
             text = "다음으로",
-            onClick = { onNextClick(birthDate, height, weight) },
+            onClick = { onNextClick(age, height, weight) },
             enabled = isFormValid,
         )
     }
