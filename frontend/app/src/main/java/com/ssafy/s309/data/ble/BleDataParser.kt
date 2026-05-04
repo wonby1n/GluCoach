@@ -9,7 +9,7 @@ import kotlin.math.abs
  * 패치에서 도착하는 4바이트 패킷을 [GlucoseReading] 으로 변환한다.
  *
  * 처리 파이프라인은 3단계로 분리되어 있다:
- * 1. [extractRaw] — 패킷 검증 + 16비트 raw 값 추출
+ * 1. [extractRaw] — 패킷 검증 + 16비트 raw 값 추출 + 생리학적 범위 체크
  * 2. [trackMovingAverage] — 이동평균 갱신 (모든 수신 샘플에 대해 호출)
  * 3. [applyFilterAndConvert] — 스파이크 필터 + 출력 타입에 따른 변환
  *
@@ -64,6 +64,8 @@ class BleDataParser
         /**
          * 바이트 패킷을 검증하고 16비트 raw 값을 추출한다.
          * 길이가 [PACKET_SIZE] 가 아니거나 헤더(`0x2F 0xFF`)가 다르면 null.
+         * raw 값이 생리학적 유효 범위([BleConfig.Processing.MIN_VALID_RAW]..[BleConfig.Processing.MAX_VALID_RAW])
+         * 를 벗어나면 null — 이동평균 오염을 막기 위해 [trackMovingAverage] 호출 전에 드롭한다.
          */
         fun extractRaw(bytes: ByteArray): Int? {
             if (bytes.size != BleConfig.Protocol.PACKET_SIZE) return null
@@ -72,8 +74,11 @@ class BleDataParser
             ) {
                 return null
             }
-            return ((bytes[2].toInt() and BYTE_MASK) shl Byte.SIZE_BITS) or
-                (bytes[3].toInt() and BYTE_MASK)
+            val raw =
+                ((bytes[2].toInt() and BYTE_MASK) shl Byte.SIZE_BITS) or
+                    (bytes[3].toInt() and BYTE_MASK)
+            if (raw < BleConfig.Processing.MIN_VALID_RAW || raw > BleConfig.Processing.MAX_VALID_RAW) return null
+            return raw
         }
 
         /**
