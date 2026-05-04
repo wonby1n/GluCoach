@@ -1,9 +1,9 @@
 """
-Glucoach Agent — Tool-calling Hello World
-==========================================
+Glucoach Agent — 오늘의 혈당 전략 agent
+========================================
 Claude API에 시스템 프롬프트 + TOOL_SCHEMAS를 전달하고,
 Claude가 도구를 호출하면 TOOL_MAP으로 실행 → 결과를 다시 보내는
-agentic loop의 최소 구현.
+agentic loop 구현.
 
 실행 방법:
     cd ai
@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 import anthropic
 
 from app.agent.tools import TOOL_SCHEMAS, TOOL_MAP
-from app.agent.mock_data import USER_INFO, DEMO_DATE
+from app.agent.prompts import build_morning_prompt
 
 # ── 환경 설정 ─────────────────────────────────────────────
 
@@ -32,38 +32,6 @@ BASE_URL = "https://gms.ssafy.io/gmsapi/api.anthropic.com"
 MODEL = "claude-sonnet-4-5-20250929"
 MAX_TOKENS = 4096
 MAX_TURNS = 10
-
-
-# ── 시스템 프롬프트 ───────────────────────────────────────
-
-SYSTEM_PROMPT = f"""당신은 당뇨 환자의 혈당 관리를 돕는 AI 코치입니다.
-
-[사용자 정보]
-- 이름: {USER_INFO["name"]}
-- 직업: {USER_INFO["job"]}
-- 당뇨 유형: {USER_INFO["diabetes_type"]}형
-- 식전 목표 혈당: 80~130 mg/dL
-- 식후 2시간 목표: 180 mg/dL 미만
-- 저혈당 주의: 70 mg/dL 미만
-- 고혈당 주의: 180 mg/dL 초과
-
-지금은 아침이고, 사용자의 어젯밤 데이터를 보고 오늘의 혈당 관리 전략을
-알려줘야 해. 다음 도구들을 사용해서 상황을 파악한 뒤, 적절한 알림을 보내.
-
-도구 목록: [get_sleep, get_glucose, get_meals,
-            get_notification_history, send_notification]
-
-판단 기준:
-- 어젯밤 수면이 평소보다 부족함
-- 어제 저녁 식후 최고 혈당이 평소보다 높았음
-- 어제 혈당 변동폭이 평소보다 큼
-
-고려할 점:
-- 수면, 혈당, 식사 데이터를 종합해서 메시지 작성
-- 알림 이력을 확인해서 중복 알림 방지
-- 오늘 날짜는 {DEMO_DATE['today']}, 어제 날짜는 {DEMO_DATE['yesterday']}
-
-모든 결정 과정은 reasoning에 남겨."""
 
 
 # ── 도구 실행 ─────────────────────────────────────────────
@@ -102,7 +70,7 @@ def run_agent():
         response = client.messages.create(
             model=MODEL,
             max_tokens=MAX_TOKENS,
-            system=SYSTEM_PROMPT,
+            system=build_morning_prompt(),
             tools=TOOL_SCHEMAS,
             messages=messages,
         )
