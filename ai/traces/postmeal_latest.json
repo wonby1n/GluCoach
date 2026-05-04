@@ -1,17 +1,17 @@
 {
   "agent": "postmeal",
-  "triggered_at": "2026-05-05 00:23:59",
-  "message": "알겠어요! 회의 끝나고 나면 잠깐 움직여볼까요? 나중에 다시 확인할게요 😊",
+  "triggered_at": "2026-05-05 01:05:08",
+  "message": "회의 끝나셨나요? 잠깐 일어나서 스트레칭이라도 해볼까요? 😊",
   "display_trace": null,
   "turns": 3,
   "tool_calls": [
     {
       "name": "get_notification_history",
       "input": {
-        "hours": 24
+        "hours": 4
       },
       "result": {
-        "hours": 24,
+        "hours": 4,
         "notifications": [
           {
             "id": "notif_001",
@@ -63,7 +63,7 @@
       "name": "get_glucose",
       "input": {
         "start_time": "2026-05-04T11:30:00",
-        "end_time": "2026-05-04T14:00:00"
+        "end_time": "2026-05-04T13:30:00"
       },
       "result": {
         "readings": [
@@ -82,10 +82,6 @@
           {
             "time": "2026-05-04 13:30",
             "glucose_mg_dl": 180
-          },
-          {
-            "time": "2026-05-04 14:00",
-            "glucose_mg_dl": 175
           }
         ],
         "averages": {
@@ -99,12 +95,12 @@
       "name": "get_steps",
       "input": {
         "start_time": "2026-05-04T12:00:00",
-        "end_time": "2026-05-04T14:00:00"
+        "end_time": "2026-05-04T13:30:00"
       },
       "result": {
         "start_time": "2026-05-04 12:00",
-        "end_time": "2026-05-04 14:00",
-        "total_steps": 444,
+        "end_time": "2026-05-04 13:30",
+        "total_steps": 64,
         "periods": [
           {
             "start": "2026-05-04 12:30",
@@ -117,36 +113,18 @@
             "end": "2026-05-04 13:30",
             "steps": 41,
             "period_minutes": 30
-          },
-          {
-            "start": "2026-05-04 13:30",
-            "end": "2026-05-04 14:00",
-            "steps": 380,
-            "period_minutes": 30
           }
         ]
       }
     },
     {
-      "name": "schedule_followup",
-      "input": {
-        "delay_minutes": 30,
-        "reason": "사용자 회의 중, 회의 종료 후 식후 활동 재권유"
-      },
-      "result": {
-        "status": "scheduled",
-        "delay_minutes": 30,
-        "reason": "사용자 회의 중, 회의 종료 후 식후 활동 재권유"
-      }
-    },
-    {
       "name": "send_notification",
       "input": {
-        "message": "알겠어요! 회의 끝나고 나면 잠깐 움직여볼까요? 나중에 다시 확인할게요 😊"
+        "message": "회의 끝나셨나요? 잠깐 일어나서 스트레칭이라도 해볼까요? 😊"
       },
       "result": {
         "status": "sent",
-        "message": "알겠어요! 회의 끝나고 나면 잠깐 움직여볼까요? 나중에 다시 확인할게요 😊"
+        "message": "회의 끝나셨나요? 잠깐 일어나서 스트레칭이라도 해볼까요? 😊"
       }
     }
   ]
