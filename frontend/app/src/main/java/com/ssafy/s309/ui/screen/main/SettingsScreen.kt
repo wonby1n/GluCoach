@@ -146,13 +146,13 @@ private fun SettingsForm(
 ) {
     var height by remember(settings) { mutableStateOf(settings.height?.toString() ?: "") }
     var weight by remember(settings) { mutableStateOf(settings.weight?.toString() ?: "") }
-    var diabetesType by remember(settings) { mutableStateOf(settings.diabetesType) }
-    var isMedicated by remember(settings) { mutableStateOf(settings.isMedicated) }
-    var targetLow by remember(settings) { mutableStateOf(settings.targetLow.toString()) }
-    var targetHigh by remember(settings) { mutableStateOf(settings.targetHigh.toString()) }
-    var alertLow by remember(settings) { mutableStateOf(settings.alertLow.toString()) }
-    var alertHigh by remember(settings) { mutableStateOf(settings.alertHigh.toString()) }
-    var nightWatch by remember(settings) { mutableStateOf(settings.nightWatch) }
+    var diabetesType by remember(settings) { mutableStateOf(settings.diabetesType ?: "") }
+    var isMedicated by remember(settings) { mutableStateOf(settings.isMedicated ?: false) }
+    var targetLow by remember(settings) { mutableStateOf(settings.targetLow?.toString() ?: "") }
+    var targetHigh by remember(settings) { mutableStateOf(settings.targetHigh?.toString() ?: "") }
+    var alertLow by remember(settings) { mutableStateOf(settings.alertLow?.toString() ?: "") }
+    var alertHigh by remember(settings) { mutableStateOf(settings.alertHigh?.toString() ?: "") }
+    var nightWatch by remember(settings) { mutableStateOf(settings.nightWatch ?: false) }
 
     Column(
         modifier =

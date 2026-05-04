@@ -2,7 +2,9 @@ package com.ssafy.s309.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ssafy.s309.data.model.UserSettingsUpdateRequest
 import com.ssafy.s309.data.repository.AuthRepository
+import com.ssafy.s309.data.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +31,7 @@ class AuthViewModel
     @Inject
     constructor(
         private val authRepository: AuthRepository,
+        private val userRepository: UserRepository,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
         val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
@@ -101,6 +104,15 @@ class AuthViewModel
                 _uiState.value = AuthUiState.Loading
                 authRepository.signup(pendingEmail, pendingPassword, pendingName, pendingPhone)
                     .onSuccess {
+                        val settingsRequest =
+                            UserSettingsUpdateRequest(
+                                name = pendingName.ifBlank { null },
+                                age = pendingAge.toIntOrNull(),
+                                phone = pendingPhone.ifBlank { null },
+                                height = pendingHeight.toFloatOrNull(),
+                                weight = pendingWeight.toFloatOrNull(),
+                            )
+                        userRepository.updateSettings(settingsRequest)
                         clearPendingData()
                         _uiState.value = AuthUiState.LoginSuccess(isNewUser = true)
                     }
