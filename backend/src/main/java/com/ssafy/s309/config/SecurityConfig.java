@@ -26,6 +26,17 @@ public class SecurityConfig {
   private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
   private final AgentApiKeyFilter agentApiKeyFilter;
 
+  /** /api/admin/** 전용 chain — JWT 인증 미적용, X-Admin-Key 검증은 컨트롤러가 담당. */
+  @Bean
+  @Order(0)
+  public SecurityFilterChain adminFilterChain(HttpSecurity http) throws Exception {
+    http.securityMatcher("/api/admin/**")
+        .csrf(csrf -> csrf.disable())
+        .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+    return http.build();
+  }
+
   /** /api/agent/** 전용 chain — API 키 헤더만 검증, JWT 필터 미적용. */
   @Bean
   @Order(1)
@@ -57,7 +68,6 @@ public class SecurityConfig {
                         "/api/auth/login",
                         "/api/auth/refresh",
                         "/api/auth/logout",
-                        "/api/admin/**",
                         "/swagger-ui/**",
                         "/swagger-ui.html",
                         "/swagger-resources/**",
