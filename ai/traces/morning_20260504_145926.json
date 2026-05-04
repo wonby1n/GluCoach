@@ -1,0 +1,178 @@
+{
+  "agent": "morning",
+  "triggered_at": "2026-05-04 14:59:26",
+  "message": "좋은 아침이에요! 😊 어젯밤 5시간 수면으로 평소보다 부족했고, 저녁 식사 후 혈당이 220까지 올랐다가 새벽엔 75까지 떨어졌어요. 오늘은 수면 부족으로 몸이 혈당을 조절하기 조금 더 힘들 수 있으니, 아침은 단순당을 피하고 통곡물+단백질 위주로 챙겨보세요. 오늘 컨디션 회복이 우선이에요! 💪",
+  "turns": 3,
+  "tool_calls": [
+    {
+      "name": "get_sleep",
+      "input": {
+        "date": "2026-05-03"
+      },
+      "result": {
+        "date": "2026-05-03",
+        "sleep": {
+          "sleep_start": "2026-05-04 02:00",
+          "sleep_end": "2026-05-04 07:00",
+          "duration_hours": 5.0
+        },
+        "average_7d": {
+          "duration_hours": 7.0
+        }
+      }
+    },
+    {
+      "name": "get_glucose",
+      "input": {
+        "start_time": "2026-05-03T18:00:00",
+        "end_time": "2026-05-04T10:00:00"
+      },
+      "result": {
+        "readings": [
+          {
+            "time": "2026-05-03 18:00",
+            "glucose_mg_dl": 130
+          },
+          {
+            "time": "2026-05-03 19:00",
+            "glucose_mg_dl": 158
+          },
+          {
+            "time": "2026-05-03 19:30",
+            "glucose_mg_dl": 195
+          },
+          {
+            "time": "2026-05-03 20:00",
+            "glucose_mg_dl": 220
+          },
+          {
+            "time": "2026-05-03 21:00",
+            "glucose_mg_dl": 198
+          },
+          {
+            "time": "2026-05-03 22:00",
+            "glucose_mg_dl": 175
+          },
+          {
+            "time": "2026-05-03 23:00",
+            "glucose_mg_dl": 160
+          },
+          {
+            "time": "2026-05-04 00:00",
+            "glucose_mg_dl": 145
+          },
+          {
+            "time": "2026-05-04 01:00",
+            "glucose_mg_dl": 118
+          },
+          {
+            "time": "2026-05-04 02:00",
+            "glucose_mg_dl": 95
+          },
+          {
+            "time": "2026-05-04 03:00",
+            "glucose_mg_dl": 75
+          },
+          {
+            "time": "2026-05-04 04:00",
+            "glucose_mg_dl": 78
+          },
+          {
+            "time": "2026-05-04 05:00",
+            "glucose_mg_dl": 98
+          },
+          {
+            "time": "2026-05-04 06:00",
+            "glucose_mg_dl": 108
+          },
+          {
+            "time": "2026-05-04 07:00",
+            "glucose_mg_dl": 112
+          },
+          {
+            "time": "2026-05-04 08:00",
+            "glucose_mg_dl": 118
+          }
+        ],
+        "averages": {
+          "postmeal_peak_avg": 170,
+          "nightly_variation_avg": 50,
+          "fasting_avg": 115
+        }
+      }
+    },
+    {
+      "name": "get_meals",
+      "input": {
+        "date": "2026-05-03"
+      },
+      "result": {
+        "date": "2026-05-03",
+        "meals": [
+          {
+            "meal_id": "meal_001",
+            "type": "dinner",
+            "time": "2026-05-03 19:30",
+            "foods": [
+              "비빔밥",
+              "콜라"
+            ],
+            "carbs_g": 95,
+            "calories": 720
+          }
+        ]
+      }
+    },
+    {
+      "name": "get_notification_history",
+      "input": {
+        "hours": 12
+      },
+      "result": {
+        "hours": 12,
+        "notifications": [
+          {
+            "id": "notif_001",
+            "sent_at": "2026-05-03 08:05",
+            "type": "오늘의 혈당 전략",
+            "message": "오늘 점심 가볍게 가봐요!",
+            "user_action": "clicked"
+          },
+          {
+            "id": "notif_002",
+            "sent_at": "2026-05-03 14:00",
+            "type": "식후 활동 유도",
+            "message": "10분만 걸어볼까요?",
+            "user_action": "ignored"
+          },
+          {
+            "id": "notif_003",
+            "sent_at": "2026-05-03 07:10",
+            "type": "오늘의 혈당 전략",
+            "message": "어제 잠이 조금 부족했어요. 오늘 점심은 메뉴를 한 번 확인해볼까요? 🍃",
+            "user_action": "clicked"
+          },
+          {
+            "id": "notif_004",
+            "sent_at": "2026-05-04 13:00",
+            "type": "식후 활동 유도",
+            "message": "식사 후 움직임이 없어요! 10분만 걸어볼까요? 🚶",
+            "user_action": "replied",
+            "user_reply": "지금 회의 중이에요",
+            "followup_scheduled_at": "2026-05-04 13:30"
+          }
+        ]
+      }
+    },
+    {
+      "name": "send_notification",
+      "input": {
+        "message": "좋은 아침이에요! 😊 어젯밤 5시간 수면으로 평소보다 부족했고, 저녁 식사 후 혈당이 220까지 올랐다가 새벽엔 75까지 떨어졌어요. 오늘은 수면 부족으로 몸이 혈당을 조절하기 조금 더 힘들 수 있으니, 아침은 단순당을 피하고 통곡물+단백질 위주로 챙겨보세요. 오늘 컨디션 회복이 우선이에요! 💪"
+      },
+      "result": {
+        "status": "sent",
+        "message": "좋은 아침이에요! 😊 어젯밤 5시간 수면으로 평소보다 부족했고, 저녁 식사 후 혈당이 220까지 올랐다가 새벽엔 75까지 떨어졌어요. 오늘은 수면 부족으로 몸이 혈당을 조절하기 조금 더 힘들 수 있으니, 아침은 단순당을 피하고 통곡물+단백질 위주로 챙겨보세요. 오늘 컨디션 회복이 우선이에요! 💪"
+      }
+    }
+  ]
+}
