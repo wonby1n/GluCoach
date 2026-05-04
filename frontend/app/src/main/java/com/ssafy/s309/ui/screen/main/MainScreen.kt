@@ -84,6 +84,7 @@ fun MainScreen(
     onLogoutClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onGuardianClick: () -> Unit = {},
+    onProjectorClick: () -> Unit = {},
     userEmail: String = "",
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -103,6 +104,7 @@ fun MainScreen(
         onLogoutClick = onLogoutClick,
         onSettingsClick = onSettingsClick,
         onGuardianClick = onGuardianClick,
+        onProjectorClick = onProjectorClick,
         userEmail = userEmail,
     )
 }
@@ -123,6 +125,7 @@ fun MainScreenContent(
     onLogoutClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onGuardianClick: () -> Unit = {},
+    onProjectorClick: () -> Unit = {},
     userEmail: String = "",
 ) {
     var selectedTab by rememberSaveable { mutableStateOf("home") }
@@ -152,6 +155,7 @@ fun MainScreenContent(
                                 onDeviceClick = onConnectedDeviceClick,
                                 onHealthDetailClick = onSettingsClick,
                                 onGuardianClick = onGuardianClick,
+                                onProjectorClick = onProjectorClick,
                                 userEmail = userEmail,
                             )
                         "add" -> {
