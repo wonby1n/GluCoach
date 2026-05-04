@@ -47,7 +47,7 @@ from app.glucose.data_loader import (
     get_dataloader,
     load_scaler,
 )
-from app.glucose.evaluate import (
+from scripts.evaluate import (
     baseline_last_value,
     baseline_meal_heuristic,
     baseline_now_last_value,
@@ -208,7 +208,7 @@ def plot_combined_clarke(
     for ax, (name, y_true, y_pred) in zip(axes[0], runs):
         i = LABEL_STEPS.index(horizon_min)
         # plot_clarke_error_grid 와 동일 로직 인라인 (재사용 위해 모듈 함수도 가능)
-        from app.glucose.evaluate import _shade_zones, clarke_zone_counts
+        from scripts.evaluate import _shade_zones, clarke_zone_counts
 
         ax.set_facecolor("white")
         _shade_zones(ax)

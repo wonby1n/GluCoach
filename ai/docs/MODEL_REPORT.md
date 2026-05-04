@@ -252,37 +252,53 @@ LSTM: 시간 순서를 기억하는 신경망. 식후 혈당 변화의 시간적
 
 ## 8. 파일 구조
 
+### 운영 모델 (서버에 배포되는 파일)
+
 ```
 ai/
 ├── models/
-│   ├── scaler.pkl              시뮬레이터 기준 정규화 파라미터
-│   ├── user_split.json         환자 학습/검증/테스트 분리 정보
-│   ├── lstm_meal.pt            모델 1 최종 (식사 기반, LSTM)
-│   ├── mlp_meal.pt             모델 1 비교용 (MLP)
-│   ├── ridge_meal.pkl          모델 1 비교용 (Ridge)
-│   ├── lstm_now.pt             모델 2 최종 (시계열 기반, NowLSTM)
-│   ├── shanghai/               실제 환자 데이터 전용
-│   │   ├── scaler.pkl
-│   │   └── lstm_meal.pt
-│   └── mixed/                  혼합 데이터 전용
-│       ├── scaler.pkl
-│       └── lstm_meal.pt
+│   ├── scaler.pkl              정규화 파라미터 (sim_v3 기준, seed=42 고정)
+│   ├── lstm_meal.pt            모델 1 운영본 (식사 기반 LSTM)
+│   └── lstm_now.pt             모델 2 운영본 (시계열 기반 NowLSTM)
 ├── data/
-│   ├── processed/              시뮬레이터 전처리 결과
-│   │   ├── train.csv / val.csv / test.csv
-│   │   ├── timeseries/         모델 2용 슬라이딩 윈도우 데이터
-│   │   ├── shanghai/           실제 환자 전처리 결과
-│   │   └── mixed/              혼합 전처리 결과
+│   ├── processed/              시뮬레이터 전처리 결과 (train/val/test.csv)
 │   └── glucose_data/           원본 데이터
 └── docs/
-    └── EVALUATION_REPORT.md    이 문서
+    └── MODEL_REPORT.md         이 문서
 ```
+
+> 개인화 파인튜닝으로 생성된 `lstm_meal_personalized_{user_id}.pt` 파일도 동일한 `models/` 디렉토리에 저장됨 (Docker named volume `ai-models` 로 재시작 후에도 유지).
+
+### 실험 전용 파일 (배포 불필요, 로컬/실험 환경 전용)
+
+```
+ai/models/
+├── mlp_meal.pt                 모델 1 비교 실험용 (MLP)
+├── ridge_meal.pkl              모델 1 비교 실험용 (Ridge)
+├── shanghai/                   실제 환자 데이터 전용 실험 모델
+│   ├── scaler.pkl
+│   └── lstm_meal.pt
+└── mixed/                      혼합 데이터 전용 실험 모델
+    ├── scaler.pkl
+    └── lstm_meal.pt
+```
+
+> 이 파일들은 섹션 6(데이터 전략 비교 실험 E2)에서 사용된 것으로, 운영 추론에는 사용되지 않음.
 
 ---
 
-## 9. 다음 단계
+## 9. 현황 및 남은 과제
 
-- [x] 개인화(파인튜닝) 구현 및 검증 완료
-- [ ] Clarke 오류 격자 시각화 리포트 생성
-- [ ] 실제 DB 연동 시 scaler 일관성 검증 로직 확인
-- [ ] 실제 사용자 데이터 누적 후 베이스 모델 재학습 계획 수립
+### 완료
+
+- [x] 모델 1, 2 학습 및 성능 검증
+- [x] 개인화(파인튜닝) 구현 및 효과 검증 (95% 환자에서 개선)
+- [x] FastAPI 추론 서버 구현 (`/inference/glucose/meal`, `/now`, `/personalize`, `/health`)
+- [x] 백엔드 연동 스키마 정렬 (요청 optional 필드, 응답 curve/peak/return 형식)
+- [x] Docker volume 설정으로 개인화 모델 재시작 후 유지
+
+### 진행 중 / 예정
+
+- [ ] 백엔드 Jackson snake_case 설정 적용 (백엔드 브랜치 작업)
+- [ ] 실제 사용자 데이터 누적 후 베이스 모델 재학습
+- [ ] Clarke 오류 격자 시각화 (선택)
