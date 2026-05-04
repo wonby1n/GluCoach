@@ -2,6 +2,7 @@ package com.ssafy.s309.di
 
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.ssafy.s309.data.api.AuthApi
+import com.ssafy.s309.data.api.FoodApi
 import com.ssafy.s309.data.api.UserApi
 import com.ssafy.s309.data.network.AuthInterceptor
 import dagger.Module
@@ -87,4 +88,10 @@ object AppModule {
     fun provideUserApi(
         @Named("authenticated") retrofit: Retrofit,
     ): UserApi = retrofit.create(UserApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideFoodApi(
+        @Named("authenticated") retrofit: Retrofit,
+    ): FoodApi = retrofit.create(FoodApi::class.java)
 }
