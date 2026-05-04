@@ -250,6 +250,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 onGraphClick = { navController.navigate(Screen.Graph.route) },
                 onConnectedDeviceClick = { navController.navigate(Screen.HealthSource.route) },
                 onLogoutClick = { authViewModel.logout() },
+                onWithdrawClick = { password -> authViewModel.withdraw(password) },
                 onSettingsClick = { navController.navigate(Screen.Settings.route) },
                 onGuardianClick = { navController.navigate(Screen.Guardian.route) },
                 onAccountClick = { navController.navigate(Screen.MyAccount.route) },
@@ -257,9 +258,19 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             )
         }
         composable(Screen.MyAccount.route) {
+            LaunchedEffect(authState) {
+                android.util.Log.d("AppNav", "MyAccount authState: $authState")
+                if (authState is AuthUiState.WithdrawSuccess) {
+                    authViewModel.resetState()
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Main.route) { inclusive = true }
+                    }
+                }
+            }
+
             MyAccountScreen(
                 onBack = { navController.popBackStack() },
-                onWithdrawClick = { authViewModel.withdraw("") },
+                onWithdrawClick = { password -> authViewModel.withdraw(password) },
             )
         }
         composable(Screen.Graph.route) {
