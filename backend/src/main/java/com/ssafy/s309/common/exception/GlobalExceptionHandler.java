@@ -3,10 +3,12 @@ package com.ssafy.s309.common.exception;
 import com.ssafy.s309.domain.food.exception.FoodApiException;
 import com.ssafy.s309.domain.prediction.exception.AiServiceException;
 import com.ssafy.s309.domain.prediction.exception.AiServiceException.ErrorType;
+import jakarta.validation.ConstraintViolationException;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -26,6 +28,24 @@ public class GlobalExceptionHandler {
             .findFirst()
             .orElse("입력값이 올바르지 않습니다");
     return ResponseEntity.badRequest().body(Map.of("message", message));
+  }
+
+  @ExceptionHandler(ConstraintViolationException.class)
+  public ResponseEntity<Map<String, String>> handleConstraintViolation(
+      ConstraintViolationException e) {
+    String message =
+        e.getConstraintViolations().stream()
+            .map(v -> v.getPropertyPath() + ": " + v.getMessage())
+            .findFirst()
+            .orElse("입력값이 올바르지 않습니다");
+    return ResponseEntity.badRequest().body(Map.of("message", message));
+  }
+
+  @ExceptionHandler(MissingServletRequestParameterException.class)
+  public ResponseEntity<Map<String, String>> handleMissingParam(
+      MissingServletRequestParameterException e) {
+    return ResponseEntity.badRequest()
+        .body(Map.of("message", e.getParameterName() + " 파라미터가 누락되었습니다"));
   }
 
   @ExceptionHandler(FoodApiException.class)
