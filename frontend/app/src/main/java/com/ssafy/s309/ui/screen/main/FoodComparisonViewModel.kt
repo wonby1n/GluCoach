@@ -71,6 +71,6 @@ class FoodComparisonViewModel
                 fatG = fat,
                 kcal = calories,
                 sugarG = sugar,
-                giScore = gi,
+                giScore = gi.takeIf { it > 0 },
             )
     }

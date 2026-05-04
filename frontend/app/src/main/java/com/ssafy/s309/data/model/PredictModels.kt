@@ -17,7 +17,7 @@ data class FoodCompareItem(
     val fatG: Int,
     val kcal: Int,
     val sugarG: Int,
-    val giScore: Int,
+    val giScore: Int? = null,
 )
 
 @Serializable
