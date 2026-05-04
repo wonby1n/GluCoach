@@ -153,9 +153,13 @@ def run_postmeal_agent(trigger: dict):
 # ── 실행 ──────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    # 818: 사용자 응답 기반 재트리거
+    # 817에서 발송한 알림에 사용자가 "지금 회의 중이에요"라고 응답한 시나리오
     trigger = {
-        "reason":    "meal_recorded",
-        "meal_time": "2026-05-04 12:00",
+        "reason":                        "user_response",
+        "meal_time":                     "2026-05-04 12:00",
+        "previous_notification_sent_at": "2026-05-04 13:00",
+        "user_reply":                    "지금 회의 중이에요",
     }
 
     result = run_postmeal_agent(trigger)
