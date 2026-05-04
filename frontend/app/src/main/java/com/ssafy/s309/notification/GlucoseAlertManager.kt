@@ -11,6 +11,7 @@ import com.ssafy.s309.R
 import com.ssafy.s309.data.ble.BleManager
 import com.ssafy.s309.data.model.GlucoseReading
 import com.ssafy.s309.data.model.NotificationItem
+import com.ssafy.s309.projector.ProjectorSocketClient
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +37,7 @@ class GlucoseAlertManager
     constructor(
         @ApplicationContext private val context: Context,
         private val bleManager: BleManager,
+        private val projectorClient: ProjectorSocketClient,
     ) {
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -151,6 +153,10 @@ class GlucoseAlertManager
             lastAlertMs[type] = now
             val id = notifIdCounter.incrementAndGet()
             val urgent = type == AlertType.LOW
+
+            if (type == AlertType.HIGH || type == AlertType.LOW) {
+                scope.launch { projectorClient.alert() }
+            }
 
             val pendingIntent =
                 PendingIntent.getActivity(

@@ -1,0 +1,17 @@
+[Unit]
+Description=GlucoFit Projection Server
+After=graphical.target network.target
+Wants=graphical.target
+
+[Service]
+User=kiki
+WorkingDirectory=/home/kiki
+ExecStartPre=/bin/sleep 8
+ExecStart=/usr/bin/python3 /home/kiki/server.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=graphical.target
