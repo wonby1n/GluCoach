@@ -107,6 +107,25 @@ def build_postmeal_prompt(trigger: dict) -> str:
 - "알겠어요", "나갔다 올게요" 등 수락 응답 → 격려 메시지만 발송, followup 없음
 - "괜찮아요", "됐어요" 등 거절 응답 → 조용히 종료 (알림/followup 없음)
 """
+    elif reason == "schedule_followup":
+        original_reply = trigger.get("original_reply", "")
+        followup_at = trigger.get("followup_at", "")
+
+        trigger_section = f"""[트리거 정보]
+- 실행 이유: {reason}
+- 식사 시각: {meal_time}
+- 예약 시각: {followup_at}
+- 이전 사용자 응답: {original_reply}"""
+
+        role_section = """[역할]
+30분 전 예약된 재시도 agent입니다.
+이전 알림 이후 혈당 흐름과 활동량을 다시 확인하고, 가벼운 활동을 재권유하는 알림 1개를 보내세요."""
+
+        extra_section = """
+[재시도 지침]
+- 이전 알림과 다른 표현과 다른 앵글로 접근할 것
+- schedule_followup을 다시 호출하지 말 것 (재예약 금지)
+"""
     else:
         trigger_section = f"""[트리거 정보]
 - 실행 이유: {reason}

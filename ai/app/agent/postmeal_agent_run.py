@@ -152,9 +152,13 @@ def run_postmeal_agent(trigger: dict):
 
 # ── 실행 ──────────────────────────────────────────────────
 
+DEMO_FOLLOWUP_DELAY_SECONDS = 5  # 시연용: 실제 30분 대신 5초
+
+
 if __name__ == "__main__":
-    # 818: 사용자 응답 기반 재트리거
-    # 817에서 발송한 알림에 사용자가 "지금 회의 중이에요"라고 응답한 시나리오
+    import time
+
+    # 818: user_response 트리거로 시작
     trigger = {
         "reason":                        "user_response",
         "meal_time":                     "2026-05-04 12:00",
@@ -165,5 +169,22 @@ if __name__ == "__main__":
     result = run_postmeal_agent(trigger)
     print(f"\n[최종 결과] message={result['message']}")
     print(f"[followup]  {result['scheduled_followup']}")
-    filepath = save_trace(result, agent_type="postmeal")
-    print(f"[trace 저장] {filepath}")
+    save_trace(result, agent_type="postmeal_reply")      # → postmeal_reply_latest.json
+
+    # 819: schedule_followup이 예약됐으면 자동 재시도
+    if result["scheduled_followup"]:
+        delay_min = result["scheduled_followup"]["delay_minutes"]
+        print(f"\n[{delay_min}분 후 재시도 예약됨 → {DEMO_FOLLOWUP_DELAY_SECONDS}초 후 자동 실행]")
+        time.sleep(DEMO_FOLLOWUP_DELAY_SECONDS)
+
+        followup_trigger = {
+            "reason":         "schedule_followup",
+            "meal_time":      trigger["meal_time"],
+            "original_reply": trigger["user_reply"],
+            "followup_at":    "2026-05-04 13:30",
+        }
+
+        result2 = run_postmeal_agent(followup_trigger)
+        print(f"\n[재시도 결과] message={result2['message']}")
+        filepath = save_trace(result2, agent_type="postmeal_followup")  # → postmeal_followup_latest.json
+        print(f"[trace 저장] {filepath}")
