@@ -55,20 +55,24 @@ fun SignUpScreen(
     onSignUpClick: (String, String, String, String, String) -> Unit,
     onAlreadyMemberClick: () -> Unit,
     onBackClick: () -> Unit,
+    initialEmail: String = "",
+    initialPassword: String = "",
+    initialName: String = "",
+    initialPhone: String = "",
     isLoading: Boolean = false,
     errorMessage: String? = null,
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf(initialEmail) }
+    var password by remember { mutableStateOf(initialPassword) }
+    var confirmPassword by remember { mutableStateOf(initialPassword) }
+    var name by remember { mutableStateOf(initialName) }
+    var phone by remember { mutableStateOf(initialPhone) }
 
-    val isEmailValid = email.isNotEmpty() && email.contains("@")
+    val isEmailValid = email.isNotEmpty() && email.contains("@") && email.length <= 255
     val isPasswordValid = password.length >= 6
     val isPasswordMatch = password.isNotEmpty() && confirmPassword.isNotEmpty() && password == confirmPassword
-    val isNameValid = name.isNotEmpty()
-    val isPhoneValid = phone.isNotEmpty()
+    val isNameValid = name.isNotEmpty() && name.length <= 20
+    val isPhoneValid = phone.isNotEmpty() && phone.length <= 20
     val isFormValid = isEmailValid && isPasswordValid && isPasswordMatch && isNameValid && isPhoneValid
 
     Column(
@@ -151,7 +155,7 @@ fun SignUpScreen(
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions =
                     KeyboardOptions(
-                        keyboardType = KeyboardType.Text,
+                        keyboardType = KeyboardType.Password,
                         imeAction = ImeAction.Next,
                     ),
                 colors =
@@ -189,7 +193,7 @@ fun SignUpScreen(
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions =
                     KeyboardOptions(
-                        keyboardType = KeyboardType.Text,
+                        keyboardType = KeyboardType.Password,
                         imeAction = ImeAction.Next,
                     ),
                 colors =
@@ -236,6 +240,15 @@ fun SignUpScreen(
                     ),
             )
 
+            if (name.isNotEmpty() && name.length > 20) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "형식에 맞도록 값을 입력해주세요",
+                    fontSize = 12.sp,
+                    color = Error,
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
@@ -263,6 +276,15 @@ fun SignUpScreen(
                         unfocusedBorderColor = BorderLight,
                     ),
             )
+
+            if (phone.isNotEmpty() && phone.length > 20) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "형식에 맞도록 값을 입력해주세요",
+                    fontSize = 12.sp,
+                    color = Error,
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 

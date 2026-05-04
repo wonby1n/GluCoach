@@ -49,16 +49,61 @@ class AuthViewModel
             }
         }
 
-        fun signup(
+        var pendingEmail = ""
+            private set
+        var pendingPassword = ""
+            private set
+        var pendingName = ""
+            private set
+        var pendingPhone = ""
+            private set
+        var pendingAge = ""
+            private set
+        var pendingHeight = ""
+            private set
+        var pendingWeight = ""
+            private set
+
+        fun saveSignupData(
             email: String,
             password: String,
             name: String,
             phone: String,
         ) {
+            pendingEmail = email
+            pendingPassword = password
+            pendingName = name
+            pendingPhone = phone
+        }
+
+        fun saveHealthData(
+            age: String,
+            height: String,
+            weight: String,
+        ) {
+            pendingAge = age
+            pendingHeight = height
+            pendingWeight = weight
+        }
+
+        fun clearPendingData() {
+            pendingEmail = ""
+            pendingPassword = ""
+            pendingName = ""
+            pendingPhone = ""
+            pendingAge = ""
+            pendingHeight = ""
+            pendingWeight = ""
+        }
+
+        fun performPendingSignup() {
             viewModelScope.launch {
                 _uiState.value = AuthUiState.Loading
-                authRepository.signup(email, password, name, phone)
-                    .onSuccess { _uiState.value = AuthUiState.LoginSuccess(isNewUser = true) }
+                authRepository.signup(pendingEmail, pendingPassword, pendingName, pendingPhone)
+                    .onSuccess {
+                        clearPendingData()
+                        _uiState.value = AuthUiState.LoginSuccess(isNewUser = true)
+                    }
                     .onFailure { _uiState.value = AuthUiState.Error(it.message ?: "회원가입 실패") }
             }
         }
@@ -67,7 +112,10 @@ class AuthViewModel
             viewModelScope.launch {
                 _uiState.value = AuthUiState.Loading
                 authRepository.logout()
-                    .onSuccess { _uiState.value = AuthUiState.LogoutSuccess }
+                    .onSuccess {
+                        clearPendingData()
+                        _uiState.value = AuthUiState.LogoutSuccess
+                    }
                     .onFailure { _uiState.value = AuthUiState.Error(it.message ?: "로그아웃 실패") }
             }
         }
@@ -76,7 +124,10 @@ class AuthViewModel
             viewModelScope.launch {
                 _uiState.value = AuthUiState.Loading
                 authRepository.withdraw(password)
-                    .onSuccess { _uiState.value = AuthUiState.WithdrawSuccess }
+                    .onSuccess {
+                        clearPendingData()
+                        _uiState.value = AuthUiState.WithdrawSuccess
+                    }
                     .onFailure { _uiState.value = AuthUiState.Error(it.message ?: "회원 탈퇴 실패") }
             }
         }
