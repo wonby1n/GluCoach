@@ -43,11 +43,15 @@ pipeline {
 
         stage('Deploy to EC2') {
             steps {
-                withCredentials([file(credentialsId: 'firebase-key', variable: 'FIREBASE_KEY')]) {
+                withCredentials([
+                    file(credentialsId: 'firebase-key', variable: 'FIREBASE_KEY'),
+                    string(credentialsId: 'food-api-key', variable: 'FOOD_API_KEY')
+                ]) {
                     sshagent(credentials: ['ec2-ssh-key']) {    // Jenkins Credentials ID
                         sh """
                             scp -o StrictHostKeyChecking=no \$FIREBASE_KEY ${EC2_USER}@${EC2_HOST}:~/firebase-service-account.json
-                            ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} '
+                            ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "
+                                export FOOD_API_KEY='\$FOOD_API_KEY' &&
                                 cd ${DEPLOY_DIR} &&
                                 git reset --hard HEAD &&
                                 git clean -fd &&
@@ -55,7 +59,7 @@ pipeline {
                                 cp ~/firebase-service-account.json backend/src/main/resources/firebase-service-account.json &&
                                 docker compose -f infra/docker-compose.yml down &&
                                 docker compose -f infra/docker-compose.yml up -d --build
-                            '
+                            "
                         """
                     }
                 }
