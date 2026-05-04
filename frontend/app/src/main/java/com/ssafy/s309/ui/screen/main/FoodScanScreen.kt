@@ -77,7 +77,7 @@ import java.io.File
 
 // ── 상태 / 데이터 ───────────────────────────────────────
 
-private enum class ScanStep { CAMERA, ANALYZING, RESULT, SIMULATION }
+private enum class ScanStep { ANALYZING, RESULT, SIMULATION }
 
 private enum class AnalysisStatus { PENDING, IN_PROGRESS, COMPLETED }
 
@@ -99,22 +99,17 @@ private val candidates =
         FoodCandidate(3, "볶음밥", 550, R.drawable.jjajangmyeon, 25, 150, 110, 112),
     )
 
-// ── 진입점 ──────────────────────────────────────────────
+// ── 진입점 (카메라 제외, 탭 콘텐츠 영역에서 렌더링) ─────
 
 @Composable
-fun FoodScanFlow(onClose: () -> Unit) {
-    var step by remember { mutableStateOf(ScanStep.CAMERA) }
+fun FoodScanContent(
+    onBack: () -> Unit,
+    onRetakePhoto: () -> Unit,
+) {
+    var step by remember { mutableStateOf(ScanStep.ANALYZING) }
     var selectedIndex by remember { mutableIntStateOf(-1) }
 
     when (step) {
-        ScanStep.CAMERA -> {
-            BackHandler { onClose() }
-            CameraScreen(
-                onClose = onClose,
-                onPhotoTaken = { step = ScanStep.ANALYZING },
-            )
-        }
-
         ScanStep.ANALYZING -> {
             BackHandler(enabled = false) { }
             AnalyzingScreen(
@@ -123,10 +118,11 @@ fun FoodScanFlow(onClose: () -> Unit) {
         }
 
         ScanStep.RESULT -> {
-            BackHandler { step = ScanStep.CAMERA }
+            BackHandler { onBack() }
             AnalyzingResultScreen(
                 selectedIndex = selectedIndex,
                 onSelect = { selectedIndex = it },
+                onBack = onBack,
                 onViewDetail = {
                     if (selectedIndex >= 0) step = ScanStep.SIMULATION
                 },
@@ -140,7 +136,7 @@ fun FoodScanFlow(onClose: () -> Unit) {
                 onBack = { step = ScanStep.RESULT },
                 onRetakePhoto = {
                     selectedIndex = -1
-                    step = ScanStep.CAMERA
+                    onRetakePhoto()
                 },
                 onRecordMeal = { },
             )
@@ -151,10 +147,11 @@ fun FoodScanFlow(onClose: () -> Unit) {
 // ── 1. 카메라 화면 (FoodScan.png) ───────────────────────
 
 @Composable
-private fun CameraScreen(
+fun CameraScreen(
     onClose: () -> Unit,
     onPhotoTaken: () -> Unit,
 ) {
+    BackHandler { onClose() }
     val context = LocalContext.current
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -526,6 +523,7 @@ private fun AnalysisStepRow(
 private fun AnalyzingResultScreen(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
+    onBack: () -> Unit,
     onViewDetail: () -> Unit,
 ) {
     Column(
@@ -538,12 +536,22 @@ private fun AnalyzingResultScreen(
     ) {
         Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
 
-        Text(
-            text = "음식 리포트",
-            color = GlucoachColors.TextPrimary,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-        )
+        Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+            IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                    contentDescription = "뒤로",
+                    tint = GlucoachColors.TextPrimary,
+                )
+            }
+            Text(
+                text = "음식 리포트",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 

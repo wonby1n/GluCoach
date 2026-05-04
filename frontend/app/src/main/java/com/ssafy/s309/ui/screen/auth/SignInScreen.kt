@@ -44,6 +44,7 @@ import com.ssafy.s309.ui.theme.Primary
 fun SignInScreen(
     onSignInClick: (String, String) -> Unit,
     onForgotPasswordClick: () -> Unit,
+    onSignUpClick: () -> Unit,
     onBackClick: () -> Unit,
     isLoading: Boolean = false,
     errorMessage: String? = null,
@@ -171,6 +172,16 @@ fun SignInScreen(
                 color = Color(0xFF555555),
                 textDecoration = TextDecoration.Underline,
                 modifier = Modifier.clickable { onForgotPasswordClick() },
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "회원이 아니신가요?",
+                fontSize = 13.sp,
+                color = Color(0xFF555555),
+                textDecoration = TextDecoration.Underline,
+                modifier = Modifier.clickable { onSignUpClick() },
             )
         }
     }

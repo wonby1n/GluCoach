@@ -112,6 +112,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     authViewModel.login(email, password)
                 },
                 onForgotPasswordClick = {},
+                onSignUpClick = { navController.navigate(Screen.SignUp.route) },
                 onBackClick = { navController.popBackStack() },
                 isLoading = authState is AuthUiState.Loading,
                 errorMessage = (authState as? AuthUiState.Error)?.message,
@@ -132,8 +133,8 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             }
 
             SignUpScreen(
-                onSignUpClick = { email, password, _ ->
-                    authViewModel.signup(email, password)
+                onSignUpClick = { email, password, _, name, phone ->
+                    authViewModel.signup(email, password, name, phone)
                 },
                 onAlreadyMemberClick = { navController.navigate(Screen.SignIn.route) },
                 onBackClick = { navController.popBackStack() },

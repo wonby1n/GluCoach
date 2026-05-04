@@ -52,10 +52,12 @@ class AuthViewModel
         fun signup(
             email: String,
             password: String,
+            name: String,
+            phone: String,
         ) {
             viewModelScope.launch {
                 _uiState.value = AuthUiState.Loading
-                authRepository.signup(email, password)
+                authRepository.signup(email, password, name, phone)
                     .onSuccess { _uiState.value = AuthUiState.LoginSuccess(isNewUser = true) }
                     .onFailure { _uiState.value = AuthUiState.Error(it.message ?: "회원가입 실패") }
             }
