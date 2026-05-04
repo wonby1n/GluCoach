@@ -135,12 +135,17 @@ class AuthViewModel
         fun withdraw(password: String) {
             viewModelScope.launch {
                 _uiState.value = AuthUiState.Loading
+                android.util.Log.d("AuthVM", "withdraw called")
                 authRepository.withdraw(password)
                     .onSuccess {
+                        android.util.Log.d("AuthVM", "withdraw success")
                         clearPendingData()
                         _uiState.value = AuthUiState.WithdrawSuccess
                     }
-                    .onFailure { _uiState.value = AuthUiState.Error(it.message ?: "회원 탈퇴 실패") }
+                    .onFailure {
+                        android.util.Log.e("AuthVM", "withdraw failed: ${it.message}", it)
+                        _uiState.value = AuthUiState.Error(it.message ?: "회원 탈퇴 실패")
+                    }
             }
         }
 

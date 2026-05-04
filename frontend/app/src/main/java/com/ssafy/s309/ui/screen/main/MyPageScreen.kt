@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
@@ -20,9 +21,17 @@ import androidx.compose.material.icons.outlined.SentimentSatisfied
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.outlined.Videocam
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -41,9 +50,67 @@ fun MyPageContent(
     onSettingsClick: () -> Unit = {},
     onProjectorClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
+    onWithdrawClick: (String) -> Unit = {},
     userEmail: String = "",
     modifier: Modifier = Modifier,
 ) {
+    var showWithdrawDialog by remember { mutableStateOf(false) }
+    var withdrawPassword by remember { mutableStateOf("") }
+
+    if (showWithdrawDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showWithdrawDialog = false
+                withdrawPassword = ""
+            },
+            title = {
+                Text(
+                    text = "회원탈퇴",
+                    fontWeight = FontWeight.Bold,
+                )
+            },
+            text = {
+                Column {
+                    Text("정말로 탈퇴하시겠습니까?")
+                    Spacer(modifier = Modifier.height(12.dp))
+                    androidx.compose.material3.OutlinedTextField(
+                        value = withdrawPassword,
+                        onValueChange = { withdrawPassword = it },
+                        label = { Text("비밀번호 확인") },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showWithdrawDialog = false
+                        onWithdrawClick(withdrawPassword)
+                        withdrawPassword = ""
+                    },
+                    enabled = withdrawPassword.isNotEmpty(),
+                    colors = ButtonDefaults.buttonColors(containerColor = com.ssafy.s309.ui.theme.Error),
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text("예")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = {
+                        showWithdrawDialog = false
+                        withdrawPassword = ""
+                    },
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text("아니오")
+                }
+            },
+        )
+    }
+
     Column(
         modifier =
             modifier
@@ -118,6 +185,18 @@ fun MyPageContent(
             modifier =
                 Modifier
                     .clickable(onClick = onLogoutClick)
+                    .padding(vertical = GlucoachSpacing.md),
+        )
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+
+        Text(
+            text = "회원탈퇴",
+            color = GlucoachColors.TextSecondary,
+            fontSize = 14.sp,
+            modifier =
+                Modifier
+                    .clickable { showWithdrawDialog = true }
                     .padding(vertical = GlucoachSpacing.md),
         )
 

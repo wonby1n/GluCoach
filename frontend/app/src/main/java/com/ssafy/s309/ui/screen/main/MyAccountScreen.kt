@@ -22,12 +22,14 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.ManageAccounts
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -54,9 +56,65 @@ import com.ssafy.s309.ui.theme.Primary
 fun MyAccountScreen(
     viewModel: MyAccountViewModel = hiltViewModel(),
     onBack: () -> Unit = {},
-    onWithdrawClick: () -> Unit = {},
+    onWithdrawClick: (String) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showWithdrawDialog by remember { mutableStateOf(false) }
+    var withdrawPassword by remember { mutableStateOf("") }
+
+    if (showWithdrawDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showWithdrawDialog = false
+                withdrawPassword = ""
+            },
+            title = {
+                Text(
+                    text = "회원탈퇴",
+                    fontWeight = FontWeight.Bold,
+                )
+            },
+            text = {
+                Column {
+                    Text("정말로 탈퇴하시겠습니까?")
+                    Spacer(modifier = Modifier.height(12.dp))
+                    androidx.compose.material3.OutlinedTextField(
+                        value = withdrawPassword,
+                        onValueChange = { withdrawPassword = it },
+                        label = { Text("비밀번호 확인") },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showWithdrawDialog = false
+                        onWithdrawClick(withdrawPassword)
+                        withdrawPassword = ""
+                    },
+                    enabled = withdrawPassword.isNotEmpty(),
+                    colors = ButtonDefaults.buttonColors(containerColor = com.ssafy.s309.ui.theme.Error),
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text("예")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = {
+                        showWithdrawDialog = false
+                        withdrawPassword = ""
+                    },
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text("아니오")
+                }
+            },
+        )
+    }
 
     LaunchedEffect(uiState.saveSuccess) {
         if (uiState.saveSuccess) {
@@ -129,7 +187,7 @@ fun MyAccountScreen(
                 MyAccountForm(
                     uiState = uiState,
                     onSave = viewModel::saveProfile,
-                    onWithdrawClick = onWithdrawClick,
+                    onWithdrawClick = { showWithdrawDialog = true },
                 )
             }
         }
