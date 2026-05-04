@@ -15,6 +15,7 @@ import com.ssafy.s309.domain.user.entity.User;
 import com.ssafy.s309.domain.user.entity.WardGuardian;
 import com.ssafy.s309.domain.user.repository.UserRepository;
 import com.ssafy.s309.domain.user.repository.WardGuardianRepository;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +34,7 @@ class UserServiceTest {
   @Mock private WardGuardianRepository wardGuardianRepository;
   @InjectMocks private UserService userService;
 
-  private static final Long USER_ID = 1L;
+  private static final Integer USER_ID = 1;
 
   private User ward;
 
@@ -53,7 +54,7 @@ class UserServiceTest {
 
     assertThat(response.userId()).isEqualTo(USER_ID);
     assertThat(response.diabetesType()).isNull();
-    assertThat(response.weekStartDay()).isEqualTo(1);
+    assertThat(response.weekStartDay()).isEqualTo((short) 1);
   }
 
   @Test
@@ -62,11 +63,21 @@ class UserServiceTest {
 
     SettingsUpdateRequest request =
         new SettingsUpdateRequest(
-            "홍길동", 30, "male", "01012345678", 170f, 65f, DiabetesType.T2D, true, 80, 160, 1);
+            "홍길동",
+            (short) 30,
+            "male",
+            "01012345678",
+            new BigDecimal("170.0"),
+            new BigDecimal("65.0"),
+            DiabetesType.T2D,
+            true,
+            new BigDecimal("80.00"),
+            new BigDecimal("160.00"),
+            (short) 1);
 
     SettingsResponse response = userService.updateSettings(USER_ID, request);
 
-    assertThat(response.height()).isEqualTo(170f);
+    assertThat(response.height()).isEqualByComparingTo(new BigDecimal("170.0"));
     assertThat(response.diabetesType()).isEqualTo(DiabetesType.T2D);
     assertThat(response.isMedicated()).isTrue();
     assertThat(response.name()).isEqualTo("홍길동");
@@ -77,12 +88,13 @@ class UserServiceTest {
     given(userRepository.findById(USER_ID)).willReturn(Optional.of(ward));
 
     SettingsUpdateRequest request =
-        new SettingsUpdateRequest(null, null, null, null, 175f, null, null, null, null, null, null);
+        new SettingsUpdateRequest(
+            null, null, null, null, new BigDecimal("175.0"), null, null, null, null, null, null);
 
     SettingsResponse response = userService.updateSettings(USER_ID, request);
 
-    assertThat(response.height()).isEqualTo(175f);
-    assertThat(response.weekStartDay()).isEqualTo(1);
+    assertThat(response.height()).isEqualByComparingTo(new BigDecimal("175.0"));
+    assertThat(response.weekStartDay()).isEqualTo((short) 1);
   }
 
   @Test
@@ -100,15 +112,15 @@ class UserServiceTest {
   void 보호자_목록_조회_priority_순서_반환() {
     User g1 = User.builder().email("g1@example.com").build();
     User g2 = User.builder().email("g2@example.com").build();
-    ReflectionTestUtils.setField(g1, "id", 2L);
-    ReflectionTestUtils.setField(g2, "id", 3L);
+    ReflectionTestUtils.setField(g1, "id", 2);
+    ReflectionTestUtils.setField(g2, "id", 3);
 
     WardGuardian wg1 =
-        WardGuardian.builder().ward(ward).guardian(g1).relation("부모").priority(0).build();
+        WardGuardian.builder().ward(ward).guardian(g1).relation("부모").priority((short) 0).build();
     WardGuardian wg2 =
-        WardGuardian.builder().ward(ward).guardian(g2).relation("배우자").priority(1).build();
-    ReflectionTestUtils.setField(wg1, "id", 10L);
-    ReflectionTestUtils.setField(wg2, "id", 11L);
+        WardGuardian.builder().ward(ward).guardian(g2).relation("배우자").priority((short) 1).build();
+    ReflectionTestUtils.setField(wg1, "id", 10);
+    ReflectionTestUtils.setField(wg2, "id", 11);
 
     given(userRepository.findById(USER_ID)).willReturn(Optional.of(ward));
     given(wardGuardianRepository.findAllByWard_IdOrderByPriorityAsc(USER_ID))
@@ -117,44 +129,54 @@ class UserServiceTest {
     List<GuardianResponse> result = userService.getGuardians(USER_ID);
 
     assertThat(result).hasSize(2);
-    assertThat(result.get(0).priority()).isEqualTo(0);
+    assertThat(result.get(0).priority()).isEqualTo((short) 0);
     assertThat(result.get(0).relation()).isEqualTo("부모");
-    assertThat(result.get(1).priority()).isEqualTo(1);
+    assertThat(result.get(1).priority()).isEqualTo((short) 1);
   }
 
   @Test
   void 보호자_등록_priority_자동_할당() {
     User guardian = User.builder().email("guardian@example.com").build();
-    ReflectionTestUtils.setField(guardian, "id", 2L);
+    ReflectionTestUtils.setField(guardian, "id", 2);
 
     WardGuardian saved =
-        WardGuardian.builder().ward(ward).guardian(guardian).relation("부모").priority(2).build();
-    ReflectionTestUtils.setField(saved, "id", 10L);
+        WardGuardian.builder()
+            .ward(ward)
+            .guardian(guardian)
+            .relation("부모")
+            .priority((short) 2)
+            .build();
+    ReflectionTestUtils.setField(saved, "id", 10);
 
     given(userRepository.findById(USER_ID)).willReturn(Optional.of(ward));
-    given(userRepository.findById(2L)).willReturn(Optional.of(guardian));
+    given(userRepository.findById(2)).willReturn(Optional.of(guardian));
     given(wardGuardianRepository.countByWard_Id(USER_ID)).willReturn(2);
     given(wardGuardianRepository.save(any(WardGuardian.class))).willReturn(saved);
 
-    GuardianResponse response = userService.createGuardian(USER_ID, new GuardianRequest(2L, "부모"));
+    GuardianResponse response = userService.createGuardian(USER_ID, new GuardianRequest(2, "부모"));
 
-    assertThat(response.guardianId()).isEqualTo(2L);
-    assertThat(response.priority()).isEqualTo(2);
+    assertThat(response.guardianId()).isEqualTo(2);
+    assertThat(response.priority()).isEqualTo((short) 2);
   }
 
   @Test
   void 보호자_수정_성공() {
     User guardian = User.builder().email("guardian@example.com").build();
-    ReflectionTestUtils.setField(guardian, "id", 2L);
+    ReflectionTestUtils.setField(guardian, "id", 2);
 
     WardGuardian wg =
-        WardGuardian.builder().ward(ward).guardian(guardian).relation("부모").priority(0).build();
-    ReflectionTestUtils.setField(wg, "id", 10L);
+        WardGuardian.builder()
+            .ward(ward)
+            .guardian(guardian)
+            .relation("부모")
+            .priority((short) 0)
+            .build();
+    ReflectionTestUtils.setField(wg, "id", 10);
 
-    given(wardGuardianRepository.findById(10L)).willReturn(Optional.of(wg));
+    given(wardGuardianRepository.findById(10)).willReturn(Optional.of(wg));
 
     GuardianResponse response =
-        userService.updateGuardian(USER_ID, 10L, new GuardianRequest(2L, "가족"));
+        userService.updateGuardian(USER_ID, 10, new GuardianRequest(2, "가족"));
 
     assertThat(response.relation()).isEqualTo("가족");
   }
@@ -162,18 +184,18 @@ class UserServiceTest {
   @Test
   void 다른_유저의_보호자_수정_예외() {
     User otherWard = User.builder().email("other@example.com").build();
-    ReflectionTestUtils.setField(otherWard, "id", 99L);
+    ReflectionTestUtils.setField(otherWard, "id", 99);
 
     User guardian = User.builder().email("guardian@example.com").build();
-    ReflectionTestUtils.setField(guardian, "id", 2L);
+    ReflectionTestUtils.setField(guardian, "id", 2);
 
-    WardGuardian wg = WardGuardian.builder().ward(otherWard).guardian(guardian).priority(0).build();
-    ReflectionTestUtils.setField(wg, "id", 10L);
+    WardGuardian wg =
+        WardGuardian.builder().ward(otherWard).guardian(guardian).priority((short) 0).build();
+    ReflectionTestUtils.setField(wg, "id", 10);
 
-    given(wardGuardianRepository.findById(10L)).willReturn(Optional.of(wg));
+    given(wardGuardianRepository.findById(10)).willReturn(Optional.of(wg));
 
-    assertThatThrownBy(
-            () -> userService.updateGuardian(USER_ID, 10L, new GuardianRequest(2L, null)))
+    assertThatThrownBy(() -> userService.updateGuardian(USER_ID, 10, new GuardianRequest(2, null)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("해당 유저의 보호자가 아닙니다");
   }
@@ -183,23 +205,23 @@ class UserServiceTest {
     User g1 = User.builder().email("g1@example.com").build();
     User g2 = User.builder().email("g2@example.com").build();
     User g3 = User.builder().email("g3@example.com").build();
-    ReflectionTestUtils.setField(g1, "id", 2L);
-    ReflectionTestUtils.setField(g2, "id", 3L);
-    ReflectionTestUtils.setField(g3, "id", 4L);
+    ReflectionTestUtils.setField(g1, "id", 2);
+    ReflectionTestUtils.setField(g2, "id", 3);
+    ReflectionTestUtils.setField(g3, "id", 4);
 
-    WardGuardian wg0 = WardGuardian.builder().ward(ward).guardian(g1).priority(0).build();
-    WardGuardian wg1 = WardGuardian.builder().ward(ward).guardian(g2).priority(1).build();
-    WardGuardian wg2 = WardGuardian.builder().ward(ward).guardian(g3).priority(2).build();
-    ReflectionTestUtils.setField(wg1, "id", 11L);
+    WardGuardian wg0 = WardGuardian.builder().ward(ward).guardian(g1).priority((short) 0).build();
+    WardGuardian wg1 = WardGuardian.builder().ward(ward).guardian(g2).priority((short) 1).build();
+    WardGuardian wg2 = WardGuardian.builder().ward(ward).guardian(g3).priority((short) 2).build();
+    ReflectionTestUtils.setField(wg1, "id", 11);
 
-    given(wardGuardianRepository.findById(11L)).willReturn(Optional.of(wg1));
+    given(wardGuardianRepository.findById(11)).willReturn(Optional.of(wg1));
     given(wardGuardianRepository.findAllByWard_IdOrderByPriorityAsc(USER_ID))
         .willReturn(List.of(wg0, wg2));
 
-    userService.deleteGuardian(USER_ID, 11L);
+    userService.deleteGuardian(USER_ID, 11);
 
     verify(wardGuardianRepository).delete(wg1);
-    assertThat(wg2.getPriority()).isEqualTo(1);
-    assertThat(wg0.getPriority()).isEqualTo(0);
+    assertThat(wg2.getPriority()).isEqualTo((short) 1);
+    assertThat(wg0.getPriority()).isEqualTo((short) 0);
   }
 }

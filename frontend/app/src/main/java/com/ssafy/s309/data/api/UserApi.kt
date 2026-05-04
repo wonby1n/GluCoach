@@ -1,5 +1,6 @@
 package com.ssafy.s309.data.api
 
+import com.ssafy.s309.data.model.FcmTokenRequest
 import com.ssafy.s309.data.model.GuardianCreateRequest
 import com.ssafy.s309.data.model.GuardianItem
 import com.ssafy.s309.data.model.UserSettings
@@ -12,6 +13,12 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 
 interface UserApi {
+    @PUT("api/users/{userId}/fcm-token")
+    suspend fun registerFcmToken(
+        @Path("userId") userId: String,
+        @Body request: FcmTokenRequest,
+    )
+
     @GET("api/users/{userId}/settings")
     suspend fun getSettings(
         @Path("userId") userId: String,

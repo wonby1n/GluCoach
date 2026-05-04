@@ -3,12 +3,15 @@ package com.ssafy.s309.domain.food.client.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
-public record FoodApiResponse(@JsonProperty("I2790") I2790 i2790) {
+public record FoodApiResponse(
+    @JsonProperty("header") Header header, @JsonProperty("body") Body body) {
 
-  public record I2790(
-      @JsonProperty("total_count") String totalCount,
-      @JsonProperty("row") List<FoodApiItem> rows,
-      @JsonProperty("RESULT") Result result) {}
+  public record Header(
+      @JsonProperty("resultCode") String resultCode, @JsonProperty("resultMsg") String resultMsg) {}
 
-  public record Result(@JsonProperty("CODE") String code, @JsonProperty("MSG") String msg) {}
+  public record Body(
+      @JsonProperty("pageNo") Integer pageNo,
+      @JsonProperty("totalCount") Integer totalCount,
+      @JsonProperty("numOfRows") Integer numOfRows,
+      @JsonProperty("items") List<FoodApiItem> items) {}
 }

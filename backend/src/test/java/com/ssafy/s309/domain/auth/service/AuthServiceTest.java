@@ -34,7 +34,7 @@ class AuthServiceTest {
   @Mock private PasswordEncoder passwordEncoder;
   @InjectMocks private AuthService authService;
 
-  private static final Long USER_ID = 1L;
+  private static final Integer USER_ID = 1;
   private User user;
 
   @BeforeEach
@@ -45,7 +45,8 @@ class AuthServiceTest {
 
   @Test
   void 회원가입_성공() {
-    SignupRequest request = new SignupRequest("new@example.com", "password123");
+    SignupRequest request =
+        new SignupRequest("new@example.com", "password123", "테스트유저", "010-0000-0000");
     given(userRepository.existsByEmail("new@example.com")).willReturn(false);
     given(passwordEncoder.encode("password123")).willReturn("encodedPassword");
     given(userRepository.save(any(User.class)))
@@ -67,7 +68,8 @@ class AuthServiceTest {
 
   @Test
   void 회원가입_이메일_중복_예외() {
-    SignupRequest request = new SignupRequest("test@example.com", "password123");
+    SignupRequest request =
+        new SignupRequest("test@example.com", "password123", "테스트유저", "010-0000-0000");
     given(userRepository.existsByEmail("test@example.com")).willReturn(true);
 
     assertThatThrownBy(() -> authService.signup(request))

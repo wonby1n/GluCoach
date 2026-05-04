@@ -37,10 +37,13 @@ ai-service:
   read-timeout-ms: ${AI_READ_TIMEOUT:5000}
 
 food-api:
-  base-url: ${FOOD_API_URL:https://openapi.foodsafetykorea.go.kr/api}
+  base-url: ${FOOD_API_URL:https://apis.data.go.kr/1471000}
   service-key: ${FOOD_API_KEY}
   connect-timeout-ms: ${FOOD_API_CONNECT_TIMEOUT:3000}
   read-timeout-ms: ${FOOD_API_READ_TIMEOUT:5000}
+
+agent:
+  api-key: ${AGENT_API_KEY:dev-agent-key-change-in-prod}
 
 aws:
   s3:

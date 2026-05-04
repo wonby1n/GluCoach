@@ -14,6 +14,7 @@ import com.ssafy.s309.domain.auth.jwt.JwtProvider;
 import com.ssafy.s309.domain.user.entity.User;
 import com.ssafy.s309.domain.user.entity.WardGuardian;
 import com.ssafy.s309.domain.user.repository.UserRepository;
+import java.math.BigDecimal;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,7 +37,7 @@ class AuthWithdrawFlowTest {
   @Mock private PasswordEncoder passwordEncoder;
   @InjectMocks private AuthService authService;
 
-  private static final Long USER_ID = 1L;
+  private static final Integer USER_ID = 1;
 
   private User user;
 
@@ -47,8 +48,8 @@ class AuthWithdrawFlowTest {
             .email("user@glucofit.com")
             .password("encodedPw")
             .provider("email")
-            .height(175f)
-            .weight(70f)
+            .height(new BigDecimal("175.0"))
+            .weight(new BigDecimal("70.0"))
             .build();
     ReflectionTestUtils.setField(user, "id", USER_ID);
   }
@@ -70,7 +71,8 @@ class AuthWithdrawFlowTest {
     given(jwtProvider.generateRefreshToken(any())).willReturn("rt");
 
     TokenResponse signupResp =
-        authService.signup(new SignupRequest("user@glucofit.com", "myPassword"));
+        authService.signup(
+            new SignupRequest("user@glucofit.com", "myPassword", "테스트유저", "010-0000-0000"));
     assertThat(signupResp.accessToken()).isNotNull();
 
     // 2) 로그인 성공
@@ -106,10 +108,15 @@ class AuthWithdrawFlowTest {
   @DisplayName("탈퇴 시 보호자 관계도 함께 제거")
   void 탈퇴시_보호자_관계_클리어() {
     User guardianUser = User.builder().email("guardian@glucofit.com").build();
-    ReflectionTestUtils.setField(guardianUser, "id", 2L);
+    ReflectionTestUtils.setField(guardianUser, "id", 2);
 
     WardGuardian wg =
-        WardGuardian.builder().ward(user).guardian(guardianUser).relation("가족").priority(0).build();
+        WardGuardian.builder()
+            .ward(user)
+            .guardian(guardianUser)
+            .relation("가족")
+            .priority((short) 0)
+            .build();
     user.getWardGuardians().add(wg);
 
     given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
@@ -137,14 +144,15 @@ class AuthWithdrawFlowTest {
         .willAnswer(
             inv -> {
               User saved = inv.getArgument(0);
-              ReflectionTestUtils.setField(saved, "id", 99L);
+              ReflectionTestUtils.setField(saved, "id", 99);
               return saved;
             });
     given(jwtProvider.generateAccessToken(any(), anyString())).willReturn("new-at");
     given(jwtProvider.generateRefreshToken(any())).willReturn("new-rt");
 
     TokenResponse reSignup =
-        authService.signup(new SignupRequest("user@glucofit.com", "newPassword"));
+        authService.signup(
+            new SignupRequest("user@glucofit.com", "newPassword", "테스트유저", "010-0000-0000"));
     assertThat(reSignup.accessToken()).isEqualTo("new-at");
   }
 

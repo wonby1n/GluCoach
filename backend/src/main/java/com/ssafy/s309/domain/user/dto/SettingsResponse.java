@@ -2,20 +2,21 @@ package com.ssafy.s309.domain.user.dto;
 
 import com.ssafy.s309.domain.user.entity.DiabetesType;
 import com.ssafy.s309.domain.user.entity.User;
+import java.math.BigDecimal;
 
 public record SettingsResponse(
-    Long userId,
+    Integer userId,
     String name,
-    Integer age,
+    Short age,
     String gender,
     String phone,
-    Float height,
-    Float weight,
+    BigDecimal height,
+    BigDecimal weight,
     DiabetesType diabetesType,
     Boolean isMedicated,
-    Integer targetLow,
-    Integer targetHigh,
-    Integer weekStartDay) {
+    BigDecimal targetLow,
+    BigDecimal targetHigh,
+    Short weekStartDay) {
 
   public static SettingsResponse from(User user) {
     return new SettingsResponse(

@@ -26,7 +26,7 @@ class UserEntityTest {
 
     assertThat(found.getDiabetesType()).isNull();
     assertThat(found.getIsMedicated()).isNull();
-    assertThat(found.getWeekStartDay()).isEqualTo(1);
+    assertThat(found.getWeekStartDay()).isEqualTo((short) 1);
     assertThat(found.getTargetLow()).isNull();
     assertThat(found.getTargetHigh()).isNull();
   }

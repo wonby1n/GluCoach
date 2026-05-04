@@ -48,3 +48,9 @@ data class GuardianCreateRequest(
     val relation: String? = null,
     val isPrimary: Boolean = false,
 )
+
+@Serializable
+data class FcmTokenRequest(
+    val token: String,
+    val deviceType: String? = "android",
+)

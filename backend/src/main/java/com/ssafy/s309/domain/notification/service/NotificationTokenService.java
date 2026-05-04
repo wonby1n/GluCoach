@@ -1,6 +1,7 @@
 package com.ssafy.s309.domain.notification.service;
 
 import com.ssafy.s309.common.service.FcmService;
+import com.ssafy.s309.domain.notification.entity.DeviceType;
 import com.ssafy.s309.domain.notification.entity.NotificationToken;
 import com.ssafy.s309.domain.notification.repository.NotificationTokenRepository;
 import com.ssafy.s309.domain.user.entity.User;
@@ -17,7 +18,7 @@ public class NotificationTokenService {
   private final FcmService fcmService;
 
   @Transactional
-  public void saveToken(User user, String token, String deviceType) {
+  public void saveToken(User user, String token, DeviceType deviceType) {
     tokenRepository
         .findByUserAndDeviceType(user, deviceType)
         .ifPresentOrElse(
