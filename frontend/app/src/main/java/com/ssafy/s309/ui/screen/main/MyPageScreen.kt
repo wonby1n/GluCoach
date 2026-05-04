@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.ManageAccounts
 import androidx.compose.material.icons.outlined.SentimentSatisfied
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Smartphone
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +39,7 @@ fun MyPageContent(
     onGuardianClick: () -> Unit = {},
     onDeviceClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onProjectorClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
     userEmail: String = "",
     modifier: Modifier = Modifier,
@@ -90,6 +92,11 @@ fun MyPageContent(
             icon = Icons.Outlined.Settings,
             title = "설정",
             onClick = onSettingsClick,
+        )
+        InfoMenuItem(
+            icon = Icons.Outlined.Videocam,
+            title = "프로젝터 제어",
+            onClick = onProjectorClick,
         )
 
         Spacer(modifier = Modifier.height(64.dp))
