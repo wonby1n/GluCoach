@@ -14,6 +14,7 @@ import com.ssafy.s309.data.repository.source.HealthConnectDataSource
 import com.ssafy.s309.data.repository.source.HealthDataSource
 import com.ssafy.s309.data.repository.source.MockHealthDataSource
 import com.ssafy.s309.data.repository.source.SamsungHealthDataSource
+import com.ssafy.s309.notification.GlucoseAlertManager
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
@@ -45,6 +46,9 @@ class HealthRepository
         samsungDataSource: SamsungHealthDataSource,
         healthConnectDataSource: HealthConnectDataSource,
         private val bleManager: BleManager,
+        private val glucoseAlertManager: GlucoseAlertManager,
+        // TODO(BE 연동): 실제 API 연결 시 주입 활성화
+        // private val healthApi: HealthApi,
     ) {
         // 우선순위: Samsung Health → Health Connect → Mock(=fallback)
         private val primarySources: List<HealthDataSource> =
@@ -65,6 +69,17 @@ class HealthRepository
 
         /** 패치에서 누적된 혈당 히스토리 (최대 100개, 앱 수명 동안 유지). */
         val glucoseHistory: StateFlow<List<GlucoseReading>> = bleManager.glucoseHistory
+
+        /** GlucoseAlertManager 가 감지한 이상 혈당 알림 스트림 (인앱 패널 표시용). */
+        val glucoseAlertStream: SharedFlow<NotificationItem> = glucoseAlertManager.alertStream
+
+        /** 사용자 설정 기반 알림 임계값 갱신. */
+        fun updateAlertThresholds(
+            alertLow: Int,
+            alertHigh: Int,
+        ) {
+            glucoseAlertManager.updateThresholds(alertLow, alertHigh)
+        }
 
         /** 데이터 처리 설정 스냅샷 (보정값 / 스파이크 임계값 / 출력타입 / 주기평균). */
         val bleProcessingSettings: StateFlow<BleProcessingSettings> = bleManager.processingSettings

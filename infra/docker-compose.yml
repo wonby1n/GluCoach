@@ -118,6 +118,8 @@ services:
       - "8000"
     environment:
       DEBUG: ${AI_DEBUG:-false}
+    volumes:
+      - ai-models:/app/models
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
@@ -158,6 +160,7 @@ volumes:
   postgres-data:
   redis-data:
   n8n-data:
+  ai-models:
 networks:
   internal:
     driver: bridge

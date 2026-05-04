@@ -1,7 +1,10 @@
 package com.ssafy.s309.data.repository
 
+import android.util.Log
 import com.ssafy.s309.data.api.AuthApi
+import com.ssafy.s309.data.api.UserApi
 import com.ssafy.s309.data.local.TokenManager
+import com.ssafy.s309.data.model.FcmTokenRequest
 import com.ssafy.s309.data.model.LoginRequest
 import com.ssafy.s309.data.model.ReissueRequest
 import com.ssafy.s309.data.model.SignupRequest
@@ -16,6 +19,7 @@ class AuthRepository
     constructor(
         private val authApi: AuthApi,
         private val tokenManager: TokenManager,
+        private val userApi: UserApi,
     ) {
         suspend fun signup(
             email: String,
@@ -26,6 +30,7 @@ class AuthRepository
                 tokenManager.saveTokens(response.accessToken, response.refreshToken)
                 tokenManager.saveEmail(email)
                 tokenManager.parseUserIdFromJwt(response.accessToken)?.let { tokenManager.saveUserId(it) }
+                sendStoredFcmToken()
                 response
             }
 
@@ -38,8 +43,20 @@ class AuthRepository
                 tokenManager.saveTokens(response.accessToken, response.refreshToken)
                 tokenManager.saveEmail(email)
                 tokenManager.parseUserIdFromJwt(response.accessToken)?.let { tokenManager.saveUserId(it) }
+                sendStoredFcmToken()
                 response
             }
+
+        /** 로컬에 저장된 FCM 토큰을 서버에 등록. 실패해도 로그인 흐름은 계속된다. */
+        private suspend fun sendStoredFcmToken() {
+            val userId = tokenManager.getUserId() ?: return
+            val fcmToken = tokenManager.getFcmToken() ?: return
+            runCatching {
+                userApi.registerFcmToken(userId, FcmTokenRequest(fcmToken))
+            }.onFailure {
+                Log.w("AuthRepository", "FCM 토큰 서버 등록 실패", it)
+            }
+        }
 
         suspend fun refresh(): Result<TokenResponse> =
             runCatching {

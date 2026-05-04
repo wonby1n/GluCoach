@@ -14,7 +14,7 @@ import torch
 
 from app.glucose import config, predict
 from app.glucose.constants import LABEL_STEPS
-from app.schemas.glucose import HealthResponse, PredictResponse
+from app.schemas.glucose import GlucosePoint, HealthResponse, PredictResponse
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,41 @@ def _dummy_curve_from_recent(recent_values: list[float]) -> list[float]:
 
 
 # ─────────────────────────────────────────────────────────────────────
+# 응답 조립 헬퍼
+# ─────────────────────────────────────────────────────────────────────
+
+
+def _build_predict_response(
+    horizons: list[int],
+    predicted: list[float],
+    baseline: float,
+    model_type: str,
+    confidence: float,
+) -> PredictResponse:
+    """curve 배열과 파생 지표(peak/return)를 계산해 PredictResponse 를 만든다.
+
+    return_minute: 피크 이후 처음으로 상승분의 80% 이상이 복귀되는 시점.
+    피크 이전이거나 상승이 없으면 마지막 시점 반환.
+    """
+    curve = [
+        GlucosePoint(minute_offset=h, glucose_mgdl=v)
+        for h, v in zip(horizons, predicted)
+    ]
+
+    peak_mgdl = max(predicted) if predicted else baseline
+    peak_idx = predicted.index(peak_mgdl) if predicted else 0
+    peak_minute = horizons[peak_idx] if predicted else horizons[-1]
+
+    return PredictResponse(
+        curve=curve,
+        peak_mgdl=round(peak_mgdl, 2),
+        peak_minute=peak_minute,
+        model_type=model_type,
+        confidence=confidence,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────
 # Public API (api/glucose.py 호출)
 # ─────────────────────────────────────────────────────────────────────
 
@@ -56,31 +91,33 @@ def predict_meal_response(request: dict[str, Any]) -> PredictResponse:
 
     user_id 에 개인화 모델이 있으면 자동 사용, 없으면 베이스 모델.
     실제 모델 시도 → 실패 시 dummy 폴백.
+    recent_values 없으면 400 (ValueError).
     """
     recent: list[float] = request.get("recent_values") or []
     if not recent:
         raise ValueError("recent_values is required (>=1)")
 
+    baseline = float(recent[-1])
     user_id: str | None = request.get("user_id")
     predicted: list[float]
-    mode = "base"
+    model_type = "base"
     used_dummy = False
     try:
         predictor = predict.get_meal_predictor(model_type=config.MEAL_MODEL_TYPE, user_id=user_id)
         predicted = predictor.predict(request)
-        mode = predictor.mode
+        model_type = predictor.mode
     except (RuntimeError, FileNotFoundError) as e:
         logger.warning(f"meal model not loaded → dummy fallback: {e}")
         used_dummy = True
         carbs = float(request["meal"]["carbs"])
-        current_glucose = float(recent[-1])
-        predicted = _dummy_curve_from_meal(carbs, current_glucose)
+        predicted = _dummy_curve_from_meal(carbs, baseline)
 
-    return PredictResponse(
-        horizons_min=LABEL_STEPS,
+    return _build_predict_response(
+        horizons=LABEL_STEPS,
         predicted=predicted,
+        baseline=baseline,
+        model_type=model_type,
         confidence=0.85 if not used_dummy else 0.3,
-        mode=mode,
     )
 
 
@@ -90,6 +127,7 @@ def predict_now(request: dict[str, Any]) -> PredictResponse:
     if len(recent) < 12:
         raise ValueError(f"recent_values must have >=12 items, got {len(recent)}")
 
+    baseline = float(recent[-1])
     predicted: list[float]
     used_dummy = False
     try:
@@ -100,11 +138,12 @@ def predict_now(request: dict[str, Any]) -> PredictResponse:
         used_dummy = True
         predicted = _dummy_curve_from_recent(recent)
 
-    return PredictResponse(
-        horizons_min=LABEL_STEPS,
+    return _build_predict_response(
+        horizons=LABEL_STEPS,
         predicted=predicted,
+        baseline=baseline,
+        model_type="base",
         confidence=0.85 if not used_dummy else 0.3,
-        mode="base",
     )
 
 
@@ -120,10 +159,10 @@ def health_check() -> HealthResponse:
 
     if meal_loaded and now_loaded and scaler_loaded:
         status = "UP"
-    elif scaler_loaded and (meal_loaded or now_loaded):
+    elif meal_loaded or now_loaded or scaler_loaded:
         status = "DEGRADED"
     else:
-        status = "DEGRADED"
+        status = "DOWN"
 
     return HealthResponse(
         status=status,
@@ -132,5 +171,3 @@ def health_check() -> HealthResponse:
         scaler_loaded=scaler_loaded,
         cuda_available=torch.cuda.is_available(),
     )
-
-
