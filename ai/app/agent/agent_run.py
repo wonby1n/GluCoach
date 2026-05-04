@@ -19,6 +19,7 @@ import anthropic
 
 from app.agent.tools import TOOL_SCHEMAS, TOOL_MAP
 from app.agent.prompts import build_morning_prompt
+from app.agent.trace_writer import save_trace
 
 # ── 환경 설정 ─────────────────────────────────────────────
 
@@ -144,3 +145,5 @@ def run_agent():
 if __name__ == "__main__":
     result = run_agent()
     print(f"\n[최종 결과] message={result['message']}")
+    filepath = save_trace(result, agent_type="morning")
+    print(f"[trace 저장] {filepath}")
