@@ -19,6 +19,7 @@ import anthropic
 
 from app.agent.tools import TOOL_SCHEMAS, TOOL_MAP
 from app.agent.prompts import build_morning_prompt
+from app.agent.trace_writer import save_trace
 
 # ── 환경 설정 ─────────────────────────────────────────────
 
@@ -60,6 +61,8 @@ def run_agent():
     ]
 
     turn = 0
+    sent_message = None   # send_notification으로 보낸 메시지
+    tool_call_details = []  # 도구 호출 이력 (815 reasoning trace용)
 
     while turn < MAX_TURNS:
         turn += 1
@@ -103,6 +106,15 @@ def run_agent():
             result = execute_tool(block.name, block.input)
             print(f"  -> {block.name} 결과: {result[:100]}...")
 
+            tool_call_details.append({
+                "name": block.name,
+                "input": block.input,
+                "result": json.loads(result),
+            })
+
+            if block.name == "send_notification":
+                sent_message = block.input.get("message")
+
             tool_results.append({
                 "type": "tool_result",
                 "tool_use_id": block.id,
@@ -120,8 +132,18 @@ def run_agent():
     # ── 토큰 사용량 ───────────────────────────────────────
     print(f"\n[토큰 사용량] input={response.usage.input_tokens}, output={response.usage.output_tokens}")
 
+    return {
+        "message":          sent_message,
+        "turns":            turn,
+        "tool_call_details": tool_call_details,
+        "messages":         messages,
+    }
+
 
 # ── 실행 ──────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    run_agent()
+    result = run_agent()
+    print(f"\n[최종 결과] message={result['message']}")
+    filepath = save_trace(result, agent_type="morning")
+    print(f"[trace 저장] {filepath}")
