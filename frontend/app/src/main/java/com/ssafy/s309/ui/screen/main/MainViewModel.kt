@@ -51,7 +51,9 @@ class MainViewModel
                 // 사용자 알림 임계값(alertLow/alertHigh)으로 갱신
                 userRepository.getSettings()
                     .onSuccess { settings ->
-                        healthRepository.updateAlertThresholds(settings.alertLow, settings.alertHigh)
+                        val low = settings.alertLow ?: return@onSuccess
+                        val high = settings.alertHigh ?: return@onSuccess
+                        healthRepository.updateAlertThresholds(low, high)
                     }
             }
         }

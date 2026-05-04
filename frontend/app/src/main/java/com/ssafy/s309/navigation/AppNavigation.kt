@@ -26,6 +26,7 @@ import com.ssafy.s309.ui.screen.ble.BleScreen
 import com.ssafy.s309.ui.screen.health.HealthSourceScreen
 import com.ssafy.s309.ui.screen.main.GuardianScreen
 import com.ssafy.s309.ui.screen.main.MainScreen
+import com.ssafy.s309.ui.screen.main.MyAccountScreen
 import com.ssafy.s309.ui.screen.main.SettingsScreen
 import com.ssafy.s309.ui.screen.onboarding.BasicHealthInfoScreen
 import com.ssafy.s309.ui.screen.onboarding.BloodSugarRangeScreen
@@ -74,6 +75,8 @@ sealed class Screen(val route: String) {
     object Guardian : Screen("guardian")
 
     object Projector : Screen("projector")
+
+    object MyAccount : Screen("my_account")
 }
 
 @Composable
@@ -249,7 +252,14 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 onLogoutClick = { authViewModel.logout() },
                 onSettingsClick = { navController.navigate(Screen.Settings.route) },
                 onGuardianClick = { navController.navigate(Screen.Guardian.route) },
+                onAccountClick = { navController.navigate(Screen.MyAccount.route) },
                 userEmail = authViewModel.userEmail,
+            )
+        }
+        composable(Screen.MyAccount.route) {
+            MyAccountScreen(
+                onBack = { navController.popBackStack() },
+                onWithdrawClick = { authViewModel.withdraw("") },
             )
         }
         composable(Screen.Graph.route) {
