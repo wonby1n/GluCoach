@@ -12,7 +12,7 @@ class Settings(BaseSettings):
 
     yolo_model_path: str = "models/yolo_food/best.pt"
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 settings = Settings()

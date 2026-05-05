@@ -49,7 +49,7 @@ def execute_tool(name: str, tool_input: dict) -> str:
 
 # ── Agentic Loop ──────────────────────────────────────────
 
-def run_postmeal_agent(trigger: dict):
+def run_postmeal_agent(trigger: dict, user_id: str = None):
     """
     trigger: agent를 깨운 이유와 컨텍스트
         - reason   : "meal_recorded" | "schedule_followup" | "user_response"

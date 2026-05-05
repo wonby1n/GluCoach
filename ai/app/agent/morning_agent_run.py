@@ -50,7 +50,7 @@ def execute_tool(name: str, tool_input: dict) -> str:
 
 # ── Agentic Loop ──────────────────────────────────────────
 
-def run_agent():
+def run_agent(user_id: str = None):
     """Claude API를 호출하고, 도구 호출이 끝날 때까지 루프를 돈다."""
     client = anthropic.Anthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
