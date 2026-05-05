@@ -1,6 +1,6 @@
 # GlucoFit AI Agent 시각화 — 하드웨어 진행상황
 
-> 마지막 업데이트: 2026-05-04  
+> 마지막 업데이트: 2026-05-05  
 > 담당자: godhw1018
 
 ---
@@ -43,6 +43,10 @@ Raspberry Pi Zero 2W가 소켓 서버로 동작하며, 안드로이드 앱/백�
 - [x] `projection.service` — systemd 서비스 등록, 부팅 시 자동 실행
 - [x] `setup.sh` — Pi 초기 세팅 자동화 스크립트 (mpv, xdotool 설치, HDMI 설정, 서비스 등록)
 - [x] `TEST_GUIDE.md` — 테스트 절차 문서화
+- [x] `server.py` mpv 옵션 — `--panscan=1.0` 추가 (검은 여백 제거, 화면 꽉 채우기)
+- [x] `server.py` mpv 옵션 — `--audio-device=pipewire/alsa_output.platform-3f902000.hdmi.hdmi-stereo` 추가 (HDMI 오디오 출력)
+- [x] `ai/app/agent/projection_client.py` — AI agent → Pi TCP 명령 클라이언트 신규 작성
+- [x] `ai/app/agent/tools.py` — `trigger_projection` 툴 추가 (Claude가 브리핑/알림 시 프로젝터 자동 제어)
 
 ### 지원 명령어 (소켓)
 
@@ -140,6 +144,7 @@ PRINT_PART = 2  → F6 → Export STL  (탑 리드, 뒤집혀서 나옴)
 - [ ] `powerbank_mount.scad` OpenSCAD에서 열고 치수 조정 후 STL 내보내기
 - [ ] SSAFY 3D 프린터로 마운트 출력
 - [ ] `assistant_briefing.mp4`, `assistant_alert.mp4` 영상 제작
+- [ ] AI agent 실제 배포 환경에서 `trigger_projection` 툴 동작 검증 (Pi IP 네트워크 연결 확인)
 - [ ] 안드로이드 앱 → Pi 소켓 연동 최종 테스트
 - [ ] 전체 하드웨어 어셈블리 완성 사진 촬영
 
@@ -151,3 +156,5 @@ PRINT_PART = 2  → F6 → Export STL  (탑 리드, 뒤집혀서 나옴)
 |------|------|------|
 | 2026-05-04 | `mpv` 환경변수 없이 실행 시 영상 미표시 | `env=_env` 를 `Popen`에 전달하여 해결 |
 | 2026-05-04 | YG300 기본 입력이 자체화면으로 고정 | 부팅 후 SOURCE 버튼으로 HDMI 수동 전환 필요 |
+| 2026-05-05 | 영상 주변 검은 여백 표시 | `--panscan=1.0` 옵션 추가로 해결 |
+| 2026-05-05 | ALSA `hw:0,0` 오디오 포맷 오류 | PipeWire HDMI 장치(`pipewire/alsa_output.platform-3f902000.hdmi.hdmi-stereo`) 직접 지정으로 해결 |
