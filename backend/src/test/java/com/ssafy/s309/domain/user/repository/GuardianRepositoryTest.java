@@ -2,6 +2,7 @@ package com.ssafy.s309.domain.user.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.ssafy.s309.config.JpaConfig;
 import com.ssafy.s309.domain.user.entity.User;
 import com.ssafy.s309.domain.user.entity.WardGuardian;
 import java.util.List;
@@ -11,9 +12,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.context.annotation.Import;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Import(JpaConfig.class) // @EnableJpaAuditing 활성화 (created_at/updated_at 자동 채움)
 @SuppressWarnings("NonAsciiCharacters")
 class GuardianRepositoryTest {
 
@@ -27,10 +30,14 @@ class GuardianRepositoryTest {
 
   @BeforeEach
   void setUp() {
-    ward = em.persistAndFlush(User.builder().email("ward@example.com").build());
-    g1User = em.persistAndFlush(User.builder().email("g1@example.com").build());
-    g2User = em.persistAndFlush(User.builder().email("g2@example.com").build());
-    g3User = em.persistAndFlush(User.builder().email("g3@example.com").build());
+    ward = em.persistAndFlush(buildUser("ward@example.com"));
+    g1User = em.persistAndFlush(buildUser("g1@example.com"));
+    g2User = em.persistAndFlush(buildUser("g2@example.com"));
+    g3User = em.persistAndFlush(buildUser("g3@example.com"));
+  }
+
+  private static User buildUser(String email) {
+    return User.builder().email(email).name("테스트유저").phone("010-0000-0000").build();
   }
 
   @Test
@@ -81,7 +88,7 @@ class GuardianRepositoryTest {
 
   @Test
   void 다른_유저의_보호자는_조회되지_않음() {
-    User otherWard = em.persistAndFlush(User.builder().email("other@example.com").build());
+    User otherWard = em.persistAndFlush(buildUser("other@example.com"));
     em.persistAndFlush(
         WardGuardian.builder().ward(ward).guardian(g1User).priority((short) 0).build());
     em.persistAndFlush(
