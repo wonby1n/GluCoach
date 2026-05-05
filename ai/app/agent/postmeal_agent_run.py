@@ -19,6 +19,7 @@ import anthropic
 from app.agent.tools import TOOL_SCHEMAS, TOOL_MAP
 from app.agent.prompts import build_postmeal_prompt
 from app.agent.trace_writer import save_trace
+from app.agent.fallback import call_llm_with_retry, get_fallback_message
 
 # ── 환경 설정 ─────────────────────────────────────────────
 
@@ -75,13 +76,28 @@ def run_postmeal_agent(trigger: dict):
         print(f" Turn {turn}: Claude API 호출")
         print(f"{'='*60}")
 
-        response = client.messages.create(
+        response = call_llm_with_retry(
+            client,
             model=MODEL,
             max_tokens=MAX_TOKENS,
             system=build_postmeal_prompt(trigger),
             tools=TOOL_SCHEMAS,
             messages=messages,
         )
+
+        # ── LLM 호출 실패 → 폴백 ────────────────────────
+        if response is None:
+            fallback_msg = get_fallback_message("postmeal")
+            print(f"\n[fallback] LLM 호출 실패 → 폴백 메시지: {fallback_msg}")
+            return {
+                "message":           fallback_msg,
+                "turns":             turn,
+                "tool_call_details": tool_call_details,
+                "messages":          messages,
+                "scheduled_followup": scheduled_followup,
+                "trigger":           trigger,
+                "error":             "llm_call_failed",
+            }
 
         print(f"  stop_reason: {response.stop_reason}")
 
