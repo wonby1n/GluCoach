@@ -5,6 +5,8 @@ import com.ssafy.s309.data.local.TokenManager
 import com.ssafy.s309.data.model.FcmTokenRequest
 import com.ssafy.s309.data.model.GuardianCreateRequest
 import com.ssafy.s309.data.model.GuardianItem
+import com.ssafy.s309.data.model.UserProfile
+import com.ssafy.s309.data.model.UserProfileUpdateRequest
 import com.ssafy.s309.data.model.UserSettings
 import com.ssafy.s309.data.model.UserSettingsUpdateRequest
 import javax.inject.Inject
@@ -25,10 +27,15 @@ class UserRepository
                 userApi.registerFcmToken(id, FcmTokenRequest(token))
             }
 
-        suspend fun getSettings(): Result<UserSettings> = runCatching { userApi.getSettings(userId()) }
+        suspend fun getProfile(): Result<UserProfile> = runCatching { userApi.getProfile(userId()) }
+
+        suspend fun updateProfile(request: UserProfileUpdateRequest): Result<UserProfile> =
+            runCatching { userApi.updateProfile(userId(), request) }
+
+        suspend fun getSettings(): Result<UserSettings> = runCatching { userApi.getSettings() }
 
         suspend fun updateSettings(request: UserSettingsUpdateRequest): Result<UserSettings> =
-            runCatching { userApi.updateSettings(userId(), request) }
+            runCatching { userApi.updateSettings(request) }
 
         suspend fun getGuardians(): Result<List<GuardianItem>> = runCatching { userApi.getGuardians(userId()) }
 
