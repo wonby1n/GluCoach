@@ -23,10 +23,74 @@
 | 기능명 | Method | 엔드포인트 | 상세 설명 | 구현 | 우선순위 |
 |--------|--------|-----------|-----------|------|---------|
 | 회원가입 | POST | `/api/auth/signup` | 이메일/소셜 가입. JWT access(1h) + refresh(30d) 발급. 회원가입 시 인증정보(email/password) + 개인정보(name/phone/age/gender) + 신체정보(height/weight) + 당뇨정보(diabetesType/isMedicated) + 목표혈당(targetLow/targetHigh) + 주간시작요일까지 한 번에 입력. | ⬜ | 🔴 Highest |
+| 이메일 중복 확인 | GET | `/api/auth/email/check?email={email}` | 회원가입 전 이메일 사용 가능 여부 사전 조회. 인증 불필요. per-IP rate limit 10/min. 상세 명세는 [§1.1](#11-이메일-중복-확인-api-상세) | 🟩 | 🟠 High |
 | 로그인 | POST | `/api/auth/login` | JWT Bearer 토큰 발급. 탈퇴 사용자(`deleted_at IS NOT NULL`) 차단. 사용자 열거 방지 메시지 통일 | 🟩 | 🔴 Highest |
 | 토큰 갱신 | POST | `/api/auth/refresh` | access 만료 시 refresh로 재발급. Refresh Rotation 적용 (재사용 감지 시 모든 토큰 무효화) | 🟩 | 🔴 Highest |
 | 로그아웃 | POST | `/api/auth/logout` | Redis의 RefreshToken 삭제 | 🟩 | 🔴 Highest |
 | 회원 탈퇴 | DELETE | `/api/auth/withdraw` | 비밀번호 재검증 후 소프트 삭제(`deleted_at` 기록) + 이메일 익명화 + RefreshToken 삭제 | 🟩 | 🟠 High |
+
+### 1.1 이메일 중복 확인 API 상세
+
+**요청**
+
+```
+GET /api/auth/email/check?email={email}
+```
+
+| 파라미터 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| `email` | query string | △ | 검사할 이메일. 누락/공백/형식 위반 시 400 (`INVALID_FORMAT`). 정규식: `^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$` |
+
+- 인증 헤더 불필요 (SecurityConfig 화이트리스트)
+- 검증은 컨트롤러 내부 수동 처리 (`@Validated` 미사용 — 다른 엔드포인트로 가정 누수 방지)
+
+**응답 스키마** — `EmailCheckResponse`
+
+| 필드 | 타입 | 비고 |
+|---|---|---|
+| `available` | boolean | 사용 가능하면 true |
+| `status` | enum | `AVAILABLE` / `ALREADY_REGISTERED` / `INVALID_FORMAT` / `RATE_LIMITED` |
+| `retryAfterSeconds` | int? | `RATE_LIMITED` 일 때만 존재 (Jackson `@JsonInclude(NON_NULL)`) |
+
+**응답 케이스**
+
+| 상황 | HTTP | Body 예시 | 추가 헤더 |
+|---|---|---|---|
+| 사용 가능 | `200 OK` | `{"available":true,"status":"AVAILABLE"}` | — |
+| 이미 가입됨 | `200 OK` | `{"available":false,"status":"ALREADY_REGISTERED"}` | — |
+| 형식 오류 / 누락 | `400 Bad Request` | `{"available":false,"status":"INVALID_FORMAT"}` | — |
+| 분당 IP 한도 초과 | `429 Too Many Requests` | `{"available":false,"status":"RATE_LIMITED","retryAfterSeconds":42}` | `Retry-After: 42` |
+
+**Rate Limit 정책**
+
+- 키: `rate:email-check:{ip}` (Redis)
+- 윈도우: 60초, IP당 최대 10회
+- 동작: INCR + 매 호출마다 EXPIRE 갱신 (race 자가 회복 + sliding-ish window)
+- Redis 장애 시 fail-open (가용성 우선)
+- 클라이언트 IP는 `X-Forwarded-For` 첫 항목 사용 → **nginx 등 신뢰 가능한 리버스 프록시 뒤 배포 가정** (현재 토폴로지: 외부 → nginx(80/443) → backend(8080, 도커 내부망 only))
+
+### 1.2 보안 검토 — Account Enumeration
+
+**위험 표면**: 본 엔드포인트는 입력한 이메일이 가입된 계정인지 명시적으로 노출한다. 따라서 **회원가입 엔드포인트와 동등 수준의 enumeration 위험**을 갖는다 (signup도 중복 이메일에 대해 400을 반환하므로 동일한 정보가 새어나감).
+
+**완화 장치**
+
+| 항목 | 본 API | 회원가입 API | 비고 |
+|---|---|---|---|
+| Rate limit (per-IP) | 🟩 10/min | ⬜ 미적용 | signup도 동일 정책 적용 권장 (별도 이슈 필요) |
+| Account lockout | N/A | N/A | 비밀번호 입력이 아니라 무관 |
+| CAPTCHA | ⬜ | ⬜ | SSAFY 범위 외 |
+
+**완화의 한계**
+
+- Rate limit은 enumeration 시도를 **늦출 뿐 막지 못함** — 다중 IP / NAT 우회 / 분산 공격에는 무력
+- 진정한 방어는 CAPTCHA 또는 인증 후에만 노출하는 설계지만 UX 트레이드오프 큼
+- 본 API의 효용(가입 전 즉시 피드백)이 enumeration 위험보다 큰 것으로 판단해 채택. **운영 트래픽 모니터링 시 동일 IP에서 다량 호출 패턴 감지되면 정책 강화** (한도 축소 / 차단 시간 연장)
+
+**연관 사항**
+
+- signup API도 enumeration 면에서 본 API와 동일 위험. 별도 보안 강화 이슈에서 같이 다루는 것을 권장 (한 API만 rate limit이면 공격자가 다른 쪽으로 우회)
+- 토큰 발급(login) 응답 메시지가 이미 "이메일 또는 비밀번호가 올바르지 않습니다"로 통일되어 있어 login 면에서는 enumeration이 차단됨 (사용자 존재 여부 미노출)
 
 ---
 
