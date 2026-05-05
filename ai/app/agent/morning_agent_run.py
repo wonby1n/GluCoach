@@ -7,7 +7,7 @@ agentic loop 구현.
 
 실행 방법:
     cd ai
-    python -m app.agent.agent_run
+    python -m app.agent.morning_agent_run
 """
 
 import json
@@ -20,6 +20,7 @@ import anthropic
 from app.agent.tools import TOOL_SCHEMAS, TOOL_MAP
 from app.agent.prompts import build_morning_prompt
 from app.agent.trace_writer import save_trace
+from app.agent.fallback import call_llm_with_retry, get_fallback_message
 
 # ── 환경 설정 ─────────────────────────────────────────────
 
@@ -49,7 +50,7 @@ def execute_tool(name: str, tool_input: dict) -> str:
 
 # ── Agentic Loop ──────────────────────────────────────────
 
-def run_agent():
+def run_agent(user_id: str = None):
     """Claude API를 호출하고, 도구 호출이 끝날 때까지 루프를 돈다."""
     client = anthropic.Anthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
@@ -70,13 +71,26 @@ def run_agent():
         print(f" Turn {turn}: Claude API 호출")
         print(f"{'='*60}")
 
-        response = client.messages.create(
+        response = call_llm_with_retry(
+            client,
             model=MODEL,
             max_tokens=MAX_TOKENS,
             system=build_morning_prompt(),
             tools=TOOL_SCHEMAS,
             messages=messages,
         )
+
+        # ── LLM 호출 실패 → 폴백 ────────────────────────
+        if response is None:
+            fallback_msg = get_fallback_message("morning")
+            print(f"\n[fallback] LLM 호출 실패 → 폴백 메시지: {fallback_msg}")
+            return {
+                "message":          fallback_msg,
+                "turns":            turn,
+                "tool_call_details": tool_call_details,
+                "messages":         messages,
+                "error":            "llm_call_failed",
+            }
 
         print(f"  stop_reason: {response.stop_reason}")
 

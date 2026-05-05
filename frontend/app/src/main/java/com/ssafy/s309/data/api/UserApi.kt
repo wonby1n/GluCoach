@@ -3,6 +3,8 @@ package com.ssafy.s309.data.api
 import com.ssafy.s309.data.model.FcmTokenRequest
 import com.ssafy.s309.data.model.GuardianCreateRequest
 import com.ssafy.s309.data.model.GuardianItem
+import com.ssafy.s309.data.model.UserProfile
+import com.ssafy.s309.data.model.UserProfileUpdateRequest
 import com.ssafy.s309.data.model.UserSettings
 import com.ssafy.s309.data.model.UserSettingsUpdateRequest
 import retrofit2.http.Body
@@ -13,20 +15,28 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 
 interface UserApi {
+    @GET("api/users/{userId}")
+    suspend fun getProfile(
+        @Path("userId") userId: String,
+    ): UserProfile
+
+    @PUT("api/users/{userId}")
+    suspend fun updateProfile(
+        @Path("userId") userId: String,
+        @Body request: UserProfileUpdateRequest,
+    ): UserProfile
+
     @PUT("api/users/{userId}/fcm-token")
     suspend fun registerFcmToken(
         @Path("userId") userId: String,
         @Body request: FcmTokenRequest,
     )
 
-    @GET("api/users/{userId}/settings")
-    suspend fun getSettings(
-        @Path("userId") userId: String,
-    ): UserSettings
+    @GET("api/user/settings")
+    suspend fun getSettings(): UserSettings
 
-    @PUT("api/users/{userId}/settings")
+    @PUT("api/user/settings")
     suspend fun updateSettings(
-        @Path("userId") userId: String,
         @Body request: UserSettingsUpdateRequest,
     ): UserSettings
 

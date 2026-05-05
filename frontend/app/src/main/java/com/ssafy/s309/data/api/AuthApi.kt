@@ -6,7 +6,7 @@ import com.ssafy.s309.data.model.SignupRequest
 import com.ssafy.s309.data.model.TokenResponse
 import com.ssafy.s309.data.model.WithdrawRequest
 import retrofit2.http.Body
-import retrofit2.http.DELETE
+import retrofit2.http.HTTP
 import retrofit2.http.Header
 import retrofit2.http.POST
 
@@ -31,7 +31,7 @@ interface AuthApi {
         @Body request: ReissueRequest,
     )
 
-    @DELETE("api/auth/withdraw")
+    @HTTP(method = "DELETE", path = "api/auth/withdraw", hasBody = true)
     suspend fun withdraw(
         @Header("Authorization") bearerToken: String,
         @Body request: WithdrawRequest,

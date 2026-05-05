@@ -82,9 +82,11 @@ fun MainScreen(
     onGraphClick: () -> Unit = {},
     onConnectedDeviceClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
+    onWithdrawClick: (String) -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onGuardianClick: () -> Unit = {},
     onProjectorClick: () -> Unit = {},
+    onAccountClick: () -> Unit = {},
     userEmail: String = "",
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -102,9 +104,11 @@ fun MainScreen(
         onGraphClick = onGraphClick,
         onConnectedDeviceClick = onConnectedDeviceClick,
         onLogoutClick = onLogoutClick,
+        onWithdrawClick = onWithdrawClick,
         onSettingsClick = onSettingsClick,
         onGuardianClick = onGuardianClick,
         onProjectorClick = onProjectorClick,
+        onAccountClick = onAccountClick,
         userEmail = userEmail,
     )
 }
@@ -123,9 +127,11 @@ fun MainScreenContent(
     onGraphClick: () -> Unit = {},
     onConnectedDeviceClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
+    onWithdrawClick: (String) -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onGuardianClick: () -> Unit = {},
     onProjectorClick: () -> Unit = {},
+    onAccountClick: () -> Unit = {},
     userEmail: String = "",
 ) {
     var selectedTab by rememberSaveable { mutableStateOf("home") }
@@ -151,7 +157,9 @@ fun MainScreenContent(
                     when (tab) {
                         "profile" ->
                             MyPageContent(
+                                onAccountClick = onAccountClick,
                                 onLogoutClick = onLogoutClick,
+                                onWithdrawClick = onWithdrawClick,
                                 onDeviceClick = onConnectedDeviceClick,
                                 onHealthDetailClick = onSettingsClick,
                                 onGuardianClick = onGuardianClick,

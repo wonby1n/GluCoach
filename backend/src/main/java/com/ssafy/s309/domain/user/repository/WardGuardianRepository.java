@@ -8,5 +8,7 @@ public interface WardGuardianRepository extends JpaRepository<WardGuardian, Inte
 
   List<WardGuardian> findAllByWard_IdOrderByPriorityAsc(Integer wardId);
 
+  List<WardGuardian> findAllByWard_Id(Integer wardId);
+
   int countByWard_Id(Integer wardId);
 }
