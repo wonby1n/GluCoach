@@ -9,7 +9,14 @@ import org.springframework.stereotype.Component;
 /**
  * 이메일 중복 확인 엔드포인트의 per-IP rate limiter.
  *
- * <p>Redis INCR + EXPIRE 기반의 fixed-window. 사용자 열거(enumeration) 공격 완화 목적으로 60초 창에 IP당 10회로 제한한다.
+ * <p>Redis INCR + EXPIRE 기반. 사용자 열거(enumeration) 공격 완화 목적으로 60초 창에 IP당 10회로 제한한다.
+ *
+ * <p>매 호출마다 EXPIRE 를 호출해 TTL 을 갱신한다. 이는 두 가지 효과를 갖는다:
+ *
+ * <ul>
+ *   <li>INCR 와 EXPIRE 사이 프로세스 사고로 TTL 이 빠지더라도 다음 호출이 자가 회복
+ *   <li>지속적 burst 호출에 대해 sliding-ish window 로 동작 — 공격자가 hit 를 멈출 때까지 차단 유지
+ * </ul>
  *
  * <p>Redis 일시 장애 시에는 fail-open (요청을 통과시킴) — 가용성을 우선.
  */
@@ -36,6 +43,10 @@ public class EmailCheckRateLimiter {
     Long count;
     try {
       count = redisTemplate.opsForValue().increment(key);
+      if (count != null) {
+        // 매 호출마다 TTL 갱신: race 자가 회복 + sliding-ish window 효과
+        redisTemplate.expire(key, WINDOW_SECONDS, TimeUnit.SECONDS);
+      }
     } catch (Exception e) {
       log.warn("Redis 장애로 rate limit fail-open: ip={}, error={}", ip, e.getMessage());
       return null;
@@ -43,10 +54,6 @@ public class EmailCheckRateLimiter {
 
     if (count == null) {
       return null;
-    }
-
-    if (count == 1L) {
-      redisTemplate.expire(key, WINDOW_SECONDS, TimeUnit.SECONDS);
     }
 
     if (count > MAX_REQUESTS_PER_WINDOW) {

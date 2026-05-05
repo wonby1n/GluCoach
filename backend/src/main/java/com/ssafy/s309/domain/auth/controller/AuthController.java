@@ -13,26 +13,26 @@ import com.ssafy.s309.domain.auth.service.EmailCheckRateLimiter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.util.StringUtils;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@Validated
 @Tag(name = "Auth", description = "인증 관련 API")
 public class AuthController {
 
   private static final String FORWARDED_FOR_HEADER = "X-Forwarded-For";
+
+  // jakarta.validation @Email 과 동일한 RFC 5322 유연 변형 (Hibernate Validator 기본)
+  private static final Pattern EMAIL_PATTERN =
+      Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
   private final AuthService authService;
   private final EmailCheckRateLimiter emailCheckRateLimiter;
@@ -46,7 +46,11 @@ public class AuthController {
   @Operation(summary = "이메일 중복 확인", description = "사용 가능 여부 + 사유(status) 반환. 분당 IP당 10회 제한")
   @GetMapping("/email/check")
   public ResponseEntity<EmailCheckResponse> checkEmail(
-      @RequestParam("email") @NotBlank @Email String email, HttpServletRequest request) {
+      @RequestParam(value = "email", required = false) String email, HttpServletRequest request) {
+    if (!isValidEmailFormat(email)) {
+      return ResponseEntity.badRequest().body(EmailCheckResponse.ofInvalidFormat());
+    }
+
     Integer retryAfter = emailCheckRateLimiter.tryAcquireOrGetRetryAfter(extractClientIp(request));
     if (retryAfter != null) {
       throw new RateLimitedException(retryAfter);
@@ -86,13 +90,6 @@ public class AuthController {
   }
 
   // ── 이메일 중복 확인 전용 예외 처리 ───────────────────────────────────
-  // 이 컨트롤러의 다른 메서드들은 @RequestBody @Valid 만 쓰므로 MethodArgumentNotValidException
-  // 만 던지고, ConstraintViolationException 은 /email/check 에서만 발생한다.
-
-  @ExceptionHandler(ConstraintViolationException.class)
-  public ResponseEntity<EmailCheckResponse> handleEmailValidation(ConstraintViolationException e) {
-    return ResponseEntity.badRequest().body(EmailCheckResponse.ofInvalidFormat());
-  }
 
   @ExceptionHandler(RateLimitedException.class)
   public ResponseEntity<EmailCheckResponse> handleRateLimited(RateLimitedException e) {
@@ -103,7 +100,21 @@ public class AuthController {
 
   // ── 헬퍼 ────────────────────────────────────────────────────────────
 
-  /** 클라이언트 실제 IP 추출. nginx 등 리버스 프록시 뒤에 있을 때 X-Forwarded-For 의 첫 값을 우선 사용. */
+  private static boolean isValidEmailFormat(String email) {
+    return StringUtils.hasText(email) && EMAIL_PATTERN.matcher(email).matches();
+  }
+
+  /**
+   * 클라이언트 실제 IP 추출.
+   *
+   * <p><strong>보안 가정</strong>: 본 메서드는 X-Forwarded-For 헤더를 가공 없이 신뢰한다. 따라서 반드시 신뢰 가능한 리버스 프록시(nginx
+   * 등) 뒤에서 동작해야 안전하다. 애플리케이션이 외부에 직접 노출되면 공격자가 헤더를 조작해 IP 기반 rate limit 등을 우회할 수 있다.
+   *
+   * <p>현재 배포 토폴로지: 외부 → nginx(80/443) → backend(8080, 도커 내부망 only). backend 포트는 호스트로 노출되지 않음
+   * (infra/docker-compose.yml 참고).
+   *
+   * <p>토폴로지 변경 시: server.forward-headers-strategy=NATIVE 글로벌 설정 또는 신뢰 프록시 IP 화이트리스트 도입 검토.
+   */
   private String extractClientIp(HttpServletRequest request) {
     String forwarded = request.getHeader(FORWARDED_FOR_HEADER);
     if (StringUtils.hasText(forwarded)) {

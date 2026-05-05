@@ -222,10 +222,19 @@ class AuthControllerTest {
 
   @Test
   void 이메일_중복_확인_형식_오류_400_반환() throws Exception {
-    given(emailCheckRateLimiter.tryAcquireOrGetRetryAfter(any())).willReturn(null);
-
+    // 형식 검증이 rate limit 호출 전에 실패하므로 emailCheckRateLimiter 모킹 불필요
     mockMvc
         .perform(get("/api/auth/email/check").param("email", "not-an-email"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.available").value(false))
+        .andExpect(jsonPath("$.status").value("INVALID_FORMAT"));
+  }
+
+  @Test
+  void 이메일_중복_확인_파라미터_누락_400_반환() throws Exception {
+    // required=false + 수동 검증으로 일관된 EmailCheckResponse(INVALID_FORMAT) 응답
+    mockMvc
+        .perform(get("/api/auth/email/check"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.available").value(false))
         .andExpect(jsonPath("$.status").value("INVALID_FORMAT"));

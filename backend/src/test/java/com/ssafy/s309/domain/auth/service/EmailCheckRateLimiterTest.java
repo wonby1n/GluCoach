@@ -1,11 +1,8 @@
 package com.ssafy.s309.domain.auth.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.util.concurrent.TimeUnit;
@@ -46,13 +43,14 @@ class EmailCheckRateLimiterTest {
   }
 
   @Test
-  void 한도_내_호출_허용_TTL_재설정_없음() {
+  void 한도_내_호출_TTL_매번_갱신() {
     given(valueOperations.increment(KEY)).willReturn(5L);
 
     Integer retryAfter = rateLimiter.tryAcquireOrGetRetryAfter(IP);
 
     assertThat(retryAfter).isNull();
-    verify(redisTemplate, never()).expire(any(), anyLong(), any());
+    // race 자가 회복 + sliding-ish 동작을 위해 매 호출마다 TTL 갱신
+    verify(redisTemplate).expire(eq(KEY), eq(60L), eq(TimeUnit.SECONDS));
   }
 
   @Test
