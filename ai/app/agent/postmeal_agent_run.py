@@ -158,33 +158,67 @@ DEMO_FOLLOWUP_DELAY_SECONDS = 5  # 시연용: 실제 30분 대신 5초
 if __name__ == "__main__":
     import time
 
-    # 818: user_response 트리거로 시작
-    trigger = {
+    # ── 817: 식사 기록 → 첫 활동 알림 ──────────────────────
+    print("\n" + "▶" * 30)
+    print(" [817] meal_recorded → 첫 활동 알림")
+    print("▶" * 30)
+
+    trigger_817 = {
+        "reason":    "meal_recorded",
+        "meal_time": "2026-05-04 12:00",
+    }
+
+    result_817 = run_postmeal_agent(trigger_817)
+    print(f"\n[817 결과] message={result_817['message']}")
+    save_trace(result_817, agent_type="postmeal")
+
+    # ── 818: 사용자 응답 선택 → 응답 처리 ───────────────────
+    print("\n" + "-" * 40)
+    print(" 사용자 응답을 선택하세요:")
+    print("  1) 알겠어요.  (수락)")
+    print("  2) 지금 회의 중이에요.  (지금 불가)")
+    print("  3) 괜찮아요.  (거절)")
+    print("-" * 40)
+
+    choice = input("선택 (1/2/3): ").strip()
+    reply_map = {"1": "알겠어요.", "2": "지금 회의 중이에요.", "3": "괜찮아요."}
+    user_reply = reply_map.get(choice, "지금 회의 중이에요.")
+
+    print(f"\n→ 사용자 응답: \"{user_reply}\"")
+
+    print("\n" + "▶" * 30)
+    print(f" [818] user_response → 사용자 응답 처리")
+    print("▶" * 30)
+
+    trigger_818 = {
         "reason":                        "user_response",
         "meal_time":                     "2026-05-04 12:00",
         "previous_notification_sent_at": "2026-05-04 13:00",
-        "user_reply":                    "지금 회의 중이에요",
+        "user_reply":                    user_reply,
     }
 
-    result = run_postmeal_agent(trigger)
-    print(f"\n[최종 결과] message={result['message']}")
-    print(f"[followup]  {result['scheduled_followup']}")
-    save_trace(result, agent_type="postmeal_reply")      # → postmeal_reply_latest.json
+    result_818 = run_postmeal_agent(trigger_818)
+    print(f"\n[818 결과] message={result_818['message']}")
+    print(f"[818 followup] {result_818['scheduled_followup']}")
+    save_trace(result_818, agent_type="postmeal_reply")
 
-    # 819: schedule_followup이 예약됐으면 자동 재시도
-    if result["scheduled_followup"]:
-        delay_min = result["scheduled_followup"]["delay_minutes"]
+    # ── 819: schedule_followup 감지 → 자동 재시도 ──────────
+    if result_818["scheduled_followup"]:
+        delay_min = result_818["scheduled_followup"]["delay_minutes"]
         print(f"\n[{delay_min}분 후 재시도 예약됨 → {DEMO_FOLLOWUP_DELAY_SECONDS}초 후 자동 실행]")
         time.sleep(DEMO_FOLLOWUP_DELAY_SECONDS)
 
-        followup_trigger = {
+        print("\n" + "▶" * 30)
+        print(" [819] schedule_followup → 자동 재시도")
+        print("▶" * 30)
+
+        trigger_819 = {
             "reason":         "schedule_followup",
-            "meal_time":      trigger["meal_time"],
-            "original_reply": trigger["user_reply"],
+            "meal_time":      trigger_818["meal_time"],
+            "original_reply": trigger_818["user_reply"],
             "followup_at":    "2026-05-04 13:30",
         }
 
-        result2 = run_postmeal_agent(followup_trigger)
-        print(f"\n[재시도 결과] message={result2['message']}")
-        filepath = save_trace(result2, agent_type="postmeal_followup")  # → postmeal_followup_latest.json
-        print(f"[trace 저장] {filepath}")
+        result_819 = run_postmeal_agent(trigger_819)
+        print(f"\n[819 결과] message={result_819['message']}")
+        save_trace(result_819, agent_type="postmeal_followup")
