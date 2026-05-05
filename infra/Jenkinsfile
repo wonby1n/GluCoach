@@ -53,9 +53,9 @@ pipeline {
                             ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "
                                 export FOOD_API_KEY='\$FOOD_API_KEY' &&
                                 cd ${DEPLOY_DIR} &&
-                                git reset --hard HEAD &&
+                                git fetch origin release &&
+                                git reset --hard origin/release &&
                                 git clean -fd &&
-                                git pull origin release &&
                                 cp ~/firebase-service-account.json backend/src/main/resources/firebase-service-account.json &&
                                 docker compose -f infra/docker-compose.yml down &&
                                 docker compose -f infra/docker-compose.yml up -d --build
