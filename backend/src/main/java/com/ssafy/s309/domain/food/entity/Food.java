@@ -60,13 +60,13 @@ public class Food extends BaseEntity {
   @Column(name = "trans_fat_g", precision = 5, scale = 2)
   private BigDecimal transFatG;
 
-  @Column(name = "cholesterol_mg", precision = 5, scale = 2)
+  @Column(name = "cholesterol_mg", precision = 7, scale = 2)
   private BigDecimal cholesterolMg;
 
-  @Column(name = "sodium_mg", precision = 5, scale = 2)
+  @Column(name = "sodium_mg", precision = 7, scale = 2)
   private BigDecimal sodiumMg;
 
-  @Column(name = "serving_size", precision = 5, scale = 2)
+  @Column(name = "serving_size", precision = 7, scale = 2)
   private BigDecimal servingSize;
 
   @Column(name = "is_customized", nullable = false)
