@@ -16,6 +16,7 @@ import com.ssafy.s309.config.TestSecurityConfig;
 import com.ssafy.s309.domain.auth.dto.*;
 import com.ssafy.s309.domain.auth.principal.CustomUserPrincipal;
 import com.ssafy.s309.domain.auth.service.AuthService;
+import com.ssafy.s309.domain.auth.service.EmailCheckRateLimiter;
 import java.util.Collections;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +43,7 @@ class AuthControllerTest {
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;
   @MockitoBean private AuthService authService;
+  @MockitoBean private EmailCheckRateLimiter emailCheckRateLimiter;
 
   private static final Integer USER_ID = 1;
 
@@ -122,7 +124,7 @@ class AuthControllerTest {
 
     mockMvc
         .perform(
-            post("/api/auth/reissue")
+            post("/api/auth/refresh")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
@@ -190,5 +192,55 @@ class AuthControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void 이메일_중복_확인_사용가능_200_반환() throws Exception {
+    given(emailCheckRateLimiter.tryAcquireOrGetRetryAfter(any())).willReturn(null);
+    given(authService.checkEmailAvailability("new@example.com")).willReturn(true);
+
+    mockMvc
+        .perform(get("/api/auth/email/check").param("email", "new@example.com"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.available").value(true))
+        .andExpect(jsonPath("$.status").value("AVAILABLE"))
+        .andExpect(jsonPath("$.retryAfterSeconds").doesNotExist());
+  }
+
+  @Test
+  void 이메일_중복_확인_이미_가입됨_200_반환() throws Exception {
+    given(emailCheckRateLimiter.tryAcquireOrGetRetryAfter(any())).willReturn(null);
+    given(authService.checkEmailAvailability("test@example.com")).willReturn(false);
+
+    mockMvc
+        .perform(get("/api/auth/email/check").param("email", "test@example.com"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.available").value(false))
+        .andExpect(jsonPath("$.status").value("ALREADY_REGISTERED"))
+        .andExpect(jsonPath("$.retryAfterSeconds").doesNotExist());
+  }
+
+  @Test
+  void 이메일_중복_확인_형식_오류_400_반환() throws Exception {
+    given(emailCheckRateLimiter.tryAcquireOrGetRetryAfter(any())).willReturn(null);
+
+    mockMvc
+        .perform(get("/api/auth/email/check").param("email", "not-an-email"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.available").value(false))
+        .andExpect(jsonPath("$.status").value("INVALID_FORMAT"));
+  }
+
+  @Test
+  void 이메일_중복_확인_rate_limit_초과_429_반환() throws Exception {
+    given(emailCheckRateLimiter.tryAcquireOrGetRetryAfter(any())).willReturn(42);
+
+    mockMvc
+        .perform(get("/api/auth/email/check").param("email", "test@example.com"))
+        .andExpect(status().isTooManyRequests())
+        .andExpect(header().string("Retry-After", "42"))
+        .andExpect(jsonPath("$.available").value(false))
+        .andExpect(jsonPath("$.status").value("RATE_LIMITED"))
+        .andExpect(jsonPath("$.retryAfterSeconds").value(42));
   }
 }
