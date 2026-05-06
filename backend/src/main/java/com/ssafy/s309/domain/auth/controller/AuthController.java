@@ -2,6 +2,7 @@ package com.ssafy.s309.domain.auth.controller;
 
 import com.ssafy.s309.domain.auth.dto.EmailCheckResponse;
 import com.ssafy.s309.domain.auth.dto.LoginRequest;
+import com.ssafy.s309.domain.auth.dto.PasswordChangeRequest;
 import com.ssafy.s309.domain.auth.dto.ReissueRequest;
 import com.ssafy.s309.domain.auth.dto.SignupRequest;
 import com.ssafy.s309.domain.auth.dto.TokenResponse;
@@ -86,6 +87,16 @@ public class AuthController {
       @AuthenticationPrincipal CustomUserPrincipal principal,
       @RequestBody WithdrawRequest request) {
     authService.withdraw(principal.userId(), request.password());
+    return ResponseEntity.noContent().build();
+  }
+
+  @Operation(summary = "비밀번호 변경", description = "변경 성공 시 모든 RefreshToken 무효화")
+  @PutMapping("/password")
+  public ResponseEntity<Void> changePassword(
+      @AuthenticationPrincipal CustomUserPrincipal principal,
+      @Valid @RequestBody PasswordChangeRequest request) {
+    authService.changePassword(
+        principal.userId(), request.currentPassword(), request.newPassword());
     return ResponseEntity.noContent().build();
   }
 

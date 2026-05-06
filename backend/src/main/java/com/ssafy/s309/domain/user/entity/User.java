@@ -93,6 +93,10 @@ public class User extends BaseEntity {
     return this.deletedAt;
   }
 
+  public void changePassword(String encodedNewPassword) {
+    this.password = encodedNewPassword;
+  }
+
   public void withdraw() {
     this.deletedAt = LocalDateTime.now();
     this.email = "deleted_" + this.id + "@withdrawn.local";

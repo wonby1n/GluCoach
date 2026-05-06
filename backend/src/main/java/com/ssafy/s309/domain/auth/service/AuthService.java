@@ -8,9 +8,11 @@ import com.ssafy.s309.domain.user.entity.User;
 import com.ssafy.s309.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @Service
@@ -107,6 +109,29 @@ public class AuthService {
 
   public boolean checkEmailAvailability(String email) {
     return !userRepository.existsByEmail(email);
+  }
+
+  @Transactional
+  public void changePassword(Integer userId, String currentPassword, String newPassword) {
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new IllegalStateException("인증된 사용자를 DB에서 찾을 수 없습니다: " + userId));
+
+    if (user.isDeleted() || user.getPassword() == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "비밀번호를 변경할 수 없는 계정입니다");
+    }
+
+    if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "현재 비밀번호가 올바르지 않습니다");
+    }
+
+    if (currentPassword.equals(newPassword)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "새 비밀번호가 현재 비밀번호와 같습니다");
+    }
+
+    user.changePassword(passwordEncoder.encode(newPassword));
+    refreshTokenService.delete(userId);
   }
 
   private TokenResponse issueTokens(Integer userId, String email) {
