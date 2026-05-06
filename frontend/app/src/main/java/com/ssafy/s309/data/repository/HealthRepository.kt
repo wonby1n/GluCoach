@@ -226,19 +226,7 @@ class HealthRepository
             return null
         }
 
-        private fun resolveAlertTitle(alertType: String): String =
-            when (alertType) {
-                "HIGH" -> "고혈당 경고"
-                "LOW" -> "저혈당 경고"
-                "SOS" -> "SOS 알림"
-                "WEEKLY_REPORT" -> "주간 보고서 도착"
-                "AGENT_GLUCOSE_HIGH" -> "혈당이 올라가고 있어요"
-                "AGENT_GLUCOSE_LOW" -> "저혈당 주의"
-                "AGENT_MEAL_FOLLOWUP" -> "키키"
-                "AGENT_WAKE_UP" -> "키키"
-                "AGENT_SLEEP_INSIGHT" -> "수면 인사이트"
-                else -> "GluCoach 알림"
-            }
+        private fun resolveAlertTitle(alertType: String): String = "키키"
 
         private fun formatTimeAgo(isoDateTime: String): String =
             try {

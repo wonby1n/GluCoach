@@ -1,10 +1,42 @@
 {
   "agent": "postmeal_followup",
-  "triggered_at": "2026-05-06 15:16:26",
-  "message": "회의 끝나셨나요? 물 한 잔 마시러 일어나볼까요? 💧",
+  "triggered_at": "2026-05-06 16:00:38",
+  "message": "회의 끝나셨나요? 잠깐 자리에서 스트레칭 한 번 해볼까요? 😊",
   "display_trace": null,
   "turns": 3,
   "tool_calls": [
+    {
+      "name": "get_notification_history",
+      "input": {
+        "hours": 2
+      },
+      "result": {
+        "hours": 2,
+        "notifications": [
+          {
+            "id": "notif_001",
+            "sent_at": "2026-05-03 08:05",
+            "type": "오늘의 혈당 전략",
+            "message": "오늘 점심 가볍게 가봐요!",
+            "user_action": "clicked"
+          },
+          {
+            "id": "notif_002",
+            "sent_at": "2026-05-03 14:00",
+            "type": "식후 활동 유도",
+            "message": "10분만 걸어볼까요?",
+            "user_action": "ignored"
+          },
+          {
+            "id": "notif_003",
+            "sent_at": "2026-05-03 07:10",
+            "type": "오늘의 혈당 전략",
+            "message": "어제 잠이 조금 부족했어요. 오늘 점심은 메뉴를 한 번 확인해볼까요? 🍃",
+            "user_action": "clicked"
+          }
+        ]
+      }
+    },
     {
       "name": "get_glucose",
       "input": {
@@ -64,67 +96,13 @@
       }
     },
     {
-      "name": "get_notification_history",
-      "input": {
-        "hours": 2
-      },
-      "result": {
-        "hours": 2,
-        "notifications": [
-          {
-            "id": "notif_001",
-            "sent_at": "2026-05-03 08:05",
-            "type": "오늘의 혈당 전략",
-            "message": "오늘 점심 가볍게 가봐요!",
-            "user_action": "clicked"
-          },
-          {
-            "id": "notif_002",
-            "sent_at": "2026-05-03 14:00",
-            "type": "식후 활동 유도",
-            "message": "10분만 걸어볼까요?",
-            "user_action": "ignored"
-          },
-          {
-            "id": "notif_003",
-            "sent_at": "2026-05-03 07:10",
-            "type": "오늘의 혈당 전략",
-            "message": "어제 잠이 조금 부족했어요. 오늘 점심은 메뉴를 한 번 확인해볼까요? 🍃",
-            "user_action": "clicked"
-          }
-        ]
-      }
-    },
-    {
-      "name": "get_meals",
-      "input": {
-        "date": "2026-05-04"
-      },
-      "result": {
-        "date": "2026-05-04",
-        "meals": [
-          {
-            "meal_id": "meal_002",
-            "type": "lunch",
-            "time": "2026-05-04 12:00",
-            "foods": [
-              "김치찌개",
-              "공기밥"
-            ],
-            "carbs_g": 75,
-            "calories": 580
-          }
-        ]
-      }
-    },
-    {
       "name": "send_notification",
       "input": {
-        "message": "회의 끝나셨나요? 물 한 잔 마시러 일어나볼까요? 💧"
+        "message": "회의 끝나셨나요? 잠깐 자리에서 스트레칭 한 번 해볼까요? 😊"
       },
       "result": {
         "status": "sent",
-        "message": "회의 끝나셨나요? 물 한 잔 마시러 일어나볼까요? 💧"
+        "message": "회의 끝나셨나요? 잠깐 자리에서 스트레칭 한 번 해볼까요? 😊"
       }
     }
   ]
