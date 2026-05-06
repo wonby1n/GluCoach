@@ -137,6 +137,7 @@ fun MainScreenContent(
     var selectedTab by rememberSaveable { mutableStateOf("home") }
     var showCamera by remember { mutableStateOf(false) }
     var scanSessionId by remember { mutableIntStateOf(0) }
+    var lastPhotoFile by remember { mutableStateOf<java.io.File?>(null) }
     var showReportSheet by remember { mutableStateOf(false) }
     var showAddSheet by remember { mutableStateOf(false) }
 
@@ -175,6 +176,7 @@ fun MainScreenContent(
                                             scanSessionId++
                                             showCamera = true
                                         },
+                                        photoFile = lastPhotoFile,
                                     )
                                 }
                             } else {
@@ -353,7 +355,8 @@ fun MainScreenContent(
                     showCamera = false
                     selectedTab = "home"
                 },
-                onPhotoTaken = {
+                onPhotoTaken = { file ->
+                    lastPhotoFile = file
                     showCamera = false
                 },
             )

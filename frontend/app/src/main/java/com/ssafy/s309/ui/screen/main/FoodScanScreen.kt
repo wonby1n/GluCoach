@@ -38,12 +38,16 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -67,37 +71,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.ssafy.s309.R
+import com.ssafy.s309.data.model.FoodSearchItem
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
 import kotlinx.coroutines.delay
 import java.io.File
 
-// ── 상태 / 데이터 ───────────────────────────────────────
+// ── 상태 ──────────────────────────────────────────────
 
 private enum class ScanStep { ANALYZING, RESULT, SIMULATION }
 
 private enum class AnalysisStatus { PENDING, IN_PROGRESS, COMPLETED }
-
-private data class FoodCandidate(
-    val rank: Int,
-    val name: String,
-    val calories: Int,
-    val imageResId: Int,
-    val predictedRise: Int,
-    val peakGlucose: Int,
-    val baseGlucose: Int,
-    val afterTwoHours: Int,
-)
-
-private val candidates =
-    listOf(
-        FoodCandidate(1, "짜장면", 700, R.drawable.jjajangmyeon, 20, 142, 110, 110),
-        FoodCandidate(2, "짬뽕", 630, R.drawable.jjambbong, 15, 135, 110, 108),
-        FoodCandidate(3, "볶음밥", 550, R.drawable.jjajangmyeon, 25, 150, 110, 112),
-    )
 
 // ── 진입점 (카메라 제외, 탭 콘텐츠 영역에서 렌더링) ─────
 
@@ -105,9 +93,15 @@ private val candidates =
 fun FoodScanContent(
     onBack: () -> Unit,
     onRetakePhoto: () -> Unit,
+    photoFile: File? = null,
+    viewModel: FoodScanViewModel = hiltViewModel(),
 ) {
+    LaunchedEffect(photoFile) {
+        viewModel.setPhotoFile(photoFile)
+    }
+
+    val uiState by viewModel.uiState.collectAsState()
     var step by remember { mutableStateOf(ScanStep.ANALYZING) }
-    var selectedIndex by remember { mutableIntStateOf(-1) }
 
     when (step) {
         ScanStep.ANALYZING -> {
@@ -119,27 +113,39 @@ fun FoodScanContent(
 
         ScanStep.RESULT -> {
             BackHandler { onBack() }
-            AnalyzingResultScreen(
-                selectedIndex = selectedIndex,
-                onSelect = { selectedIndex = it },
-                onBack = onBack,
-                onViewDetail = {
-                    if (selectedIndex >= 0) step = ScanStep.SIMULATION
+            FoodSearchResultScreen(
+                uiState = uiState,
+                onQueryChange = viewModel::searchFoods,
+                onSelect = { food ->
+                    viewModel.selectFood(food)
+                    step = ScanStep.SIMULATION
                 },
+                onBack = onBack,
             )
         }
 
         ScanStep.SIMULATION -> {
             BackHandler { step = ScanStep.RESULT }
-            SimulationScreen(
-                food = candidates[selectedIndex],
-                onBack = { step = ScanStep.RESULT },
-                onRetakePhoto = {
-                    selectedIndex = -1
-                    onRetakePhoto()
-                },
-                onRecordMeal = { },
-            )
+            val food = uiState.selectedFood
+            if (food != null) {
+                SimulationScreen(
+                    food = food,
+                    predictedRise = viewModel.estimatePredictedRise(food),
+                    isSaving = uiState.isSaving,
+                    saveSuccess = uiState.saveSuccess,
+                    onBack = {
+                        viewModel.clearSelection()
+                        step = ScanStep.RESULT
+                    },
+                    onRetakePhoto = {
+                        viewModel.clearSelection()
+                        onRetakePhoto()
+                    },
+                    onRecordMeal = viewModel::recordMeal,
+                )
+            } else {
+                step = ScanStep.RESULT
+            }
         }
     }
 }
@@ -149,7 +155,7 @@ fun FoodScanContent(
 @Composable
 fun CameraScreen(
     onClose: () -> Unit,
-    onPhotoTaken: () -> Unit,
+    onPhotoTaken: (File?) -> Unit,
 ) {
     BackHandler { onClose() }
     val context = LocalContext.current
@@ -262,7 +268,7 @@ fun CameraScreen(
                     .clickable {
                         if (!isTaking) {
                             isTaking = true
-                            takePhoto(imageCapture, context) { onPhotoTaken() }
+                            takePhoto(imageCapture, context) { file -> onPhotoTaken(file) }
                         }
                     },
             contentAlignment = Alignment.Center,
@@ -318,7 +324,7 @@ private fun CameraPreviewView(imageCapture: ImageCapture) {
 private fun takePhoto(
     imageCapture: ImageCapture,
     context: android.content.Context,
-    onResult: () -> Unit,
+    onResult: (File?) -> Unit,
 ) {
     val photoFile = File.createTempFile("food_", ".jpg", context.cacheDir)
     val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
@@ -328,11 +334,11 @@ private fun takePhoto(
         ContextCompat.getMainExecutor(context),
         object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                onResult()
+                onResult(photoFile)
             }
 
             override fun onError(exc: ImageCaptureException) {
-                onResult()
+                onResult(null)
             }
         },
     )
@@ -517,22 +523,20 @@ private fun AnalysisStepRow(
     }
 }
 
-// ── 3. 분석 결과 화면 (FoodAnalyzingResult.png) ──────────
+// ── 3. 음식 검색 화면 ────────────────────────────────────
 
 @Composable
-private fun AnalyzingResultScreen(
-    selectedIndex: Int,
-    onSelect: (Int) -> Unit,
+private fun FoodSearchResultScreen(
+    uiState: FoodScanUiState,
+    onQueryChange: (String) -> Unit,
+    onSelect: (FoodSearchItem) -> Unit,
     onBack: () -> Unit,
-    onViewDetail: () -> Unit,
 ) {
     Column(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(GlucoachColors.Background)
-                .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
+                .background(GlucoachColors.Background),
     ) {
         Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
 
@@ -545,7 +549,7 @@ private fun AnalyzingResultScreen(
                 )
             }
             Text(
-                text = "음식 리포트",
+                text = "음식 검색",
                 color = GlucoachColors.TextPrimary,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
@@ -553,147 +557,126 @@ private fun AnalyzingResultScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+        Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
 
-        // 음식 이미지 카드
-        Box(
+        OutlinedTextField(
+            value = uiState.searchQuery,
+            onValueChange = onQueryChange,
+            placeholder = { Text("음식 이름을 검색하세요", color = GlucoachColors.TextSecondary) },
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 22.dp)
-                    .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
-                    .clip(RoundedCornerShape(GlucoachCorner.card))
-                    .background(GlucoachColors.Surface)
-                    .padding(32.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.jjajangmyeon),
-                contentDescription = null,
-                modifier = Modifier.size(160.dp),
-                contentScale = ContentScale.Fit,
-            )
-        }
+                    .padding(horizontal = 22.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors =
+                OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = GlucoachColors.Primary,
+                    unfocusedBorderColor = GlucoachColors.Border,
+                ),
+            singleLine = true,
+            trailingIcon = {
+                if (uiState.isSearching) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = GlucoachColors.Primary,
+                    )
+                }
+            },
+        )
 
-        Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+        Spacer(modifier = Modifier.height(GlucoachSpacing.md))
 
-        // 음식 목록
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 22.dp),
         ) {
-            Text(
-                text = "음식 목록",
-                color = GlucoachColors.TextPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-            )
-
-            Spacer(modifier = Modifier.height(GlucoachSpacing.md))
-
-            candidates.forEachIndexed { index, food ->
-                val isSelected = index == selectedIndex
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .border(
-                                width = if (isSelected) 2.dp else 1.dp,
-                                color = if (isSelected) GlucoachColors.Primary else GlucoachColors.Border,
-                                shape = RoundedCornerShape(12.dp),
+            if (uiState.searchResults.isEmpty() && uiState.searchQuery.isBlank()) {
+                Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+                Text(
+                    text = "음식 이름을 입력하면 검색 결과가 나타납니다",
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 14.sp,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
+            } else if (uiState.searchResults.isEmpty() && !uiState.isSearching && uiState.searchQuery.isNotBlank()) {
+                Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+                Text(
+                    text = "검색 결과가 없습니다",
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 14.sp,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
+            } else {
+                uiState.searchResults.forEachIndexed { index, food ->
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, GlucoachColors.Border, RoundedCornerShape(12.dp))
+                                .background(GlucoachColors.Surface)
+                                .clickable { onSelect(food) }
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = food.name,
+                                color = GlucoachColors.TextPrimary,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
                             )
-                            .background(GlucoachColors.Surface)
-                            .clickable { onSelect(index) }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "${food.rank}",
-                        color = GlucoachColors.TextPrimary,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(modifier = Modifier.width(GlucoachSpacing.md))
-                    Text(
-                        text = food.name,
-                        color = GlucoachColors.TextPrimary,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
-                    Text(
-                        text = "1인분 ${food.calories}kcal",
-                        color = GlucoachColors.TextSecondary,
-                        fontSize = 14.sp,
-                    )
-                }
-                if (index < candidates.lastIndex) {
-                    Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+                            if (food.category != null) {
+                                Text(
+                                    text = food.category,
+                                    color = GlucoachColors.TextSecondary,
+                                    fontSize = 12.sp,
+                                )
+                            }
+                        }
+                        if (food.kcal != null) {
+                            Text(
+                                text = "${food.kcal.toInt()}kcal",
+                                color = GlucoachColors.TextSecondary,
+                                fontSize = 14.sp,
+                            )
+                        }
+                    }
+                    if (index < uiState.searchResults.lastIndex) {
+                        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+                    }
                 }
             }
+            Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
         }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        // 하단 버튼
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp),
-        ) {
-            Button(
-                onClick = { },
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor = GlucoachColors.Border,
-                        contentColor = GlucoachColors.TextSecondary,
-                    ),
-            ) {
-                Text(
-                    text = "직접 입력하기",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
-
-            Button(
-                onClick = onViewDetail,
-                enabled = selectedIndex >= 0,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor =
-                            if (selectedIndex >= 0) GlucoachColors.Primary else GlucoachColors.Border,
-                        contentColor =
-                            if (selectedIndex >= 0) Color.White else GlucoachColors.TextSecondary,
-                        disabledContainerColor = GlucoachColors.Border,
-                        disabledContentColor = GlucoachColors.TextSecondary,
-                    ),
-            ) {
-                Text(
-                    text = "분석 결과 자세히 보기",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
     }
 }
 
-// ── 4. 시뮬레이션 화면 (FoodSimulation.png) ─────────────
+// ── 4. 시뮬레이션 화면 ──────────────────────────────────
 
 @Composable
 private fun SimulationScreen(
-    food: FoodCandidate,
+    food: FoodSearchItem,
+    predictedRise: Int,
+    isSaving: Boolean,
+    saveSuccess: Boolean,
     onBack: () -> Unit,
     onRetakePhoto: () -> Unit,
     onRecordMeal: () -> Unit,
 ) {
+    val baseGlucose = 110
+    val peakGlucose = baseGlucose + predictedRise
+    val afterTwoHours = baseGlucose + (predictedRise * 0.3).toInt()
+
+    LaunchedEffect(saveSuccess) {
+        if (saveSuccess) onBack()
+    }
+
     Column(
         modifier =
             Modifier
@@ -703,7 +686,6 @@ private fun SimulationScreen(
     ) {
         Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
 
-        // 상단 바
         Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
             IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
                 Icon(
@@ -732,7 +714,7 @@ private fun SimulationScreen(
             Spacer(modifier = Modifier.height(GlucoachSpacing.xs))
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
-                    text = "+${food.predictedRise}",
+                    text = "+$predictedRise",
                     color = GlucoachColors.Primary,
                     fontSize = 48.sp,
                     fontWeight = FontWeight.Bold,
@@ -748,7 +730,6 @@ private fun SimulationScreen(
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
 
-            // 음식 + 마스코트 카드
             Box(
                 modifier =
                     Modifier
@@ -758,7 +739,6 @@ private fun SimulationScreen(
                         .background(GlucoachColors.Surface)
                         .padding(GlucoachSpacing.xl),
             ) {
-                // 음식 이름 배지
                 Box(
                     modifier =
                         Modifier
@@ -767,21 +747,12 @@ private fun SimulationScreen(
                             .background(GlucoachColors.Primary)
                             .padding(horizontal = 12.dp, vertical = 6.dp),
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "${food.rank}",
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = food.name,
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
+                    Text(
+                        text = food.name,
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
                 }
 
                 Image(
@@ -798,7 +769,7 @@ private fun SimulationScreen(
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
             Text(
-                text = "식후 완만한",
+                text = if (predictedRise <= 20) "식후 완만한" else "식후 주의가 필요한",
                 color = GlucoachColors.TextPrimary,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
@@ -812,12 +783,14 @@ private fun SimulationScreen(
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
-            // 예상 혈당 반응 차트
-            GlucosePredictionChart(food = food)
+            GlucosePredictionChart(
+                baseGlucose = baseGlucose,
+                peakGlucose = peakGlucose,
+                afterTwoHours = afterTwoHours,
+            )
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
-            // 하단 버튼
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.md),
@@ -841,6 +814,7 @@ private fun SimulationScreen(
 
                 Button(
                     onClick = onRecordMeal,
+                    enabled = !isSaving,
                     modifier = Modifier.weight(1f).height(48.dp),
                     shape = RoundedCornerShape(24.dp),
                     colors =
@@ -849,11 +823,19 @@ private fun SimulationScreen(
                             contentColor = Color.White,
                         ),
                 ) {
-                    Text(
-                        text = "식사 기록하기",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    if (isSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = Color.White,
+                        )
+                    } else {
+                        Text(
+                            text = "식사 기록하기",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
             }
 
@@ -863,7 +845,11 @@ private fun SimulationScreen(
 }
 
 @Composable
-private fun GlucosePredictionChart(food: FoodCandidate) {
+private fun GlucosePredictionChart(
+    baseGlucose: Int,
+    peakGlucose: Int,
+    afterTwoHours: Int,
+) {
     Column(
         modifier =
             Modifier
@@ -901,9 +887,9 @@ private fun GlucosePredictionChart(food: FoodCandidate) {
 
                 val points =
                     listOf(
-                        0f to food.baseGlucose.toFloat(),
-                        w * 0.45f to food.peakGlucose.toFloat(),
-                        w to food.afterTwoHours.toFloat(),
+                        0f to baseGlucose.toFloat(),
+                        w * 0.45f to peakGlucose.toFloat(),
+                        w to afterTwoHours.toFloat(),
                     )
 
                 // 커브 그리기
@@ -951,9 +937,9 @@ private fun GlucosePredictionChart(food: FoodCandidate) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            ChartLabel(title = "식전", value = "${food.baseGlucose}mg/dL")
-            ChartLabel(title = "식후 최고점", value = "${food.peakGlucose}mg/dL")
-            ChartLabel(title = "2시간 후", value = "${food.afterTwoHours}mg/dL")
+            ChartLabel(title = "식전", value = "${baseGlucose}mg/dL")
+            ChartLabel(title = "식후 최고점", value = "${peakGlucose}mg/dL")
+            ChartLabel(title = "2시간 후", value = "${afterTwoHours}mg/dL")
         }
     }
 }
