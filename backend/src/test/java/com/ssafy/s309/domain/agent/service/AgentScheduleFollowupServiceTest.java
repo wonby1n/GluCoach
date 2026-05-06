@@ -40,7 +40,7 @@ class AgentScheduleFollowupServiceTest {
 
     LocalDateTime before = LocalDateTime.now();
     AgentScheduleFollowupResponse res =
-        service.schedule(new AgentScheduleFollowupRequest(3, "post_meal_followup", 12, 30));
+        service.schedule(new AgentScheduleFollowupRequest(3, "post_meal_followup", 12, 30, "회의 중"));
     LocalDateTime after = LocalDateTime.now();
 
     assertThat(res.triggerId()).isEqualTo(99);
@@ -63,7 +63,7 @@ class AgentScheduleFollowupServiceTest {
                   .build();
             });
 
-    service.schedule(new AgentScheduleFollowupRequest(7, "post_meal_followup", 42, 60));
+    service.schedule(new AgentScheduleFollowupRequest(7, "post_meal_followup", 42, 60, null));
 
     ArgumentCaptor<AgentPendingTrigger> captor = ArgumentCaptor.forClass(AgentPendingTrigger.class);
     org.mockito.Mockito.verify(repository).save(captor.capture());
@@ -89,7 +89,8 @@ class AgentScheduleFollowupServiceTest {
             });
 
     AgentScheduleFollowupResponse res =
-        service.schedule(new AgentScheduleFollowupRequest(1, "post_meal_followup", null, 10));
+        service.schedule(
+            new AgentScheduleFollowupRequest(1, "post_meal_followup", null, 10, "데이터 부족"));
 
     assertThat(res.triggerId()).isEqualTo(2);
   }
