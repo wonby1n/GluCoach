@@ -96,6 +96,40 @@ data class AlertListResponse(
     val total: Long,
 )
 
+/** POST /api/health/snapshots 요청 항목 — 1분 한 점 메트릭 */
+@Serializable
+data class HealthSnapshotItem(
+    // ISO-8601 LocalDateTime
+    val recordedAt: String,
+    val stepsTotal: Int? = null,
+    val caloriesBurned: Double? = null,
+    val heartRate: Double? = null,
+)
+
+/** POST /api/health/snapshots 요청 — 5분 batch */
+@Serializable
+data class HealthSnapshotBatchRequest(
+    val items: List<HealthSnapshotItem>,
+)
+
+/** POST /api/health/snapshots 응답 */
+@Serializable
+data class HealthSnapshotBatchResponse(
+    val inserted: Int,
+    val skipped: Int,
+)
+
+/** POST /api/health/daily-summary 요청 — 일별 누적값 upsert */
+@Serializable
+data class DailyHealthSummaryUpsertRequest(
+    // ISO-8601 LocalDate "2026-05-06"
+    val date: String,
+    val steps: Int? = null,
+    val caloriesBurned: Double? = null,
+    val sleepMinutes: Int? = null,
+    val avgHeartRate: Double? = null,
+)
+
 /** POST /api/sleep-sessions 요청 — 워치 수면 세션 송신 */
 @Serializable
 data class SleepSessionCreateRequest(

@@ -8,8 +8,11 @@ import com.ssafy.s309.data.ble.BleManager
 import com.ssafy.s309.data.ble.BleProcessingSettings
 import com.ssafy.s309.data.ble.ScannedDevice
 import com.ssafy.s309.data.model.DailyHealthSummary
+import com.ssafy.s309.data.model.DailyHealthSummaryUpsertRequest
 import com.ssafy.s309.data.model.GlucoseRange
 import com.ssafy.s309.data.model.GlucoseReading
+import com.ssafy.s309.data.model.HealthSnapshotBatchRequest
+import com.ssafy.s309.data.model.HealthSnapshotItem
 import com.ssafy.s309.data.model.MealEvent
 import com.ssafy.s309.data.model.NotificationItem
 import com.ssafy.s309.data.model.SleepSessionCreateRequest
@@ -206,6 +209,53 @@ class HealthRepository
 
         @Volatile private var lastSyncedSleepStartedAt: String? = null
 
+        /**
+         * 1분 폴링 시점 메트릭을 in-memory 버퍼에 누적. 5개(=5분) 모이면 batch INSERT.
+         * 실패는 swallow — 폴 루프 보호.
+         */
+        suspend fun bufferSnapshot(item: HealthSnapshotItem) {
+            val toFlush: List<HealthSnapshotItem>?
+            synchronized(snapshotBuffer) {
+                snapshotBuffer.add(item)
+                toFlush =
+                    if (snapshotBuffer.size >= SNAPSHOT_FLUSH_SIZE) {
+                        val copy = snapshotBuffer.toList()
+                        snapshotBuffer.clear()
+                        copy
+                    } else {
+                        null
+                    }
+            }
+            if (toFlush != null) {
+                runCatching { healthApi.saveSnapshotBatch(HealthSnapshotBatchRequest(items = toFlush)) }
+                    .onSuccess { Log.d(TAG, "snapshot batch 송신 ok: inserted=${it.inserted} skipped=${it.skipped}") }
+                    .onFailure { Log.w(TAG, "snapshot batch 송신 실패", it) }
+            }
+        }
+
+        /** 일별 누적값 upsert. 1분 폴링마다 호출 가능 (BE는 같은 (user_id,date) 키에 UPDATE). */
+        suspend fun upsertDailySummary(
+            date: LocalDate,
+            steps: Int?,
+            caloriesBurned: Double?,
+            sleepMinutes: Int?,
+            avgHeartRate: Double?,
+        ) {
+            runCatching {
+                healthApi.upsertDailySummary(
+                    DailyHealthSummaryUpsertRequest(
+                        date = date.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                        steps = steps,
+                        caloriesBurned = caloriesBurned,
+                        sleepMinutes = sleepMinutes,
+                        avgHeartRate = avgHeartRate,
+                    ),
+                )
+            }.onFailure { Log.w(TAG, "daily summary upsert 실패", it) }
+        }
+
+        private val snapshotBuffer = mutableListOf<HealthSnapshotItem>()
+
         // ── helpers ──────────────────────────────────────────────────
 
         private suspend fun <T> firstNonEmptyList(fetch: suspend (HealthDataSource) -> List<T>): List<T>? {
@@ -259,5 +309,6 @@ class HealthRepository
 
         private companion object {
             const val TAG = "HealthRepository"
+            const val SNAPSHOT_FLUSH_SIZE = 5
         }
     }
