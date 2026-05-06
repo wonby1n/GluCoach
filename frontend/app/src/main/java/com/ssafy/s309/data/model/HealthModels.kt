@@ -95,3 +95,6 @@ data class AlertListResponse(
     val size: Int,
     val total: Long,
 )
+
+@Serializable
+data class MealCreateResponse(val mealId: Int)
