@@ -12,6 +12,7 @@ import com.ssafy.s309.MainActivity
 import com.ssafy.s309.R
 import com.ssafy.s309.data.local.TokenManager
 import com.ssafy.s309.data.repository.UserRepository
+import com.ssafy.s309.notification.GlucoseAlertManager
 import com.ssafy.s309.notification.TtsManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -27,6 +28,8 @@ class FcmService : FirebaseMessagingService() {
     @Inject lateinit var tokenManager: TokenManager
 
     @Inject lateinit var ttsManager: TtsManager
+
+    @Inject lateinit var glucoseAlertManager: GlucoseAlertManager
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -50,6 +53,7 @@ class FcmService : FirebaseMessagingService() {
         val body = message.notification?.body ?: message.data["body"] ?: return
         showNotification(title, body)
         ttsManager.speak("$title. $body")
+        glucoseAlertManager.emitFcmAlert(title, body)
     }
 
     private fun showNotification(
