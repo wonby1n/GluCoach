@@ -80,7 +80,8 @@ data class MealRecordResponse(
 data class MealCreateRequest(
     val foodId: Int,
     val memo: String? = null,
-    val recordedAt: String, // ISO-8601 "2026-05-06T12:30:00"
+    // ISO-8601 "2026-05-06T12:30:00"
+    val recordedAt: String,
 )
 
 /** POST /api/meals 응답 */
