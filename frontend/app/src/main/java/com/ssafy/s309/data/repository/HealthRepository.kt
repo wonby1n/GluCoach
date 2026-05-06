@@ -187,7 +187,7 @@ class HealthRepository
                         request,
                     )
                 val requestBody = json.toRequestBody("application/json".toMediaType())
-                healthApi.createMeal(request = requestBody)
+                healthApi.createMeal(request = requestBody, image = null)
             }
 
         /** 알림 읽음 처리 (백엔드 반영). 실패해도 UI 상태는 유지. */
