@@ -28,11 +28,11 @@ data class GlucoseCompareResponse(
 
 @Serializable
 data class GlucosePrediction(
-    val predictionId: Int = 0,
-    val curve: List<GlucoseCurvePoint> = emptyList(),
-    val peakMgdl: Float = 0f,
-    val peakMinute: Int = 0,
-    val confidence: Float = 0f,
+    val predictionId: Int,
+    val curve: List<GlucoseCurvePoint>,
+    val peakMgdl: Float,
+    val peakMinute: Int,
+    val confidence: Float,
 )
 
 @Serializable

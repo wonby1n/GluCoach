@@ -19,6 +19,7 @@ import com.ssafy.s309.domain.user.entity.User;
 import com.ssafy.s309.domain.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,9 @@ public class PredictionService {
   private static final double DEFAULT_WEIGHT_KG = 60.0;
   private static final String DEFAULT_ACTIVITY = "medium";
   private static final String DEFAULT_MEAL_PATTERN = "regular_3";
+
+  // AI 측 _parse_iso_to_hour 가 naive datetime 을 KST 로 해석하므로 명시적으로 KST 로 생성.
+  private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
   private final GlucosePredictClient glucosePredictClient;
   private final GlucosePredictionRepository predictionRepository;
@@ -79,7 +83,7 @@ public class PredictionService {
   }
 
   private GlucosePredictRequest buildAiRequest(User user, PredictRequest request) {
-    MealInfo meal = new MealInfo(request.carbsG().doubleValue(), LocalDateTime.now().toString());
+    MealInfo meal = new MealInfo(request.carbsG().doubleValue(), LocalDateTime.now(KST).toString());
 
     double weightKg = user.getWeight() != null ? user.getWeight().doubleValue() : DEFAULT_WEIGHT_KG;
 
@@ -91,6 +95,8 @@ public class PredictionService {
             mapDiabetesType(user.getDiabetesType()),
             DEFAULT_MEAL_PATTERN);
 
+    // CGM 미구현. fasting_bg 와 동일 값 단일 원소로 fallback (AI min_length=1 통과 + 모델은
+    // 마지막 값을 baseline 으로 사용). 향후 최근 60분 5분 간격 시계열로 교체 예정.
     return new GlucosePredictRequest(
         String.valueOf(user.getId()), List.of(DEFAULT_FASTING_BG), meal, profile);
   }
