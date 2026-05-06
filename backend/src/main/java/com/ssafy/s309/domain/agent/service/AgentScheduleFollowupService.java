@@ -31,6 +31,7 @@ public class AgentScheduleFollowupService {
                 .triggerType(req.triggerType())
                 .referenceId(req.referenceId())
                 .scheduledAt(scheduledAt)
+                .reason(req.reason())
                 .build());
     return new AgentScheduleFollowupResponse(saved.getId(), saved.getScheduledAt());
   }
