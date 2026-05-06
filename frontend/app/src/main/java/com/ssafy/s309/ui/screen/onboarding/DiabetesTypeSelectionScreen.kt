@@ -95,7 +95,7 @@ fun DiabetesTypeSelectionScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        ProgressIndicator(currentStep = 3, totalSteps = 7)
+        ProgressIndicator(currentStep = 3, totalSteps = 4)
 
         Spacer(modifier = Modifier.height(32.dp))
 

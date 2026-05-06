@@ -16,7 +16,7 @@ import com.ssafy.s309.ui.theme.Primary
 @Composable
 fun ProgressIndicator(
     currentStep: Int,
-    totalSteps: Int = 7,
+    totalSteps: Int = 4,
     modifier: Modifier = Modifier,
 ) {
     Row(

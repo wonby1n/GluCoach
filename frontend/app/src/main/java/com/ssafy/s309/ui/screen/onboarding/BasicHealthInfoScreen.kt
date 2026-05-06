@@ -97,7 +97,7 @@ fun BasicHealthInfoScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        ProgressIndicator(currentStep = 2, totalSteps = 7)
+        ProgressIndicator(currentStep = 2, totalSteps = 4)
 
         Spacer(modifier = Modifier.height(32.dp))
 
