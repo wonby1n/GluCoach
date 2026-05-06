@@ -51,10 +51,9 @@ class AuthRepository
 
         /** 로컬에 저장된 FCM 토큰을 서버에 등록. 실패해도 로그인 흐름은 계속된다. */
         private suspend fun sendStoredFcmToken() {
-            val userId = tokenManager.getUserId() ?: return
             val fcmToken = tokenManager.getFcmToken() ?: return
             runCatching {
-                userApi.registerFcmToken(userId, FcmTokenRequest(fcmToken))
+                userApi.registerFcmToken(FcmTokenRequest(fcmToken))
             }.onFailure {
                 Log.w("AuthRepository", "FCM 토큰 서버 등록 실패", it)
             }
