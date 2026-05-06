@@ -14,6 +14,9 @@ LLM tool-calling 시 호출되는 mock 함수 7개.
   - schedule_followup(delay_minutes, reason)
 """
 
+import os
+import requests as _requests
+
 from app.agent.mock_data import (
     GLUCOSE_DATA,
     GLUCOSE_AVERAGES,
@@ -22,6 +25,16 @@ from app.agent.mock_data import (
     STEPS_DATA,
     NOTIFICATION_HISTORY,
 )
+
+
+# ── Agent 컨텍스트 (runner가 실행 전에 set) ─────────────────
+
+_agent_context: dict = {"user_id": None, "alert_type": "AGENT_GENERIC"}
+
+
+def set_agent_context(user_id: int, alert_type: str) -> None:
+    _agent_context["user_id"] = user_id
+    _agent_context["alert_type"] = alert_type
 
 
 # ── 유틸 ───────────────────────────────────────────────────
@@ -98,11 +111,26 @@ def get_notification_history(hours: int) -> dict:
 
 
 def send_notification(message: str) -> dict:
-    """사용자에게 알림 메시지를 발송한다. (mock: 발송 성공 반환)"""
-    return {
-        "status": "sent",
-        "message": message,
-    }
+    """사용자에게 알림 메시지를 발송한다. BACKEND_API_URL 설정 시 실제 FCM 발송."""
+    user_id = _agent_context.get("user_id")
+    alert_type = _agent_context.get("alert_type", "AGENT_GENERIC")
+    backend_url = os.getenv("BACKEND_API_URL", "")
+    agent_api_key = os.getenv("AGENT_API_KEY", "dev-agent-key-change-in-prod")
+
+    if not backend_url or user_id is None:
+        return {"status": "sent", "message": message}
+
+    try:
+        resp = _requests.post(
+            f"{backend_url}/api/agent/notifications",
+            headers={"X-Agent-Api-Key": agent_api_key},
+            json={"userId": user_id, "alertType": alert_type, "message": message},
+            timeout=5,
+        )
+        resp.raise_for_status()
+        return {"status": "sent", "message": message}
+    except Exception as e:
+        return {"status": "error", "message": message, "error": str(e)}
 
 
 def schedule_followup(delay_minutes: int, reason: str) -> dict:

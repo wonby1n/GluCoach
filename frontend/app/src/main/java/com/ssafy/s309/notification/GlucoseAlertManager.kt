@@ -64,6 +64,22 @@ class GlucoseAlertManager
             }
         }
 
+        fun emitFcmAlert(
+            title: String,
+            message: String,
+        ) {
+            val id = notifIdCounter.incrementAndGet()
+            _alertStream.tryEmit(
+                NotificationItem(
+                    id = id.toLong(),
+                    title = title,
+                    message = message,
+                    timeAgoText = "방금",
+                    isUnread = true,
+                ),
+            )
+        }
+
         fun updateThresholds(
             low: Int,
             high: Int,
