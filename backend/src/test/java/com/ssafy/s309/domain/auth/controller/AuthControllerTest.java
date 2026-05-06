@@ -24,11 +24,13 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.ComponentScan.Filter;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.server.ResponseStatusException;
 
 @WebMvcTest(
     controllers = AuthController.class,
@@ -187,6 +189,88 @@ class AuthControllerTest {
     mockMvc
         .perform(
             delete("/api/auth/withdraw")
+                .with(authentication(customAuth()))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void 비밀번호_변경_204_반환() throws Exception {
+    PasswordChangeRequest request = new PasswordChangeRequest("oldPassword", "newPassword123");
+    doNothing()
+        .when(authService)
+        .changePassword(eq(USER_ID), eq("oldPassword"), eq("newPassword123"));
+
+    mockMvc
+        .perform(
+            put("/api/auth/password")
+                .with(authentication(customAuth()))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void 비밀번호_변경_새_비밀번호_6자_미만_400_반환() throws Exception {
+    PasswordChangeRequest request = new PasswordChangeRequest("oldPassword", "abc");
+
+    mockMvc
+        .perform(
+            put("/api/auth/password")
+                .with(authentication(customAuth()))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("6자")));
+  }
+
+  @Test
+  void 비밀번호_변경_현재_비밀번호_불일치_401_반환() throws Exception {
+    PasswordChangeRequest request = new PasswordChangeRequest("wrongPassword", "newPassword123");
+    doThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "현재 비밀번호가 올바르지 않습니다"))
+        .when(authService)
+        .changePassword(eq(USER_ID), eq("wrongPassword"), eq("newPassword123"));
+
+    mockMvc
+        .perform(
+            put("/api/auth/password")
+                .with(authentication(customAuth()))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("현재 비밀번호")));
+  }
+
+  @Test
+  void 비밀번호_변경_새_비밀번호_동일_400_반환() throws Exception {
+    PasswordChangeRequest request = new PasswordChangeRequest("samePassword", "samePassword");
+    doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "새 비밀번호가 현재 비밀번호와 같습니다"))
+        .when(authService)
+        .changePassword(eq(USER_ID), eq("samePassword"), eq("samePassword"));
+
+    mockMvc
+        .perform(
+            put("/api/auth/password")
+                .with(authentication(customAuth()))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("새 비밀번호")));
+  }
+
+  @Test
+  void 비밀번호_변경_현재_비밀번호_누락_400_반환() throws Exception {
+    PasswordChangeRequest request = new PasswordChangeRequest("", "newPassword123");
+
+    mockMvc
+        .perform(
+            put("/api/auth/password")
                 .with(authentication(customAuth()))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
