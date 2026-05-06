@@ -178,8 +178,11 @@ class HealthRepository
         /** 날짜별 식사 기록 조회 */
         suspend fun getMealsByDate(date: String): Result<List<MealRecordResponse>> = runCatching { healthApi.getMeals(date = date) }
 
-        /** 식사 기록 생성 (multipart) */
-        suspend fun createMealRecord(request: MealCreateRequest): Result<MealCreateResponse> =
+        /** 식사 기록 생성 (multipart, 이미지 선택) */
+        suspend fun createMealRecord(
+            request: MealCreateRequest,
+            imageFile: java.io.File? = null,
+        ): Result<MealCreateResponse> =
             runCatching {
                 val json =
                     kotlinx.serialization.json.Json.encodeToString(
@@ -187,7 +190,12 @@ class HealthRepository
                         request,
                     )
                 val requestBody = json.toRequestBody("application/json".toMediaType())
-                healthApi.createMeal(request = requestBody, image = null)
+                val imagePart =
+                    imageFile?.takeIf { it.exists() }?.let {
+                        val imageBody = it.readBytes().toRequestBody("image/jpeg".toMediaType())
+                        okhttp3.MultipartBody.Part.createFormData("image", it.name, imageBody)
+                    }
+                healthApi.createMeal(request = requestBody, image = imagePart)
             }
 
         /** 알림 읽음 처리 (백엔드 반영). 실패해도 UI 상태는 유지. */
