@@ -66,6 +66,8 @@ class AuthRepository
                         ?: error("리프레시 토큰이 없습니다")
                 val response = authApi.refresh(ReissueRequest(refreshToken))
                 tokenManager.saveTokens(response.accessToken, response.refreshToken)
+                tokenManager.parseUserIdFromJwt(response.accessToken)?.let { tokenManager.saveUserId(it) }
+                sendStoredFcmToken()
                 response
             }
 
