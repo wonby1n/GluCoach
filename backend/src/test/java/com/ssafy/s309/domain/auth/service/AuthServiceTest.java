@@ -208,4 +208,22 @@ class AuthServiceTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("이메일 또는 비밀번호가 올바르지 않습니다");
   }
+
+  @Test
+  void 이메일_중복_확인_사용가능() {
+    given(userRepository.existsByEmail("new@example.com")).willReturn(false);
+
+    boolean available = authService.checkEmailAvailability("new@example.com");
+
+    assertThat(available).isTrue();
+  }
+
+  @Test
+  void 이메일_중복_확인_이미_가입됨() {
+    given(userRepository.existsByEmail("test@example.com")).willReturn(true);
+
+    boolean available = authService.checkEmailAvailability("test@example.com");
+
+    assertThat(available).isFalse();
+  }
 }

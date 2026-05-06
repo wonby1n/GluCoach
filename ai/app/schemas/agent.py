@@ -3,6 +3,7 @@
 엔드포인트:
 - POST /agent/morning
 - POST /agent/post-meal
+- POST /trigger
 """
 
 from __future__ import annotations
@@ -13,6 +14,13 @@ from pydantic import BaseModel, Field
 
 
 # ── 요청 ─────────────────────────────────────────────────
+
+class TriggerRequest(BaseModel):
+    """백엔드 AgentTriggerDispatcher가 POST /trigger로 전송하는 페이로드."""
+    userId: int = Field(..., description="사용자 ID")
+    triggerType: str = Field(..., description="트리거 유형 (post_meal | morning)")
+    referenceId: Optional[int] = Field(None, description="참조 ID (식사 기록 ID 등)")
+
 
 class MorningRequest(BaseModel):
     user_id: str = Field(..., description="사용자 ID")

@@ -28,6 +28,7 @@ if ! grep -q "hdmi_force_hotplug" "$CONFIG"; then
 
 # GlucoFit Projection
 hdmi_force_hotplug=1
+hdmi_drive=2
 hdmi_group=2
 hdmi_mode=87
 hdmi_cvt=854 480 60 6 0 0 0
