@@ -48,8 +48,72 @@ class FcmService : FirebaseMessagingService() {
         super.onMessageReceived(message)
         val title = message.notification?.title ?: message.data["title"] ?: "GluCoach"
         val body = message.notification?.body ?: message.data["body"] ?: return
-        showNotification(title, body)
+
+        // data["alertType"] 우선, 없으면 title로 판별
+        val alertType =
+            message.data["alertType"]
+                ?: if (title == MEAL_FOLLOWUP_TITLE) ALERT_TYPE_MEAL_FOLLOWUP else null
+
+        if (alertType == ALERT_TYPE_MEAL_FOLLOWUP) {
+            showMealFollowupNotification(title, body)
+        } else {
+            showNotification(title, body)
+        }
         glucoseAlertManager.emitFcmAlert(title, body)
+    }
+
+    private fun showMealFollowupNotification(
+        title: String,
+        body: String,
+    ) {
+        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        manager.createNotificationChannel(
+            NotificationChannel(CHANNEL_MEAL, "식후 활동 알림", NotificationManager.IMPORTANCE_HIGH)
+                .apply { description = "식후 활동 유도 및 선택 응답 알림" },
+        )
+
+        val notifId = System.currentTimeMillis().toInt()
+
+        fun actionPendingIntent(
+            reply: String,
+            code: Int,
+        ): PendingIntent {
+            val intent =
+                Intent(this, NotificationActionReceiver::class.java).apply {
+                    action = NotificationActionReceiver.ACTION_MEAL_REPLY
+                    putExtra(NotificationActionReceiver.EXTRA_USER_REPLY, reply)
+                    putExtra(NotificationActionReceiver.EXTRA_NOTIF_ID, notifId)
+                }
+            return PendingIntent.getBroadcast(
+                this,
+                code,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        }
+
+        val openAppIntent =
+            PendingIntent.getActivity(
+                this,
+                notifId,
+                Intent(this, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_CLEAR_TOP },
+                PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE,
+            )
+
+        manager.notify(
+            notifId,
+            NotificationCompat.Builder(this, CHANNEL_MEAL)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                .setSmallIcon(R.drawable.ic_notification)
+                .setAutoCancel(true)
+                .setContentIntent(openAppIntent)
+                .addAction(0, "알겠어요", actionPendingIntent(NotificationActionReceiver.REPLY_OKAY, notifId + 1))
+                .addAction(0, "회의 중", actionPendingIntent(NotificationActionReceiver.REPLY_BUSY, notifId + 2))
+                .addAction(0, "괜찮아요", actionPendingIntent(NotificationActionReceiver.REPLY_DECLINE, notifId + 3))
+                .build(),
+        )
     }
 
     private fun showNotification(
@@ -85,5 +149,8 @@ class FcmService : FirebaseMessagingService() {
     companion object {
         private const val TAG = "FcmService"
         private const val CHANNEL_DEFAULT = "glucoach_default"
+        private const val CHANNEL_MEAL = "glucose_coaching"
+        private const val ALERT_TYPE_MEAL_FOLLOWUP = "AGENT_MEAL_FOLLOWUP"
+        private const val MEAL_FOLLOWUP_TITLE = "식후 컨디션"
     }
 }

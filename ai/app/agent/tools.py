@@ -128,6 +128,7 @@ def send_notification(message: str) -> dict:
             json={"userId": user_id, "alertType": alert_type, "message": message},
             timeout=5,
         )
+        print(f"[API 응답] status={resp.status_code}, body={resp.text}")  # 추가
         resp.raise_for_status()
         return {"status": "sent", "message": message}
     except Exception as e:
