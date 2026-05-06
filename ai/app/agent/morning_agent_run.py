@@ -52,7 +52,7 @@ def execute_tool(name: str, tool_input: dict) -> str:
 
 def run_agent(user_id: int = None):
     """Claude API를 호출하고, 도구 호출이 끝날 때까지 루프를 돈다."""
-    set_agent_context(user_id=user_id, alert_type="AGENT_WAKE_UP")
+    set_agent_context(user_id=user_id, alert_type="AGENT_WAKE_UP_TEST")
     client = anthropic.Anthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
         base_url=BASE_URL,
@@ -158,7 +158,7 @@ def run_agent(user_id: int = None):
 # ── 실행 ──────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    result = run_agent()
+    result = run_agent(user_id=5)
     print(f"\n[최종 결과] message={result['message']}")
     filepath = save_trace(result, agent_type="morning")
     print(f"[trace 저장] {filepath}")
