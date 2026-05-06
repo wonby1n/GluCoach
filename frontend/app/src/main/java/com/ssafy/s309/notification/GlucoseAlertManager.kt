@@ -38,6 +38,7 @@ class GlucoseAlertManager
         @ApplicationContext private val context: Context,
         private val bleManager: BleManager,
         private val projectorClient: ProjectorSocketClient,
+        private val ttsManager: TtsManager,
     ) {
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -177,6 +178,8 @@ class GlucoseAlertManager
                     .setContentIntent(pendingIntent)
                     .build(),
             )
+
+            ttsManager.speak("$title. $message", urgent)
 
             _alertStream.tryEmit(
                 NotificationItem(
