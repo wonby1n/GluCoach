@@ -20,7 +20,7 @@ import org.springframework.web.client.RestClientResponseException;
 @RequiredArgsConstructor
 public class GlucosePredictClientImpl implements GlucosePredictClient {
 
-  private static final String PREDICT_PATH = "/inference/glucose";
+  private static final String PREDICT_PATH = "/inference/glucose/meal";
   static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
   static final String CORRELATION_ID_MDC_KEY = "correlationId";
   static final int MAX_ATTEMPTS = 3;

@@ -105,6 +105,10 @@ public class AuthService {
     refreshTokenService.delete(userId);
   }
 
+  public boolean checkEmailAvailability(String email) {
+    return !userRepository.existsByEmail(email);
+  }
+
   private TokenResponse issueTokens(Integer userId, String email) {
     String accessToken = jwtProvider.generateAccessToken(userId, email);
     String refreshToken = jwtProvider.generateRefreshToken(userId);

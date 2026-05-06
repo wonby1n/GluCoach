@@ -107,16 +107,16 @@ internal data class FoodItem(
 
 private fun FoodSearchItem.toFoodItem() =
     FoodItem(
-        id = id,
+        id = id.toLong(),
         name = name,
-        category = category,
-        calories = kcal,
-        carbs = carbsG,
-        sugar = sugarG,
-        protein = proteinG,
-        fat = fatG,
-        fiber = fiberG,
-        servingSize = servingSize,
+        category = category.orEmpty(),
+        calories = kcal?.toInt() ?: 0,
+        carbs = carbsG?.toInt() ?: 0,
+        sugar = sugarG?.toInt() ?: 0,
+        protein = proteinG?.toInt() ?: 0,
+        fat = fatG?.toInt() ?: 0,
+        fiber = fiberG?.toInt() ?: 0,
+        servingSize = servingSize?.toInt() ?: 0,
     )
 
 private val allFoods =
@@ -908,7 +908,7 @@ private fun FoodSearchDialog(
                                             color = GlucoachColors.TextPrimary,
                                             fontSize = 15.sp,
                                         )
-                                        if (item.category.isNotBlank()) {
+                                        if (!item.category.isNullOrBlank()) {
                                             Text(
                                                 text = item.category,
                                                 color = GlucoachColors.TextSecondary,
@@ -917,7 +917,7 @@ private fun FoodSearchDialog(
                                         }
                                     }
                                     Text(
-                                        text = "${item.kcal}kcal",
+                                        text = item.kcal?.let { "${it.toInt()}kcal" } ?: "-",
                                         color = GlucoachColors.TextSecondary,
                                         fontSize = 13.sp,
                                     )
