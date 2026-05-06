@@ -9,7 +9,10 @@ import com.ssafy.s309.data.ble.ScannedDevice
 import com.ssafy.s309.data.model.DailyHealthSummary
 import com.ssafy.s309.data.model.GlucoseRange
 import com.ssafy.s309.data.model.GlucoseReading
+import com.ssafy.s309.data.model.MealCreateRequest
+import com.ssafy.s309.data.model.MealCreateResponse
 import com.ssafy.s309.data.model.MealEvent
+import com.ssafy.s309.data.model.MealRecordResponse
 import com.ssafy.s309.data.model.NotificationItem
 import com.ssafy.s309.data.repository.source.HealthConnectDataSource
 import com.ssafy.s309.data.repository.source.HealthDataSource
@@ -18,6 +21,8 @@ import com.ssafy.s309.data.repository.source.SamsungHealthDataSource
 import com.ssafy.s309.notification.GlucoseAlertManager
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -169,6 +174,21 @@ class HealthRepository
 
             return firstNonEmptyList { it.getNotifications() } ?: mockDataSource.getNotifications()
         }
+
+        /** 날짜별 식사 기록 조회 */
+        suspend fun getMealsByDate(date: String): Result<List<MealRecordResponse>> = runCatching { healthApi.getMeals(date = date) }
+
+        /** 식사 기록 생성 (multipart) */
+        suspend fun createMealRecord(request: MealCreateRequest): Result<MealCreateResponse> =
+            runCatching {
+                val json =
+                    kotlinx.serialization.json.Json.encodeToString(
+                        MealCreateRequest.serializer(),
+                        request,
+                    )
+                val requestBody = json.toRequestBody("application/json".toMediaType())
+                healthApi.createMeal(request = requestBody)
+            }
 
         /** 알림 읽음 처리 (백엔드 반영). 실패해도 UI 상태는 유지. */
         suspend fun markAlertRead(alertId: Int) {
