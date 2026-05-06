@@ -439,7 +439,7 @@ private fun FoodSelectionContent(
                 foodSearchViewModel = foodSearchViewModel,
                 recentKeywords = recentKeywords,
                 onFoodSelected = { food ->
-                    onFoodSelected(food)
+                    onFoodSelected(food.toFoodItem())
                     showSearchDialog = false
                 },
                 onDismiss = {
@@ -696,10 +696,10 @@ private fun EmptyChartPlaceholder() {
 // ── 검색 다이얼로그 ──────────────────────────────────────
 
 @Composable
-private fun FoodSearchDialog(
+internal fun FoodSearchDialog(
     foodSearchViewModel: FoodSearchViewModel,
     recentKeywords: MutableList<String>,
-    onFoodSelected: (FoodItem) -> Unit,
+    onFoodSelected: (FoodSearchItem) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -897,7 +897,7 @@ private fun FoodSearchDialog(
                                                 if (!recentKeywords.contains(item.name)) {
                                                     recentKeywords.add(0, item.name)
                                                 }
-                                                onFoodSelected(item.toFoodItem())
+                                                onFoodSelected(item)
                                             },
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically,
@@ -987,7 +987,7 @@ private fun FoodSearchDialog(
 }
 
 @Composable
-private fun SearchTab(
+internal fun SearchTab(
     text: String,
     isSelected: Boolean,
     onClick: () -> Unit,
