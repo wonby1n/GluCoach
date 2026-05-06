@@ -80,13 +80,29 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         startDestination = Screen.Landing.route,
     ) {
         composable(Screen.Landing.route) {
-            LandingScreen(
-                onNavigateToLogin = {
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(Screen.Landing.route) { inclusive = true }
+            val autoLoginResult by authViewModel.autoLoginResult.collectAsState()
+
+            LaunchedEffect(Unit) {
+                authViewModel.tryAutoLogin()
+            }
+
+            LaunchedEffect(autoLoginResult) {
+                when (autoLoginResult) {
+                    true -> {
+                        navController.navigate(Screen.Main.route) {
+                            popUpTo(Screen.Landing.route) { inclusive = true }
+                        }
                     }
-                },
-            )
+                    false -> {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(Screen.Landing.route) { inclusive = true }
+                        }
+                    }
+                    null -> {}
+                }
+            }
+
+            LandingScreen()
         }
         composable(Screen.Login.route) {
             LoginScreen(
