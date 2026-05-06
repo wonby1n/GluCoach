@@ -138,7 +138,7 @@ fun MainScreenContent(
     var selectedTab by rememberSaveable { mutableStateOf("home") }
     var showCamera by remember { mutableStateOf(false) }
     var scanSessionId by remember { mutableIntStateOf(0) }
-    var capturedPhotoFile by remember { mutableStateOf<File?>(null) }
+    var capturedPhotoFile by remember { mutableStateOf<java.io.File?>(null) }
     var showReportSheet by remember { mutableStateOf(false) }
     var showAddSheet by remember { mutableStateOf(false) }
 
@@ -185,7 +185,6 @@ fun MainScreenContent(
                                         )
                                     }
                                 } else {
-                                    // 사진 없이 진입한 경우 홈으로 복귀
                                     androidx.compose.runtime.LaunchedEffect(Unit) {
                                         selectedTab = "home"
                                     }
