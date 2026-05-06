@@ -206,6 +206,19 @@ class GlucoseAlertManager
                 else -> "혈당이 ${value}mg/dL이에요. 오늘 식사 내용을 기록해두면 패턴 파악에 좋아요 📝"
             }
 
+        /** FCM 서버 메시지를 인앱 알림 패널 스트림에만 emit. TTS는 FcmService가 담당. */
+        fun emitFcmAlert(title: String, body: String) {
+            _alertStream.tryEmit(
+                NotificationItem(
+                    id = notifIdCounter.incrementAndGet().toLong(),
+                    title = title,
+                    message = body,
+                    timeAgoText = "방금",
+                    isUnread = true,
+                ),
+            )
+        }
+
         enum class AlertType { LOW, HIGH, RISING, FALLING }
 
         companion object {
