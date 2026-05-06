@@ -2,6 +2,7 @@ package com.ssafy.s309.domain.auth.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
@@ -23,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 @SuppressWarnings("NonAsciiCharacters")
@@ -207,6 +209,93 @@ class AuthServiceTest {
     assertThatThrownBy(() -> authService.login(request))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("이메일 또는 비밀번호가 올바르지 않습니다");
+  }
+
+  @Test
+  void 비밀번호_변경_성공_새_해시_저장_및_RefreshToken_무효화() {
+    given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
+    given(passwordEncoder.matches("oldPassword", "encodedPassword")).willReturn(true);
+    given(passwordEncoder.encode("newPassword123")).willReturn("newEncodedPassword");
+
+    authService.changePassword(USER_ID, "oldPassword", "newPassword123");
+
+    assertThat(user.getPassword()).isEqualTo("newEncodedPassword");
+    verify(refreshTokenService).delete(USER_ID);
+  }
+
+  @Test
+  void 비밀번호_변경_현재_비밀번호_불일치_401() {
+    given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
+    given(passwordEncoder.matches("wrongPassword", "encodedPassword")).willReturn(false);
+
+    ResponseStatusException ex =
+        catchThrowableOfType(
+            ResponseStatusException.class,
+            () -> authService.changePassword(USER_ID, "wrongPassword", "newPassword123"));
+
+    assertThat(ex).isNotNull();
+    assertThat(ex.getStatusCode().value()).isEqualTo(401);
+    assertThat(ex.getReason()).contains("현재 비밀번호");
+    assertThat(user.getPassword()).isEqualTo("encodedPassword");
+    verify(refreshTokenService, never()).delete(any());
+  }
+
+  @Test
+  void 비밀번호_변경_새_비밀번호가_현재와_동일_400() {
+    given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
+    given(passwordEncoder.matches("samePassword", "encodedPassword")).willReturn(true);
+
+    ResponseStatusException ex =
+        catchThrowableOfType(
+            ResponseStatusException.class,
+            () -> authService.changePassword(USER_ID, "samePassword", "samePassword"));
+
+    assertThat(ex).isNotNull();
+    assertThat(ex.getStatusCode().value()).isEqualTo(400);
+    assertThat(ex.getReason()).contains("새 비밀번호");
+    assertThat(user.getPassword()).isEqualTo("encodedPassword");
+    verify(refreshTokenService, never()).delete(any());
+  }
+
+  @Test
+  void 비밀번호_변경_탈퇴된_사용자_400() {
+    user.withdraw();
+    given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
+
+    ResponseStatusException ex =
+        catchThrowableOfType(
+            ResponseStatusException.class,
+            () -> authService.changePassword(USER_ID, "anyPassword", "newPassword123"));
+
+    assertThat(ex).isNotNull();
+    assertThat(ex.getStatusCode().value()).isEqualTo(400);
+    verify(refreshTokenService, never()).delete(any());
+  }
+
+  @Test
+  void 비밀번호_변경_OAuth_사용자_400() {
+    User oauthUser = User.builder().email("oauth@example.com").provider("kakao").build();
+    ReflectionTestUtils.setField(oauthUser, "id", USER_ID);
+    given(userRepository.findById(USER_ID)).willReturn(Optional.of(oauthUser));
+
+    ResponseStatusException ex =
+        catchThrowableOfType(
+            ResponseStatusException.class,
+            () -> authService.changePassword(USER_ID, "anyPassword", "newPassword123"));
+
+    assertThat(ex).isNotNull();
+    assertThat(ex.getStatusCode().value()).isEqualTo(400);
+    verify(refreshTokenService, never()).delete(any());
+  }
+
+  @Test
+  void 비밀번호_변경_사용자_미존재_IllegalState() {
+    given(userRepository.findById(USER_ID)).willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> authService.changePassword(USER_ID, "anyPassword", "newPassword123"))
+        .isInstanceOf(IllegalStateException.class);
+
+    verify(refreshTokenService, never()).delete(any());
   }
 
   @Test
