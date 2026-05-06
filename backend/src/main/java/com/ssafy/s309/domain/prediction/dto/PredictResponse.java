@@ -8,5 +8,4 @@ public record PredictResponse(
     List<GlucosePoint> curve,
     Double peakMgdl,
     Integer peakMinute,
-    Integer returnMinute,
     Double confidence) {}
