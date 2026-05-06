@@ -68,6 +68,7 @@ import com.ssafy.s309.ui.component.GlucoseChartCard
 import com.ssafy.s309.ui.component.SummaryStatCard
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -137,6 +138,7 @@ fun MainScreenContent(
     var selectedTab by rememberSaveable { mutableStateOf("home") }
     var showCamera by remember { mutableStateOf(false) }
     var scanSessionId by remember { mutableIntStateOf(0) }
+    var capturedPhotoFile by remember { mutableStateOf<File?>(null) }
     var showReportSheet by remember { mutableStateOf(false) }
     var showAddSheet by remember { mutableStateOf(false) }
 
@@ -168,14 +170,25 @@ fun MainScreenContent(
                             )
                         "add" -> {
                             if (!showCamera) {
-                                key(scanSessionId) {
-                                    FoodScanContent(
-                                        onBack = { selectedTab = "home" },
-                                        onRetakePhoto = {
-                                            scanSessionId++
-                                            showCamera = true
-                                        },
-                                    )
+                                val photoFile = capturedPhotoFile
+                                if (photoFile != null) {
+                                    key(scanSessionId) {
+                                        FoodScanContent(
+                                            photoFile = photoFile,
+                                            onBack = { selectedTab = "home" },
+                                            onRetakePhoto = {
+                                                scanSessionId++
+                                                capturedPhotoFile = null
+                                                showCamera = true
+                                            },
+                                            onMealSaved = { selectedTab = "home" },
+                                        )
+                                    }
+                                } else {
+                                    // 사진 없이 진입한 경우 홈으로 복귀
+                                    androidx.compose.runtime.LaunchedEffect(Unit) {
+                                        selectedTab = "home"
+                                    }
                                 }
                             } else {
                                 Box(
@@ -353,7 +366,8 @@ fun MainScreenContent(
                     showCamera = false
                     selectedTab = "home"
                 },
-                onPhotoTaken = {
+                onPhotoTaken = { file ->
+                    capturedPhotoFile = file
                     showCamera = false
                 },
             )

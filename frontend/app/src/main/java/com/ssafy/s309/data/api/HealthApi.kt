@@ -36,12 +36,12 @@ interface HealthApi {
         @Query("date") date: String,
     ): List<MealRecordResponse>
 
-    /** 식사 기록 생성 (multipart: request JSON + optional image) */
+    /** 식사 기록 생성. request = JSON, image = 선택적 사진 */
     @Multipart
     @POST("api/meals")
     suspend fun createMeal(
         @Part("request") request: RequestBody,
-        @Part image: MultipartBody.Part? = null,
+        @Part image: MultipartBody.Part?,
     ): MealCreateResponse
 
     /** 알림 목록 조회 */
