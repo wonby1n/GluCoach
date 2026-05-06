@@ -75,6 +75,21 @@ data class MealRecordResponse(
     val imageUrl: String? = null,
 )
 
+/** POST /api/meals 요청 (multipart "request" 파트) */
+@Serializable
+data class MealCreateRequest(
+    val foodId: Int,
+    val memo: String? = null,
+    // ISO-8601 "2026-05-06T12:30:00"
+    val recordedAt: String,
+)
+
+/** POST /api/meals 응답 */
+@Serializable
+data class MealCreateResponse(
+    val mealId: Int,
+)
+
 /** GET /api/v1/alerts 응답 항목 */
 @Serializable
 data class AlertItem(

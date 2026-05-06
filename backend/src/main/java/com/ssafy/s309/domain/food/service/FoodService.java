@@ -48,7 +48,9 @@ public class FoodService {
 
     try {
       List<FoodApiItem> items = foodApiClient.search(normalized);
-      List<Food> saved = items.stream().map(this::upsert).toList();
+      // 탄수화물 누락/0 음식은 ingest 단계에서 차단. 혈당 예측 모델의 핵심 입력이라
+      // 결측 시 비교 시뮬레이션이 무의미한 결과를 낸다.
+      List<Food> saved = items.stream().filter(this::hasValidCarbs).map(this::upsert).toList();
       log.info(
           "[FoodSearch] cache=MISS query={} count={} elapsedMs={}",
           normalized,
@@ -115,6 +117,11 @@ public class FoodService {
                         .searchCount(0)
                         .cachedAt(LocalDateTime.now())
                         .build()));
+  }
+
+  private boolean hasValidCarbs(FoodApiItem item) {
+    BigDecimal carbs = parseBigDecimal(item.carbsG());
+    return carbs != null && carbs.signum() > 0;
   }
 
   private BigDecimal parseBigDecimal(String value) {

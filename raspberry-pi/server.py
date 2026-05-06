@@ -65,12 +65,22 @@ def _play(key: str, loop: bool = True):
         log.warning("영상 파일 없음: %s → %s", key, path)
         return
     _stop()
-    cmd = ["mpv", "--fullscreen", "--no-osd", "--no-terminal", "--really-quiet",
-           "--video-rotate=90", "--panscan=1.0",
-           "--audio-device=pipewire/alsa_output.platform-3f902000.hdmi.hdmi-stereo"]
+
+    cmd = [
+        "mpv",
+        "--fullscreen",
+        "--no-osd",
+        "--no-terminal",
+        "--really-quiet",
+        "--video-rotate=90",
+        "--panscan=1.0",
+        "--audio-device=alsa/hdmi:CARD=vc4hdmi,DEV=0"
+    ]
+
     if loop:
         cmd.append("--loop=inf")
     cmd.append(path)
+
     with _lock:
         global _proc
         _proc = subprocess.Popen(cmd, env=_env)

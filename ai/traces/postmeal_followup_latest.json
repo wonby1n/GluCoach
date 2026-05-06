@@ -1,7 +1,7 @@
 {
   "agent": "postmeal_followup",
-  "triggered_at": "2026-05-05 14:22:51",
-  "message": "회의 끝나셨나요? 자리에서 가볍게 스트레칭 한 번 해볼까요? 🙂",
+  "triggered_at": "2026-05-06 15:16:26",
+  "message": "회의 끝나셨나요? 물 한 잔 마시러 일어나볼까요? 💧",
   "display_trace": null,
   "turns": 3,
   "tool_calls": [
@@ -96,13 +96,35 @@
       }
     },
     {
+      "name": "get_meals",
+      "input": {
+        "date": "2026-05-04"
+      },
+      "result": {
+        "date": "2026-05-04",
+        "meals": [
+          {
+            "meal_id": "meal_002",
+            "type": "lunch",
+            "time": "2026-05-04 12:00",
+            "foods": [
+              "김치찌개",
+              "공기밥"
+            ],
+            "carbs_g": 75,
+            "calories": 580
+          }
+        ]
+      }
+    },
+    {
       "name": "send_notification",
       "input": {
-        "message": "회의 끝나셨나요? 자리에서 가볍게 스트레칭 한 번 해볼까요? 🙂"
+        "message": "회의 끝나셨나요? 물 한 잔 마시러 일어나볼까요? 💧"
       },
       "result": {
         "status": "sent",
-        "message": "회의 끝나셨나요? 자리에서 가볍게 스트레칭 한 번 해볼까요? 🙂"
+        "message": "회의 끝나셨나요? 물 한 잔 마시러 일어나볼까요? 💧"
       }
     }
   ]

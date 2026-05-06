@@ -30,8 +30,8 @@ public final class AlertChannelResolver {
       case "WEEKLY_REPORT" -> "주간 보고서 도착";
       case "AGENT_GLUCOSE_HIGH" -> "혈당이 올라가고 있어요";
       case "AGENT_GLUCOSE_LOW" -> "저혈당 주의";
-      case "AGENT_MEAL_FOLLOWUP" -> "식후 컨디션";
-      case "AGENT_WAKE_UP" -> "오늘의 혈당 전략";
+      case "AGENT_MEAL_FOLLOWUP" -> "키키";
+      case "AGENT_WAKE_UP" -> "키키";
       case "AGENT_SLEEP_INSIGHT" -> "수면 인사이트";
       default -> "GlucoCoach 알림";
     };
