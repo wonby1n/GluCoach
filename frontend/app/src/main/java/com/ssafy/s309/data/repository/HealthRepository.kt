@@ -208,8 +208,15 @@ class HealthRepository
 
         private fun formatTimeAgo(isoDateTime: String): String =
             try {
-                val dt = LocalDateTime.parse(isoDateTime)
-                val minutes = java.time.Duration.between(dt, LocalDateTime.now()).toMinutes()
+                // OffsetDateTime으로 먼저 시도 ("Z", "+09:00" 등 offset 포함 형식 처리)
+                // 실패 시 timezone 없는 LocalDateTime으로 fallback
+                val instant =
+                    try {
+                        java.time.OffsetDateTime.parse(isoDateTime).toInstant()
+                    } catch (e: Exception) {
+                        LocalDateTime.parse(isoDateTime).atZone(ZoneId.systemDefault()).toInstant()
+                    }
+                val minutes = java.time.Duration.between(instant, java.time.Instant.now()).toMinutes()
                 when {
                     minutes < 1 -> "방금 전"
                     minutes < 60 -> "${minutes}분 전"
