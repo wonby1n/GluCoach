@@ -223,7 +223,10 @@ class GlucoseAlertManager
             }
 
         /** FCM 서버 메시지를 인앱 알림 패널 스트림에만 emit. TTS는 FcmService가 담당. */
-        fun emitFcmAlert(title: String, body: String) {
+        fun emitFcmAlert(
+            title: String,
+            body: String,
+        ) {
             _alertStream.tryEmit(
                 NotificationItem(
                     id = notifIdCounter.incrementAndGet().toLong(),

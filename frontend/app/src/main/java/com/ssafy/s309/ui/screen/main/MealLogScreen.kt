@@ -62,8 +62,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ssafy.s309.R
+import com.ssafy.s309.data.model.FoodSearchItem
 import com.ssafy.s309.data.model.MealCreateRequest
 import com.ssafy.s309.data.model.MealRecordResponse
+import com.ssafy.s309.data.repository.FoodRepository
 import com.ssafy.s309.data.repository.HealthRepository
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
@@ -238,9 +240,13 @@ class MealLogViewModel
     @Inject
     constructor(
         private val healthRepository: HealthRepository,
+        private val foodRepository: FoodRepository,
     ) : ViewModel() {
         private val _beMeals = MutableStateFlow<List<MealRecordResponse>>(emptyList())
         val beMeals: StateFlow<List<MealRecordResponse>> = _beMeals.asStateFlow()
+
+        private val _foodNutritionMap = MutableStateFlow<Map<Int, FoodSearchItem>>(emptyMap())
+        val foodNutritionMap: StateFlow<Map<Int, FoodSearchItem>> = _foodNutritionMap.asStateFlow()
 
         private val _beDaysWithMeals = MutableStateFlow<Set<Int>>(emptySet())
         val beDaysWithMeals: StateFlow<Set<Int>> = _beDaysWithMeals.asStateFlow()
@@ -256,9 +262,28 @@ class MealLogViewModel
                             val day = LocalDate.parse(date).dayOfMonth
                             _beDaysWithMeals.value = _beDaysWithMeals.value + day
                         }
+                        meals.forEach { meal ->
+                            val foodId = meal.foodId ?: return@forEach
+                            if (foodId in _foodNutritionMap.value) return@forEach
+                            val name = meal.foodName ?: return@forEach
+                            launch { lookupFoodNutrition(foodId, name) }
+                        }
                     }
                     .onFailure { _beMeals.value = emptyList() }
             }
+        }
+
+        private suspend fun lookupFoodNutrition(
+            foodId: Int,
+            foodName: String,
+        ) {
+            foodRepository.searchFoods(foodName)
+                .onSuccess { results ->
+                    val match = results.firstOrNull { it.id == foodId }
+                    if (match != null) {
+                        _foodNutritionMap.value = _foodNutritionMap.value + (foodId to match)
+                    }
+                }
         }
 
         fun onMonthChanged(
@@ -355,6 +380,7 @@ private fun MealLogCalendarContent(
 
     val beMeals by mealLogViewModel.beMeals.collectAsState()
     val beDaysWithMeals by mealLogViewModel.beDaysWithMeals.collectAsState()
+    val nutritionMap by mealLogViewModel.foodNutritionMap.collectAsState()
 
     LaunchedEffect(displayYear, displayMonth) {
         mealLogViewModel.onMonthChanged(displayYear, displayMonth)
@@ -374,8 +400,9 @@ private fun MealLogCalendarContent(
             MealLogMockData.mealsForDate(displayYear, displayMonth, selectedDay)
         }
     val beConvertedMeals =
-        remember(beMeals, displayYear, displayMonth, selectedDay) {
+        remember(beMeals, displayYear, displayMonth, selectedDay, nutritionMap) {
             beMeals.map { m ->
+                val food = m.foodId?.let { nutritionMap[it] }
                 MealRecord(
                     id = m.mealId,
                     year = displayYear,
@@ -384,10 +411,10 @@ private fun MealLogCalendarContent(
                     mealType = guessMealType(m.recordedAt),
                     name = m.foodName ?: "식사 기록",
                     description = m.memo ?: "",
-                    calories = 0,
-                    carbs = 0f,
-                    protein = 0f,
-                    fat = 0f,
+                    calories = food?.kcal?.toInt() ?: 0,
+                    carbs = food?.carbsG?.toFloat() ?: 0f,
+                    protein = food?.proteinG?.toFloat() ?: 0f,
+                    fat = food?.fatG?.toFloat() ?: 0f,
                 )
             }
         }
