@@ -1,5 +1,6 @@
 package com.ssafy.s309.ui.screen.main
 
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
@@ -28,6 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.LocalCafe
@@ -37,8 +39,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -53,11 +58,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.ssafy.s309.R
+import com.ssafy.s309.data.model.MealCreateRequest
+import com.ssafy.s309.data.model.MealRecordResponse
+import com.ssafy.s309.data.repository.HealthRepository
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
+import com.ssafy.s309.ui.viewmodel.FoodSearchViewModel
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Calendar
+import javax.inject.Inject
 
 // ── 데이터 모델 ──────────────────────────────────────────
 
@@ -210,6 +231,62 @@ private object MealLogMockData {
     ): Set<Int> = meals.filter { it.year == year && it.month == month }.map { it.day }.toSet()
 }
 
+// ── ViewModel ──────────────────────────────────────────
+
+@HiltViewModel
+class MealLogViewModel
+    @Inject
+    constructor(
+        private val healthRepository: HealthRepository,
+    ) : ViewModel() {
+        private val _beMeals = MutableStateFlow<List<MealRecordResponse>>(emptyList())
+        val beMeals: StateFlow<List<MealRecordResponse>> = _beMeals.asStateFlow()
+
+        private val _beDaysWithMeals = MutableStateFlow<Set<Int>>(emptySet())
+        val beDaysWithMeals: StateFlow<Set<Int>> = _beDaysWithMeals.asStateFlow()
+
+        private var loadedMonth: Pair<Int, Int>? = null
+
+        fun loadMeals(date: String) {
+            viewModelScope.launch {
+                healthRepository.getMealsByDate(date)
+                    .onSuccess { meals ->
+                        _beMeals.value = meals
+                        if (meals.isNotEmpty()) {
+                            val day = LocalDate.parse(date).dayOfMonth
+                            _beDaysWithMeals.value = _beDaysWithMeals.value + day
+                        }
+                    }
+                    .onFailure { _beMeals.value = emptyList() }
+            }
+        }
+
+        fun onMonthChanged(
+            year: Int,
+            month: Int,
+        ) {
+            if (loadedMonth == year to month) return
+            loadedMonth = year to month
+            _beDaysWithMeals.value = emptySet()
+        }
+
+        fun createMeal(
+            foodId: Int,
+            recordedAt: String,
+            onSuccess: () -> Unit,
+        ) {
+            viewModelScope.launch {
+                healthRepository.createMealRecord(
+                    MealCreateRequest(foodId = foodId, recordedAt = recordedAt),
+                ).onSuccess {
+                    onSuccess()
+                }.onFailure {
+                    Log.w("MealLogVM", "식사 기록 생성 실패", it)
+                }
+            }
+        }
+    }
+
 // ── 진입점 ──────────────────────────────────────────────
 
 @Composable
@@ -217,6 +294,8 @@ fun MealLogContent(
     onBackToHome: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val mealLogViewModel: MealLogViewModel = hiltViewModel()
+    val foodSearchViewModel: FoodSearchViewModel = hiltViewModel()
     var selectedMeal by remember { mutableStateOf<MealRecord?>(null) }
     var displayedMeal by remember { mutableStateOf<MealRecord?>(null) }
     if (selectedMeal != null) displayedMeal = selectedMeal
@@ -227,6 +306,8 @@ fun MealLogContent(
 
     Box(modifier = modifier.fillMaxSize()) {
         MealLogCalendarContent(
+            mealLogViewModel = mealLogViewModel,
+            foodSearchViewModel = foodSearchViewModel,
             onMealClick = { selectedMeal = it },
             onBack = onBackToHome,
         )
@@ -250,6 +331,8 @@ fun MealLogContent(
 
 @Composable
 private fun MealLogCalendarContent(
+    mealLogViewModel: MealLogViewModel,
+    foodSearchViewModel: FoodSearchViewModel,
     onMealClick: (MealRecord) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -267,14 +350,52 @@ private fun MealLogCalendarContent(
     var displayYear by remember { mutableIntStateOf(today.first) }
     var displayMonth by remember { mutableIntStateOf(today.second) }
     var selectedDay by remember { mutableIntStateOf(today.third) }
+    var showSearchDialog by remember { mutableStateOf(false) }
+    val recentKeywords = remember { mutableStateListOf<String>() }
 
-    val daysWithMeals =
-        remember(displayYear, displayMonth) {
-            MealLogMockData.daysWithMeals(displayYear, displayMonth)
+    val beMeals by mealLogViewModel.beMeals.collectAsState()
+    val beDaysWithMeals by mealLogViewModel.beDaysWithMeals.collectAsState()
+
+    LaunchedEffect(displayYear, displayMonth) {
+        mealLogViewModel.onMonthChanged(displayYear, displayMonth)
+    }
+
+    LaunchedEffect(displayYear, displayMonth, selectedDay) {
+        if (selectedDay > 0) {
+            val date =
+                LocalDate.of(displayYear, displayMonth, selectedDay)
+                    .format(DateTimeFormatter.ISO_LOCAL_DATE)
+            mealLogViewModel.loadMeals(date)
         }
-    val selectedDateMeals =
+    }
+
+    val mockMeals =
         remember(displayYear, displayMonth, selectedDay) {
             MealLogMockData.mealsForDate(displayYear, displayMonth, selectedDay)
+        }
+    val beConvertedMeals =
+        remember(beMeals, displayYear, displayMonth, selectedDay) {
+            beMeals.map { m ->
+                MealRecord(
+                    id = m.mealId,
+                    year = displayYear,
+                    month = displayMonth,
+                    day = selectedDay,
+                    mealType = guessMealType(m.recordedAt),
+                    name = m.foodName ?: "식사 기록",
+                    description = m.memo ?: "",
+                    calories = 0,
+                    carbs = 0f,
+                    protein = 0f,
+                    fat = 0f,
+                )
+            }
+        }
+    val selectedDateMeals = if (beConvertedMeals.isNotEmpty()) beConvertedMeals else mockMeals
+
+    val daysWithMeals =
+        remember(displayYear, displayMonth, beDaysWithMeals) {
+            MealLogMockData.daysWithMeals(displayYear, displayMonth) + beDaysWithMeals
         }
 
     Column(
@@ -287,27 +408,80 @@ private fun MealLogCalendarContent(
         Spacer(Modifier.height(GlucoachSpacing.xxl))
 
         Row(
-            modifier =
-                Modifier
-                    .clickable(onClick = onBack),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                contentDescription = "뒤로가기",
-                tint = GlucoachColors.TextPrimary,
-                modifier = Modifier.size(24.dp),
-            )
-            Spacer(Modifier.width(GlucoachSpacing.sm))
-            Text(
-                text = "식사 캘린더",
-                color = GlucoachColors.TextPrimary,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-            )
+            Row(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .clickable(onClick = onBack),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                    contentDescription = "뒤로가기",
+                    tint = GlucoachColors.TextPrimary,
+                    modifier = Modifier.size(24.dp),
+                )
+                Spacer(Modifier.width(GlucoachSpacing.sm))
+                Text(
+                    text = "식사 캘린더",
+                    color = GlucoachColors.TextPrimary,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            IconButton(
+                onClick = { showSearchDialog = true },
+                modifier = Modifier.size(36.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Add,
+                    contentDescription = "식사 기록 추가",
+                    tint = GlucoachColors.Primary,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
         }
 
         Spacer(Modifier.height(GlucoachSpacing.xl))
+
+        if (showSearchDialog) {
+            FoodSearchDialog(
+                foodSearchViewModel = foodSearchViewModel,
+                recentKeywords = recentKeywords,
+                onFoodSelected = { food ->
+                    showSearchDialog = false
+                    val day = if (selectedDay > 0) selectedDay else today.third
+                    if (selectedDay <= 0) selectedDay = today.third
+                    val recordedAt =
+                        LocalDateTime.of(
+                            displayYear,
+                            displayMonth,
+                            day,
+                            LocalDateTime.now().hour,
+                            LocalDateTime.now().minute,
+                        )
+                            .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                    mealLogViewModel.createMeal(
+                        foodId = food.id,
+                        recordedAt = recordedAt,
+                        onSuccess = {
+                            val date =
+                                LocalDate.of(displayYear, displayMonth, day)
+                                    .format(DateTimeFormatter.ISO_LOCAL_DATE)
+                            mealLogViewModel.loadMeals(date)
+                        },
+                    )
+                    foodSearchViewModel.clearSearch()
+                },
+                onDismiss = {
+                    foodSearchViewModel.clearSearch()
+                    showSearchDialog = false
+                },
+            )
+        }
 
         MonthCalendar(
             year = displayYear,
@@ -928,3 +1102,16 @@ private fun NutritionItem(
         )
     }
 }
+
+private fun guessMealType(isoDateTime: String): MealType =
+    try {
+        val hour = LocalDateTime.parse(isoDateTime).hour
+        when {
+            hour < 10 -> MealType.BREAKFAST
+            hour < 14 -> MealType.LUNCH
+            hour < 18 -> MealType.DINNER
+            else -> MealType.SNACK
+        }
+    } catch (e: Exception) {
+        MealType.LUNCH
+    }
