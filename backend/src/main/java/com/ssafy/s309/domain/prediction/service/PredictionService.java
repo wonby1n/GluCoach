@@ -1,7 +1,5 @@
 package com.ssafy.s309.domain.prediction.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.s309.domain.prediction.client.GlucosePredictClient;
 import com.ssafy.s309.domain.prediction.client.dto.GlucosePredictRequest;
 import com.ssafy.s309.domain.prediction.client.dto.GlucosePredictResponse;
@@ -12,7 +10,6 @@ import com.ssafy.s309.domain.prediction.dto.AbPredictResponse;
 import com.ssafy.s309.domain.prediction.dto.PredictRequest;
 import com.ssafy.s309.domain.prediction.dto.PredictResponse;
 import com.ssafy.s309.domain.prediction.entity.GlucosePrediction;
-import com.ssafy.s309.domain.prediction.exception.AiServiceException;
 import com.ssafy.s309.domain.prediction.repository.GlucosePredictionRepository;
 import com.ssafy.s309.domain.user.entity.DiabetesType;
 import com.ssafy.s309.domain.user.entity.User;
@@ -42,7 +39,6 @@ public class PredictionService {
   private final GlucosePredictClient glucosePredictClient;
   private final GlucosePredictionRepository predictionRepository;
   private final UserRepository userRepository;
-  private final ObjectMapper objectMapper;
 
   @Transactional
   public PredictResponse predict(Integer userId, PredictRequest request) {
@@ -113,19 +109,12 @@ public class PredictionService {
 
   private GlucosePrediction savePrediction(
       User user, PredictRequest request, GlucosePredictResponse aiResponse) {
-    String curveJson;
-    try {
-      curveJson = objectMapper.writeValueAsString(aiResponse.curve());
-    } catch (JsonProcessingException e) {
-      throw new AiServiceException(AiServiceException.ErrorType.MODEL_ERROR, "곡선 데이터 직렬화 실패", e);
-    }
-
     return predictionRepository.save(
         GlucosePrediction.builder()
             .user(user)
             .foodId(request.foodId())
             .foodName(request.foodName())
-            .predictedCurve(curveJson)
+            .predictedCurve(aiResponse.curve())
             .predictedPeak(
                 aiResponse.peakMgdl() != null ? BigDecimal.valueOf(aiResponse.peakMgdl()) : null)
             .build());
