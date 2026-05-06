@@ -49,14 +49,14 @@ def execute_tool(name: str, tool_input: dict) -> str:
 
 # ── Agentic Loop ──────────────────────────────────────────
 
-def run_postmeal_agent(trigger: dict, user_id: int = None):
+def run_postmeal_agent(trigger: dict, user_id: int = None, alert_type: str = "AGENT_MEAL_FOLLOWUP"):
     """
     trigger: agent를 깨운 이유와 컨텍스트
         - reason   : "meal_recorded" | "schedule_followup" | "user_response"
         - meal_time: 식사 시각 (예: "2026-05-04 12:00")
         - user_reply: 사용자 응답 텍스트 (재트리거 시)
     """
-    set_agent_context(user_id=user_id, alert_type="AGENT_MEAL_FOLLOWUP")
+    set_agent_context(user_id=user_id, alert_type=alert_type)
     client = anthropic.Anthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
         base_url=BASE_URL,
@@ -185,7 +185,7 @@ if __name__ == "__main__":
         "meal_time": "2026-05-04 12:00",
     }
 
-    result_817 = run_postmeal_agent(trigger_817)
+    result_817 = run_postmeal_agent(trigger_817, user_id=5, alert_type="AGENT_MEAL_FOLLOWUP")
     print(f"\n[817 결과] message={result_817['message']}")
     save_trace(result_817, agent_type="postmeal")
 
@@ -214,7 +214,7 @@ if __name__ == "__main__":
         "user_reply":                    user_reply,
     }
 
-    result_818 = run_postmeal_agent(trigger_818)
+    result_818 = run_postmeal_agent(trigger_818, user_id=5, alert_type="AGENT_MEAL_REPLY")
     print(f"\n[818 결과] message={result_818['message']}")
     print(f"[818 followup] {result_818['scheduled_followup']}")
     save_trace(result_818, agent_type="postmeal_reply")
@@ -236,6 +236,6 @@ if __name__ == "__main__":
             "followup_at":    "2026-05-04 13:30",
         }
 
-        result_819 = run_postmeal_agent(trigger_819)
+        result_819 = run_postmeal_agent(trigger_819, user_id=5, alert_type="AGENT_MEAL_RETRY")
         print(f"\n[819 결과] message={result_819['message']}")
         save_trace(result_819, agent_type="postmeal_followup")

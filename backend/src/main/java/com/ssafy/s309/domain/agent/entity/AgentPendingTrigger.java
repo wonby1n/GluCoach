@@ -23,6 +23,7 @@ import org.hibernate.annotations.CreationTimestamp;
 public class AgentPendingTrigger {
 
   public static final String TYPE_POST_MEAL = "post_meal";
+  public static final String TYPE_WAKE_UP = "wake_up";
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -45,6 +45,14 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <receiver
+            android:name=".fcm.NotificationActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.ssafy.s309.ACTION_MEAL_REPLY" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

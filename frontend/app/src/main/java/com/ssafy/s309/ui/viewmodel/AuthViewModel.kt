@@ -6,6 +6,8 @@ import com.ssafy.s309.data.model.UserSettingsUpdateRequest
 import com.ssafy.s309.data.repository.AuthRepository
 import com.ssafy.s309.data.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,9 +38,20 @@ class AuthViewModel
         private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
         val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
+        private val _autoLoginResult = MutableStateFlow<Boolean?>(null)
+        val autoLoginResult: StateFlow<Boolean?> = _autoLoginResult.asStateFlow()
+
         val isLoggedIn: Boolean get() = authRepository.isLoggedIn()
 
         val userEmail: String get() = authRepository.getUserEmail() ?: ""
+
+        fun tryAutoLogin() {
+            viewModelScope.launch {
+                val refreshResult = async { authRepository.refresh() }
+                delay(1500L)
+                _autoLoginResult.value = refreshResult.await().isSuccess
+            }
+        }
 
         fun login(
             email: String,
