@@ -17,7 +17,7 @@ import os
 from dotenv import load_dotenv
 import anthropic
 
-from app.agent.tools import TOOL_SCHEMAS, TOOL_MAP
+from app.agent.tools import TOOL_SCHEMAS, TOOL_MAP, set_agent_context
 from app.agent.prompts import build_morning_prompt
 from app.agent.trace_writer import save_trace
 from app.agent.fallback import call_llm_with_retry, get_fallback_message
@@ -50,8 +50,9 @@ def execute_tool(name: str, tool_input: dict) -> str:
 
 # ── Agentic Loop ──────────────────────────────────────────
 
-def run_agent(user_id: str = None):
+def run_agent(user_id: int = None):
     """Claude API를 호출하고, 도구 호출이 끝날 때까지 루프를 돈다."""
+    set_agent_context(user_id=user_id, alert_type="AGENT_WAKE_UP")
     client = anthropic.Anthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
         base_url=BASE_URL,

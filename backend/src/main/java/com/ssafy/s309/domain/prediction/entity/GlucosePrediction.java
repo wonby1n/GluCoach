@@ -1,5 +1,6 @@
 package com.ssafy.s309.domain.prediction.entity;
 
+import com.ssafy.s309.domain.prediction.client.dto.GlucosePoint;
 import com.ssafy.s309.domain.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -13,11 +14,14 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -45,7 +49,8 @@ public class GlucosePrediction {
   private String foodName;
 
   @Column(name = "predicted_curve", nullable = false, columnDefinition = "JSON")
-  private String predictedCurve;
+  @JdbcTypeCode(SqlTypes.JSON)
+  private List<GlucosePoint> predictedCurve;
 
   @Column(name = "predicted_peak", precision = 5, scale = 2)
   private BigDecimal predictedPeak;

@@ -16,7 +16,7 @@ import os
 from dotenv import load_dotenv
 import anthropic
 
-from app.agent.tools import TOOL_SCHEMAS, TOOL_MAP
+from app.agent.tools import TOOL_SCHEMAS, TOOL_MAP, set_agent_context
 from app.agent.prompts import build_postmeal_prompt
 from app.agent.trace_writer import save_trace
 from app.agent.fallback import call_llm_with_retry, get_fallback_message
@@ -49,13 +49,14 @@ def execute_tool(name: str, tool_input: dict) -> str:
 
 # ── Agentic Loop ──────────────────────────────────────────
 
-def run_postmeal_agent(trigger: dict, user_id: str = None):
+def run_postmeal_agent(trigger: dict, user_id: int = None):
     """
     trigger: agent를 깨운 이유와 컨텍스트
         - reason   : "meal_recorded" | "schedule_followup" | "user_response"
         - meal_time: 식사 시각 (예: "2026-05-04 12:00")
         - user_reply: 사용자 응답 텍스트 (재트리거 시)
     """
+    set_agent_context(user_id=user_id, alert_type="AGENT_MEAL_FOLLOWUP")
     client = anthropic.Anthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
         base_url=BASE_URL,
