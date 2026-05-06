@@ -116,10 +116,10 @@ public class AuthService {
     User user =
         userRepository
             .findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다"));
+            .orElseThrow(() -> new IllegalStateException("인증된 사용자를 DB에서 찾을 수 없습니다: " + userId));
 
     if (user.isDeleted() || user.getPassword() == null) {
-      throw new IllegalArgumentException("비밀번호를 변경할 수 없는 계정입니다");
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "비밀번호를 변경할 수 없는 계정입니다");
     }
 
     if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
@@ -127,7 +127,7 @@ public class AuthService {
     }
 
     if (currentPassword.equals(newPassword)) {
-      throw new IllegalArgumentException("새 비밀번호가 현재 비밀번호와 같습니다");
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "새 비밀번호가 현재 비밀번호와 같습니다");
     }
 
     user.changePassword(passwordEncoder.encode(newPassword));
