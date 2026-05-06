@@ -1,6 +1,7 @@
 package com.ssafy.s309.di
 
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+import com.ssafy.s309.data.api.AiFoodApi
 import com.ssafy.s309.data.api.AuthApi
 import com.ssafy.s309.data.api.FoodApi
 import com.ssafy.s309.data.api.HealthApi
@@ -108,4 +109,10 @@ object AppModule {
     fun provideHealthApi(
         @Named("authenticated") retrofit: Retrofit,
     ): HealthApi = retrofit.create(HealthApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideAiFoodApi(
+        @Named("authenticated") retrofit: Retrofit,
+    ): AiFoodApi = retrofit.create(AiFoodApi::class.java)
 }

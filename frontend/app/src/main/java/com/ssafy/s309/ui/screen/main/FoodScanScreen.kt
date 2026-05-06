@@ -13,7 +13,6 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -309,7 +308,7 @@ private fun CameraPreviewView(imageCapture: ImageCapture) {
                                 imageCapture,
                             )
                         } catch (_: Exception) {
-                            // 카메라를 지원하지 않는 에뮬레이터·기기에서 안전하게 무시
+                            // 카메라 미지원 환경에서 무시
                         }
                     },
                     ContextCompat.getMainExecutor(ctx),
@@ -389,11 +388,6 @@ private fun AnalyzingScreen(
             color = GlucoachColors.TextSecondary,
             fontSize = 14.sp,
         )
-        Text(
-            text = "잠깐만 기다려 주세요",
-            color = GlucoachColors.TextSecondary,
-            fontSize = 14.sp,
-        )
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
@@ -469,13 +463,21 @@ private fun AnalysisStepRow(
                     ),
             contentAlignment = Alignment.Center,
         ) {
-            if (status == AnalysisStatus.COMPLETED) {
-                Icon(
-                    imageVector = Icons.Filled.Check,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(16.dp),
-                )
+            when (status) {
+                AnalysisStatus.COMPLETED ->
+                    Icon(
+                        imageVector = Icons.Filled.Check,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp),
+                    )
+                AnalysisStatus.IN_PROGRESS ->
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                    )
+                AnalysisStatus.PENDING -> {}
             }
         }
 
@@ -675,7 +677,7 @@ private fun SimulationScreen(
                 )
             }
             Text(
-                text = "식사기록",
+                text = "식사 기록",
                 color = GlucoachColors.TextPrimary,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
@@ -735,7 +737,7 @@ private fun SimulationScreen(
                     )
                 }
 
-                Image(
+                androidx.compose.foundation.Image(
                     painter = painterResource(id = R.drawable.kiki_main),
                     contentDescription = null,
                     modifier =
@@ -782,6 +784,8 @@ private fun SimulationScreen(
                         ButtonDefaults.buttonColors(
                             containerColor = GlucoachColors.Primary,
                             contentColor = Color.White,
+                            disabledContainerColor = GlucoachColors.Primary.copy(alpha = 0.6f),
+                            disabledContentColor = Color.White,
                         ),
                 ) {
                     if (isSaving) {
@@ -958,12 +962,7 @@ private fun GlucosePredictionChart(
 
         val chartHeight = 120.dp
 
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(chartHeight),
-        ) {
+        Box(modifier = Modifier.fillMaxWidth().height(chartHeight)) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height

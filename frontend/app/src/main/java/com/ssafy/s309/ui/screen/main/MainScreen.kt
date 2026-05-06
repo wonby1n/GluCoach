@@ -68,6 +68,7 @@ import com.ssafy.s309.ui.component.GlucoseChartCard
 import com.ssafy.s309.ui.component.SummaryStatCard
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale

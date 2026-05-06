@@ -13,6 +13,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @RestControllerAdvice
@@ -21,6 +22,16 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(IllegalArgumentException.class)
   public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException e) {
     return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+  }
+
+  /**
+   * ResponseStatusException 응답 포맷을 {"message": "..."} 로 정규화. 다른 예외 핸들러들과 응답 스키마를 통일하여 클라가 분기 처리하지
+   * 않도록 한다.
+   */
+  @ExceptionHandler(ResponseStatusException.class)
+  public ResponseEntity<Map<String, String>> handleResponseStatus(ResponseStatusException e) {
+    String message = e.getReason() != null ? e.getReason() : "";
+    return ResponseEntity.status(e.getStatusCode()).body(Map.of("message", message));
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
