@@ -2,33 +2,21 @@ package com.ssafy.s309.data.model
 
 import kotlinx.serialization.Serializable
 
-/**
- * 실시간 혈당 측정 값 (CGM 등)
- *
- * @property timestampMillis 측정 시각 (epoch millis)
- * @property valueMgDl 혈당 수치 mg/dL
- */
+/** 실시간 혈당 측정 값 (BLE 패치 / UI 표시용) */
 @Serializable
 data class GlucoseReading(
     val timestampMillis: Long,
     val valueMgDl: Int,
 )
 
-/**
- * 사용자가 설정한 목표 혈당 범위. 그래프의 회색 박스로 표시된다.
- *
- * @property minMgDl 하한 (예: 90)
- * @property maxMgDl 상한 (예: 180)
- */
+/** 목표 혈당 범위 (그래프 회색 박스) */
 @Serializable
 data class GlucoseRange(
     val minMgDl: Int,
     val maxMgDl: Int,
 )
 
-/**
- * 사용자가 입력한 식사 이벤트. 그래프 위에 밥그릇 핀으로 표시된다.
- */
+/** 식사 이벤트 (그래프 밥그릇 핀) */
 @Serializable
 data class MealEvent(
     val id: Long,
@@ -36,23 +24,14 @@ data class MealEvent(
     val label: String = "식사",
 )
 
-/**
- * 하루 누적 건강 요약 (칼로리, 수면 등).
- *
- * @property caloriesBurnedKcal 하루 누적 소모 칼로리
- * @property sleepMinutes 수면 시간 (분)
- */
+/** 하루 누적 건강 요약 (칼로리, 수면) */
 @Serializable
 data class DailyHealthSummary(
     val caloriesBurnedKcal: Int,
     val sleepMinutes: Int,
 )
 
-/**
- * 알림 패널에 표시될 알림 항목.
- *
- * @property isUnread true 이면 굵게 표시
- */
+/** 알림 패널 항목 */
 @Serializable
 data class NotificationItem(
     val id: Long,
@@ -60,4 +39,56 @@ data class NotificationItem(
     val message: String,
     val timeAgoText: String,
     val isUnread: Boolean,
+)
+
+// ── 백엔드 응답 DTO ─────────────────────────────────────────────────
+
+/** GET /api/glucose-records 응답 항목 */
+@Serializable
+data class CgmRecordResponse(
+    val id: Long,
+    val value: Double,
+    val measuredAt: String, // ISO-8601 "2026-05-06T10:30:00"
+)
+
+/** GET /api/health/daily-summary 응답 항목 */
+@Serializable
+data class DailyHealthSummaryResponse(
+    val date: String,
+    val steps: Int? = null,
+    val caloriesBurned: Double? = null,
+    val sleepMinutes: Int? = null,
+    val avgHeartRate: Double? = null,
+    val updatedAt: String? = null,
+)
+
+/** GET /api/meals 응답 항목 */
+@Serializable
+data class MealRecordResponse(
+    val mealId: Int,
+    val foodId: Int? = null,
+    val foodName: String? = null,
+    val memo: String? = null,
+    val recordedAt: String, // ISO-8601
+    val imageUrl: String? = null,
+)
+
+/** GET /api/v1/alerts 응답 항목 */
+@Serializable
+data class AlertItem(
+    val id: Int,
+    val alertType: String,
+    val message: String,
+    val isRead: Boolean,
+    val createdAt: String, // ISO-8601
+)
+
+/** GET /api/v1/alerts 페이지 응답 */
+@Serializable
+data class AlertListResponse(
+    val content: List<AlertItem>,
+    val unreadCount: Long,
+    val page: Int,
+    val size: Int,
+    val total: Long,
 )

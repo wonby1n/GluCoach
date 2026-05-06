@@ -12,10 +12,10 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import com.ssafy.s309.domain.prediction.client.dto.FoodNutrition;
 import com.ssafy.s309.domain.prediction.client.dto.GlucosePredictRequest;
 import com.ssafy.s309.domain.prediction.client.dto.GlucosePredictResponse;
-import com.ssafy.s309.domain.prediction.client.dto.UserProfile;
+import com.ssafy.s309.domain.prediction.client.dto.MealInfo;
+import com.ssafy.s309.domain.prediction.client.dto.UserProfileWithPattern;
 import com.ssafy.s309.domain.prediction.exception.AiServiceException;
 import com.ssafy.s309.domain.prediction.exception.AiServiceException.ErrorType;
 import java.util.List;
@@ -38,10 +38,11 @@ class GlucosePredictClientImplTest {
 
   @BeforeEach
   void setUp() {
-    FoodNutrition food = new FoodNutrition("1", "흰쌀밥", 56.0, 4.4, 0.5, 250.0, 0.3, 86);
-    UserProfile profile = new UserProfile("T2D", true, 175f, 70f, 105.0);
-    request = new GlucosePredictRequest(food, profile, "generic");
-    response = new GlucosePredictResponse(List.of(), 168.0, 45, 95, "generic", 0.82);
+    MealInfo meal = new MealInfo(56.0, "2026-05-06T10:00:00");
+    UserProfileWithPattern profile =
+        new UserProfileWithPattern(100.0, 70.0, "medium", "T2D", "regular_3");
+    request = new GlucosePredictRequest("1", List.of(100.0), meal, profile);
+    response = new GlucosePredictResponse(List.of(), 168.0, 45, "base", 0.82);
     MDC.remove(GlucosePredictClientImpl.CORRELATION_ID_MDC_KEY);
   }
 

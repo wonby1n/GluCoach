@@ -15,11 +15,12 @@ data class UserSettings(
     val isMedicated: Boolean? = null,
     val targetLow: Int? = null,
     val targetHigh: Int? = null,
+    val weekStartDay: Int? = null,
+    // 백엔드 SettingsResponse에 없는 클라이언트 전용 필드 (null로 수신됨)
     val alertLow: Int? = null,
     val alertHigh: Int? = null,
     val nightWatch: Boolean? = null,
     val characterType: String? = null,
-    val weekStartDay: Int? = null,
 )
 
 @Serializable
@@ -33,43 +34,37 @@ data class UserSettingsUpdateRequest(
     val isMedicated: Boolean? = null,
     val targetLow: Int? = null,
     val targetHigh: Int? = null,
+    // 백엔드 SettingsUpdateRequest에 없는 필드 (서버가 무시함)
     val alertLow: Int? = null,
     val alertHigh: Int? = null,
     val nightWatch: Boolean? = null,
     val characterType: String? = null,
 )
 
+/** 백엔드 GET /api/user/search 응답 */
+@Serializable
+data class UserSearchResponse(
+    val userId: Int,
+    val name: String,
+)
+
+/** 백엔드 GET /api/user/guardians 응답 항목 (GuardianResponse 매핑) */
 @Serializable
 data class GuardianItem(
-    val guardianId: String,
-    val name: String,
-    val phone: String,
+    val id: Int,
+    val wardId: Int,
+    val guardianId: Int,
     val relation: String? = null,
-    val isPrimary: Boolean,
-    val priority: Int,
+    val priority: Int = 0,
+    /** 서버 응답에는 없음 — 보호자 추가 시 검색 결과에서 채워넣는 표시용 필드 */
+    val name: String = "",
 )
 
+/** 백엔드 POST /api/user/guardians 요청 (GuardianRequest 매핑) */
 @Serializable
 data class GuardianCreateRequest(
-    val name: String,
-    val phone: String,
+    val guardianId: Int,
     val relation: String? = null,
-    val isPrimary: Boolean = false,
-)
-
-@Serializable
-data class UserProfile(
-    val email: String = "",
-    val name: String = "",
-    val age: Int? = null,
-    val phone: String = "",
-)
-
-@Serializable
-data class UserProfileUpdateRequest(
-    val name: String? = null,
-    val age: Int? = null,
-    val phone: String? = null,
 )
 
 @Serializable

@@ -63,8 +63,10 @@ class MyAccountViewModel
 
                 userRepository.getGuardians()
                     .onSuccess { guardians ->
-                        val primary = guardians.firstOrNull { it.isPrimary } ?: guardians.firstOrNull()
-                        _uiState.update { it.copy(guardian = primary?.name ?: "") }
+                        // priority=0이 주 보호자; name은 서버 응답에 없으므로 guardianId로 표시
+                        val primary = guardians.minByOrNull { it.priority }
+                        val label = primary?.name?.ifBlank { null } ?: primary?.let { "보호자 #${it.guardianId}" } ?: ""
+                        _uiState.update { it.copy(guardian = label) }
                     }
             }
         }

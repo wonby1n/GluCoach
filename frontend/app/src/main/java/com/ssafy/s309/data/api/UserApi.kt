@@ -3,8 +3,7 @@ package com.ssafy.s309.data.api
 import com.ssafy.s309.data.model.FcmTokenRequest
 import com.ssafy.s309.data.model.GuardianCreateRequest
 import com.ssafy.s309.data.model.GuardianItem
-import com.ssafy.s309.data.model.UserProfile
-import com.ssafy.s309.data.model.UserProfileUpdateRequest
+import com.ssafy.s309.data.model.UserSearchResponse
 import com.ssafy.s309.data.model.UserSettings
 import com.ssafy.s309.data.model.UserSettingsUpdateRequest
 import retrofit2.http.Body
@@ -13,22 +12,11 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface UserApi {
-    @GET("api/users/{userId}")
-    suspend fun getProfile(
-        @Path("userId") userId: String,
-    ): UserProfile
-
-    @PUT("api/users/{userId}")
-    suspend fun updateProfile(
-        @Path("userId") userId: String,
-        @Body request: UserProfileUpdateRequest,
-    ): UserProfile
-
-    @PUT("api/users/{userId}/fcm-token")
+    @PUT("api/user/fcm-token")
     suspend fun registerFcmToken(
-        @Path("userId") userId: String,
         @Body request: FcmTokenRequest,
     )
 
@@ -40,27 +28,29 @@ interface UserApi {
         @Body request: UserSettingsUpdateRequest,
     ): UserSettings
 
-    @GET("api/users/{userId}/guardians")
-    suspend fun getGuardians(
-        @Path("userId") userId: String,
-    ): List<GuardianItem>
+    /** 이메일 또는 전화번호로 앱 가입 사용자 검색 — 보호자 추가 전 userId 확인용 */
+    @GET("api/user/search")
+    suspend fun searchUser(
+        @Query("email") email: String? = null,
+        @Query("phone") phone: String? = null,
+    ): UserSearchResponse
 
-    @POST("api/users/{userId}/guardians")
+    @GET("api/user/guardians")
+    suspend fun getGuardians(): List<GuardianItem>
+
+    @POST("api/user/guardians")
     suspend fun createGuardian(
-        @Path("userId") userId: String,
         @Body request: GuardianCreateRequest,
     ): GuardianItem
 
-    @PUT("api/users/{userId}/guardians/{guardianId}")
+    @PUT("api/user/guardians/{wardGuardianId}")
     suspend fun updateGuardian(
-        @Path("userId") userId: String,
-        @Path("guardianId") guardianId: String,
+        @Path("wardGuardianId") wardGuardianId: Int,
         @Body request: GuardianCreateRequest,
     ): GuardianItem
 
-    @DELETE("api/users/{userId}/guardians/{guardianId}")
+    @DELETE("api/user/guardians/{wardGuardianId}")
     suspend fun deleteGuardian(
-        @Path("userId") userId: String,
-        @Path("guardianId") guardianId: String,
+        @Path("wardGuardianId") wardGuardianId: Int,
     )
 }

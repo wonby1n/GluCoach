@@ -1149,7 +1149,7 @@ private fun FoodCard(
 ) {
     val borderColor = if (isSelected) GlucoachColors.Primary else GlucoachColors.Border
     val isStable = prediction.peakMgdl < 140f
-    val recoveryText = formatMinutes(prediction.returnMinute)
+    val peakReachText = formatMinutes(prediction.peakMinute)
 
     Column(
         modifier =
@@ -1237,8 +1237,8 @@ private fun FoodCard(
                         .background(GlucoachColors.Border),
             )
             StatCell(
-                label = "정상 복귀",
-                value = recoveryText,
+                label = "피크 도달",
+                value = peakReachText,
                 unit = "",
                 modifier = Modifier.weight(1f),
             )

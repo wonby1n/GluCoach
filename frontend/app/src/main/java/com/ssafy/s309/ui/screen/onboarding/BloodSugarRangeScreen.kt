@@ -97,7 +97,7 @@ fun BloodSugarRangeScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        ProgressIndicator(currentStep = 7, totalSteps = 7)
+        ProgressIndicator(currentStep = 4, totalSteps = 4)
 
         Spacer(modifier = Modifier.height(32.dp))
 

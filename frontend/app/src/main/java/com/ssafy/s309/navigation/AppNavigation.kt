@@ -32,9 +32,6 @@ import com.ssafy.s309.ui.screen.onboarding.BasicHealthInfoScreen
 import com.ssafy.s309.ui.screen.onboarding.BloodSugarRangeScreen
 import com.ssafy.s309.ui.screen.onboarding.DiabetesTypeSelectionScreen
 import com.ssafy.s309.ui.screen.onboarding.SignupDoneScreen
-import com.ssafy.s309.ui.screen.onboarding.TreatmentPillsScreen
-import com.ssafy.s309.ui.screen.onboarding.TreatmentSelectionScreen
-import com.ssafy.s309.ui.screen.onboarding.TreatmentTimeScreen
 import com.ssafy.s309.ui.screen.projector.ProjectorScreen
 import com.ssafy.s309.ui.viewmodel.AuthUiState
 import com.ssafy.s309.ui.viewmodel.AuthViewModel
@@ -51,12 +48,6 @@ sealed class Screen(val route: String) {
     object BasicHealthInfo : Screen("basic_health_info")
 
     object DiabetesTypeSelection : Screen("diabetes_type_selection")
-
-    object TreatmentSelection : Screen("treatment_selection")
-
-    object TreatmentTime : Screen("treatment_time")
-
-    object TreatmentPills : Screen("treatment_pills")
 
     object BloodSugarRange : Screen("blood_sugar_range")
 
@@ -159,35 +150,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         }
         composable(Screen.DiabetesTypeSelection.route) {
             DiabetesTypeSelectionScreen(
-                onNextClick = { selectedIndex ->
-                    if (selectedIndex == 0) {
-                        // 당뇨 전 혈당 관리 → 치료 관련 화면 스킵
-                        navController.navigate(Screen.BloodSugarRange.route)
-                    } else {
-                        navController.navigate(Screen.TreatmentSelection.route)
-                    }
-                },
-                onBackClick = { navController.popBackStack() },
-            )
-        }
-        composable(Screen.TreatmentSelection.route) {
-            TreatmentSelectionScreen(
-                onNextClick = { _ ->
-                    navController.navigate(Screen.TreatmentTime.route)
-                },
-                onBackClick = { navController.popBackStack() },
-            )
-        }
-        composable(Screen.TreatmentTime.route) {
-            TreatmentTimeScreen(
-                onNextClick = { _ ->
-                    navController.navigate(Screen.TreatmentPills.route)
-                },
-                onBackClick = { navController.popBackStack() },
-            )
-        }
-        composable(Screen.TreatmentPills.route) {
-            TreatmentPillsScreen(
                 onNextClick = { _ ->
                     navController.navigate(Screen.BloodSugarRange.route)
                 },

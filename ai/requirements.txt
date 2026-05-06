@@ -30,3 +30,4 @@ anthropic>=0.40
 python-dotenv>=1.0
 loguru>=0.7
 tqdm>=4.65
+requests>=2.31

@@ -1,6 +1,7 @@
 package com.ssafy.s309.data.repository
 
 import android.util.Log
+import com.ssafy.s309.data.api.HealthApi
 import com.ssafy.s309.data.ble.BleConnectionState
 import com.ssafy.s309.data.ble.BleManager
 import com.ssafy.s309.data.ble.BleProcessingSettings
@@ -17,63 +18,44 @@ import com.ssafy.s309.data.repository.source.SamsungHealthDataSource
 import com.ssafy.s309.notification.GlucoseAlertManager
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * 건강/혈당 관련 데이터 + BLE 패치 통신을 단일 진입점으로 노출하는 Repository.
  *
- * 외부 시그니처는 변경되지 않는다 — MainViewModel 등 호출부는 영향받지 않는다.
- *
- * 정적 조회(우선순위 fallback):
- *  1. [primarySources] 의 우선순위대로 시도 (Samsung Health → Health Connect).
- *  2. 빈 결과 / null / 예외 → 다음 소스로 이동.
- *  3. 모든 primary 소스가 데이터를 못 주면 [mockDataSource] 로 fallback.
- *
- * 권한 미부여 / SDK 미지원 / 매니저 생성 실패 등 어떤 상황에서도 mock 으로 안전하게
- * 떨어지므로, 디바이스 환경과 무관하게 메인 화면은 항상 동일하게 동작한다.
- *
- * 데이터 소스 현재 상태:
- *  - 정적 조회 메서드: Samsung Health / Health Connect → Mock fallback
- *  - [glucoseStream] / [glucoseHistory]: BLE 패치에서 도착하는 실시간 측정 값
- *  - BLE 연결/제어: [BleManager] 위임
+ * 정적 조회 우선순위:
+ *  1. 백엔드 API (HealthApi)
+ *  2. Samsung Health / Health Connect
+ *  3. Mock (항상 동작 보장)
  */
 @Singleton
 class HealthRepository
     @Inject
     constructor(
+        private val healthApi: HealthApi,
         private val mockDataSource: MockHealthDataSource,
         samsungDataSource: SamsungHealthDataSource,
         healthConnectDataSource: HealthConnectDataSource,
         private val bleManager: BleManager,
         private val glucoseAlertManager: GlucoseAlertManager,
-        // TODO(BE 연동): 실제 API 연결 시 주입 활성화
-        // private val healthApi: HealthApi,
     ) {
-        // 우선순위: Samsung Health → Health Connect → Mock(=fallback)
         private val primarySources: List<HealthDataSource> =
             listOf(samsungDataSource, healthConnectDataSource)
 
-        // ────────────────────────────────────────
-        // BLE 상태 / 스트림 (UI 가 collect)
-        // ────────────────────────────────────────
+        // ── BLE 상태 / 스트림 ────────────────────────────────────────
 
-        /** 패치 연결 상태 (Idle / Scanning / Connecting / Connected / Disconnected / Error). */
         val bleConnectionState: StateFlow<BleConnectionState> = bleManager.connectionState
-
-        /** 스캔으로 발견된 패치 후보 목록. */
         val scannedDevices: StateFlow<List<ScannedDevice>> = bleManager.scannedDevices
-
-        /** 패치에서 도착하는 실시간 혈당 측정 값 (이벤트 스트림). */
         val glucoseStream: SharedFlow<GlucoseReading> = bleManager.glucoseReadings
-
-        /** 패치에서 누적된 혈당 히스토리 (최대 100개, 앱 수명 동안 유지). */
         val glucoseHistory: StateFlow<List<GlucoseReading>> = bleManager.glucoseHistory
-
-        /** GlucoseAlertManager 가 감지한 이상 혈당 알림 스트림 (인앱 패널 표시용). */
         val glucoseAlertStream: SharedFlow<NotificationItem> = glucoseAlertManager.alertStream
+        val bleProcessingSettings: StateFlow<BleProcessingSettings> = bleManager.processingSettings
 
-        /** 사용자 설정 기반 알림 임계값 갱신. */
         fun updateAlertThresholds(
             alertLow: Int,
             alertHigh: Int,
@@ -81,12 +63,7 @@ class HealthRepository
             glucoseAlertManager.updateThresholds(alertLow, alertHigh)
         }
 
-        /** 데이터 처리 설정 스냅샷 (보정값 / 스파이크 임계값 / 출력타입 / 주기평균). */
-        val bleProcessingSettings: StateFlow<BleProcessingSettings> = bleManager.processingSettings
-
-        // ────────────────────────────────────────
-        // BLE 액션 (UI 의 사용자 입력에 의해 호출)
-        // ────────────────────────────────────────
+        // ── BLE 액션 ─────────────────────────────────────────────────
 
         fun isBleSupported(): Boolean = bleManager.isBleSupported()
 
@@ -104,33 +81,103 @@ class HealthRepository
 
         fun updateBleProcessingSettings(settings: BleProcessingSettings) = bleManager.updateProcessingSettings(settings)
 
-        // ────────────────────────────────────────
-        // 정적 조회 (Samsung/HealthConnect → Mock fallback)
-        // ────────────────────────────────────────
+        // ── 정적 조회 (BE → Samsung/HealthConnect → Mock) ────────────
 
-        /** 최근 혈당 흐름. 메인 화면 그래프 초기 로드용. */
-        suspend fun getRecentGlucose(hours: Int = 6): List<GlucoseReading> =
-            firstNonEmptyList { it.getRecentGlucose(hours) } ?: mockDataSource.getRecentGlucose(hours)
+        /** 최근 혈당 흐름. BE 기록이 있으면 우선 사용. */
+        suspend fun getRecentGlucose(hours: Int = 6): List<GlucoseReading> {
+            runCatching {
+                val to = LocalDateTime.now()
+                val from = to.minusHours(hours.toLong())
+                val records =
+                    healthApi.getGlucoseRecords(
+                        from = from.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                        to = to.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                    )
+                if (records.isNotEmpty()) {
+                    return records.map { r ->
+                        GlucoseReading(
+                            timestampMillis =
+                                LocalDateTime.parse(r.measuredAt)
+                                    .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+                            valueMgDl = r.value.toInt(),
+                        )
+                    }
+                }
+            }.onFailure { Log.w(TAG, "BE 혈당 조회 실패, 로컬 소스로 fallback", it) }
 
-        /** 사용자 목표 혈당 범위 (그래프의 회색 박스). */
+            return firstNonEmptyList { it.getRecentGlucose(hours) } ?: mockDataSource.getRecentGlucose(hours)
+        }
+
+        /** 목표 혈당 범위 — 백엔드에 전용 엔드포인트 없음, 로컬 소스 사용. */
         suspend fun getGlucoseTargetRange(): GlucoseRange =
             firstNonNull { it.getGlucoseTargetRange() } ?: mockDataSource.getGlucoseTargetRange()
 
-        /** 오늘의 식사 이벤트. 그래프 위 밥그릇 핀에 사용. */
-        suspend fun getTodayMeals(): List<MealEvent> = firstNonEmptyList { it.getTodayMeals() } ?: mockDataSource.getTodayMeals()
+        /** 오늘 식사 이벤트. BE 기록이 있으면 우선 사용. */
+        suspend fun getTodayMeals(): List<MealEvent> {
+            runCatching {
+                val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+                val meals = healthApi.getMeals(date = today)
+                if (meals.isNotEmpty()) {
+                    return meals.map { m ->
+                        MealEvent(
+                            id = m.mealId.toLong(),
+                            timestampMillis =
+                                LocalDateTime.parse(m.recordedAt)
+                                    .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+                            label = m.foodName?.ifBlank { null } ?: "식사",
+                        )
+                    }
+                }
+            }.onFailure { Log.w(TAG, "BE 식사 조회 실패, 로컬 소스로 fallback", it) }
 
-        /** 하루 누적 칼로리/수면 요약. */
-        suspend fun getTodaySummary(): DailyHealthSummary = firstNonNull { it.getTodaySummary() } ?: mockDataSource.getTodaySummary()
+            return firstNonEmptyList { it.getTodayMeals() } ?: mockDataSource.getTodayMeals()
+        }
 
-        /** 알림 리스트. */
-        suspend fun getNotifications(): List<NotificationItem> =
-            firstNonEmptyList { it.getNotifications() } ?: mockDataSource.getNotifications()
+        /** 오늘 건강 요약. BE 기록이 있으면 우선 사용. */
+        suspend fun getTodaySummary(): DailyHealthSummary {
+            runCatching {
+                val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+                val list = healthApi.getDailyHealthSummary(from = today, to = today)
+                val summary = list.firstOrNull()
+                if (summary != null) {
+                    return DailyHealthSummary(
+                        caloriesBurnedKcal = summary.caloriesBurned?.toInt() ?: 0,
+                        sleepMinutes = summary.sleepMinutes ?: 0,
+                    )
+                }
+            }.onFailure { Log.w(TAG, "BE 건강 요약 조회 실패, 로컬 소스로 fallback", it) }
 
-        // ────────────────────────────────────────
-        // Fallback helpers
-        // ────────────────────────────────────────
+            return firstNonNull { it.getTodaySummary() } ?: mockDataSource.getTodaySummary()
+        }
 
-        /** primary 소스에서 첫 번째 비-빈 리스트를 반환. 모두 비어있으면 null. */
+        /** 알림 목록. BE 기록이 있으면 우선 사용. */
+        suspend fun getNotifications(): List<NotificationItem> {
+            runCatching {
+                val response = healthApi.getAlerts()
+                if (response.content.isNotEmpty()) {
+                    return response.content.map { a ->
+                        NotificationItem(
+                            id = a.id.toLong(),
+                            title = a.alertType,
+                            message = a.message,
+                            timeAgoText = formatTimeAgo(a.createdAt),
+                            isUnread = !a.isRead,
+                        )
+                    }
+                }
+            }.onFailure { Log.w(TAG, "BE 알림 조회 실패, mock으로 fallback", it) }
+
+            return firstNonEmptyList { it.getNotifications() } ?: mockDataSource.getNotifications()
+        }
+
+        /** 알림 읽음 처리 (백엔드 반영). 실패해도 UI 상태는 유지. */
+        suspend fun markAlertRead(alertId: Int) {
+            runCatching { healthApi.markAlertRead(alertId) }
+                .onFailure { Log.w(TAG, "알림 읽음 처리 실패 id=$alertId", it) }
+        }
+
+        // ── helpers ──────────────────────────────────────────────────
+
         private suspend fun <T> firstNonEmptyList(fetch: suspend (HealthDataSource) -> List<T>): List<T>? {
             for (source in primarySources) {
                 val result =
@@ -145,7 +192,6 @@ class HealthRepository
             return null
         }
 
-        /** primary 소스에서 첫 번째 non-null 결과를 반환. 모두 null 이면 null. */
         private suspend fun <T : Any> firstNonNull(fetch: suspend (HealthDataSource) -> T?): T? {
             for (source in primarySources) {
                 val result =
@@ -159,6 +205,27 @@ class HealthRepository
             }
             return null
         }
+
+        private fun formatTimeAgo(isoDateTime: String): String =
+            try {
+                // OffsetDateTime으로 먼저 시도 ("Z", "+09:00" 등 offset 포함 형식 처리)
+                // 실패 시 timezone 없는 LocalDateTime으로 fallback
+                val instant =
+                    try {
+                        java.time.OffsetDateTime.parse(isoDateTime).toInstant()
+                    } catch (e: Exception) {
+                        LocalDateTime.parse(isoDateTime).atZone(ZoneId.systemDefault()).toInstant()
+                    }
+                val minutes = java.time.Duration.between(instant, java.time.Instant.now()).toMinutes()
+                when {
+                    minutes < 1 -> "방금 전"
+                    minutes < 60 -> "${minutes}분 전"
+                    minutes < 1440 -> "${minutes / 60}시간 전"
+                    else -> "${minutes / 1440}일 전"
+                }
+            } catch (e: Exception) {
+                ""
+            }
 
         private companion object {
             const val TAG = "HealthRepository"
