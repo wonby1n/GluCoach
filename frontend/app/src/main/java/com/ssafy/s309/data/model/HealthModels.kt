@@ -48,7 +48,8 @@ data class NotificationItem(
 data class CgmRecordResponse(
     val id: Long,
     val value: Double,
-    val measuredAt: String, // ISO-8601 "2026-05-06T10:30:00"
+    // ISO-8601 "2026-05-06T10:30:00"
+    val measuredAt: String,
 )
 
 /** GET /api/health/daily-summary 응답 항목 */
@@ -69,7 +70,8 @@ data class MealRecordResponse(
     val foodId: Int? = null,
     val foodName: String? = null,
     val memo: String? = null,
-    val recordedAt: String, // ISO-8601
+    // ISO-8601
+    val recordedAt: String,
     val imageUrl: String? = null,
 )
 
@@ -80,7 +82,8 @@ data class AlertItem(
     val alertType: String,
     val message: String,
     val isRead: Boolean,
-    val createdAt: String, // ISO-8601
+    // ISO-8601
+    val createdAt: String,
 )
 
 /** GET /api/v1/alerts 페이지 응답 */

@@ -38,6 +38,7 @@ class GlucoseAlertManager
         @ApplicationContext private val context: Context,
         private val bleManager: BleManager,
         private val projectorClient: ProjectorSocketClient,
+        private val ttsManager: TtsManager,
     ) {
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -194,6 +195,8 @@ class GlucoseAlertManager
                     .build(),
             )
 
+            ttsManager.speak("$title. $message", urgent)
+
             _alertStream.tryEmit(
                 NotificationItem(
                     id = id.toLong(),
@@ -218,6 +221,19 @@ class GlucoseAlertManager
                 value > 200 -> "혈당이 ${value}mg/dL까지 올랐어요. 가벼운 20분 산책이 도움이 돼요 🚶"
                 else -> "혈당이 ${value}mg/dL이에요. 오늘 식사 내용을 기록해두면 패턴 파악에 좋아요 📝"
             }
+
+        /** FCM 서버 메시지를 인앱 알림 패널 스트림에만 emit. TTS는 FcmService가 담당. */
+        fun emitFcmAlert(title: String, body: String) {
+            _alertStream.tryEmit(
+                NotificationItem(
+                    id = notifIdCounter.incrementAndGet().toLong(),
+                    title = title,
+                    message = body,
+                    timeAgoText = "방금",
+                    isUnread = true,
+                ),
+            )
+        }
 
         enum class AlertType { LOW, HIGH, RISING, FALLING }
 

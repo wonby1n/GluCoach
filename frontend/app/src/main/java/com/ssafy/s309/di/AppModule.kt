@@ -64,12 +64,12 @@ object AppModule {
     @Named("authenticated")
     fun provideAuthenticatedOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient =
         OkHttpClient.Builder()
+            .addInterceptor(authInterceptor)
             .addInterceptor(
                 HttpLoggingInterceptor().apply {
                     level = HttpLoggingInterceptor.Level.BODY
                 },
             )
-            .addInterceptor(authInterceptor)
             .build()
 
     @Provides
