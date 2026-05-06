@@ -8,11 +8,13 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.sql.Types;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
 
 @Entity
 @Table(name = "user_food_grades")
@@ -35,7 +37,8 @@ public class UserFoodGrade extends BaseEntity {
   @Column(name = "avg_slope", nullable = false, precision = 3, scale = 1)
   private BigDecimal avgSlope;
 
-  @Column(name = "grade", nullable = false, length = 1)
+  @JdbcTypeCode(Types.CHAR)
+  @Column(name = "grade", nullable = false, columnDefinition = "CHAR(1)")
   private String grade;
 
   @Column(name = "meal_count", nullable = false)
