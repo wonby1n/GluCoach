@@ -42,8 +42,9 @@ public class MealGlucoseResponseService {
 
   @Transactional(readOnly = true)
   public List<Integer> findUnprocessedMealIds() {
-    LocalDateTime cutoff = LocalDateTime.now().minusMinutes(RESPONSE_WINDOW_MINUTES);
-    LocalDateTime expiry = LocalDateTime.now().minusHours(GIVE_UP_HOURS);
+    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime cutoff = now.minusMinutes(RESPONSE_WINDOW_MINUTES);
+    LocalDateTime expiry = now.minusHours(GIVE_UP_HOURS);
     return mealRecordRepository.findUnprocessedBetween(expiry, cutoff).stream()
         .map(MealRecord::getId)
         .toList();
@@ -95,11 +96,14 @@ public class MealGlucoseResponseService {
     long minutes = ChronoUnit.MINUTES.between(mealTime, peak.getMeasuredAt());
 
     // slope (mg/dL/min): NUMERIC(3,1) → scale=1, HALF_UP
-    BigDecimal slope =
+    BigDecimal rawSlope =
         peak.getValue()
             .subtract(baseline.getValue())
-            .divide(BigDecimal.valueOf(minutes), 1, RoundingMode.HALF_UP)
-            .min(SLOPE_DB_MAX);
+            .divide(BigDecimal.valueOf(minutes), 1, RoundingMode.HALF_UP);
+    if (rawSlope.compareTo(SLOPE_DB_MAX) > 0) {
+      log.warn("slope 이상치 클램프 mealId={}, rawSlope={} mg/dL/min", meal.getId(), rawSlope);
+    }
+    BigDecimal slope = rawSlope.min(SLOPE_DB_MAX);
 
     mealGlucoseResponseRepository.save(
         MealGlucoseResponse.builder()
