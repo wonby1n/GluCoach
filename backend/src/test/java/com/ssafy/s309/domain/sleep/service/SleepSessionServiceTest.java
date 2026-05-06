@@ -56,7 +56,7 @@ class SleepSessionServiceTest {
     assertThat(trigger.getTriggerType()).isEqualTo(AgentPendingTrigger.TYPE_WAKE_UP);
     assertThat(trigger.getReferenceId()).isEqualTo(99);
     assertThat(trigger.getUserId()).isEqualTo(userId);
-    assertThat(trigger.getScheduledAt()).isBefore(LocalDateTime.now().plusSeconds(2));
+    assertThat(trigger.getScheduledAt()).isEqualTo(end.plusMinutes(10));
   }
 
   @Test

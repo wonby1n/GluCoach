@@ -6,7 +6,6 @@ import com.ssafy.s309.domain.sleep.dto.SleepSessionCreateRequest;
 import com.ssafy.s309.domain.sleep.dto.SleepSessionResponse;
 import com.ssafy.s309.domain.sleep.entity.SleepSession;
 import com.ssafy.s309.domain.sleep.repository.SleepSessionRepository;
-import java.time.LocalDateTime;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -15,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class SleepSessionService {
+
+  private static final int WAKE_UP_TRIGGER_DELAY_MINUTES = 10;
 
   private final SleepSessionRepository sleepSessionRepository;
   private final AgentPendingTriggerRepository triggerRepository;
@@ -45,7 +46,7 @@ public class SleepSessionService {
             .userId(userId)
             .triggerType(AgentPendingTrigger.TYPE_WAKE_UP)
             .referenceId(saved.getId())
-            .scheduledAt(LocalDateTime.now())
+            .scheduledAt(req.endedAt().plusMinutes(WAKE_UP_TRIGGER_DELAY_MINUTES))
             .build());
 
     return SleepSessionResponse.from(saved);

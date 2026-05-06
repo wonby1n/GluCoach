@@ -8,7 +8,7 @@
 --
 -- 트리거 연계:
 --   세션 INSERT 시 agent_pending_triggers(trigger_type='wake_up', reference_id=session.id) 자동 INSERT.
---   폴러가 즉시(NOW()) 발화 → Agent가 기상 직후 코칭.
+--   scheduled_at = ended_at + 10분 (기상 직후 바로 코칭하지 않고 짧은 버퍼 후 발화).
 --
 -- 중복 방지:
 --   동일 사용자가 동일 started_at으로 두 번 INSERT 시도 시 unique 제약으로 차단.
