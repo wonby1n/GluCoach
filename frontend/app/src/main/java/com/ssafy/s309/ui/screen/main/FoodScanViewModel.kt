@@ -3,105 +3,133 @@ package com.ssafy.s309.ui.screen.main
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ssafy.s309.data.model.FoodSearchItem
-import com.ssafy.s309.data.model.MealCreateRequest
 import com.ssafy.s309.data.repository.FoodRepository
-import com.ssafy.s309.data.repository.HealthRepository
+import com.ssafy.s309.data.repository.MealRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
-data class FoodScanUiState(
-    val searchQuery: String = "",
-    val searchResults: List<FoodSearchItem> = emptyList(),
-    val selectedFood: FoodSearchItem? = null,
-    val isSearching: Boolean = false,
-    val isSaving: Boolean = false,
-    val saveSuccess: Boolean = false,
-    val error: String? = null,
+data class FoodScanCandidate(
+    val rank: Int,
+    val foodId: Int,
+    val name: String,
+    val kcal: Double?,
+    val carbsG: Double?,
+    val proteinG: Double?,
+    val fatG: Double?,
+    val confidence: Float,
 )
+
+sealed class FoodScanState {
+    object Idle : FoodScanState()
+
+    data class Analyzing(val stage: Int) : FoodScanState() // 0=시작 1=AI인식 2=영양검색 3=완료
+
+    data class Result(
+        val candidates: List<FoodScanCandidate>,
+        val isSaving: Boolean = false,
+    ) : FoodScanState()
+
+    data class Error(val message: String) : FoodScanState()
+
+    object Saved : FoodScanState()
+}
 
 @HiltViewModel
 class FoodScanViewModel
     @Inject
     constructor(
         private val foodRepository: FoodRepository,
-        private val healthRepository: HealthRepository,
+        private val mealRepository: MealRepository,
     ) : ViewModel() {
-        private val _uiState = MutableStateFlow(FoodScanUiState())
-        val uiState: StateFlow<FoodScanUiState> = _uiState.asStateFlow()
+        private val _state = MutableStateFlow<FoodScanState>(FoodScanState.Idle)
+        val state: StateFlow<FoodScanState> = _state.asStateFlow()
 
-        private var photoFile: File? = null
-        private var searchJob: Job? = null
-
-        fun setPhotoFile(file: File?) {
-            photoFile = file
-        }
-
-        fun searchFoods(query: String) {
-            _uiState.update { it.copy(searchQuery = query) }
-            searchJob?.cancel()
-            if (query.isBlank()) {
-                _uiState.update { it.copy(searchResults = emptyList()) }
-                return
-            }
-            searchJob =
-                viewModelScope.launch {
-                    delay(300)
-                    _uiState.update { it.copy(isSearching = true) }
-                    foodRepository.searchFoods(query)
-                        .onSuccess { results ->
-                            _uiState.update { it.copy(searchResults = results, isSearching = false) }
-                        }
-                        .onFailure { e ->
-                            _uiState.update { it.copy(isSearching = false, error = e.message) }
-                        }
-                }
-        }
-
-        fun selectFood(food: FoodSearchItem) {
-            _uiState.update { it.copy(selectedFood = food, searchResults = emptyList(), searchQuery = food.name) }
-        }
-
-        fun clearSelection() {
-            _uiState.update { it.copy(selectedFood = null) }
-        }
-
-        fun recordMeal() {
-            val food = _uiState.value.selectedFood ?: return
+        fun analyze(photoFile: File) {
+            if (_state.value !is FoodScanState.Idle) return
             viewModelScope.launch {
-                _uiState.update { it.copy(isSaving = true, error = null) }
-                val request =
-                    MealCreateRequest(
-                        foodId = food.id,
-                        recordedAt = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                    )
-                healthRepository.createMealRecord(request, photoFile)
-                    .onSuccess {
-                        _uiState.update { it.copy(isSaving = false, saveSuccess = true) }
+                _state.value = FoodScanState.Analyzing(0)
+
+                // Stage 1: AI 음식 탐지
+                _state.value = FoodScanState.Analyzing(1)
+                val detectResult = foodRepository.detectFood(photoFile)
+                if (detectResult.isFailure) {
+                    _state.value =
+                        FoodScanState.Error(
+                            detectResult.exceptionOrNull()?.message ?: "음식 인식에 실패했습니다",
+                        )
+                    return@launch
+                }
+                val detections = detectResult.getOrNull()?.detections.orEmpty()
+                if (detections.isEmpty()) {
+                    _state.value = FoodScanState.Error("음식을 인식하지 못했습니다.\n다시 촬영해 주세요.")
+                    return@launch
+                }
+
+                // Stage 2: 식약처 DB에서 영양 정보 검색
+                _state.value = FoodScanState.Analyzing(2)
+                val candidates = mutableListOf<FoodScanCandidate>()
+                detections.take(3).forEachIndexed { idx, detection ->
+                    val searchResult = foodRepository.searchFoods(detection.nameKo)
+                    val foodItem: FoodSearchItem? = searchResult.getOrNull()?.firstOrNull()
+                    if (foodItem != null) {
+                        candidates.add(
+                            FoodScanCandidate(
+                                rank = idx + 1,
+                                foodId = foodItem.id,
+                                name = foodItem.name,
+                                kcal = foodItem.kcal,
+                                carbsG = foodItem.carbsG,
+                                proteinG = foodItem.proteinG,
+                                fatG = foodItem.fatG,
+                                confidence = detection.confidence,
+                            ),
+                        )
                     }
-                    .onFailure { e ->
-                        _uiState.update { it.copy(isSaving = false, error = e.message ?: "식사 기록 실패") }
+                }
+
+                // Stage 3: 완료
+                _state.value = FoodScanState.Analyzing(3)
+                delay(400)
+
+                _state.value =
+                    if (candidates.isEmpty()) {
+                        FoodScanState.Error("영양 정보를 찾을 수 없습니다.\n다시 촬영해 주세요.")
+                    } else {
+                        FoodScanState.Result(candidates)
                     }
             }
         }
 
-        fun clearError() {
-            _uiState.update { it.copy(error = null) }
+        fun saveMeal(
+            candidate: FoodScanCandidate,
+            photoFile: File,
+        ) {
+            val current = _state.value as? FoodScanState.Result ?: return
+            viewModelScope.launch {
+                _state.value = current.copy(isSaving = true)
+                val result =
+                    mealRepository.createMeal(
+                        foodId = candidate.foodId,
+                        recordedAt = LocalDateTime.now(),
+                        photoFile = photoFile,
+                    )
+                _state.value =
+                    if (result.isSuccess) {
+                        FoodScanState.Saved
+                    } else {
+                        current.copy(isSaving = false)
+                    }
+            }
         }
 
-        /** 탄수화물 기반 혈당 상승 추정 (예측 API 없이 영양 정보 기반) */
-        fun estimatePredictedRise(food: FoodSearchItem): Int {
-            val carbs = food.carbsG?.toInt() ?: 30
-            val sugar = food.sugarG?.toInt() ?: 0
-            return ((carbs + sugar * 0.5) * 0.45).toInt().coerceIn(5, 60)
+        fun resetError() {
+            _state.value = FoodScanState.Idle
         }
     }

@@ -137,7 +137,7 @@ fun MainScreenContent(
     var selectedTab by rememberSaveable { mutableStateOf("home") }
     var showCamera by remember { mutableStateOf(false) }
     var scanSessionId by remember { mutableIntStateOf(0) }
-    var lastPhotoFile by remember { mutableStateOf<java.io.File?>(null) }
+    var capturedPhotoFile by remember { mutableStateOf<java.io.File?>(null) }
     var showReportSheet by remember { mutableStateOf(false) }
     var showAddSheet by remember { mutableStateOf(false) }
 
@@ -169,15 +169,24 @@ fun MainScreenContent(
                             )
                         "add" -> {
                             if (!showCamera) {
-                                key(scanSessionId) {
-                                    FoodScanContent(
-                                        onBack = { selectedTab = "home" },
-                                        onRetakePhoto = {
-                                            scanSessionId++
-                                            showCamera = true
-                                        },
-                                        photoFile = lastPhotoFile,
-                                    )
+                                val photoFile = capturedPhotoFile
+                                if (photoFile != null) {
+                                    key(scanSessionId) {
+                                        FoodScanContent(
+                                            photoFile = photoFile,
+                                            onBack = { selectedTab = "home" },
+                                            onRetakePhoto = {
+                                                scanSessionId++
+                                                capturedPhotoFile = null
+                                                showCamera = true
+                                            },
+                                            onMealSaved = { selectedTab = "home" },
+                                        )
+                                    }
+                                } else {
+                                    androidx.compose.runtime.LaunchedEffect(Unit) {
+                                        selectedTab = "home"
+                                    }
                                 }
                             } else {
                                 Box(
@@ -356,7 +365,7 @@ fun MainScreenContent(
                     selectedTab = "home"
                 },
                 onPhotoTaken = { file ->
-                    lastPhotoFile = file
+                    capturedPhotoFile = file
                     showCamera = false
                 },
             )
