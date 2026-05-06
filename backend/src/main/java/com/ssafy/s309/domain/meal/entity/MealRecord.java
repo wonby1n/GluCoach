@@ -58,4 +58,8 @@ public class MealRecord extends BaseEntity {
 
   @Column(name = "recorded_at", nullable = false)
   private LocalDateTime recordedAt;
+
+  public void markAsProcessed() {
+    this.isProcessed = true;
+  }
 }

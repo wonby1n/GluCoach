@@ -23,6 +23,7 @@ import org.hibernate.annotations.CreationTimestamp;
 public class AgentPendingTrigger {
 
   public static final String TYPE_POST_MEAL = "post_meal";
+  public static final String TYPE_WAKE_UP = "wake_up";
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -43,6 +44,13 @@ public class AgentPendingTrigger {
   @Column(name = "is_dispatched", nullable = false)
   @Builder.Default
   private Boolean isDispatched = false;
+
+  /**
+   * Agent #8 schedule_followup 호출 시 Agent가 보낸 LLM 판단 메모. 폴러 재호출 payload에 echo. 식사 자동 예약(post_meal)
+   * 경로에서는 NULL.
+   */
+  @Column(name = "reason", length = 500)
+  private String reason;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)

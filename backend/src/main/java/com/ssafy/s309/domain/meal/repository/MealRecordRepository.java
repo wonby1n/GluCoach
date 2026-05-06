@@ -44,4 +44,7 @@ public interface MealRecordRepository extends JpaRepository<MealRecord, Integer>
       @Param("userId") Integer userId,
       @Param("from") LocalDateTime from,
       @Param("to") LocalDateTime to);
+
+  @Query("SELECT m FROM MealRecord m WHERE m.isProcessed = false AND m.recordedAt <= :cutoff")
+  List<MealRecord> findUnprocessedBefore(@Param("cutoff") LocalDateTime cutoff);
 }
