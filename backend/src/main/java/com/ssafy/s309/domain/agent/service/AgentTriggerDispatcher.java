@@ -17,7 +17,10 @@ public class AgentTriggerDispatcher {
   public void dispatch(AgentPendingTrigger trigger) {
     AgentTriggerDispatchRequest payload =
         new AgentTriggerDispatchRequest(
-            trigger.getUserId(), trigger.getTriggerType(), trigger.getReferenceId());
+            trigger.getUserId(),
+            trigger.getTriggerType(),
+            trigger.getReferenceId(),
+            trigger.getReason());
 
     aiRestClient.post().uri("/trigger").body(payload).retrieve().toBodilessEntity();
 
