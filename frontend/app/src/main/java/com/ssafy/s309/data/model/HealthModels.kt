@@ -95,3 +95,21 @@ data class AlertListResponse(
     val size: Int,
     val total: Long,
 )
+
+/** POST /api/sleep-sessions 요청 — 워치 수면 세션 송신 */
+@Serializable
+data class SleepSessionCreateRequest(
+    // ISO-8601 LocalDateTime "2026-05-06T23:30:00"
+    val startedAt: String,
+    val endedAt: String,
+    val source: String? = null,
+)
+
+/** POST /api/sleep-sessions 응답 */
+@Serializable
+data class SleepSessionResponse(
+    val id: Int,
+    val startedAt: String,
+    val endedAt: String,
+    val source: String? = null,
+)

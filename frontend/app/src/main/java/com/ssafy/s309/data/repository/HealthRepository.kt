@@ -2,6 +2,7 @@ package com.ssafy.s309.data.repository
 
 import android.util.Log
 import com.ssafy.s309.data.api.HealthApi
+import com.ssafy.s309.data.api.SleepSessionApi
 import com.ssafy.s309.data.ble.BleConnectionState
 import com.ssafy.s309.data.ble.BleManager
 import com.ssafy.s309.data.ble.BleProcessingSettings
@@ -11,6 +12,7 @@ import com.ssafy.s309.data.model.GlucoseRange
 import com.ssafy.s309.data.model.GlucoseReading
 import com.ssafy.s309.data.model.MealEvent
 import com.ssafy.s309.data.model.NotificationItem
+import com.ssafy.s309.data.model.SleepSessionCreateRequest
 import com.ssafy.s309.data.repository.source.HealthConnectDataSource
 import com.ssafy.s309.data.repository.source.HealthDataSource
 import com.ssafy.s309.data.repository.source.MockHealthDataSource
@@ -38,6 +40,7 @@ class HealthRepository
     @Inject
     constructor(
         private val healthApi: HealthApi,
+        private val sleepSessionApi: SleepSessionApi,
         private val mockDataSource: MockHealthDataSource,
         samsungDataSource: SamsungHealthDataSource,
         healthConnectDataSource: HealthConnectDataSource,
@@ -175,6 +178,33 @@ class HealthRepository
             runCatching { healthApi.markAlertRead(alertId) }
                 .onFailure { Log.w(TAG, "알림 읽음 처리 실패 id=$alertId", it) }
         }
+
+        /**
+         * 워치 최근 수면 세션을 BE에 송신. 동일 startedAt 재호출 시 BE가 idempotent하게 기존 row 반환.
+         * 추가 안전장치: 직전 송신과 동일한 startedAt이면 네트워크 호출 자체 생략.
+         * 실패는 swallow — 폴러를 죽이지 않는다.
+         */
+        suspend fun syncSleepSession(
+            startedAt: LocalDateTime,
+            endedAt: LocalDateTime,
+            source: String,
+        ) {
+            val key = startedAt.toString()
+            if (key == lastSyncedSleepStartedAt) return
+            runCatching {
+                sleepSessionApi.create(
+                    SleepSessionCreateRequest(
+                        startedAt = startedAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                        endedAt = endedAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                        source = source,
+                    ),
+                )
+                lastSyncedSleepStartedAt = key
+                Log.d(TAG, "수면 세션 송신 완료: $startedAt ~ $endedAt")
+            }.onFailure { Log.w(TAG, "수면 세션 송신 실패", it) }
+        }
+
+        @Volatile private var lastSyncedSleepStartedAt: String? = null
 
         // ── helpers ──────────────────────────────────────────────────
 

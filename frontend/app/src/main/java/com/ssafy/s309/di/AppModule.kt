@@ -5,6 +5,7 @@ import com.ssafy.s309.data.api.AuthApi
 import com.ssafy.s309.data.api.FoodApi
 import com.ssafy.s309.data.api.HealthApi
 import com.ssafy.s309.data.api.PredictApi
+import com.ssafy.s309.data.api.SleepSessionApi
 import com.ssafy.s309.data.api.UserApi
 import com.ssafy.s309.data.network.AuthInterceptor
 import dagger.Module
@@ -108,4 +109,10 @@ object AppModule {
     fun provideHealthApi(
         @Named("authenticated") retrofit: Retrofit,
     ): HealthApi = retrofit.create(HealthApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideSleepSessionApi(
+        @Named("authenticated") retrofit: Retrofit,
+    ): SleepSessionApi = retrofit.create(SleepSessionApi::class.java)
 }
