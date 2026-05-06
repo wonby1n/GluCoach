@@ -48,11 +48,11 @@ class MainViewModel
                     )
                 }
 
-                // 사용자 알림 임계값(alertLow/alertHigh)으로 갱신
+                // 사용자 목표 혈당 범위로 알림 임계값 갱신
                 userRepository.getSettings()
                     .onSuccess { settings ->
-                        val low = settings.alertLow ?: return@onSuccess
-                        val high = settings.alertHigh ?: return@onSuccess
+                        val low = settings.targetLow ?: return@onSuccess
+                        val high = settings.targetHigh ?: return@onSuccess
                         healthRepository.updateAlertThresholds(low, high)
                     }
             }
@@ -142,6 +142,9 @@ class MainViewModel
                             if (it.id == selected.id) it.copy(isUnread = false) else it
                         },
                 )
+            }
+            viewModelScope.launch {
+                healthRepository.markAlertRead(selected.id.toInt())
             }
         }
 

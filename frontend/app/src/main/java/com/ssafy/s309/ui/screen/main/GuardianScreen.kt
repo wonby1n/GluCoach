@@ -32,8 +32,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -158,27 +156,30 @@ fun GuardianScreen(
         }
     }
 
+    // 보호자 추가 — 1단계: 전화번호 검색 / 2단계: 관계 입력 후 확정
     if (showAddDialog) {
-        GuardianFormDialog(
-            title = "보호자 추가",
-            onDismiss = { showAddDialog = false },
-            onConfirm = { name, phone, relation, isPrimary ->
-                viewModel.createGuardian(name, phone, relation, isPrimary)
+        AddGuardianDialog(
+            uiState = uiState,
+            onSearch = { phone -> viewModel.searchUserByPhone(phone) },
+            onConfirm = { relation ->
+                viewModel.createGuardian(relation)
                 showAddDialog = false
+                viewModel.clearSearchState()
+            },
+            onDismiss = {
+                showAddDialog = false
+                viewModel.clearSearchState()
             },
         )
     }
 
+    // 보호자 수정 — 관계(relation)만 수정 가능
     editingGuardian?.let { guardian ->
-        GuardianFormDialog(
-            title = "보호자 수정",
-            initialName = guardian.name,
-            initialPhone = guardian.phone,
+        EditGuardianDialog(
             initialRelation = guardian.relation ?: "",
-            initialIsPrimary = guardian.isPrimary,
             onDismiss = { editingGuardian = null },
-            onConfirm = { name, phone, relation, isPrimary ->
-                viewModel.updateGuardian(guardian.guardianId, name, phone, relation, isPrimary)
+            onConfirm = { relation ->
+                viewModel.updateGuardian(guardian, relation)
                 editingGuardian = null
             },
         )
@@ -188,11 +189,14 @@ fun GuardianScreen(
         AlertDialog(
             onDismissRequest = { deleteTarget = null },
             title = { Text("보호자 삭제") },
-            text = { Text("${guardian.name}을(를) 보호자 목록에서 삭제할까요?") },
+            text = {
+                val label = guardian.name.ifBlank { "보호자 #${guardian.guardianId}" }
+                Text("${label}을(를) 보호자 목록에서 삭제할까요?")
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.deleteGuardian(guardian.guardianId)
+                        viewModel.deleteGuardian(guardian)
                         deleteTarget = null
                     },
                 ) {
@@ -206,6 +210,120 @@ fun GuardianScreen(
             },
         )
     }
+}
+
+/** 보호자 추가 다이얼로그 — 전화번호 검색 후 관계 입력 */
+@Composable
+private fun AddGuardianDialog(
+    uiState: GuardianUiState,
+    onSearch: (String) -> Unit,
+    onConfirm: (String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var phone by remember { mutableStateOf("") }
+    var relation by remember { mutableStateOf("") }
+
+    val searchResult = uiState.searchResult
+    val isPhoneValid = phone.length in 10..11 && phone.all { it.isDigit() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("보호자 추가", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(GlucoachSpacing.md)) {
+                if (searchResult == null) {
+                    // 1단계: 전화번호로 검색
+                    FormField(
+                        label = "보호자 전화번호 (숫자만)",
+                        value = phone,
+                        onValueChange = { if (it.all { c -> c.isDigit() } && it.length <= 11) phone = it },
+                        placeholder = "01012345678",
+                        keyboardType = KeyboardType.Phone,
+                    )
+                    uiState.searchError?.let { err ->
+                        Text(text = err, fontSize = 12.sp, color = com.ssafy.s309.ui.theme.Error)
+                    }
+                    if (uiState.isSearching) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Primary, strokeWidth = 2.dp)
+                    }
+                } else {
+                    // 2단계: 검색된 사용자 확인 + 관계 입력
+                    Text(
+                        text = "찾은 사용자: ${searchResult.name}",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = GlucoachColors.TextPrimary,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    FormField(
+                        label = "관계 (선택)",
+                        value = relation,
+                        onValueChange = { relation = it },
+                        placeholder = "예: 부모님, 배우자",
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (searchResult == null) {
+                Button(
+                    onClick = { onSearch(phone) },
+                    enabled = isPhoneValid && !uiState.isSearching,
+                    colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                ) {
+                    Text("검색")
+                }
+            } else {
+                Button(
+                    onClick = { onConfirm(relation.ifBlank { null }) },
+                    colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                ) {
+                    Text("추가")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("취소", color = GlucoachColors.TextSecondary)
+            }
+        },
+    )
+}
+
+/** 보호자 수정 다이얼로그 — 관계(relation)만 수정 */
+@Composable
+private fun EditGuardianDialog(
+    initialRelation: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String?) -> Unit,
+) {
+    var relation by remember { mutableStateOf(initialRelation) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("보호자 수정", fontWeight = FontWeight.Bold) },
+        text = {
+            FormField(
+                label = "관계 (선택)",
+                value = relation,
+                onValueChange = { relation = it },
+                placeholder = "예: 부모님, 배우자",
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(relation.ifBlank { null }) },
+                colors = ButtonDefaults.buttonColors(containerColor = Primary),
+            ) {
+                Text("저장")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("취소", color = GlucoachColors.TextSecondary)
+            }
+        },
+    )
 }
 
 @Composable
@@ -227,12 +345,12 @@ private fun GuardianCard(
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = guardian.name,
+                    text = guardian.name.ifBlank { "보호자 #${guardian.guardianId}" },
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = GlucoachColors.TextPrimary,
                 )
-                if (guardian.isPrimary) {
+                if (guardian.priority == 0) {
                     Spacer(modifier = Modifier.width(GlucoachSpacing.sm))
                     Box(
                         modifier =
@@ -245,10 +363,9 @@ private fun GuardianCard(
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(text = guardian.phone, fontSize = 13.sp, color = GlucoachColors.TextSecondary)
             if (!guardian.relation.isNullOrBlank()) {
-                Text(text = guardian.relation, fontSize = 12.sp, color = GlucoachColors.TextSecondary)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(text = guardian.relation, fontSize = 13.sp, color = GlucoachColors.TextSecondary)
             }
         }
         IconButton(onClick = onEdit, modifier = Modifier.size(40.dp)) {
@@ -268,78 +385,6 @@ private fun GuardianCard(
             )
         }
     }
-}
-
-@Composable
-private fun GuardianFormDialog(
-    title: String,
-    initialName: String = "",
-    initialPhone: String = "",
-    initialRelation: String = "",
-    initialIsPrimary: Boolean = false,
-    onDismiss: () -> Unit,
-    onConfirm: (name: String, phone: String, relation: String, isPrimary: Boolean) -> Unit,
-) {
-    var name by remember { mutableStateOf(initialName) }
-    var phone by remember { mutableStateOf(initialPhone) }
-    var relation by remember { mutableStateOf(initialRelation) }
-    var isPrimary by remember { mutableStateOf(initialIsPrimary) }
-
-    val isValid = name.isNotBlank() && phone.length in 10..11 && phone.all { it.isDigit() }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title, fontWeight = FontWeight.Bold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(GlucoachSpacing.md)) {
-                FormField(
-                    label = "이름",
-                    value = name,
-                    onValueChange = { name = it },
-                    placeholder = "이름을 입력하세요",
-                )
-                FormField(
-                    label = "전화번호 (숫자만)",
-                    value = phone,
-                    onValueChange = { if (it.all { c -> c.isDigit() } && it.length <= 11) phone = it },
-                    placeholder = "01012345678",
-                    keyboardType = KeyboardType.Phone,
-                )
-                FormField(
-                    label = "관계 (선택)",
-                    value = relation,
-                    onValueChange = { relation = it },
-                    placeholder = "예: 부모님, 배우자",
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(text = "주 보호자로 설정", fontSize = 13.sp, color = TextLabel, fontWeight = FontWeight.Medium)
-                    Switch(
-                        checked = isPrimary,
-                        onCheckedChange = { isPrimary = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Primary),
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onConfirm(name, phone, relation, isPrimary) },
-                enabled = isValid,
-                colors = ButtonDefaults.buttonColors(containerColor = Primary),
-            ) {
-                Text("저장")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("취소", color = GlucoachColors.TextSecondary)
-            }
-        },
-    )
 }
 
 @Composable

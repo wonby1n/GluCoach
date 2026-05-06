@@ -1,12 +1,10 @@
 package com.ssafy.s309.data.repository
 
 import com.ssafy.s309.data.api.UserApi
-import com.ssafy.s309.data.local.TokenManager
 import com.ssafy.s309.data.model.FcmTokenRequest
 import com.ssafy.s309.data.model.GuardianCreateRequest
 import com.ssafy.s309.data.model.GuardianItem
-import com.ssafy.s309.data.model.UserProfile
-import com.ssafy.s309.data.model.UserProfileUpdateRequest
+import com.ssafy.s309.data.model.UserSearchResponse
 import com.ssafy.s309.data.model.UserSettings
 import com.ssafy.s309.data.model.UserSettingsUpdateRequest
 import javax.inject.Inject
@@ -17,35 +15,24 @@ class UserRepository
     @Inject
     constructor(
         private val userApi: UserApi,
-        private val tokenManager: TokenManager,
     ) {
-        private fun userId(): String = tokenManager.getUserId() ?: error("로그인이 필요합니다")
-
-        suspend fun registerFcmToken(token: String): Result<Unit> =
-            runCatching {
-                val id = tokenManager.getUserId() ?: return@runCatching
-                userApi.registerFcmToken(id, FcmTokenRequest(token))
-            }
-
-        suspend fun getProfile(): Result<UserProfile> = runCatching { userApi.getProfile(userId()) }
-
-        suspend fun updateProfile(request: UserProfileUpdateRequest): Result<UserProfile> =
-            runCatching { userApi.updateProfile(userId(), request) }
+        suspend fun registerFcmToken(token: String): Result<Unit> = runCatching { userApi.registerFcmToken(FcmTokenRequest(token)) }
 
         suspend fun getSettings(): Result<UserSettings> = runCatching { userApi.getSettings() }
 
         suspend fun updateSettings(request: UserSettingsUpdateRequest): Result<UserSettings> =
             runCatching { userApi.updateSettings(request) }
 
-        suspend fun getGuardians(): Result<List<GuardianItem>> = runCatching { userApi.getGuardians(userId()) }
+        suspend fun searchUser(phone: String): Result<UserSearchResponse> = runCatching { userApi.searchUser(phone = phone) }
 
-        suspend fun createGuardian(request: GuardianCreateRequest): Result<GuardianItem> =
-            runCatching { userApi.createGuardian(userId(), request) }
+        suspend fun getGuardians(): Result<List<GuardianItem>> = runCatching { userApi.getGuardians() }
+
+        suspend fun createGuardian(request: GuardianCreateRequest): Result<GuardianItem> = runCatching { userApi.createGuardian(request) }
 
         suspend fun updateGuardian(
-            guardianId: String,
+            wardGuardianId: Int,
             request: GuardianCreateRequest,
-        ): Result<GuardianItem> = runCatching { userApi.updateGuardian(userId(), guardianId, request) }
+        ): Result<GuardianItem> = runCatching { userApi.updateGuardian(wardGuardianId, request) }
 
-        suspend fun deleteGuardian(guardianId: String): Result<Unit> = runCatching { userApi.deleteGuardian(userId(), guardianId) }
+        suspend fun deleteGuardian(wardGuardianId: Int): Result<Unit> = runCatching { userApi.deleteGuardian(wardGuardianId) }
     }

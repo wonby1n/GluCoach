@@ -1,37 +1,46 @@
-@file:Suppress("ktlint:standard:no-empty-file")
-
 package com.ssafy.s309.data.api
 
-// TODO(BE 연동): 백엔드 API가 준비되면 주석을 해제하고 실제 엔드포인트로 교체한다.
-//
-// import com.ssafy.s309.data.model.DailyHealthSummary
-// import com.ssafy.s309.data.model.GlucoseRange
-// import com.ssafy.s309.data.model.GlucoseReading
-// import com.ssafy.s309.data.model.MealEvent
-// import com.ssafy.s309.data.model.NotificationItem
-// import retrofit2.http.GET
-// import retrofit2.http.Query
-//
-// interface HealthApi {
-//     /** 최근 N시간 혈당 흐름 조회 (기본 6시간) */
-//     @GET("/api/glucose/recent")
-//     suspend fun getRecentGlucose(
-//         @Query("hours") hours: Int = 6,
-//     ): List<GlucoseReading>
-//
-//     /** 사용자 목표 혈당 범위 */
-//     @GET("/api/glucose/target-range")
-//     suspend fun getGlucoseTargetRange(): GlucoseRange
-//
-//     /** 오늘 식사 이벤트 목록 */
-//     @GET("/api/meals/today")
-//     suspend fun getTodayMeals(): List<MealEvent>
-//
-//     /** 오늘의 건강 요약 (칼로리 / 수면) */
-//     @GET("/api/health/summary/today")
-//     suspend fun getTodaySummary(): DailyHealthSummary
-//
-//     /** 알림 목록 */
-//     @GET("/api/notifications")
-//     suspend fun getNotifications(): List<NotificationItem>
-// }
+import com.ssafy.s309.data.model.AlertListResponse
+import com.ssafy.s309.data.model.CgmRecordResponse
+import com.ssafy.s309.data.model.DailyHealthSummaryResponse
+import com.ssafy.s309.data.model.MealRecordResponse
+import retrofit2.http.GET
+import retrofit2.http.PATCH
+import retrofit2.http.Path
+import retrofit2.http.Query
+
+interface HealthApi {
+    /** 혈당 기록 기간 조회. from/to = ISO-8601 datetime (e.g. "2026-05-06T00:00:00") */
+    @GET("api/glucose-records")
+    suspend fun getGlucoseRecords(
+        @Query("from") from: String,
+        @Query("to") to: String,
+    ): List<CgmRecordResponse>
+
+    /** 일별 헬스 요약 기간 조회. from/to = ISO-8601 date (e.g. "2026-05-06") */
+    @GET("api/health/daily-summary")
+    suspend fun getDailyHealthSummary(
+        @Query("from") from: String,
+        @Query("to") to: String,
+    ): List<DailyHealthSummaryResponse>
+
+    /** 날짜별 식사 기록 조회. date = ISO-8601 date (e.g. "2026-05-06") */
+    @GET("api/meals")
+    suspend fun getMeals(
+        @Query("date") date: String,
+    ): List<MealRecordResponse>
+
+    /** 알림 목록 조회 */
+    @GET("api/v1/alerts")
+    suspend fun getAlerts(
+        @Query("is_read") isRead: Boolean? = null,
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 20,
+    ): AlertListResponse
+
+    /** 알림 읽음 처리 */
+    @PATCH("api/v1/alerts/{id}/read")
+    suspend fun markAlertRead(
+        @Path("id") id: Int,
+    )
+}
