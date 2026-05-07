@@ -20,8 +20,7 @@ def run_weekly_report(req: WeeklyReportRequest) -> WeeklyReportResponse:
     """
     주간 보고서 생성 전체 흐름을 실행한다.
 
-    LLM 호출 실패 시 fallback 텍스트로 계속 진행한다.
-    S3 업로드 실패 시 error 반환.
+    LLM 호출 / PDF 생성 / S3 업로드 중 하나라도 실패하면 error 반환.
     """
     log.info("주간 보고서 생성 시작: user_id=%d week=%s~%s",
              req.user_id, req.week_start, req.week_end)
