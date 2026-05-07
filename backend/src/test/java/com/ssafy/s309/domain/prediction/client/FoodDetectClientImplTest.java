@@ -12,7 +12,6 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import com.ssafy.s309.domain.prediction.client.dto.FoodBBox;
 import com.ssafy.s309.domain.prediction.client.dto.FoodDetectResponse;
 import com.ssafy.s309.domain.prediction.client.dto.FoodDetection;
 import com.ssafy.s309.domain.prediction.exception.AiServiceException;
@@ -40,12 +39,7 @@ class FoodDetectClientImplTest {
   @BeforeEach
   void setUp() {
     image = new MockMultipartFile("file", "bibimbap.jpg", "image/jpeg", new byte[] {1, 2, 3, 4});
-    response =
-        new FoodDetectResponse(
-            1,
-            List.of(
-                new FoodDetection(
-                    "비빔밥", "bibimbap", 0.91, new FoodBBox(10.0, 20.0, 100.0, 200.0))));
+    response = new FoodDetectResponse(1, List.of(new FoodDetection("비빔밥", "bibimbap", 0.91)));
     MDC.remove(FoodDetectClientImpl.CORRELATION_ID_MDC_KEY);
   }
 

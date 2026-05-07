@@ -1,5 +1,6 @@
 package com.ssafy.s309.domain.prediction.client.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 
 /**
@@ -9,4 +10,5 @@ import java.util.List;
  * {@code detections.sort(key=lambda d: d["confidence"], reverse=True)}). 호출자는 {@code
  * detections.get(0)} 을 top 으로 사용 가능.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record FoodDetectResponse(int count, List<FoodDetection> detections) {}
