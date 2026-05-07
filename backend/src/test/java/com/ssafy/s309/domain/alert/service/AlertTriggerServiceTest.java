@@ -25,7 +25,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @SuppressWarnings("NonAsciiCharacters")
 class AlertTriggerServiceTest {
 
-  @Mock private AlertCreationService alertCreationService;
+  @Mock
+  private com.ssafy.s309.domain.chat.service.ChatMessageCreationService chatMessageCreationService;
+
   @Mock private AlertRepository alertRepository;
   @InjectMocks private AlertTriggerService alertTriggerService;
 
@@ -40,8 +42,8 @@ class AlertTriggerServiceTest {
     alertTriggerService.handle(event(new BigDecimal("180")));
 
     ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
-    verify(alertCreationService)
-        .createIfNotDuplicate(eq(USER_ID), eq("HIGH"), messageCaptor.capture(), eq("be"));
+    verify(chatMessageCreationService)
+        .createIfNotDuplicate(eq(USER_ID), eq("HIGH"), messageCaptor.capture());
     assertThat(messageCaptor.getValue()).contains("180");
     verify(alertRepository, never()).findByUserIdAndAlertTypeInAndResolvedAtIsNull(any(), any());
   }
@@ -50,14 +52,14 @@ class AlertTriggerServiceTest {
   void HIGH_185_알림_생성() {
     alertTriggerService.handle(event(new BigDecimal("185")));
 
-    verify(alertCreationService).createIfNotDuplicate(eq(USER_ID), eq("HIGH"), any(), eq("be"));
+    verify(chatMessageCreationService).createIfNotDuplicate(eq(USER_ID), eq("HIGH"), any());
   }
 
   @Test
   void LOW_70_경계_알림_생성() {
     alertTriggerService.handle(event(new BigDecimal("70")));
 
-    verify(alertCreationService).createIfNotDuplicate(eq(USER_ID), eq("LOW"), any(), eq("be"));
+    verify(chatMessageCreationService).createIfNotDuplicate(eq(USER_ID), eq("LOW"), any());
     verify(alertRepository, never()).findByUserIdAndAlertTypeInAndResolvedAtIsNull(any(), any());
   }
 
@@ -65,7 +67,7 @@ class AlertTriggerServiceTest {
   void LOW_65_알림_생성() {
     alertTriggerService.handle(event(new BigDecimal("65")));
 
-    verify(alertCreationService).createIfNotDuplicate(eq(USER_ID), eq("LOW"), any(), eq("be"));
+    verify(chatMessageCreationService).createIfNotDuplicate(eq(USER_ID), eq("LOW"), any());
   }
 
   @Test
@@ -93,7 +95,7 @@ class AlertTriggerServiceTest {
 
     alertTriggerService.handle(event(new BigDecimal("120")));
 
-    verify(alertCreationService, never()).createIfNotDuplicate(any(), any(), any(), any());
+    verify(chatMessageCreationService, never()).createIfNotDuplicate(any(), any(), any());
     assertThat(openHigh.getResolvedAt()).isNotNull();
     assertThat(openLow.getResolvedAt()).isNotNull();
   }
@@ -107,7 +109,7 @@ class AlertTriggerServiceTest {
 
     alertTriggerService.handle(event(new BigDecimal("120")));
 
-    verify(alertCreationService, never()).createIfNotDuplicate(any(), any(), any(), any());
+    verify(chatMessageCreationService, never()).createIfNotDuplicate(any(), any(), any());
     verify(alertRepository, times(1))
         .findByUserIdAndAlertTypeInAndResolvedAtIsNull(eq(USER_ID), any(Collection.class));
   }
@@ -121,7 +123,7 @@ class AlertTriggerServiceTest {
 
     alertTriggerService.handle(event(new BigDecimal("71")));
 
-    verify(alertCreationService, never()).createIfNotDuplicate(any(), any(), any(), any());
+    verify(chatMessageCreationService, never()).createIfNotDuplicate(any(), any(), any());
     verify(alertRepository)
         .findByUserIdAndAlertTypeInAndResolvedAtIsNull(eq(USER_ID), any(Collection.class));
   }
