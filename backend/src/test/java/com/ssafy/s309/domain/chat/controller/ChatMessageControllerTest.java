@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.s309.config.SecurityConfig;
 import com.ssafy.s309.config.TestSecurityConfig;
 import com.ssafy.s309.domain.auth.principal.CustomUserPrincipal;
+import com.ssafy.s309.domain.chat.dto.ChatCommandRequest;
 import com.ssafy.s309.domain.chat.dto.ChatReplyRequest;
 import com.ssafy.s309.domain.chat.entity.ChatMessage;
 import com.ssafy.s309.domain.chat.service.ChatMessageService;
@@ -176,5 +177,49 @@ class ChatMessageControllerTest {
         .perform(get("/api/chat/messages/unread-count").with(authedUser))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.unreadCount").value(5));
+  }
+
+  @Test
+  void POST_command_정상_201_반환() throws Exception {
+    ChatMessage userCmd =
+        withId(
+            ChatMessage.builder()
+                .userId(USER_ID)
+                .sender(ChatMessage.SENDER_USER)
+                .commandType("USER_REQUEST_FOOD_RECOMMEND")
+                .message("음식 추천해줘")
+                .payload(Map.of("category", "한식"))
+                .build(),
+            20L);
+    given(
+            chatMessageService.insertUserCommand(
+                eq(USER_ID), eq("USER_REQUEST_FOOD_RECOMMEND"), eq("음식 추천해줘"), any()))
+        .willReturn(userCmd);
+
+    ChatCommandRequest req =
+        new ChatCommandRequest("USER_REQUEST_FOOD_RECOMMEND", "음식 추천해줘", Map.of("category", "한식"));
+    mockMvc
+        .perform(
+            post("/api/chat/messages/command")
+                .with(authedUser)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.id").value(20))
+        .andExpect(jsonPath("$.sender").value("user"))
+        .andExpect(jsonPath("$.commandType").value("USER_REQUEST_FOOD_RECOMMEND"))
+        .andExpect(jsonPath("$.parentId").doesNotExist());
+  }
+
+  @Test
+  void POST_command_commandType_없으면_400() throws Exception {
+    ChatCommandRequest req = new ChatCommandRequest("", "음식 추천해줘", null);
+    mockMvc
+        .perform(
+            post("/api/chat/messages/command")
+                .with(authedUser)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+        .andExpect(status().isBadRequest());
   }
 }
