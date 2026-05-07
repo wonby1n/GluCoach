@@ -62,6 +62,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ssafy.s309.data.ble.BleConnectionState
 import com.ssafy.s309.feature.glucofit.glucose.GlucoseSimulator
 import com.ssafy.s309.ui.screen.ble.BleViewModel
+import com.ssafy.s309.ui.screen.main.MainViewModel
 import com.ssafy.s309.ui.theme.Primary
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -120,12 +121,14 @@ private fun getCurrentWeekDates(): Pair<List<Int>, Int> {
 fun GraphScreen(
     onBack: () -> Unit = {},
     onNavigateToBle: () -> Unit = {},
-    diabetesType: String = "NONE",
     bleViewModel: BleViewModel = hiltViewModel(),
+    mainViewModel: MainViewModel = hiltViewModel(),
 ) {
     val connectionState by bleViewModel.connectionState.collectAsStateWithLifecycle()
     val glucoseReadings by bleViewModel.glucoseReadings.collectAsStateWithLifecycle()
     val isDeviceConnected = connectionState is BleConnectionState.Connected
+    val mainUiState by mainViewModel.uiState.collectAsStateWithLifecycle()
+    val diabetesType = mainUiState.diabetesType
 
     // 시뮬레이터 롤링 버퍼 (BLE 미연결 시 사용)
     val context = LocalContext.current
