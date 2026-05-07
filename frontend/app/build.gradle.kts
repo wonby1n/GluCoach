@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -21,7 +23,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        val props = java.util.Properties()
+        val props = Properties()
         val localPropsFile = File(rootDir, "local.properties")
         if (localPropsFile.exists()) props.load(localPropsFile.inputStream())
         buildConfigField("String", "GOOGLE_TTS_API_KEY", "\"${props.getProperty("GOOGLE_TTS_API_KEY", "")}\"")
@@ -46,7 +48,6 @@ android {
         compose = true
         buildConfig = true
     }
-
 }
 
 kotlin {
