@@ -25,6 +25,10 @@ openpyxl>=3.1
 
 # LLM
 anthropic>=0.40
+openai>=1.30.0
+
+# AWS S3
+boto3>=1.35.0
 
 # 유틸
 python-dotenv>=1.0

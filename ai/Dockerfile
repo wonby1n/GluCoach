@@ -13,7 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
+    fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -c "import matplotlib.font_manager; matplotlib.font_manager._load_fontmanager(try_read_cache=False)"
 
 WORKDIR /app
 COPY --from=builder /install /usr/local
