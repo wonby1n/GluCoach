@@ -9,9 +9,9 @@
 import logging
 
 from app.schemas.report import WeeklyReportRequest, WeeklyReportResponse
-from app.report.llm_caller import call_weekly_report_llm
-from app.report.pdf_generator import generate_pdf
-from app.report.s3_uploader import upload_pdf
+from app.weekly_report.llm_caller import call_weekly_report_llm
+from app.weekly_report.pdf_generator import generate_pdf
+from app.weekly_report.s3_uploader import upload_pdf
 
 log = logging.getLogger(__name__)
 

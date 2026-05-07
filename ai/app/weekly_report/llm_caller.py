@@ -13,7 +13,7 @@ from openai import OpenAI, APIStatusError, APIConnectionError, APITimeoutError
 
 from app.core.config import settings
 from app.schemas.report import WeeklyReportRequest
-from app.report.prompt import build_weekly_report_prompt
+from app.weekly_report.prompt import build_weekly_report_prompt
 
 log = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ def call_weekly_report_llm(req: WeeklyReportRequest) -> tuple[str, str]:
 
     client = OpenAI(
         api_key=settings.openai_api_key,
-        base_url="https://gms.ssafy.io/gmsapi/api.openai.com/v1",
+        base_url=settings.openai_base_url,
     )
     system_prompt = build_weekly_report_prompt(req)
 

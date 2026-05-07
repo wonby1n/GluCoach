@@ -12,7 +12,7 @@ from fastapi import APIRouter
 from fastapi.concurrency import run_in_threadpool
 
 from app.schemas.report import WeeklyReportRequest, WeeklyReportResponse
-from app.report.runner import run_weekly_report
+from app.weekly_report.runner import run_weekly_report
 
 log = logging.getLogger(__name__)
 

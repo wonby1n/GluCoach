@@ -15,6 +15,7 @@ class Settings(BaseSettings):
 
     # OpenAI API (주간 보고서 LLM)
     openai_api_key: Optional[str] = None
+    openai_base_url: str = "https://gms.ssafy.io/gmsapi/api.openai.com/v1"
 
     # S3 설정 (주간 보고서 PDF 업로드)
     aws_access_key_id: Optional[str] = None
