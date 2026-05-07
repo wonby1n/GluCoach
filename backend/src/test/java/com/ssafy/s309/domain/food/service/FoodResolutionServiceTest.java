@@ -68,10 +68,7 @@ class FoodResolutionServiceTest {
   @Test
   void DB_캐시에_영양정보있는_row_있으면_CACHE_HIT() {
     Food cached = foodWithNutrition(10, "비빔밥", 5);
-    given(
-            foodRepository
-                .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
-                    eq("비빔밥"), any(LocalDateTime.class)))
+    given(foodRepository.findByNameIgnoreCaseOrderBySearchCountDesc("비빔밥"))
         .willReturn(List.of(cached));
 
     FoodResolution result = resolutionService.resolve("비빔밥");
@@ -80,6 +77,57 @@ class FoodResolutionServiceTest {
     assertThat(result.food()).isSameAs(cached);
     assertThat(cached.getSearchCount()).isEqualTo(6);
     verifyNoInteractions(foodApiClient, foodService);
+  }
+
+  @Test
+  void 정확매칭이_검색량높은_부분매칭보다_우선() {
+    // CV "비빔밥" 입력 시 "돼지비빔밥(sc=500)"이 검색량 정렬로 "비빔밥(sc=10)"보다 앞서는 오매칭 방지.
+    Food exact = foodWithNutrition(100, "비빔밥", 10);
+    given(foodRepository.findByNameIgnoreCaseOrderBySearchCountDesc("비빔밥"))
+        .willReturn(List.of(exact));
+
+    FoodResolution result = resolutionService.resolve("비빔밥");
+
+    assertThat(result.status()).isEqualTo(ResolutionStatus.CACHE_HIT);
+    assertThat(result.food()).isSameAs(exact);
+    // 정확 매칭 히트 시 부분일치 쿼리는 호출되지 않아야 함.
+    verify(foodRepository, never())
+        .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
+            anyString(), any(LocalDateTime.class));
+  }
+
+  @Test
+  void 정확매칭_없으면_부분매칭으로_폴백() {
+    Food partial = foodWithNutrition(101, "비빔밥_돼지머리", 50);
+    given(foodRepository.findByNameIgnoreCaseOrderBySearchCountDesc("비빔밥")).willReturn(List.of());
+    given(
+            foodRepository
+                .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
+                    eq("비빔밥"), any(LocalDateTime.class)))
+        .willReturn(List.of(partial));
+
+    FoodResolution result = resolutionService.resolve("비빔밥");
+
+    assertThat(result.status()).isEqualTo(ResolutionStatus.CACHE_HIT);
+    assertThat(result.food()).isSameAs(partial);
+  }
+
+  @Test
+  void 정확매칭_있어도_carbsG_NULL이면_부분매칭으로_폴백() {
+    Food exactNoCarbs = foodWithoutNutrition(102, "비빔밥");
+    Food partial = foodWithNutrition(103, "비빔밥_육회", 1);
+    given(foodRepository.findByNameIgnoreCaseOrderBySearchCountDesc("비빔밥"))
+        .willReturn(List.of(exactNoCarbs));
+    given(
+            foodRepository
+                .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
+                    eq("비빔밥"), any(LocalDateTime.class)))
+        .willReturn(List.of(partial));
+
+    FoodResolution result = resolutionService.resolve("비빔밥");
+
+    assertThat(result.status()).isEqualTo(ResolutionStatus.CACHE_HIT);
+    assertThat(result.food()).isSameAs(partial);
   }
 
   @Test

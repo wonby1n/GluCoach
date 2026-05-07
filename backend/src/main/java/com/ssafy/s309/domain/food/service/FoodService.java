@@ -70,7 +70,7 @@ public class FoodService {
   }
 
   /** 식약처 API 결과를 foods 테이블에 upsert. 탄수화물 결측 항목은 차단 — 혈당 예측 모델 핵심 입력이라 NULL 이면 비교 시뮬레이션이 무의미해진다. */
-  public List<Food> upsertFromApi(List<FoodApiItem> items) {
+  List<Food> upsertFromApi(List<FoodApiItem> items) {
     return items.stream().filter(this::hasValidCarbs).map(this::upsert).toList();
   }
 

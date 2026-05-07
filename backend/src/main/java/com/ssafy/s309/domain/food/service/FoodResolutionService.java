@@ -73,7 +73,23 @@ public class FoodResolutionService {
     return trimmed;
   }
 
+  /**
+   * 영양정보 있는 캐시 row 검색.
+   *
+   * <p>① 정확 일치 우선 → ② 부분 일치 fallback. 정확 일치를 먼저 보지 않으면 "비빔밥" 입력 시 검색량 큰 "돼지비빔밥"이 잡혀 영양정보가 다른 음식
+   * 데이터로 예측 모델 입력이 오염됨.
+   *
+   * <p>{@code is_customized=true} 라도 사용자가 직접 입력해 영양정보를 채운 row 라면 재사용한다 (foods.is_customized 컬럼
+   * comment "음식 인식 실패 시 텍스트 입력" 의도와 일치).
+   */
   private Optional<Food> findCachedWithNutrition(String name) {
+    Optional<Food> exact =
+        foodRepository.findByNameIgnoreCaseOrderBySearchCountDesc(name).stream()
+            .filter(f -> f.getCarbsG() != null)
+            .findFirst();
+    if (exact.isPresent()) {
+      return exact;
+    }
     return foodRepository
         .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
             name, EPOCH_THRESHOLD)
