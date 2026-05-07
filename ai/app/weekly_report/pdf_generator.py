@@ -12,7 +12,7 @@ matplotlib PdfPages로 A4 4페이지 PDF를 생성한다.
 
 import io
 import logging
-import textwrap
+import unicodedata
 from datetime import datetime
 
 import matplotlib
@@ -69,12 +69,33 @@ def _setup_korean_font() -> str | None:
     return None
 
 
+def _char_width(c: str) -> int:
+    eaw = unicodedata.east_asian_width(c)
+    return 2 if eaw in ("W", "F") else 1
+
+
 def _wrap_text(text: str, width: int = 55) -> str:
-    """긴 텍스트를 줄바꿈 처리한다."""
+    """한글 전각 문자를 display column 기준으로 줄바꿈한다.
+
+    textwrap.fill은 한글처럼 공백 없는 텍스트를 줄바꿈하지 못하므로
+    문자 단위로 직접 처리한다.
+    """
     lines = []
     for para in text.split("\n"):
-        wrapped = textwrap.fill(para, width=width)
-        lines.append(wrapped)
+        if not para:
+            lines.append("")
+            continue
+        current, col = "", 0
+        for char in para:
+            w = _char_width(char)
+            if col + w > width:
+                lines.append(current)
+                current, col = char, w
+            else:
+                current += char
+                col += w
+        if current:
+            lines.append(current)
     return "\n".join(lines)
 
 

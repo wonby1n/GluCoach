@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class HourlyGlucose(BaseModel):
@@ -35,7 +35,7 @@ class WeeklyReportRequest(BaseModel):
     target_high: float = 180.0
 
     # 혈당 통계 (BE에서 glucose_records 집계)
-    avg_glucose: float
+    avg_glucose: float = Field(..., gt=0)
     min_glucose: float
     max_glucose: float
     glucose_sd: float
@@ -63,6 +63,13 @@ class WeeklyReportRequest(BaseModel):
 
     # 복약 (medications_records 주간 COUNT)
     medication_count: Optional[int] = None
+
+    @model_validator(mode="after")
+    def check_tir_sum(self) -> "WeeklyReportRequest":
+        total = self.time_in_range + self.time_above_range + self.time_below_range
+        if not (95.0 <= total <= 105.0):
+            raise ValueError(f"TIR 합계가 100%에서 벗어남: {total:.1f}%")
+        return self
 
 
 class WeeklyReportResponse(BaseModel):
