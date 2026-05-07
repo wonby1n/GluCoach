@@ -27,6 +27,8 @@ public class MealGlucoseResponseService {
 
   private static final int BASELINE_SEARCH_MINUTES = 60;
   private static final int RESPONSE_WINDOW_MINUTES = 120;
+  private static final int GIVE_UP_HOURS = 24;
+  private static final BigDecimal SLOPE_DB_MAX = new BigDecimal("99.9");
 
   private static final BigDecimal GRADE_S_MAX = new BigDecimal("0.5");
   private static final BigDecimal GRADE_A_MAX = new BigDecimal("1.0");
@@ -40,8 +42,10 @@ public class MealGlucoseResponseService {
 
   @Transactional(readOnly = true)
   public List<Integer> findUnprocessedMealIds() {
-    LocalDateTime cutoff = LocalDateTime.now().minusMinutes(RESPONSE_WINDOW_MINUTES);
-    return mealRecordRepository.findUnprocessedBefore(cutoff).stream()
+    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime cutoff = now.minusMinutes(RESPONSE_WINDOW_MINUTES);
+    LocalDateTime expiry = now.minusHours(GIVE_UP_HOURS);
+    return mealRecordRepository.findUnprocessedBetween(expiry, cutoff).stream()
         .map(MealRecord::getId)
         .toList();
   }
@@ -90,16 +94,16 @@ public class MealGlucoseResponseService {
         postRecords.stream().max(Comparator.comparing(GlucoseRecord::getValue)).orElseThrow();
 
     long minutes = ChronoUnit.MINUTES.between(mealTime, peak.getMeasuredAt());
-    if (minutes == 0) {
-      log.info("peak 측정 시각이 식사 시각과 동일, 스킵 mealId={}", meal.getId());
-      return;
-    }
 
     // slope (mg/dL/min): NUMERIC(3,1) → scale=1, HALF_UP
-    BigDecimal slope =
+    BigDecimal rawSlope =
         peak.getValue()
             .subtract(baseline.getValue())
             .divide(BigDecimal.valueOf(minutes), 1, RoundingMode.HALF_UP);
+    if (rawSlope.compareTo(SLOPE_DB_MAX) > 0) {
+      log.warn("slope 이상치 클램프 mealId={}, rawSlope={} mg/dL/min", meal.getId(), rawSlope);
+    }
+    BigDecimal slope = rawSlope.min(SLOPE_DB_MAX);
 
     mealGlucoseResponseRepository.save(
         MealGlucoseResponse.builder()

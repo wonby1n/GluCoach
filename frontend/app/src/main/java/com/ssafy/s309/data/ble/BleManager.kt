@@ -207,8 +207,8 @@ class BleManager
         }
 
         fun stopScan() {
-            FastBleManager.getInstance().cancelScan()
             if (_connectionState.value is BleConnectionState.Scanning) {
+                FastBleManager.getInstance().cancelScan()
                 _connectionState.value = BleConnectionState.Idle
             }
         }

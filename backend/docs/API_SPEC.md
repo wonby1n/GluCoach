@@ -1,6 +1,6 @@
 # API 명세서
 
-> **상태:** 진행 중 · **담당자:** 도현 · **업데이트:** 2026-05-02
+> **상태:** 진행 중 · **담당자:** 도현 · **업데이트:** 2026-05-06
 > 통합 V1 마이그레이션 + ERD 정합성 작업 반영. backend/docs/ERD.sql 참조.
 
 ---
@@ -28,6 +28,7 @@
 | 토큰 갱신 | POST | `/api/auth/refresh` | access 만료 시 refresh로 재발급. Refresh Rotation 적용 (재사용 감지 시 모든 토큰 무효화) | 🟩 | 🔴 Highest |
 | 로그아웃 | POST | `/api/auth/logout` | Redis의 RefreshToken 삭제 | 🟩 | 🔴 Highest |
 | 회원 탈퇴 | DELETE | `/api/auth/withdraw` | 비밀번호 재검증 후 소프트 삭제(`deleted_at` 기록) + 이메일 익명화 + RefreshToken 삭제 | 🟩 | 🟠 High |
+| 비밀번호 변경 | PUT | `/api/auth/password` | 로그인 사용자가 현재 비밀번호 검증 후 새 비밀번호로 교체. 성공 시 모든 기기의 RefreshToken 무효화. 상세는 [§1.3](#13-비밀번호-변경-api-상세) | 🟩 | 🟠 High |
 
 ### 1.1 이메일 중복 확인 API 상세
 
@@ -91,6 +92,53 @@ GET /api/auth/email/check?email={email}
 
 - signup API도 enumeration 면에서 본 API와 동일 위험. 별도 보안 강화 이슈에서 같이 다루는 것을 권장 (한 API만 rate limit이면 공격자가 다른 쪽으로 우회)
 - 토큰 발급(login) 응답 메시지가 이미 "이메일 또는 비밀번호가 올바르지 않습니다"로 통일되어 있어 login 면에서는 enumeration이 차단됨 (사용자 존재 여부 미노출)
+
+### 1.3 비밀번호 변경 API 상세
+
+**요청**
+
+```
+PUT /api/auth/password
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+**요청 바디** — `PasswordChangeRequest`
+
+| 필드 | 타입 | 필수 | 검증 | 설명 |
+|---|---|---|---|---|
+| `currentPassword` | string | O | `@NotBlank` | 현재 비밀번호 (BCrypt 검증) |
+| `newPassword` | string | O | `@NotBlank` + `@Size(min = 6)` | 새 비밀번호. 6자 이상. 회원가입 정책과 동일 |
+
+**보안 요구사항**
+
+- **JWT Bearer 인증 필수.** `userId`는 `@AuthenticationPrincipal CustomUserPrincipal`에서 추출하며 경로/바디로 받지 않음 (IDOR 방지)
+- 소셜 가입 계정(`provider != "email"`, `password IS NULL`)은 변경 불가
+- 탈퇴 계정(`deleted_at IS NOT NULL`)은 변경 불가
+
+**응답 케이스**
+
+| 상황 | HTTP | Body | 비고 |
+|---|---|---|---|
+| 변경 성공 | `204 No Content` | (없음) | 새 비밀번호 BCrypt 인코딩 후 저장 + 모든 RefreshToken 삭제 |
+| 새 비밀번호 6자 미만 / 빈 값 | `400 Bad Request` | `{"message":"newPassword: 비밀번호는 6자 이상이어야 합니다"}` | Bean Validation (`@Size`) |
+| `currentPassword` 누락 | `400 Bad Request` | `{"message":"currentPassword: 현재 비밀번호는 필수입니다"}` | Bean Validation (`@NotBlank`) |
+| 새 비밀번호가 현재와 동일 | `400 Bad Request` | `{"message":"새 비밀번호가 현재 비밀번호와 같습니다"}` | — |
+| 탈퇴 / 소셜 계정 | `400 Bad Request` | `{"message":"비밀번호를 변경할 수 없는 계정입니다"}` | — |
+| 현재 비밀번호 불일치 | `401 Unauthorized` | `{"message":"현재 비밀번호가 올바르지 않습니다"}` | BCrypt `matches` 실패 |
+| Authorization 헤더 누락 / 토큰 만료 | `401 Unauthorized` | (Spring Security 기본) | JWT 필터 단계에서 차단 |
+
+**부수 효과 — RefreshToken 전체 무효화**
+
+변경 성공 시 `refreshTokenService.delete(userId)` 호출 → Redis의 해당 사용자 RefreshToken 삭제.
+
+| 영향 | 동작 |
+|---|---|
+| 다른 기기 세션 | RefreshToken 무효화 → AccessToken 만료 후 재로그인 필요 |
+| 변경을 수행한 본인 세션 | 동일하게 무효화. 현재 AccessToken은 만료 전까지 유효하나 갱신 불가 |
+| 기존 RefreshToken으로 `/api/auth/refresh` 호출 시 | "재사용 감지" 경로로 빠져 `400 Bad Request` ("비정상적인 토큰 사용이 감지되었습니다") |
+
+> **정책 근거**: OWASP 권장 사항. 비밀번호 변경은 계정 탈취 의심 또는 보안 강화 목적이므로 모든 활성 세션을 강제 종료. 변경 후 재로그인을 통해 새 RefreshToken을 발급받아야 함.
 
 ---
 

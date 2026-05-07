@@ -85,7 +85,9 @@ class MealGlucoseResponseServiceTest {
         MealRecord.builder().userId(USER_ID).isProcessed(false).recordedAt(MEAL_TIME).build();
     ReflectionTestUtils.setField(meal2, "id", 2);
 
-    given(mealRecordRepository.findUnprocessedBefore(any(LocalDateTime.class)))
+    given(
+            mealRecordRepository.findUnprocessedBetween(
+                any(LocalDateTime.class), any(LocalDateTime.class)))
         .willReturn(List.of(meal, meal2));
 
     List<Integer> result = mealGlucoseResponseService.findUnprocessedMealIds();
@@ -95,7 +97,9 @@ class MealGlucoseResponseServiceTest {
 
   @Test
   void findUnprocessedMealIds_미처리_식사_없으면_빈_리스트() {
-    given(mealRecordRepository.findUnprocessedBefore(any(LocalDateTime.class)))
+    given(
+            mealRecordRepository.findUnprocessedBetween(
+                any(LocalDateTime.class), any(LocalDateTime.class)))
         .willReturn(List.of());
 
     assertThat(mealGlucoseResponseService.findUnprocessedMealIds()).isEmpty();
