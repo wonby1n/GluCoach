@@ -184,8 +184,11 @@ class HealthRepository
         /** 날짜별 식사 기록 조회 */
         suspend fun getMealsByDate(date: String): Result<List<MealRecordResponse>> = runCatching { healthApi.getMeals(date = date) }
 
-        /** 식사 기록 생성 (multipart) */
-        suspend fun createMealRecord(request: MealCreateRequest): Result<MealCreateResponse> =
+        /** 식사 기록 생성 (multipart, 이미지 선택) */
+        suspend fun createMealRecord(
+            request: MealCreateRequest,
+            imageFile: java.io.File? = null,
+        ): Result<MealCreateResponse> =
             runCatching {
                 val json =
                     kotlinx.serialization.json.Json.encodeToString(
@@ -193,7 +196,12 @@ class HealthRepository
                         request,
                     )
                 val requestBody = json.toRequestBody("application/json".toMediaType())
-                healthApi.createMeal(request = requestBody, image = null)
+                val imagePart =
+                    imageFile?.takeIf { it.exists() }?.let {
+                        val imageBody = it.readBytes().toRequestBody("image/jpeg".toMediaType())
+                        okhttp3.MultipartBody.Part.createFormData("image", it.name, imageBody)
+                    }
+                healthApi.createMeal(request = requestBody, image = imagePart)
             }
 
         /** 알림 읽음 처리 (백엔드 반영). 실패해도 UI 상태는 유지. */
@@ -306,19 +314,7 @@ class HealthRepository
             return null
         }
 
-        private fun resolveAlertTitle(alertType: String): String =
-            when (alertType) {
-                "HIGH" -> "고혈당 경고"
-                "LOW" -> "저혈당 경고"
-                "SOS" -> "SOS 알림"
-                "WEEKLY_REPORT" -> "주간 보고서 도착"
-                "AGENT_GLUCOSE_HIGH" -> "혈당이 올라가고 있어요"
-                "AGENT_GLUCOSE_LOW" -> "저혈당 주의"
-                "AGENT_MEAL_FOLLOWUP" -> "키키"
-                "AGENT_WAKE_UP" -> "키키"
-                "AGENT_SLEEP_INSIGHT" -> "수면 인사이트"
-                else -> "GluCoach 알림"
-            }
+        private fun resolveAlertTitle(alertType: String): String = "키키"
 
         private fun formatTimeAgo(isoDateTime: String): String =
             try {

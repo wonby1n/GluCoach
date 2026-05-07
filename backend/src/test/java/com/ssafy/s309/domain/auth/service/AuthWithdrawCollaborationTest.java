@@ -28,8 +28,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 @SuppressWarnings("NonAsciiCharacters")
-@DisplayName("회원탈퇴 E2E 시나리오")
-class AuthWithdrawFlowTest {
+@DisplayName("회원탈퇴 협력 시나리오 (mock 기반)")
+class AuthWithdrawCollaborationTest {
 
   @Mock private UserRepository userRepository;
   @Mock private JwtProvider jwtProvider;

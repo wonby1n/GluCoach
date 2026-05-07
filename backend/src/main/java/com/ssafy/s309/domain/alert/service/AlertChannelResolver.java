@@ -23,17 +23,6 @@ public final class AlertChannelResolver {
   }
 
   public static String resolveTitle(String alertType) {
-    return switch (alertType) {
-      case "HIGH" -> "⚠️ 고혈당 경고";
-      case "LOW" -> "⚠️ 저혈당 경고";
-      case "SOS" -> "🚨 SOS 알림";
-      case "WEEKLY_REPORT" -> "주간 보고서 도착";
-      case "AGENT_GLUCOSE_HIGH" -> "혈당이 올라가고 있어요";
-      case "AGENT_GLUCOSE_LOW" -> "저혈당 주의";
-      case "AGENT_MEAL_FOLLOWUP" -> "키키";
-      case "AGENT_WAKE_UP" -> "키키";
-      case "AGENT_SLEEP_INSIGHT" -> "수면 인사이트";
-      default -> "GlucoCoach 알림";
-    };
+    return "키키";
   }
 }

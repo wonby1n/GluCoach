@@ -7,6 +7,7 @@ import com.ssafy.s309.domain.prediction.client.dto.MealInfo;
 import com.ssafy.s309.domain.prediction.client.dto.UserProfileWithPattern;
 import com.ssafy.s309.domain.prediction.dto.AbPredictRequest;
 import com.ssafy.s309.domain.prediction.dto.AbPredictResponse;
+import com.ssafy.s309.domain.prediction.dto.CurvePoint;
 import com.ssafy.s309.domain.prediction.dto.PredictRequest;
 import com.ssafy.s309.domain.prediction.dto.PredictResponse;
 import com.ssafy.s309.domain.prediction.entity.GlucosePrediction;
@@ -121,9 +122,13 @@ public class PredictionService {
   }
 
   private PredictResponse toResponse(Integer predictionId, GlucosePredictResponse aiResponse) {
+    List<CurvePoint> curve =
+        aiResponse.curve().stream()
+            .map(p -> new CurvePoint(p.minuteOffset(), p.glucoseMgdl()))
+            .toList();
     return new PredictResponse(
         predictionId,
-        aiResponse.curve(),
+        curve,
         aiResponse.peakMgdl(),
         aiResponse.peakMinute(),
         aiResponse.confidence());

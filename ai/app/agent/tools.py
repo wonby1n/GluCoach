@@ -136,12 +136,30 @@ def send_notification(message: str) -> dict:
 
 
 def schedule_followup(delay_minutes: int, reason: str) -> dict:
-    """지정한 시간 후에 agent를 다시 호출하도록 예약한다. (mock: 예약 성공 반환)"""
-    return {
-        "status": "scheduled",
-        "delay_minutes": delay_minutes,
-        "reason": reason,
-    }
+    """지정한 시간 후에 agent를 다시 호출하도록 예약한다. BACKEND_API_URL 설정 시 실제 BE API 호출."""
+    user_id = _agent_context.get("user_id")
+    backend_url = os.getenv("BACKEND_API_URL", "")
+    agent_api_key = os.getenv("AGENT_API_KEY", "dev-agent-key-change-in-prod")
+
+    if not backend_url or user_id is None:
+        return {"status": "scheduled", "delay_minutes": delay_minutes, "reason": reason}
+
+    try:
+        resp = _requests.post(
+            f"{backend_url}/api/agent/schedule_followup",
+            headers={"X-Agent-Api-Key": agent_api_key},
+            json={
+                "userId": user_id,
+                "triggerType": "post_meal_followup",
+                "delayMinutes": delay_minutes,
+                "reason": reason,
+            },
+            timeout=5,
+        )
+        resp.raise_for_status()
+        return {"status": "scheduled", "delay_minutes": delay_minutes, "reason": reason}
+    except Exception as e:
+        return {"status": "error", "delay_minutes": delay_minutes, "reason": reason, "error": str(e)}
 
 
 def trigger_projection(command: str, sleep_score: str = "", glucose: str = "") -> dict:
