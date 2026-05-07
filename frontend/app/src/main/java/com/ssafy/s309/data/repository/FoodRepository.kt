@@ -21,6 +21,8 @@ class FoodRepository
     ) {
         suspend fun searchFoods(query: String): Result<List<FoodSearchItem>> = runCatching { foodApi.searchFoods(query) }
 
+        suspend fun getFoodGrades(): Result<List<FoodGradeResponse>> = runCatching { foodApi.getFoodGrades() }
+
         suspend fun detectFood(photoFile: File): Result<DetectResponse> =
             runCatching {
                 val imagePart =

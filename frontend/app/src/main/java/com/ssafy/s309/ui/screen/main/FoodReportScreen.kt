@@ -6,7 +6,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -156,24 +155,12 @@ private fun FoodReportMainContent(
     ) {
         Spacer(Modifier.height(GlucoachSpacing.xxl))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = "내 음식 성적표",
-                color = GlucoachColors.TextPrimary,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Icon(
-                imageVector = Icons.Outlined.Notifications,
-                contentDescription = "알림",
-                tint = GlucoachColors.PrimaryDark,
-                modifier = Modifier.size(28.dp),
-            )
-        }
+        Text(
+            text = "내 음식 성적표",
+            color = GlucoachColors.TextPrimary,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+        )
 
         Spacer(Modifier.height(GlucoachSpacing.xl))
 

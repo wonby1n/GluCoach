@@ -11,10 +11,12 @@ import com.ssafy.s309.data.repository.FoodRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 sealed class FoodReportUiState {
@@ -35,7 +37,7 @@ class FoodReportViewModel
         private val foodRepository: FoodRepository,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<FoodReportUiState>(FoodReportUiState.Loading)
-        val uiState: StateFlow<FoodReportUiState> = _uiState
+        val uiState: StateFlow<FoodReportUiState> = _uiState.asStateFlow()
 
         init {
             loadFoodGrades()
