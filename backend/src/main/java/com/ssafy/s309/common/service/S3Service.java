@@ -59,4 +59,11 @@ public class S3Service {
   public void delete(String key) {
     s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
   }
+
+  public String uploadBytes(byte[] bytes, String key, String contentType) {
+    s3Client.putObject(
+        PutObjectRequest.builder().bucket(bucket).key(key).contentType(contentType).build(),
+        RequestBody.fromBytes(bytes));
+    return key;
+  }
 }

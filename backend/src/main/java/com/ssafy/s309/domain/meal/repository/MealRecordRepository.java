@@ -63,7 +63,8 @@ public interface MealRecordRepository extends JpaRepository<MealRecord, Integer>
   @Query(
       value =
           """
-          SELECT f.name AS food_name,
+          SELECT f.id   AS food_id,
+                 f.name AS food_name,
                  ROUND(AVG(mgr.slope)::numeric, 1) AS avg_slope
           FROM meal_records mr
           JOIN meal_glucose_responses mgr ON mr.id = mgr.meal_id
@@ -85,7 +86,8 @@ public interface MealRecordRepository extends JpaRepository<MealRecord, Integer>
   @Query(
       value =
           """
-          SELECT f.name AS food_name,
+          SELECT f.id   AS food_id,
+                 f.name AS food_name,
                  ROUND(AVG(mgr.slope)::numeric, 1) AS avg_slope
           FROM meal_records mr
           JOIN meal_glucose_responses mgr ON mr.id = mgr.meal_id
