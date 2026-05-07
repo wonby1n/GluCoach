@@ -39,7 +39,11 @@ public class WeeklyReportQueryService {
    *
    * @throws IllegalStateException 해당 기간 혈당 데이터가 없는 경우
    */
-  public WeeklyReportAiRequest buildAiRequest(User user, LocalDate weekStart) {
+  public WeeklyReportAiRequest buildAiRequest(
+      User user,
+      LocalDate weekStart,
+      List<WeeklyFoodItemProjection> goodFoodProjections,
+      List<WeeklyFoodItemProjection> badFoodProjections) {
     LocalDate weekEnd = weekStart.plusDays(6);
     LocalDateTime from = weekStart.atStartOfDay();
     LocalDateTime to = weekEnd.plusDays(1).atStartOfDay();
@@ -58,10 +62,10 @@ public class WeeklyReportQueryService {
       throw new IllegalStateException("혈당 데이터 없음: userId=" + user.getId() + " week=" + weekStart);
     }
 
-    // TAR + TBR → TIR 역산으로 합계 100% 보장
+    // TAR + TBR → TIR 역산으로 합계 100% 보장, 데이터 품질 문제로 음수가 되는 경우 0으로 보정
     BigDecimal tar = nullSafe(stats.getTimeAboveRange());
     BigDecimal tbr = nullSafe(stats.getTimeBelowRange());
-    BigDecimal tir = BigDecimal.valueOf(100).subtract(tar).subtract(tbr);
+    BigDecimal tir = BigDecimal.valueOf(100).subtract(tar).subtract(tbr).max(BigDecimal.ZERO);
 
     // ── 2. 시간대별 혈당 패턴 ────────────────────────────────────
     List<HourlyGlucoseItem> hourly =
@@ -82,11 +86,9 @@ public class WeeklyReportQueryService {
                         .build())
             .toList();
 
-    // ── 4. 음식 데이터 ─────────────────────────────────────────────
-    List<FoodItem> goodFoods =
-        toFoodItems(mealRecordRepository.findWeeklyGoodFoods(user.getId(), from, to));
-    List<FoodItem> badFoods =
-        toFoodItems(mealRecordRepository.findWeeklyBadFoods(user.getId(), from, to));
+    // ── 4. 음식 데이터 (호출부에서 한 번 조회한 projection 재사용) ───────────
+    List<FoodItem> goodFoods = toFoodItems(goodFoodProjections);
+    List<FoodItem> badFoods = toFoodItems(badFoodProjections);
 
     // ── 5. 식사 수 ────────────────────────────────────────────────
     long mealCount = mealRecordRepository.countByUserIdAndRecordedAtBetween(user.getId(), from, to);

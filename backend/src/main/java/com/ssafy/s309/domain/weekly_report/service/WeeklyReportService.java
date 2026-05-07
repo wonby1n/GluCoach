@@ -55,61 +55,75 @@ public class WeeklyReportService {
 
     log.info("주간 보고서 생성 시작: userId={} week={}", user.getId(), weekStart);
 
-    // ── 1. DB 집계 → AI 요청 조립 ──────────────────────────────
-    WeeklyReportAiRequest aiRequest = queryService.buildAiRequest(user, weekStart);
-
-    // ── 2. AI 호출 (LLM + PDF 생성) ───────────────────────────
-    WeeklyReportAiResponse aiResponse = aiClient.generate(aiRequest);
-
-    // ── 3. PDF bytes 디코딩 → S3 업로드 ──────────────────────
-    byte[] pdfBytes = Base64.getDecoder().decode(aiResponse.getPdfBytes());
-    String pdfKey = "reports/" + user.getId() + "/week_" + weekStart + ".pdf";
-    s3Service.uploadBytes(pdfBytes, pdfKey, "application/pdf");
-
-    // ── 4. weekly_reports 저장 ────────────────────────────────
-    WeeklyReport report =
-        WeeklyReport.builder()
-            .userId(user.getId())
-            .weekStart(weekStart)
-            .avgGlucose(aiRequest.getAvgGlucose())
-            .minGlucose(aiRequest.getMinGlucose())
-            .maxGlucose(aiRequest.getMaxGlucose())
-            .glucoseSd(aiRequest.getGlucoseSd())
-            .timeInRange(aiRequest.getTimeInRange())
-            .timeAboveRange(aiRequest.getTimeAboveRange())
-            .timeBelowRange(aiRequest.getTimeBelowRange())
-            .aiSummary(aiResponse.getAiSummary())
-            .aiSuggest(aiResponse.getAiSuggest())
-            .pdfKey(pdfKey)
-            .build();
-    WeeklyReport saved = weeklyReportRepository.save(report);
-
-    // ── 5. weekly_foods 저장 ──────────────────────────────────
+    // ── 1. 음식 데이터 조회 (buildAiRequest + weekly_foods 저장에 재사용) ──
     LocalDate weekEnd = weekStart.plusDays(6);
     LocalDateTime from = weekStart.atStartOfDay();
     LocalDateTime to = weekEnd.plusDays(1).atStartOfDay();
 
-    List<WeeklyFood> foods = new ArrayList<>();
-    mealRecordRepository
-        .findWeeklyGoodFoods(user.getId(), from, to)
-        .forEach(p -> foods.add(toWeeklyFood(saved.getId(), p, "GOOD")));
-    mealRecordRepository
-        .findWeeklyBadFoods(user.getId(), from, to)
-        .forEach(p -> foods.add(toWeeklyFood(saved.getId(), p, "BAD")));
-    weeklyFoodRepository.saveAll(foods);
+    List<WeeklyFoodItemProjection> goodProjections =
+        mealRecordRepository.findWeeklyGoodFoods(user.getId(), from, to);
+    List<WeeklyFoodItemProjection> badProjections =
+        mealRecordRepository.findWeeklyBadFoods(user.getId(), from, to);
 
-    // ── 6. FCM 알림 ───────────────────────────────────────────
-    List<String> tokens =
-        notificationTokenRepository.findByUser_IdAndIsActiveTrue(user.getId()).stream()
-            .map(t -> t.getToken())
-            .toList();
+    // ── 2. DB 집계 → AI 요청 조립 ──────────────────────────────
+    WeeklyReportAiRequest aiRequest =
+        queryService.buildAiRequest(user, weekStart, goodProjections, badProjections);
 
-    if (!tokens.isEmpty()) {
-      fcmService.sendToTokens(
-          tokens, "주간 보고서 완성", "이번 주 혈당 리포트가 준비됐어요!", REPORT_FCM_CHANNEL, REPORT_ALERT_TYPE);
+    // ── 3. AI 호출 (LLM + PDF 생성) ───────────────────────────
+    WeeklyReportAiResponse aiResponse = aiClient.generate(aiRequest);
+
+    // ── 4. PDF bytes 디코딩 → S3 업로드 ──────────────────────
+    byte[] pdfBytes = Base64.getDecoder().decode(aiResponse.getPdfBytes());
+    String pdfKey = "reports/" + user.getId() + "/week_" + weekStart + ".pdf";
+    s3Service.uploadBytes(pdfBytes, pdfKey, "application/pdf");
+
+    // ── 5. weekly_reports / weekly_foods 저장 ────────────────
+    // S3 업로드 이후 DB 저장 실패 시 고아 객체가 남지 않도록 S3 cleanup 보장
+    try {
+      WeeklyReport report =
+          WeeklyReport.builder()
+              .userId(user.getId())
+              .weekStart(weekStart)
+              .avgGlucose(aiRequest.getAvgGlucose())
+              .minGlucose(aiRequest.getMinGlucose())
+              .maxGlucose(aiRequest.getMaxGlucose())
+              .glucoseSd(aiRequest.getGlucoseSd())
+              .timeInRange(aiRequest.getTimeInRange())
+              .timeAboveRange(aiRequest.getTimeAboveRange())
+              .timeBelowRange(aiRequest.getTimeBelowRange())
+              .aiSummary(aiResponse.getAiSummary())
+              .aiSuggest(aiResponse.getAiSuggest())
+              .pdfKey(pdfKey)
+              .build();
+      WeeklyReport saved = weeklyReportRepository.save(report);
+
+      List<WeeklyFood> foods = new ArrayList<>();
+      goodProjections.forEach(p -> foods.add(toWeeklyFood(saved.getId(), p, "GOOD")));
+      badProjections.forEach(p -> foods.add(toWeeklyFood(saved.getId(), p, "BAD")));
+      weeklyFoodRepository.saveAll(foods);
+
+      // ── 6. FCM 알림 ─────────────────────────────────────────
+      List<String> tokens =
+          notificationTokenRepository.findByUser_IdAndIsActiveTrue(user.getId()).stream()
+              .map(t -> t.getToken())
+              .toList();
+      if (!tokens.isEmpty()) {
+        fcmService.sendToTokens(
+            tokens, "주간 보고서 완성", "이번 주 혈당 리포트가 준비됐어요!", REPORT_FCM_CHANNEL, REPORT_ALERT_TYPE);
+      }
+
+      log.info(
+          "주간 보고서 생성 완료: userId={} reportId={} pdfKey={}", user.getId(), saved.getId(), pdfKey);
+
+    } catch (Exception e) {
+      log.warn("DB 저장 실패, S3 PDF 삭제 시도: pdfKey={}", pdfKey);
+      try {
+        s3Service.delete(pdfKey);
+      } catch (Exception s3e) {
+        log.warn("S3 PDF 삭제 실패 (수동 정리 필요): pdfKey={} cause={}", pdfKey, s3e.getMessage());
+      }
+      throw e;
     }
-
-    log.info("주간 보고서 생성 완료: userId={} reportId={} pdfKey={}", user.getId(), saved.getId(), pdfKey);
   }
 
   @Transactional(readOnly = true)

@@ -11,7 +11,7 @@ import org.springframework.web.client.RestClient;
 @EnableConfigurationProperties(AiServiceProperties.class)
 public class AiClientConfig {
 
-  @Bean
+  @Bean("aiRestClient")
   public RestClient aiRestClient(AiServiceProperties properties) {
     SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
     factory.setConnectTimeout(Duration.ofMillis(properties.connectTimeoutMs()));
