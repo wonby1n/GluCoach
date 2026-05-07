@@ -23,6 +23,12 @@ public class FcmService {
    * report_notification. channelId가 null이면 기본 채널로 전송.
    */
   public void sendToTokens(List<String> tokens, String title, String body, String channelId) {
+    sendToTokens(tokens, title, body, channelId, null);
+  }
+
+  /** alertType을 FCM data payload에 포함해 전송. FE가 message.data["alertType"]으로 버튼 분기를 결정한다. */
+  public void sendToTokens(
+      List<String> tokens, String title, String body, String channelId, String alertType) {
     AndroidConfig androidConfig =
         channelId != null
             ? AndroidConfig.builder()
@@ -37,6 +43,9 @@ public class FcmService {
                 .setNotification(Notification.builder().setTitle(title).setBody(body).build());
         if (androidConfig != null) {
           builder.setAndroidConfig(androidConfig);
+        }
+        if (alertType != null) {
+          builder.putData("alertType", alertType);
         }
         FirebaseMessaging.getInstance().send(builder.build());
       } catch (FirebaseMessagingException e) {
