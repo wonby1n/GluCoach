@@ -14,7 +14,6 @@ import com.ssafy.s309.domain.food.dto.FoodResolution.ResolutionStatus;
 import com.ssafy.s309.domain.food.entity.Food;
 import com.ssafy.s309.domain.food.service.FoodResolutionService;
 import com.ssafy.s309.domain.prediction.client.FoodDetectClient;
-import com.ssafy.s309.domain.prediction.client.dto.FoodBBox;
 import com.ssafy.s309.domain.prediction.client.dto.FoodDetectResponse;
 import com.ssafy.s309.domain.prediction.client.dto.FoodDetection;
 import com.ssafy.s309.domain.prediction.dto.FromImagePredictResponse;
@@ -46,7 +45,7 @@ class FromImagePredictionServiceTest {
       new MockMultipartFile("image", "test.jpg", "image/jpeg", new byte[] {1, 2, 3});
 
   private static FoodDetection detection(String nameKo, double confidence) {
-    return new FoodDetection(nameKo, "en", confidence, new FoodBBox(0, 0, 10, 10));
+    return new FoodDetection(nameKo, "en", confidence);
   }
 
   private static Food foodWithCarbs(int id, String name) {
@@ -151,8 +150,7 @@ class FromImagePredictionServiceTest {
   @Test
   void top_nameKo가_blank이면_LOW_CONFIDENCE로_폴백() {
     // AI FOOD_LABELS 에 ko 라벨 누락된 신규 클래스가 추가되는 경우 방어.
-    FoodDetection blankKo =
-        new FoodDetection("", "unknown_class", 0.95, new FoodBBox(0, 0, 10, 10));
+    FoodDetection blankKo = new FoodDetection("", "unknown_class", 0.95);
     given(foodDetectClient.detect(IMAGE)).willReturn(new FoodDetectResponse(1, List.of(blankKo)));
 
     FromImagePredictResponse result = service.predict(USER_ID, IMAGE);
@@ -164,8 +162,7 @@ class FromImagePredictionServiceTest {
 
   @Test
   void top_nameKo가_null이면_LOW_CONFIDENCE로_폴백() {
-    FoodDetection nullKo =
-        new FoodDetection(null, "unknown_class", 0.95, new FoodBBox(0, 0, 10, 10));
+    FoodDetection nullKo = new FoodDetection(null, "unknown_class", 0.95);
     given(foodDetectClient.detect(IMAGE)).willReturn(new FoodDetectResponse(1, List.of(nullKo)));
 
     FromImagePredictResponse result = service.predict(USER_ID, IMAGE);

@@ -49,8 +49,17 @@ class FoodSearchViewModel
                     delay(300)
                     _isLoading.value = true
                     foodRepository.searchFoods(newQuery)
-                        .onSuccess {
-                            _results.value = it
+                        .onSuccess { raw ->
+                            _results.value =
+                                raw.sortedWith(
+                                    compareBy {
+                                        when {
+                                            it.name.equals(newQuery, ignoreCase = true) -> 0
+                                            it.name.startsWith(newQuery, ignoreCase = true) -> 1
+                                            else -> 2
+                                        }
+                                    },
+                                )
                             _error.value = null
                         }
                         .onFailure {
