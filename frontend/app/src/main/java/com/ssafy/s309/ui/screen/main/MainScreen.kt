@@ -115,6 +115,8 @@ fun MainScreen(
         onProjectorClick = onProjectorClick,
         onAccountClick = onAccountClick,
         userEmail = userEmail,
+        // [DEBUG_KIKI_TEST]
+        onDebugSetGlucose = viewModel::debugSetGlucose,
     )
 }
 
@@ -138,6 +140,8 @@ fun MainScreenContent(
     onProjectorClick: () -> Unit = {},
     onAccountClick: () -> Unit = {},
     userEmail: String = "",
+    // [DEBUG_KIKI_TEST]
+    onDebugSetGlucose: (Int, Float) -> Unit = { _, _ -> },
 ) {
     var selectedTab by rememberSaveable { mutableStateOf("home") }
     var showCamera by remember { mutableStateOf(false) }
@@ -230,7 +234,8 @@ fun MainScreenContent(
                                 val kikiDrawable =
                                     KikiCharacterMapper.resolve(
                                         glucoseMgDl = state.currentGlucoseMgDl,
-                                        diffFromPrevious = state.diffFromPrevious,
+                                        trendRateMgDlPerMin = state.trendRateMgDlPerMin,
+                                        diabetesType = state.diabetesType,
                                     )
                                 CurrentGlucoseCard(
                                     currentMgDl = state.currentGlucoseMgDl ?: 0,
@@ -245,6 +250,9 @@ fun MainScreenContent(
                                     },
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+                                DebugKikiTestPanel(onDebugSetGlucose) // [DEBUG_KIKI_TEST]
+                                Spacer(modifier = Modifier.height(GlucoachSpacing.xl)) // [DEBUG_KIKI_TEST]
 
                                 val chartTimeLabels =
                                     remember {

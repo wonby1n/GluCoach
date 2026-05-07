@@ -6,33 +6,61 @@ import com.ssafy.s309.R
 enum class KikiSymptom { THIRST, TIRED, BLUR }
 
 object KikiCharacterMapper {
+    private data class Thresholds(val ok: Int, val mild: Int, val moderate: Int)
+
+    private val THRESHOLDS =
+        mapOf(
+            "NONE" to Thresholds(ok = 140, mild = 180, moderate = 250),
+            "TYPE1" to Thresholds(ok = 150, mild = 180, moderate = 250),
+            "TYPE2" to Thresholds(ok = 140, mild = 180, moderate = 250),
+        )
+
     @DrawableRes
     fun resolve(
         glucoseMgDl: Int?,
-        diffFromPrevious: Int,
+        trendRateMgDlPerMin: Float,
+        diabetesType: String = "NONE",
     ): Int {
         val glucose = glucoseMgDl ?: return R.drawable.kiki_main
 
-        val severity = classifySeverity(glucose)
-        if (severity == null) return R.drawable.kiki_main
+        val adjusted = applyTrend(glucose, trendRateMgDlPerMin)
+        val thresholds = THRESHOLDS[diabetesType] ?: THRESHOLDS.getValue("NONE")
 
-        val symptom = classifySymptom(diffFromPrevious)
+        val severity = classifySeverity(adjusted, thresholds) ?: return R.drawable.kiki_main
+        val symptom = classifySymptom(trendRateMgDlPerMin)
         return drawableFor(severity, symptom)
     }
 
-    private fun classifySeverity(glucose: Int): String? =
+    private fun applyTrend(
+        glucose: Int,
+        rate: Float,
+    ): Int {
+        val offset =
+            when {
+                rate > 3f -> 30
+                rate > 1f -> 15
+                rate >= -1f -> 0
+                rate >= -3f -> -10
+                else -> -25
+            }
+        return (glucose + offset).coerceIn(40, 400)
+    }
+
+    private fun classifySeverity(
+        adjusted: Int,
+        t: Thresholds,
+    ): String? =
         when {
-            glucose < 140 -> null
-            glucose < 180 -> "mild"
-            glucose < 250 -> "moderate"
+            adjusted < t.ok -> null
+            adjusted < t.mild -> "mild"
+            adjusted < t.moderate -> "moderate"
             else -> "severe"
         }
 
-    private fun classifySymptom(diff: Int): KikiSymptom =
+    private fun classifySymptom(rate: Float): KikiSymptom =
         when {
-            diff > 15 -> KikiSymptom.THIRST
-            diff in -5..5 -> KikiSymptom.TIRED
-            diff > 5 -> KikiSymptom.BLUR
+            rate > 3f -> KikiSymptom.THIRST
+            rate > 0f -> KikiSymptom.BLUR
             else -> KikiSymptom.TIRED
         }
 
