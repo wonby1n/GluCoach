@@ -97,6 +97,8 @@ data class MealRecord(
     val protein: Float,
     val fat: Float,
     val ingredients: List<String> = emptyList(),
+    val recordedAt: String = "",
+    val maxGlucose: Int? = null,
 )
 
 enum class MealType(val label: String) {
@@ -133,6 +135,9 @@ class MealLogViewModel
         private val _error = MutableStateFlow<String?>(null)
         val error: StateFlow<String?> = _error.asStateFlow()
 
+        private val _maxGlucoseMap = MutableStateFlow<Map<Int, Int>>(emptyMap())
+        val maxGlucoseMap: StateFlow<Map<Int, Int>> = _maxGlucoseMap.asStateFlow()
+
         private var loadedMonth: Pair<Int, Int>? = null
 
         fun loadMeals(date: String) {
@@ -151,12 +156,34 @@ class MealLogViewModel
                             val name = meal.foodName ?: return@forEach
                             launch { lookupFoodNutrition(foodId, name) }
                         }
+                        meals.forEach { meal ->
+                            launch { lookupMaxGlucose(meal.mealId, meal.recordedAt) }
+                        }
                     }
                     .onFailure {
                         Log.w("MealLogVM", "식사 조회 실패", it)
                         _beMeals.value = emptyList()
                         _error.value = "식사 기록을 불러올 수 없습니다"
                     }
+            }
+        }
+
+        private suspend fun lookupMaxGlucose(
+            mealId: Int,
+            recordedAt: String,
+        ) {
+            if (mealId in _maxGlucoseMap.value) return
+            runCatching {
+                val from = recordedAt
+                val toDateTime = LocalDateTime.parse(recordedAt).plusHours(2)
+                val to = toDateTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                val records = healthRepository.getGlucoseRecords(from, to)
+                val maxVal = records.maxOfOrNull { it.value.toInt() }
+                if (maxVal != null) {
+                    _maxGlucoseMap.value = _maxGlucoseMap.value + (mealId to maxVal)
+                }
+            }.onFailure {
+                Log.w("MealLogVM", "혈당 조회 실패 mealId=$mealId", it)
             }
         }
 
@@ -189,11 +216,12 @@ class MealLogViewModel
         fun createMeal(
             foodId: Int,
             recordedAt: String,
+            memo: String? = null,
             onSuccess: () -> Unit,
         ) {
             viewModelScope.launch {
                 healthRepository.createMealRecord(
-                    MealCreateRequest(foodId = foodId, recordedAt = recordedAt),
+                    MealCreateRequest(foodId = foodId, memo = memo?.takeIf { it.isNotBlank() }, recordedAt = recordedAt),
                 ).onSuccess {
                     _error.value = null
                     onSuccess()
@@ -269,6 +297,9 @@ private fun MealLogCalendarContent(
     var displayMonth by remember { mutableIntStateOf(today.second) }
     var selectedDay by remember { mutableIntStateOf(today.third) }
     var showSearchDialog by remember { mutableStateOf(false) }
+    var showMemoDialog by remember { mutableStateOf(false) }
+    var pendingFood by remember { mutableStateOf<FoodSearchItem?>(null) }
+    var memoInput by remember { mutableStateOf("") }
     val recentKeywords = remember { mutableStateListOf<String>() }
 
     val beMeals by mealLogViewModel.beMeals.collectAsState()
@@ -289,8 +320,10 @@ private fun MealLogCalendarContent(
         }
     }
 
+    val glucoseMap by mealLogViewModel.maxGlucoseMap.collectAsState()
+
     val selectedDateMeals =
-        remember(beMeals, displayYear, displayMonth, selectedDay, nutritionMap) {
+        remember(beMeals, displayYear, displayMonth, selectedDay, nutritionMap, glucoseMap) {
             beMeals.map { m ->
                 val food = m.foodId?.let { nutritionMap[it] }
                 MealRecord(
@@ -305,6 +338,8 @@ private fun MealLogCalendarContent(
                     carbs = food?.carbsG?.toFloat() ?: 0f,
                     protein = food?.proteinG?.toFloat() ?: 0f,
                     fat = food?.fatG?.toFloat() ?: 0f,
+                    recordedAt = m.recordedAt,
+                    maxGlucose = glucoseMap[m.mealId],
                 )
             }
         }
@@ -366,32 +401,50 @@ private fun MealLogCalendarContent(
                 recentKeywords = recentKeywords,
                 onFoodSelected = { food ->
                     showSearchDialog = false
-                    val day = if (selectedDay > 0) selectedDay else today.third
-                    if (selectedDay <= 0) selectedDay = today.third
-                    val recordedAt =
-                        LocalDateTime.of(
-                            displayYear,
-                            displayMonth,
-                            day,
-                            LocalDateTime.now().hour,
-                            LocalDateTime.now().minute,
-                        )
-                            .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                    mealLogViewModel.createMeal(
-                        foodId = food.id,
-                        recordedAt = recordedAt,
-                        onSuccess = {
-                            val date =
-                                LocalDate.of(displayYear, displayMonth, day)
-                                    .format(DateTimeFormatter.ISO_LOCAL_DATE)
-                            mealLogViewModel.loadMeals(date)
-                        },
-                    )
+                    pendingFood = food
+                    memoInput = ""
+                    showMemoDialog = true
                     foodSearchViewModel.clearSearch()
                 },
                 onDismiss = {
                     foodSearchViewModel.clearSearch()
                     showSearchDialog = false
+                },
+            )
+        }
+
+        if (showMemoDialog && pendingFood != null) {
+            val initialDay = if (selectedDay > 0) selectedDay else today.third
+            MemoInputDialog(
+                memo = memoInput,
+                onMemoChange = { memoInput = it },
+                initialDateTime =
+                    LocalDateTime.of(
+                        displayYear,
+                        displayMonth,
+                        initialDay,
+                        LocalDateTime.now().hour,
+                        LocalDateTime.now().minute,
+                    ),
+                onConfirm = { dateTime ->
+                    showMemoDialog = false
+                    val food = pendingFood ?: return@MemoInputDialog
+                    if (selectedDay <= 0) selectedDay = today.third
+                    val recordedAt = dateTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                    mealLogViewModel.createMeal(
+                        foodId = food.id,
+                        recordedAt = recordedAt,
+                        memo = memoInput,
+                        onSuccess = {
+                            val date = dateTime.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
+                            mealLogViewModel.loadMeals(date)
+                        },
+                    )
+                    pendingFood = null
+                },
+                onDismiss = {
+                    showMemoDialog = false
+                    pendingFood = null
                 },
             )
         }
@@ -891,12 +944,51 @@ private fun MealDetailContent(
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.height(GlucoachSpacing.md))
-            Text(
-                text = meal.description,
-                color = GlucoachColors.TextSecondary,
-                fontSize = 14.sp,
-                lineHeight = 22.sp,
-            )
+            if (meal.description.isNotEmpty()) {
+                Text(
+                    text = meal.description,
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 14.sp,
+                    lineHeight = 22.sp,
+                )
+                Spacer(Modifier.height(GlucoachSpacing.lg))
+            }
+
+            if (meal.maxGlucose != null) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(GlucoachCorner.card))
+                            .background(Color(0xFFFFF3E0))
+                            .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = "식후 최고 혈당",
+                        color = GlucoachColors.TextPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(
+                            text = "${meal.maxGlucose}",
+                            color = Color(0xFFE65100),
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = "mg/dL",
+                            color = GlucoachColors.TextSecondary,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(bottom = 4.dp),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(GlucoachSpacing.lg))
+            }
 
             if (meal.ingredients.isNotEmpty()) {
                 Spacer(Modifier.height(GlucoachSpacing.xxl))
@@ -974,6 +1066,100 @@ private fun MealDetailContent(
             }
 
             Spacer(Modifier.height(80.dp))
+        }
+    }
+}
+
+// ── 메모 입력 다이얼로그 ──────────────────────────────────
+
+@Composable
+private fun MemoInputDialog(
+    memo: String,
+    onMemoChange: (String) -> Unit,
+    initialDateTime: LocalDateTime = LocalDateTime.now(),
+    onConfirm: (LocalDateTime) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var selectedDateTime by remember { mutableStateOf(initialDateTime) }
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(GlucoachCorner.card))
+                    .background(GlucoachColors.Surface)
+                    .padding(24.dp),
+        ) {
+            Text(
+                text = "식사 기록",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(GlucoachSpacing.md))
+            Text(
+                text = "식사 시간",
+                color = GlucoachColors.TextSecondary,
+                fontSize = 13.sp,
+            )
+            Spacer(Modifier.height(GlucoachSpacing.sm))
+            com.ssafy.s309.ui.component.MealDateTimePicker(
+                initialDateTime = initialDateTime,
+                onDateTimeChanged = { selectedDateTime = it },
+            )
+            Spacer(Modifier.height(GlucoachSpacing.lg))
+            Text(
+                text = "메모",
+                color = GlucoachColors.TextSecondary,
+                fontSize = 13.sp,
+            )
+            Spacer(Modifier.height(GlucoachSpacing.sm))
+            androidx.compose.material3.OutlinedTextField(
+                value = memo,
+                onValueChange = onMemoChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = {
+                    Text(
+                        text = "메모를 입력하세요 (선택)",
+                        color = GlucoachColors.TextSecondary,
+                        fontSize = 14.sp,
+                    )
+                },
+                shape = RoundedCornerShape(GlucoachCorner.card),
+                colors =
+                    androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = GlucoachColors.Primary,
+                        unfocusedBorderColor = GlucoachColors.Border,
+                    ),
+                minLines = 2,
+                maxLines = 4,
+            )
+            Spacer(Modifier.height(GlucoachSpacing.xl))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.md),
+            ) {
+                androidx.compose.material3.OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).height(44.dp),
+                    shape = RoundedCornerShape(22.dp),
+                ) {
+                    Text("취소", fontSize = 14.sp)
+                }
+                androidx.compose.material3.Button(
+                    onClick = { onConfirm(selectedDateTime) },
+                    modifier = Modifier.weight(1f).height(44.dp),
+                    shape = RoundedCornerShape(22.dp),
+                    colors =
+                        androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = GlucoachColors.Primary,
+                            contentColor = Color.White,
+                        ),
+                ) {
+                    Text("확인", fontSize = 14.sp)
+                }
+            }
         }
     }
 }
