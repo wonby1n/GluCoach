@@ -232,12 +232,12 @@ fun MainScreenContent(
                                 )
                             }
                         }
-                        "edit" -> FoodComparisonContent()
+                        "edit" -> FoodComparisonContent(onMealSaved = { selectedTab = "meallog" })
                         "meallog" ->
                             MealLogContent(
                                 onBackToHome = { selectedTab = "home" },
                             )
-                        "food-comparison" -> FoodComparisonContent()
+                        "food-comparison" -> FoodComparisonContent(onMealSaved = { selectedTab = "meallog" })
                         "report" -> AIReportContent()
                         "food-report" -> FoodReportContent()
 

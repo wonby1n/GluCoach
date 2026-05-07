@@ -721,10 +721,10 @@ private fun MealCard(
         }
     val bgColor =
         when (meal.mealType) {
-            MealType.BREAKFAST -> Color(0xFFFFF8E1)
-            MealType.LUNCH -> Color(0xFFF1F8E9)
-            MealType.DINNER -> Color(0xFFE8EAF6)
-            MealType.SNACK -> Color(0xFFFCE4EC)
+            MealType.BREAKFAST -> Color(0xFFF0FAFB)
+            MealType.LUNCH -> GlucoachColors.PrimaryLight
+            MealType.DINNER -> Color(0xFFD4EEF5)
+            MealType.SNACK -> Color(0xFFE8F7FA)
         }
 
     Row(
@@ -914,11 +914,11 @@ private fun MealDetailContent(
                 ) {
                     val ingredientColors =
                         listOf(
-                            Color(0xFFFFF3E0),
-                            Color(0xFFFFEBEE),
-                            Color(0xFFE8F5E9),
-                            Color(0xFFE3F2FD),
-                            Color(0xFFF3E5F5),
+                            GlucoachColors.PrimaryLight,
+                            GlucoachColors.Primary.copy(alpha = 0.15f),
+                            GlucoachColors.Primary.copy(alpha = 0.20f),
+                            GlucoachColors.Primary.copy(alpha = 0.10f),
+                            GlucoachColors.Primary.copy(alpha = 0.18f),
                         )
                     meal.ingredients.take(4).forEachIndexed { idx, ingredient ->
                         Column(
@@ -992,7 +992,7 @@ private fun NutritionSummaryBar(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xFFFFE0B2).copy(alpha = 0.5f))
+                .background(GlucoachColors.Primary.copy(alpha = 0.1f))
                 .padding(horizontal = GlucoachSpacing.lg, vertical = GlucoachSpacing.md),
         horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
@@ -1011,13 +1011,13 @@ private fun NutritionItem(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = label,
-            color = Color(0xFFE65100),
+            color = GlucoachColors.PrimaryDark,
             fontSize = 11.sp,
         )
         Spacer(Modifier.height(2.dp))
         Text(
             text = value,
-            color = Color(0xFFE65100),
+            color = GlucoachColors.TextPrimary,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
         )

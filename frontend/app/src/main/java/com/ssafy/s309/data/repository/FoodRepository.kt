@@ -3,6 +3,7 @@ package com.ssafy.s309.data.repository
 import com.ssafy.s309.data.api.AiFoodApi
 import com.ssafy.s309.data.api.FoodApi
 import com.ssafy.s309.data.model.DetectResponse
+import com.ssafy.s309.data.model.FoodGradeResponse
 import com.ssafy.s309.data.model.FoodSearchItem
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -19,6 +20,8 @@ class FoodRepository
         private val aiFoodApi: AiFoodApi,
     ) {
         suspend fun searchFoods(query: String): Result<List<FoodSearchItem>> = runCatching { foodApi.searchFoods(query) }
+
+        suspend fun getFoodGrades(): Result<List<FoodGradeResponse>> = runCatching { foodApi.getFoodGrades() }
 
         suspend fun detectFood(photoFile: File): Result<DetectResponse> =
             runCatching {

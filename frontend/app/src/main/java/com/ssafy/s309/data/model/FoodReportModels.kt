@@ -1,6 +1,7 @@
 package com.ssafy.s309.data.model
 
-import androidx.annotation.DrawableRes
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 data class FoodGradeInfo(
     val grade: String,
@@ -12,7 +13,6 @@ data class FoodGradeInfo(
 
 data class GradeFoodItem(
     val name: String,
-    @param:DrawableRes val imageResId: Int,
     val frequency: Int,
     val lastEaten: String,
     val glucoseRise: Int,
@@ -21,3 +21,13 @@ data class GradeFoodItem(
 )
 
 enum class FoodTrend { UP, DOWN, STABLE }
+
+@Serializable
+data class FoodGradeResponse(
+    @SerialName("foodId") val foodId: Int,
+    @SerialName("foodName") val foodName: String,
+    @SerialName("grade") val grade: String,
+    @SerialName("avgSlope") val avgSlope: Double,
+    @SerialName("mealCount") val mealCount: Int,
+    @SerialName("lastEatenAt") val lastEatenAt: String,
+)

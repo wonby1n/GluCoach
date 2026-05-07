@@ -1,6 +1,7 @@
 package com.ssafy.s309.domain.health.repository;
 
 import com.ssafy.s309.domain.health.entity.DailyHealthSummary;
+import com.ssafy.s309.domain.weekly_report.dto.projection.WeeklyHealthStatsProjection;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -33,4 +34,22 @@ public interface DailyHealthSummaryRepository
       nativeQuery = true)
   BigDecimal findAverageSleepMinutesLast7Days(
       @Param("userId") Integer userId, @Param("date") LocalDate date);
+
+  @Query(
+      value =
+          """
+          SELECT
+            ROUND(AVG(steps)::numeric, 2)            AS avg_steps,
+            ROUND(SUM(calories_burned)::numeric, 2)  AS total_calories,
+            ROUND(AVG(sleep_minutes)::numeric, 2)    AS avg_sleep_minutes
+          FROM daily_health_summaries
+          WHERE user_id = :userId
+            AND date >= CAST(:weekStart AS DATE)
+            AND date <= CAST(:weekEnd AS DATE)
+          """,
+      nativeQuery = true)
+  Optional<WeeklyHealthStatsProjection> findWeeklyHealthStats(
+      @Param("userId") Integer userId,
+      @Param("weekStart") LocalDate weekStart,
+      @Param("weekEnd") LocalDate weekEnd);
 }

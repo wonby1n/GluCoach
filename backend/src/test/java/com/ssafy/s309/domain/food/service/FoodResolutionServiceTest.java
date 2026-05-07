@@ -169,6 +169,69 @@ class FoodResolutionServiceTest {
   }
 
   @Test
+  void API_결과_중_정확매칭이_substring보다_우선_선택() {
+    Food substring = foodWithNutrition(21, "전주비빔밥", 100);
+    Food exact = foodWithNutrition(22, "비빔밥", 1);
+    Food unrelated = foodWithNutrition(23, "국밥_돼지머리", 500);
+    given(
+            foodRepository
+                .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
+                    anyString(), any(LocalDateTime.class)))
+        .willReturn(List.of());
+    given(foodApiClient.search("비빔밥")).willReturn(List.of());
+    // 식약처 API 가 무관한 음식을 첫 원소로 줬을 때라도 정확 매칭이 있으면 그쪽이 선택돼야 함.
+    given(foodService.upsertFromApi(anyList())).willReturn(List.of(unrelated, substring, exact));
+
+    FoodResolution result = resolutionService.resolve("비빔밥");
+
+    assertThat(result.status()).isEqualTo(ResolutionStatus.REMOTE_FETCHED);
+    assertThat(result.food()).isSameAs(exact);
+  }
+
+  @Test
+  void API_결과에_정확매칭없으면_substring_매칭_사용() {
+    // "비빔밥" 검색 → "전주비빔밥" 같은 substring 후보는 의미적으로 가까우므로 사용.
+    Food substring = foodWithNutrition(24, "전주비빔밥", 0);
+    Food unrelated = foodWithNutrition(25, "국밥_돼지머리", 999);
+    given(
+            foodRepository
+                .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
+                    anyString(), any(LocalDateTime.class)))
+        .willReturn(List.of());
+    given(foodApiClient.search("비빔밥")).willReturn(List.of());
+    given(foodService.upsertFromApi(anyList())).willReturn(List.of(unrelated, substring));
+
+    FoodResolution result = resolutionService.resolve("비빔밥");
+
+    assertThat(result.status()).isEqualTo(ResolutionStatus.REMOTE_FETCHED);
+    assertThat(result.food()).isSameAs(substring);
+  }
+
+  @Test
+  void API_결과가_무관한_음식들뿐이면_PENDING_NUTRITION으로_폴백() {
+    // 식약처 fuzzy 매칭 결과가 입력과 무관한 음식뿐일 때 — 첫 원소를 무조건 채택하는 대신 customized 분기로 안전하게 폴백.
+    // 잘못된 음식 정보로 예측 곡선 보여주느니 사용자에게 직접 입력 요청이 정확.
+    Food unrelated1 = foodWithNutrition(26, "국밥_돼지머리", 500);
+    Food unrelated2 = foodWithNutrition(27, "곰탕", 300);
+    given(
+            foodRepository
+                .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
+                    anyString(), any(LocalDateTime.class)))
+        .willReturn(List.of());
+    given(foodApiClient.search("비빔밥")).willReturn(List.of());
+    given(foodService.upsertFromApi(anyList())).willReturn(List.of(unrelated1, unrelated2));
+    given(foodRepository.save(any(Food.class))).willAnswer(inv -> inv.getArgument(0));
+
+    FoodResolution result = resolutionService.resolve("비빔밥");
+
+    assertThat(result.status()).isEqualTo(ResolutionStatus.PENDING_NUTRITION);
+    ArgumentCaptor<Food> captor = ArgumentCaptor.forClass(Food.class);
+    verify(foodRepository).save(captor.capture());
+    assertThat(captor.getValue().isCustomized()).isTrue();
+    assertThat(captor.getValue().getName()).isEqualTo("비빔밥");
+  }
+
+  @Test
   void DB_미스_API_빈리스트면_PENDING_NUTRITION_customized_저장() {
     given(
             foodRepository

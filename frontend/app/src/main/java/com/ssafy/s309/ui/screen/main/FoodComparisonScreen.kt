@@ -28,8 +28,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.LocalCafe
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -231,12 +235,22 @@ private val allFoods =
 // ── 진입점: 선택 ↔ 결과 상태 관리 ────────────────────────
 
 @Composable
-fun FoodComparisonContent(modifier: Modifier = Modifier) {
+fun FoodComparisonContent(
+    onMealSaved: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
     val foodSearchViewModel: FoodSearchViewModel = hiltViewModel()
     val viewModel: FoodComparisonViewModel = hiltViewModel()
     var foodA by remember { mutableStateOf<FoodItem?>(null) }
     var foodB by remember { mutableStateOf<FoodItem?>(null) }
     val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(uiState.mealRecorded) {
+        if (uiState.mealRecorded) {
+            viewModel.resetResult()
+            onMealSaved()
+        }
+    }
 
     if (uiState.result != null && foodA != null && foodB != null) {
         FoodComparisonResultContent(
@@ -256,6 +270,7 @@ fun FoodComparisonContent(modifier: Modifier = Modifier) {
                 foodB = null
                 viewModel.resetResult()
             },
+            onSelectMeal = { food, hour -> viewModel.selectMeal(food, hour) },
             modifier = modifier,
         )
     } else {
@@ -347,6 +362,7 @@ private fun FoodSelectionContent(
                             showNutritionDialog = true
                         },
                         onRemoveClick = onFoodARemoved,
+                        showHint = foodB == null,
                         modifier = Modifier.weight(1f),
                     )
                 } else {
@@ -364,6 +380,7 @@ private fun FoodSelectionContent(
                             showNutritionDialog = true
                         },
                         onRemoveClick = onFoodBRemoved,
+                        showHint = foodA == null,
                         modifier = Modifier.weight(1f),
                     )
                 } else {
@@ -489,6 +506,7 @@ private fun SelectedFoodSlot(
     food: FoodItem,
     onInfoClick: () -> Unit,
     onRemoveClick: () -> Unit,
+    showHint: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -547,19 +565,21 @@ private fun SelectedFoodSlot(
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
 
-        Box(
-            modifier =
-                Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(GlucoachColors.Border)
-                    .padding(horizontal = GlucoachSpacing.md, vertical = GlucoachSpacing.xs),
-        ) {
-            Text(
-                text = "하나 더 선택해주세요",
-                color = GlucoachColors.TextSecondary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
+        if (showHint) {
+            Box(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(GlucoachColors.Border)
+                        .padding(horizontal = GlucoachSpacing.md, vertical = GlucoachSpacing.xs),
+            ) {
+                Text(
+                    text = "하나 더 선택해주세요",
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.md))
@@ -1026,11 +1046,13 @@ private fun FoodComparisonResultContent(
     onResetSelection: () -> Unit,
     onFoodARemoved: () -> Unit,
     onFoodBRemoved: () -> Unit,
+    onSelectMeal: (FoodItem, Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var selectedFoodIndex by remember { mutableIntStateOf(1) }
     var showNutritionDialog by remember { mutableStateOf(false) }
     var nutritionDialogFoodIndex by remember { mutableIntStateOf(0) }
+    var showMealTimeDialog by remember { mutableStateOf(false) }
     val foods = listOf(foodA, foodB)
     val predictions = listOf(compareResult.foodA, compareResult.foodB)
 
@@ -1114,7 +1136,7 @@ private fun FoodComparisonResultContent(
                 }
 
                 Button(
-                    onClick = { },
+                    onClick = { showMealTimeDialog = true },
                     modifier =
                         Modifier
                             .weight(1f)
@@ -1142,6 +1164,115 @@ private fun FoodComparisonResultContent(
                 food = foods[nutritionDialogFoodIndex],
                 onDismiss = { showNutritionDialog = false },
             )
+        }
+
+        if (showMealTimeDialog) {
+            MealTimePickerDialog(
+                onTimeSelected = { hour ->
+                    showMealTimeDialog = false
+                    onSelectMeal(foods[selectedFoodIndex], hour)
+                },
+                onDismiss = { showMealTimeDialog = false },
+            )
+        }
+    }
+}
+
+// ── 식사 시간 선택 다이얼로그 ──────────────────────────────
+
+private data class MealTimeOption(
+    val label: String,
+    val subLabel: String,
+    val hour: Int,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+)
+
+@Composable
+private fun MealTimePickerDialog(
+    onTimeSelected: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val options =
+        listOf(
+            MealTimeOption("아침", "06 - 10시", 8, Icons.Outlined.WbSunny),
+            MealTimeOption("점심", "11 - 14시", 12, Icons.Outlined.LightMode),
+            MealTimeOption("저녁", "17 - 21시", 19, Icons.Outlined.DarkMode),
+            MealTimeOption("간식", "그 외", 15, Icons.Outlined.LocalCafe),
+        )
+
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(GlucoachColors.Surface)
+                    .padding(GlucoachSpacing.xl),
+        ) {
+            Text(
+                text = "언제 드셨나요?",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(GlucoachSpacing.xs))
+            Text(
+                text = "식사 시간대를 선택해주세요",
+                color = GlucoachColors.TextSecondary,
+                fontSize = 13.sp,
+            )
+            Spacer(Modifier.height(GlucoachSpacing.xl))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.sm),
+            ) {
+                options.forEach { option ->
+                    Column(
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(GlucoachCorner.card))
+                                .background(GlucoachColors.Primary.copy(alpha = 0.1f))
+                                .clickable { onTimeSelected(option.hour) }
+                                .padding(vertical = GlucoachSpacing.lg),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Icon(
+                            imageVector = option.icon,
+                            contentDescription = option.label,
+                            tint = GlucoachColors.PrimaryDark,
+                            modifier = Modifier.size(24.dp),
+                        )
+                        Spacer(Modifier.height(GlucoachSpacing.sm))
+                        Text(
+                            text = option.label,
+                            color = GlucoachColors.TextPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = option.subLabel,
+                            color = GlucoachColors.TextSecondary,
+                            fontSize = 10.sp,
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(GlucoachSpacing.lg))
+
+            androidx.compose.material3.TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.align(Alignment.End),
+            ) {
+                Text(
+                    text = "취소",
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 14.sp,
+                )
+            }
         }
     }
 }
