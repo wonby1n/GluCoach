@@ -1,23 +1,23 @@
 package com.ssafy.s309.domain.agent.dto;
 
-import com.ssafy.s309.domain.alert.entity.Alert;
+import com.ssafy.s309.domain.chat.entity.ChatMessage;
 import java.time.LocalDateTime;
 
 public record AgentNotificationItem(
-    Integer alertId,
+    Long chatMessageId,
     String alertType,
     String message,
     String source,
     LocalDateTime createdAt,
     Boolean isRead) {
 
-  public static AgentNotificationItem from(Alert a) {
+  public static AgentNotificationItem from(ChatMessage m) {
     return new AgentNotificationItem(
-        a.getId(),
-        a.getAlertType(),
-        a.getMessage(),
-        a.getSource(),
-        a.getCreatedAt(),
-        a.getIsRead());
+        m.getId(),
+        m.getAlertType(),
+        m.getMessage(),
+        m.getSource(),
+        m.getCreatedAt(),
+        m.getIsRead());
   }
 }

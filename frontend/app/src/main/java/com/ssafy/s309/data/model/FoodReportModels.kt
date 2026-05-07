@@ -1,5 +1,6 @@
 package com.ssafy.s309.data.model
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 data class FoodGradeInfo(
@@ -23,10 +24,10 @@ enum class FoodTrend { UP, DOWN, STABLE }
 
 @Serializable
 data class FoodGradeResponse(
-    val foodId: Int,
-    val foodName: String,
-    val grade: String,
-    val avgSlope: Double,
-    val mealCount: Int,
-    val lastEatenAt: String,
+    @SerialName("foodId") val foodId: Int,
+    @SerialName("foodName") val foodName: String,
+    @SerialName("grade") val grade: String,
+    @SerialName("avgSlope") val avgSlope: Double,
+    @SerialName("mealCount") val mealCount: Int,
+    @SerialName("lastEatenAt") val lastEatenAt: String,
 )

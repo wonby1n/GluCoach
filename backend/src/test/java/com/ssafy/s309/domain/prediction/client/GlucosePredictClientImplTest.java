@@ -131,7 +131,7 @@ class GlucosePredictClientImplTest {
   }
 
   @Test
-  void MDC에_correlationId_있으면_그대로_사용() {
+  void MDC에_correlationId_있으면_그대로_사용하고_호출_종료_후에도_보존() {
     GlucosePredictClientImpl client = spy(new GlucosePredictClientImpl(restClient));
     doReturn(response).when(client).doPredict(any(), anyString(), anyInt());
 
@@ -139,20 +139,35 @@ class GlucosePredictClientImplTest {
     MDC.put(GlucosePredictClientImpl.CORRELATION_ID_MDC_KEY, existingId);
     try {
       client.predict(request);
+
       verify(client).doPredict(any(), eq(existingId), eq(1));
+      // 외부에서 주입된 값은 호출 종료 후에도 그대로 — 클라이언트가 외부 컨텍스트를 덮어쓰지 않는다.
+      assertThat(MDC.get(GlucosePredictClientImpl.CORRELATION_ID_MDC_KEY)).isEqualTo(existingId);
     } finally {
       MDC.remove(GlucosePredictClientImpl.CORRELATION_ID_MDC_KEY);
     }
   }
 
   @Test
-  void MDC에_correlationId_없으면_새로_생성() {
+  void MDC가_비어있던_상태면_호출_종료_시_정리됨() {
+    // 회귀 방지: 이전 구현은 새 UUID 를 put 만 하고 remove 하지 않아 Tomcat 스레드 풀 재사용 시 다음 요청에 잔류값이 묻었음.
     GlucosePredictClientImpl client = spy(new GlucosePredictClientImpl(restClient));
     doReturn(response).when(client).doPredict(any(), anyString(), anyInt());
 
     client.predict(request);
 
     verify(client).doPredict(any(), anyString(), eq(1));
-    assertThat(MDC.get(GlucosePredictClientImpl.CORRELATION_ID_MDC_KEY)).isNotBlank();
+    assertThat(MDC.get(GlucosePredictClientImpl.CORRELATION_ID_MDC_KEY)).isNull();
+  }
+
+  @Test
+  void 예외_경로에서도_MDC_정리됨() {
+    GlucosePredictClientImpl client = spy(new GlucosePredictClientImpl(restClient));
+    doThrow(new AiServiceException(ErrorType.MODEL_ERROR, "모델 오류"))
+        .when(client)
+        .doPredict(any(), anyString(), anyInt());
+
+    assertThatThrownBy(() -> client.predict(request)).isInstanceOf(AiServiceException.class);
+    assertThat(MDC.get(GlucosePredictClientImpl.CORRELATION_ID_MDC_KEY)).isNull();
   }
 }

@@ -3,6 +3,7 @@ package com.ssafy.s309.domain.alert.service;
 import com.ssafy.s309.domain.alert.entity.Alert;
 import com.ssafy.s309.domain.alert.repository.AlertRepository;
 import com.ssafy.s309.domain.cgm.event.GlucoseReceivedEvent;
+import com.ssafy.s309.domain.chat.service.ChatMessageCreationService;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +25,7 @@ public class AlertTriggerService {
   private static final BigDecimal THRESHOLD_LOW = new BigDecimal("70");
   private static final List<String> RULE_ALERT_TYPES = List.of("HIGH", "LOW");
 
-  private final AlertCreationService alertCreationService;
+  private final ChatMessageCreationService chatMessageCreationService;
   private final AlertRepository alertRepository;
 
   @Async("alertExecutor")
@@ -36,11 +37,11 @@ public class AlertTriggerService {
 
     if (value.compareTo(THRESHOLD_HIGH) >= 0) {
       String message = String.format("혈당이 %.0f mg/dL로 기준치(180)를 초과했습니다.", value);
-      alertCreationService.createIfNotDuplicate(userId, "HIGH", message, "be");
+      chatMessageCreationService.createIfNotDuplicate(userId, "HIGH", message);
       log.debug("HIGH alert triggered: user={}, value={}", userId, value);
     } else if (value.compareTo(THRESHOLD_LOW) <= 0) {
       String message = String.format("혈당이 %.0f mg/dL로 기준치(70) 이하입니다.", value);
-      alertCreationService.createIfNotDuplicate(userId, "LOW", message, "be");
+      chatMessageCreationService.createIfNotDuplicate(userId, "LOW", message);
       log.debug("LOW alert triggered: user={}, value={}", userId, value);
     } else {
       resolveOpenAlerts(userId);

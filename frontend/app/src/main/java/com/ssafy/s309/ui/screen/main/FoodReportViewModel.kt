@@ -46,26 +46,31 @@ class FoodReportViewModel
         fun loadFoodGrades() {
             viewModelScope.launch {
                 _uiState.value = FoodReportUiState.Loading
-                foodRepository
-                    .getFoodGrades()
+                foodRepository.getFoodGrades()
                     .onSuccess { responses ->
-                        val byGrade = responses.groupBy { it.grade }
                         val gradeFoodItems =
-                            byGrade.mapValues { (_, list) ->
-                                list.map { it.toGradeFoodItem() }
-                            }
+                            responses
+                                .groupBy { it.grade }
+                                .mapValues { (_, items) -> items.map { it.toGradeFoodItem() } }
+
                         val gradeInfoList =
                             FoodReportMockData.gradeInfoList.map { info ->
-                                info.copy(count = byGrade[info.grade]?.size ?: 0)
+                                info.copy(count = gradeFoodItems[info.grade]?.size ?: 0)
                             }
-                        _uiState.value = FoodReportUiState.Success(gradeInfoList, gradeFoodItems)
-                    }.onFailure { e ->
-                        _uiState.value = FoodReportUiState.Error(e.message ?: "데이터를 불러올 수 없어요")
+
+                        _uiState.value =
+                            FoodReportUiState.Success(
+                                gradeInfoList = gradeInfoList,
+                                gradeFoodItems = gradeFoodItems,
+                            )
+                    }
+                    .onFailure { e ->
+                        _uiState.value = FoodReportUiState.Error(e.message ?: "데이터를 불러오지 못했어요")
                     }
             }
         }
 
-        private fun FoodGradeResponse.toGradeFoodItem() =
+        private fun FoodGradeResponse.toGradeFoodItem(): GradeFoodItem =
             GradeFoodItem(
                 name = foodName,
                 frequency = mealCount,
@@ -75,20 +80,19 @@ class FoodReportViewModel
                 measureCount = mealCount,
             )
 
-        private fun formatLastEaten(isoDateTime: String): String =
-            try {
-                val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
-                val date: Date = sdf.parse(isoDateTime) ?: return "-"
+        private fun formatLastEaten(isoDate: String): String =
+            runCatching {
+                val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+                val date: Date = inputFormat.parse(isoDate) ?: return@runCatching isoDate
                 val diffMs = System.currentTimeMillis() - date.time
-                val days = TimeUnit.MILLISECONDS.toDays(diffMs)
+                val diffDays = (diffMs / (1000 * 60 * 60 * 24)).toInt()
                 when {
-                    days == 0L -> "오늘"
-                    days == 1L -> "어제"
-                    days < 7L -> "${days}일 전"
-                    days < 30L -> "${days / 7}주 전"
-                    else -> "${days / 30}달 전"
+                    diffDays == 0 -> "오늘"
+                    diffDays == 1 -> "어제"
+                    diffDays < 7 -> "${diffDays}일 전"
+                    diffDays < 14 -> "1주 전"
+                    diffDays < 30 -> "${diffDays / 7}주 전"
+                    else -> "${diffDays / 30}달 전"
                 }
-            } catch (e: Exception) {
-                "-"
-            }
+            }.getOrDefault(isoDate)
     }

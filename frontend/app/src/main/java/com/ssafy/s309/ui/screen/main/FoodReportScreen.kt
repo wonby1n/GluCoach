@@ -20,7 +20,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -93,25 +97,13 @@ fun FoodReportContent(
             Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "데이터를 불러오지 못했어요",
+                        text = state.message,
                         color = GlucoachColors.TextSecondary,
-                        fontSize = 15.sp,
+                        fontSize = 14.sp,
                     )
                     Spacer(Modifier.height(GlucoachSpacing.md))
-                    Box(
-                        modifier =
-                            Modifier
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(GlucoachColors.PrimaryLight)
-                                .clickable { viewModel.loadFoodGrades() }
-                                .padding(horizontal = GlucoachSpacing.xl, vertical = GlucoachSpacing.sm),
-                    ) {
-                        Text(
-                            text = "다시 시도",
-                            color = GlucoachColors.PrimaryDark,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
+                    Button(onClick = { viewModel.loadFoodGrades() }) {
+                        Text("다시 시도")
                     }
                 }
             }
@@ -130,7 +122,9 @@ fun FoodReportContent(
                         modifier = modifier,
                     )
                 } else {
-                    val gradeInfo = state.gradeInfoList.firstOrNull { it.grade == grade } ?: return@Crossfade
+                    val gradeInfo =
+                        state.gradeInfoList.firstOrNull { it.grade == grade }
+                            ?: return@Crossfade
                     val foods = state.gradeFoodItems[grade] ?: emptyList()
                     FoodReportDetailContent(
                         gradeInfo = gradeInfo,

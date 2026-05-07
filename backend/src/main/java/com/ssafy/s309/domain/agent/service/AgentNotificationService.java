@@ -1,33 +1,48 @@
 package com.ssafy.s309.domain.agent.service;
 
+import com.ssafy.s309.common.service.FcmService;
 import com.ssafy.s309.domain.agent.dto.AgentNotificationCreateRequest;
 import com.ssafy.s309.domain.agent.dto.AgentNotificationCreateResponse;
 import com.ssafy.s309.domain.agent.dto.AgentNotificationItem;
-import com.ssafy.s309.domain.alert.repository.AlertRepository;
-import com.ssafy.s309.domain.alert.service.AlertCreationService;
-import com.ssafy.s309.domain.alert.service.AlertCreationService.CreationResult;
+import com.ssafy.s309.domain.alert.service.AlertChannelResolver;
+import com.ssafy.s309.domain.chat.entity.ChatMessage;
+import com.ssafy.s309.domain.chat.repository.ChatMessageRepository;
+import com.ssafy.s309.domain.chat.service.ChatMessageService;
+import com.ssafy.s309.domain.notification.entity.NotificationToken;
+import com.ssafy.s309.domain.notification.repository.NotificationTokenRepository;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Agent #6 (notification_history) + #7 (send_notification).
+ *
+ * <p>chat_messages 직접 INSERT + dedup. AGENT_* prefix만 허용 (룰 type 보호). 30분 dedup 통과 시 INSERT + FCM
+ * 발사. dedup skip 시 200 + skipped:true.
+ */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AgentNotificationService {
 
   private static final String AGENT_PREFIX = "AGENT_";
-  private static final String SOURCE_AGENT = "agent";
+  private static final Duration DEDUP_WINDOW = Duration.ofMinutes(30);
 
-  private final AlertCreationService alertCreationService;
-  private final AlertRepository alertRepository;
+  private final ChatMessageService chatMessageService;
+  private final ChatMessageRepository chatMessageRepository;
+  private final NotificationTokenRepository tokenRepository;
+  private final FcmService fcmService;
 
   @Transactional(readOnly = true)
   public List<AgentNotificationItem> listRecent(Integer userId, Integer hours) {
     int safeHours = (hours == null || hours <= 0) ? 24 : Math.min(hours, 24 * 30);
     LocalDateTime since = LocalDateTime.now().minusHours(safeHours);
-    return alertRepository
-        .findByUserIdAndDeletedAtIsNullAndCreatedAtAfterOrderByCreatedAtDesc(userId, since)
+    return chatMessageRepository
+        .findByUserIdAndAlertTypeIsNotNullAndCreatedAtAfterOrderByCreatedAtDesc(userId, since)
         .stream()
         .map(AgentNotificationItem::from)
         .toList();
@@ -39,14 +54,39 @@ public class AgentNotificationService {
       throw new IllegalArgumentException(
           "alert_type은 AGENT_ prefix로 시작해야 합니다. (룰 type은 BE 룰 트리거에서만 INSERT)");
     }
-    CreationResult result =
-        alertCreationService.createIfNotDuplicate(
-            req.userId(), req.alertType(), req.message(), SOURCE_AGENT);
-    return new CreationOutcome(
-        result.created(),
-        result.created()
-            ? AgentNotificationCreateResponse.ofCreated(result.alertId())
-            : AgentNotificationCreateResponse.ofSkipped());
+
+    LocalDateTime since = LocalDateTime.now().minus(DEDUP_WINDOW);
+    if (chatMessageService.isDuplicateWithin(req.userId(), req.alertType(), since)) {
+      log.debug(
+          "Agent notification dedup skip: user={}, type={}, window={}m",
+          req.userId(),
+          req.alertType(),
+          DEDUP_WINDOW.toMinutes());
+      return new CreationOutcome(false, AgentNotificationCreateResponse.ofSkipped());
+    }
+
+    ChatMessage saved =
+        chatMessageService.insertAgent(
+            req.userId(), req.alertType(), req.message(), req.options(), req.displayTrace());
+
+    dispatchFcm(req.userId(), req.alertType(), req.message());
+
+    return new CreationOutcome(true, AgentNotificationCreateResponse.ofCreated(saved.getId()));
+  }
+
+  /** chat_messages INSERT 직후 FCM 발사. 토큰 0개면 silently skip. */
+  private void dispatchFcm(Integer userId, String alertType, String message) {
+    List<String> tokens =
+        tokenRepository.findByUser_IdAndIsActiveTrue(userId).stream()
+            .map(NotificationToken::getToken)
+            .toList();
+    if (tokens.isEmpty()) {
+      log.debug("FCM dispatch skip: no active tokens for user={}", userId);
+      return;
+    }
+    String title = AlertChannelResolver.resolveTitle(alertType);
+    String channelId = AlertChannelResolver.resolveChannelId(alertType);
+    fcmService.sendToTokens(tokens, title, message, channelId);
   }
 
   /** Controller가 status code(201 vs 200) 분기에 사용. */
