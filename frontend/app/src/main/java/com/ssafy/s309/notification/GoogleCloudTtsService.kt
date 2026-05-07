@@ -29,15 +29,15 @@ class GoogleCloudTtsService
                                 "voice",
                                 JSONObject().apply {
                                     put("languageCode", "ko-KR")
-                                    put("name", "ko-KR-Wavenet-A")
+                                    put("name", "ko-KR-Neural2-A")
                                 },
                             )
                             put(
                                 "audioConfig",
                                 JSONObject().apply {
                                     put("audioEncoding", "MP3")
-                                    put("pitch", 5.0)
-                                    put("speakingRate", 1.05)
+                                    put("pitch", 2.5)
+                                    put("speakingRate", 1.1)
                                 },
                             )
                         }.toString()

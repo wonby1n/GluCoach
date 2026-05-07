@@ -77,7 +77,10 @@ class TtsManager
                     if (urgent) {
                         queue.clear()
                         processingJob?.cancel()
-                        currentPlayer?.apply { stop(); release() }
+                        currentPlayer?.apply {
+                            stop()
+                            release()
+                        }
                         currentPlayer = null
                         androidTts?.stop()
                         queue.addFirst(SpeakItem(clean, urgent))
@@ -93,7 +96,10 @@ class TtsManager
             scope.launch {
                 queueMutex.withLock { queue.clear() }
                 processingJob?.cancel()
-                currentPlayer?.apply { stop(); release() }
+                currentPlayer?.apply {
+                    stop()
+                    release()
+                }
                 currentPlayer = null
                 androidTts?.stop()
             }
@@ -154,7 +160,10 @@ class TtsManager
                     }
                     cont.invokeOnCancellation {
                         currentPlayer = null
-                        runCatching { player.stop(); player.release() }
+                        runCatching {
+                            player.stop()
+                            player.release()
+                        }
                     }
                 }
             } finally {
