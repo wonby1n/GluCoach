@@ -25,6 +25,8 @@ data class MainUiState(
     val isDeviceConnected: Boolean = false,
     val currentGlucoseMgDl: Int? = null,
     val diffFromPrevious: Int = 0,
+    val trendRateMgDlPerMin: Float = 0f,
+    val diabetesType: String = "NONE",
     val glucoseSeries: List<GlucoseReading> = emptyList(),
     val glucoseRange: GlucoseRange = GlucoseRange(90, 180),
     val summary: DailyHealthSummary = DailyHealthSummary(0, 0),

@@ -13,6 +13,7 @@ agentic loop 구현.
 import json
 import sys
 import os
+import time
 
 from dotenv import load_dotenv
 import anthropic
@@ -52,7 +53,9 @@ def execute_tool(name: str, tool_input: dict) -> str:
 
 def run_agent(user_id: int = None):
     """Claude API를 호출하고, 도구 호출이 끝날 때까지 루프를 돈다."""
-    set_agent_context(user_id=user_id, alert_type="AGENT_WAKE_UP")
+    is_test = os.getenv("AGENT_TEST_MODE", "false").lower() == "true"
+    alert_type = f"AGENT_WAKE_UP_{int(time.time())}" if is_test else "AGENT_WAKE_UP"
+    set_agent_context(user_id=user_id, alert_type=alert_type)
     client = anthropic.Anthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
         base_url=BASE_URL,

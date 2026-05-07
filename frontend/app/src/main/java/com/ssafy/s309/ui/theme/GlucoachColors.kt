@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.Color
 object GlucoachColors {
     val PrimaryDark = Color(0xFF4EA8BC) // 핵심 텍스트/강조
     val Primary = Color(0xFF71C1D2) // 보조 강조, 그래프 선
+    val PrimaryLight = Color(0xFFDDF3F8) // 연한 민트 배경
     val TextPrimary = Color(0xFF222222)
     val TextSecondary = Color(0xFF757575)
     val Border = Color(0xFFD9D9D9)

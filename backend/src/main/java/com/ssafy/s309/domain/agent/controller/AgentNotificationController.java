@@ -48,8 +48,9 @@ public class AgentNotificationController {
   @Operation(
       summary = "Agent #7 — 알림 발송 (send_notification)",
       description =
-          "AGENT_* prefix만 허용 (룰 type 보호). 30분 dedup 통과 시 alerts INSERT + FCM 발사. "
-              + "dedup skip 시 200 + skipped:true 반환. AGENT_ prefix 위반 시 400.")
+          "AGENT_* prefix만 허용 (룰 type 보호). 30분 dedup 통과 시 chat_messages INSERT + FCM 발사. "
+              + "options 정확히 3개 필수. dedup skip 시 200 + skipped:true 반환. "
+              + "AGENT_ prefix / options 길이 위반 시 400.")
   @PostMapping
   public ResponseEntity<AgentNotificationCreateResponse> send(
       @Valid @RequestBody AgentNotificationCreateRequest req) {

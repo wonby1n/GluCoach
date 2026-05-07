@@ -48,9 +48,11 @@ class MainViewModel
                     )
                 }
 
-                // 사용자 목표 혈당 범위로 알림 임계값 갱신
                 userRepository.getSettings()
                     .onSuccess { settings ->
+                        _uiState.update { s ->
+                            s.copy(diabetesType = settings.diabetesType ?: "NONE")
+                        }
                         val low = settings.targetLow ?: return@onSuccess
                         val high = settings.targetHigh ?: return@onSuccess
                         healthRepository.updateAlertThresholds(low, high)
@@ -99,17 +101,19 @@ class MainViewModel
             viewModelScope.launch {
                 healthRepository.glucoseHistory.collect { history ->
                     val current = history.lastOrNull() ?: return@collect
-                    val diff =
-                        if (history.size >= 2) {
-                            current.valueMgDl - history[history.lastIndex - 1].valueMgDl
-                        } else {
-                            0
-                        }
+                    val prev = if (history.size >= 2) history[history.lastIndex - 1] else null
+                    val diff = prev?.let { current.valueMgDl - it.valueMgDl } ?: 0
+                    val rate =
+                        prev?.let {
+                            val minutes = (current.timestampMillis - it.timestampMillis) / 60_000f
+                            if (minutes > 0f) (current.valueMgDl - it.valueMgDl) / minutes else 0f
+                        } ?: 0f
                     _uiState.update { state ->
                         state.copy(
                             glucoseSeries = history,
                             currentGlucoseMgDl = current.valueMgDl,
                             diffFromPrevious = diff,
+                            trendRateMgDlPerMin = rate,
                         )
                     }
                 }
@@ -151,4 +155,19 @@ class MainViewModel
         fun clearAllNotifications() {
             _uiState.update { it.copy(notifications = emptyList()) }
         }
+
+        // [DEBUG_KIKI_TEST] 배포 전 삭제
+        fun debugSetGlucose(
+            mgDl: Int,
+            rateMgDlPerMin: Float,
+        ) {
+            _uiState.update {
+                it.copy(
+                    currentGlucoseMgDl = mgDl,
+                    trendRateMgDlPerMin = rateMgDlPerMin,
+                    diffFromPrevious = (rateMgDlPerMin * 5).toInt(),
+                )
+            }
+        }
+        // [/DEBUG_KIKI_TEST]
     }

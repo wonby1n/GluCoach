@@ -9,7 +9,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,15 +58,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ssafy.s309.R
 import com.ssafy.s309.ui.component.BottomNavBar
 import com.ssafy.s309.ui.component.BottomNavItem
 import com.ssafy.s309.ui.component.CurrentGlucoseCard
 import com.ssafy.s309.ui.component.GlucoseChartCard
+import com.ssafy.s309.ui.component.KikiCharacterMapper
+import com.ssafy.s309.ui.component.KikiImage
 import com.ssafy.s309.ui.component.SummaryStatCard
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
@@ -88,7 +95,10 @@ fun MainScreen(
     onGuardianClick: () -> Unit = {},
     onProjectorClick: () -> Unit = {},
     onAccountClick: () -> Unit = {},
+    onKikiChatClick: () -> Unit = {},
     userEmail: String = "",
+    requestedTab: String? = null,
+    onTabHandled: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -110,7 +120,12 @@ fun MainScreen(
         onGuardianClick = onGuardianClick,
         onProjectorClick = onProjectorClick,
         onAccountClick = onAccountClick,
+        onKikiChatClick = onKikiChatClick,
         userEmail = userEmail,
+        requestedTab = requestedTab,
+        onTabHandled = onTabHandled,
+        // [DEBUG_KIKI_TEST]
+        onDebugSetGlucose = viewModel::debugSetGlucose,
     )
 }
 
@@ -133,7 +148,12 @@ fun MainScreenContent(
     onGuardianClick: () -> Unit = {},
     onProjectorClick: () -> Unit = {},
     onAccountClick: () -> Unit = {},
+    onKikiChatClick: () -> Unit = {},
     userEmail: String = "",
+    requestedTab: String? = null,
+    onTabHandled: () -> Unit = {},
+    // [DEBUG_KIKI_TEST]
+    onDebugSetGlucose: (Int, Float) -> Unit = { _, _ -> },
 ) {
     var selectedTab by rememberSaveable { mutableStateOf("home") }
     var showCamera by remember { mutableStateOf(false) }
@@ -141,6 +161,21 @@ fun MainScreenContent(
     var capturedPhotoFile by remember { mutableStateOf<java.io.File?>(null) }
     var showReportSheet by remember { mutableStateOf(false) }
     var showAddSheet by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.LaunchedEffect(requestedTab) {
+        if (requestedTab != null) {
+            showReportSheet = false
+            showAddSheet = false
+            if (requestedTab == "food-scan") {
+                scanSessionId++
+                showCamera = true
+                selectedTab = "add"
+            } else {
+                selectedTab = requestedTab
+            }
+            onTabHandled()
+        }
+    }
 
     Box(
         modifier =
@@ -219,15 +254,30 @@ fun MainScreenContent(
                                     onBellClick = onBellClick,
                                     hasUnread = state.notifications.any { it.isUnread },
                                     bellIcon = bellIcon,
+                                    onKikiChatClick = onKikiChatClick,
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
 
+                                val kikiDrawable =
+                                    KikiCharacterMapper.resolve(
+                                        glucoseMgDl = state.currentGlucoseMgDl,
+                                        trendRateMgDlPerMin = state.trendRateMgDlPerMin,
+                                        diabetesType = state.diabetesType,
+                                    )
                                 CurrentGlucoseCard(
                                     currentMgDl = state.currentGlucoseMgDl ?: 0,
                                     diffFromPrevious = state.diffFromPrevious,
-                                    mascotSlot = mascotSlot,
+                                    mascotSlot = {
+                                        KikiImage(
+                                            drawableRes = kikiDrawable,
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+                                    },
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+                                DebugKikiTestPanel(onDebugSetGlucose) // [DEBUG_KIKI_TEST]
+                                Spacer(modifier = Modifier.height(GlucoachSpacing.xl)) // [DEBUG_KIKI_TEST]
 
                                 val chartTimeLabels =
                                     remember {
@@ -426,6 +476,7 @@ private fun TodayConditionHeader(
     onBellClick: () -> Unit,
     hasUnread: Boolean,
     bellIcon: (@Composable () -> Unit)? = null,
+    onKikiChatClick: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -438,31 +489,53 @@ private fun TodayConditionHeader(
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
         )
-        Box(
-            modifier =
-                Modifier
-                    .size(32.dp)
-                    .clickable(onClick = onBellClick),
-            contentAlignment = Alignment.Center,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.sm),
         ) {
-            if (bellIcon != null) {
-                bellIcon()
-            } else {
-                Icon(
-                    imageVector = Icons.Outlined.Notifications,
-                    contentDescription = if (hasUnread) "새 알림" else "알림",
-                    tint = GlucoachColors.Primary,
-                    modifier = Modifier.size(24.dp),
+            Box(
+                modifier =
+                    Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFE8F6F9))
+                        .border(1.dp, GlucoachColors.Primary.copy(alpha = 0.4f), CircleShape)
+                        .clickable(onClick = onKikiChatClick),
+                contentAlignment = Alignment.Center,
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.kiki_main),
+                    contentDescription = "키키 채팅",
+                    modifier = Modifier.size(28.dp),
+                    contentScale = ContentScale.Fit,
                 )
             }
-            if (hasUnread) {
-                Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.TopEnd)
-                            .size(8.dp)
-                            .background(Color(0xFFE53935), shape = CircleShape),
-                )
+            Box(
+                modifier =
+                    Modifier
+                        .size(32.dp)
+                        .clickable(onClick = onBellClick),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (bellIcon != null) {
+                    bellIcon()
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.Notifications,
+                        contentDescription = if (hasUnread) "새 알림" else "알림",
+                        tint = GlucoachColors.Primary,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+                if (hasUnread) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .size(8.dp)
+                                .background(Color(0xFFE53935), shape = CircleShape),
+                    )
+                }
             }
         }
     }
@@ -494,7 +567,7 @@ private fun SummaryRow(
     }
 }
 
-private fun defaultBottomNavItems(): List<BottomNavItem> =
+internal fun defaultBottomNavItems(): List<BottomNavItem> =
     listOf(
         BottomNavItem(id = "home", label = "홈", icon = Icons.Outlined.Home),
         BottomNavItem(id = "report", label = "리포트", icon = Icons.Outlined.Description),
@@ -504,7 +577,7 @@ private fun defaultBottomNavItems(): List<BottomNavItem> =
     )
 
 @Composable
-private fun ReportMenuSheet(
+internal fun ReportMenuSheet(
     onAIReport: () -> Unit,
     onFoodReport: () -> Unit,
     onClose: () -> Unit,
@@ -591,7 +664,7 @@ private fun ReportMenuSheet(
 }
 
 @Composable
-private fun AddMenuSheet(
+internal fun AddMenuSheet(
     onABComparison: () -> Unit,
     onFoodScan: () -> Unit,
     onClose: () -> Unit,

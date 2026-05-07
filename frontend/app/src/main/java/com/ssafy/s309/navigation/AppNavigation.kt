@@ -1,22 +1,32 @@
 package com.ssafy.s309.navigation
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.Image
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.Color
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.ssafy.s309.R
+import com.ssafy.s309.ui.component.BottomNavBar
 import com.ssafy.s309.ui.screen.GraphScreen
 import com.ssafy.s309.ui.screen.auth.LandingScreen
 import com.ssafy.s309.ui.screen.auth.LoginScreen
@@ -24,15 +34,20 @@ import com.ssafy.s309.ui.screen.auth.SignInScreen
 import com.ssafy.s309.ui.screen.auth.SignUpScreen
 import com.ssafy.s309.ui.screen.ble.BleScreen
 import com.ssafy.s309.ui.screen.health.HealthSourceScreen
+import com.ssafy.s309.ui.screen.main.AddMenuSheet
 import com.ssafy.s309.ui.screen.main.GuardianScreen
+import com.ssafy.s309.ui.screen.main.KikiChatScreen
 import com.ssafy.s309.ui.screen.main.MainScreen
 import com.ssafy.s309.ui.screen.main.MyAccountScreen
+import com.ssafy.s309.ui.screen.main.ReportMenuSheet
 import com.ssafy.s309.ui.screen.main.SettingsScreen
+import com.ssafy.s309.ui.screen.main.defaultBottomNavItems
 import com.ssafy.s309.ui.screen.onboarding.BasicHealthInfoScreen
 import com.ssafy.s309.ui.screen.onboarding.BloodSugarRangeScreen
 import com.ssafy.s309.ui.screen.onboarding.DiabetesTypeSelectionScreen
 import com.ssafy.s309.ui.screen.onboarding.SignupDoneScreen
 import com.ssafy.s309.ui.screen.projector.ProjectorScreen
+import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.viewmodel.AuthUiState
 import com.ssafy.s309.ui.viewmodel.AuthViewModel
 
@@ -68,6 +83,132 @@ sealed class Screen(val route: String) {
     object Projector : Screen("projector")
 
     object MyAccount : Screen("my_account")
+
+    object KikiChat : Screen("kiki_chat")
+}
+
+@Composable
+private fun SubScreenWithBottomNav(
+    navController: NavHostController,
+    selectedId: String = "profile",
+    content: @Composable () -> Unit,
+) {
+    var showReportSheet by remember { mutableStateOf(false) }
+    var showAddSheet by remember { mutableStateOf(false) }
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(GlucoachColors.Background),
+    ) {
+        Box(modifier = Modifier.weight(1f)) {
+            content()
+
+            androidx.compose.animation.AnimatedVisibility(
+                visible = showReportSheet || showAddSheet,
+                enter = fadeIn(animationSpec = tween(durationMillis = 280)),
+                exit = fadeOut(animationSpec = tween(durationMillis = 240)),
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.3f))
+                            .clickable {
+                                showReportSheet = false
+                                showAddSheet = false
+                            },
+                )
+            }
+
+            androidx.compose.animation.AnimatedVisibility(
+                visible = showReportSheet,
+                enter =
+                    expandVertically(
+                        expandFrom = Alignment.Bottom,
+                        animationSpec = tween(durationMillis = 280),
+                    ),
+                exit =
+                    shrinkVertically(
+                        shrinkTowards = Alignment.Bottom,
+                        animationSpec = tween(durationMillis = 240),
+                    ),
+                modifier = Modifier.align(Alignment.BottomCenter),
+            ) {
+                ReportMenuSheet(
+                    onAIReport = {
+                        showReportSheet = false
+                        val mainEntry = navController.getBackStackEntry(Screen.Main.route)
+                        mainEntry.savedStateHandle["requestedTab"] = "report"
+                        navController.popBackStack(Screen.Main.route, inclusive = false)
+                    },
+                    onFoodReport = {
+                        showReportSheet = false
+                        val mainEntry = navController.getBackStackEntry(Screen.Main.route)
+                        mainEntry.savedStateHandle["requestedTab"] = "food-report"
+                        navController.popBackStack(Screen.Main.route, inclusive = false)
+                    },
+                    onClose = { showReportSheet = false },
+                )
+            }
+
+            androidx.compose.animation.AnimatedVisibility(
+                visible = showAddSheet,
+                enter =
+                    expandVertically(
+                        expandFrom = Alignment.Bottom,
+                        animationSpec = tween(durationMillis = 280),
+                    ),
+                exit =
+                    shrinkVertically(
+                        shrinkTowards = Alignment.Bottom,
+                        animationSpec = tween(durationMillis = 240),
+                    ),
+                modifier = Modifier.align(Alignment.BottomCenter),
+            ) {
+                AddMenuSheet(
+                    onABComparison = {
+                        showAddSheet = false
+                        val mainEntry = navController.getBackStackEntry(Screen.Main.route)
+                        mainEntry.savedStateHandle["requestedTab"] = "food-comparison"
+                        navController.popBackStack(Screen.Main.route, inclusive = false)
+                    },
+                    onFoodScan = {
+                        showAddSheet = false
+                        val mainEntry = navController.getBackStackEntry(Screen.Main.route)
+                        mainEntry.savedStateHandle["requestedTab"] = "food-scan"
+                        navController.popBackStack(Screen.Main.route, inclusive = false)
+                    },
+                    onClose = { showAddSheet = false },
+                )
+            }
+        }
+
+        BottomNavBar(
+            items = defaultBottomNavItems(),
+            selectedId = selectedId,
+            onItemClick = { item ->
+                when (item.id) {
+                    "add" -> {
+                        showReportSheet = false
+                        showAddSheet = !showAddSheet
+                    }
+                    "report" -> {
+                        showAddSheet = false
+                        showReportSheet = !showReportSheet
+                    }
+                    else -> {
+                        showReportSheet = false
+                        showAddSheet = false
+                        val mainEntry = navController.getBackStackEntry(Screen.Main.route)
+                        mainEntry.savedStateHandle["requestedTab"] = item.id
+                        navController.popBackStack(Screen.Main.route, inclusive = false)
+                    }
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -204,7 +345,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 onRetryClick = { authViewModel.performPendingSignup() },
             )
         }
-        composable(Screen.Main.route) {
+        composable(Screen.Main.route) { backStackEntry ->
+            val requestedTab = backStackEntry.savedStateHandle.get<String>("requestedTab")
+
             LaunchedEffect(authState) {
                 if (authState is AuthUiState.LogoutSuccess ||
                     authState is AuthUiState.WithdrawSuccess
@@ -217,14 +360,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             }
 
             MainScreen(
-                mascotSlot = {
-                    Image(
-                        painter = painterResource(id = R.drawable.kiki_main),
-                        contentDescription = "키키 캐릭터",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
-                    )
-                },
                 onGraphClick = { navController.navigate(Screen.Graph.route) },
                 onConnectedDeviceClick = { navController.navigate(Screen.HealthSource.route) },
                 onLogoutClick = { authViewModel.logout() },
@@ -232,7 +367,10 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 onSettingsClick = { navController.navigate(Screen.Settings.route) },
                 onGuardianClick = { navController.navigate(Screen.Guardian.route) },
                 onAccountClick = { navController.navigate(Screen.MyAccount.route) },
+                onKikiChatClick = { navController.navigate(Screen.KikiChat.route) },
                 userEmail = authViewModel.userEmail,
+                requestedTab = requestedTab,
+                onTabHandled = { backStackEntry.savedStateHandle.remove<String>("requestedTab") },
             )
         }
         composable(Screen.MyAccount.route) {
@@ -246,42 +384,63 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 }
             }
 
-            MyAccountScreen(
-                onBack = { navController.popBackStack() },
-                onWithdrawClick = { password -> authViewModel.withdraw(password) },
-            )
+            SubScreenWithBottomNav(navController = navController) {
+                MyAccountScreen(
+                    onBack = { navController.popBackStack() },
+                    onWithdrawClick = { password -> authViewModel.withdraw(password) },
+                )
+            }
         }
         composable(Screen.Graph.route) {
-            GraphScreen(
-                onBack = { navController.popBackStack() },
-                onNavigateToBle = { navController.navigate(Screen.Ble.route) },
-            )
+            SubScreenWithBottomNav(navController = navController, selectedId = "home") {
+                GraphScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigateToBle = { navController.navigate(Screen.Ble.route) },
+                )
+            }
         }
         composable(Screen.Ble.route) {
-            BleScreen(
-                onBack = { navController.popBackStack() },
-            )
+            SubScreenWithBottomNav(navController = navController, selectedId = "home") {
+                BleScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
         }
         composable(Screen.Settings.route) {
-            SettingsScreen(
-                onBack = { navController.popBackStack() },
-                onProjectorClick = { navController.navigate(Screen.Projector.route) },
-            )
+            SubScreenWithBottomNav(navController = navController) {
+                SettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    onProjectorClick = { navController.navigate(Screen.Projector.route) },
+                )
+            }
         }
         composable(Screen.Projector.route) {
-            ProjectorScreen(
-                onBack = { navController.popBackStack() },
-            )
+            SubScreenWithBottomNav(navController = navController) {
+                ProjectorScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
         }
         composable(Screen.Guardian.route) {
-            GuardianScreen(
-                onBack = { navController.popBackStack() },
-            )
+            SubScreenWithBottomNav(navController = navController) {
+                GuardianScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
         }
         composable(Screen.HealthSource.route) {
-            HealthSourceScreen(
-                onBack = { navController.popBackStack() },
-            )
+            SubScreenWithBottomNav(navController = navController) {
+                HealthSourceScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+        }
+        composable(Screen.KikiChat.route) {
+            SubScreenWithBottomNav(navController = navController, selectedId = "home") {
+                KikiChatScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
         }
     }
 }
