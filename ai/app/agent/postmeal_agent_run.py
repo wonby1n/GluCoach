@@ -12,6 +12,7 @@ Glucoach Agent — 식후 활동 유도 agent
 import json
 import sys
 import os
+import time
 
 from dotenv import load_dotenv
 import anthropic
@@ -56,6 +57,9 @@ def run_postmeal_agent(trigger: dict, user_id: int = None, alert_type: str = "AG
         - meal_time: 식사 시각 (예: "2026-05-04 12:00")
         - user_reply: 사용자 응답 텍스트 (재트리거 시)
     """
+    is_test = os.getenv("AGENT_TEST_MODE", "false").lower() == "true"
+    if is_test:
+        alert_type = f"{alert_type}_{int(time.time())}"
     set_agent_context(user_id=user_id, alert_type=alert_type)
     client = anthropic.Anthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
