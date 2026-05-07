@@ -2,21 +2,15 @@ package com.ssafy.s309.navigation
 
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.ssafy.s309.R
 import com.ssafy.s309.ui.screen.GraphScreen
 import com.ssafy.s309.ui.screen.auth.LandingScreen
 import com.ssafy.s309.ui.screen.auth.LoginScreen
@@ -217,14 +211,6 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             }
 
             MainScreen(
-                mascotSlot = {
-                    Image(
-                        painter = painterResource(id = R.drawable.kiki_main),
-                        contentDescription = "키키 캐릭터",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
-                    )
-                },
                 onGraphClick = { navController.navigate(Screen.Graph.route) },
                 onConnectedDeviceClick = { navController.navigate(Screen.HealthSource.route) },
                 onLogoutClick = { authViewModel.logout() },

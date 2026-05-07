@@ -65,6 +65,8 @@ import com.ssafy.s309.ui.component.BottomNavBar
 import com.ssafy.s309.ui.component.BottomNavItem
 import com.ssafy.s309.ui.component.CurrentGlucoseCard
 import com.ssafy.s309.ui.component.GlucoseChartCard
+import com.ssafy.s309.ui.component.KikiCharacterMapper
+import com.ssafy.s309.ui.component.KikiImage
 import com.ssafy.s309.ui.component.SummaryStatCard
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
@@ -111,6 +113,8 @@ fun MainScreen(
         onProjectorClick = onProjectorClick,
         onAccountClick = onAccountClick,
         userEmail = userEmail,
+        // [DEBUG_KIKI_TEST]
+        onDebugSetGlucose = viewModel::debugSetGlucose,
     )
 }
 
@@ -134,6 +138,8 @@ fun MainScreenContent(
     onProjectorClick: () -> Unit = {},
     onAccountClick: () -> Unit = {},
     userEmail: String = "",
+    // [DEBUG_KIKI_TEST]
+    onDebugSetGlucose: (Int, Float) -> Unit = { _, _ -> },
 ) {
     var selectedTab by rememberSaveable { mutableStateOf("home") }
     var showCamera by remember { mutableStateOf(false) }
@@ -222,12 +228,26 @@ fun MainScreenContent(
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
 
+                                val kikiDrawable =
+                                    KikiCharacterMapper.resolve(
+                                        glucoseMgDl = state.currentGlucoseMgDl,
+                                        trendRateMgDlPerMin = state.trendRateMgDlPerMin,
+                                        diabetesType = state.diabetesType,
+                                    )
                                 CurrentGlucoseCard(
                                     currentMgDl = state.currentGlucoseMgDl ?: 0,
                                     diffFromPrevious = state.diffFromPrevious,
-                                    mascotSlot = mascotSlot,
+                                    mascotSlot = {
+                                        KikiImage(
+                                            drawableRes = kikiDrawable,
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+                                    },
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+                                DebugKikiTestPanel(onDebugSetGlucose) // [DEBUG_KIKI_TEST]
+                                Spacer(modifier = Modifier.height(GlucoachSpacing.xl)) // [DEBUG_KIKI_TEST]
 
                                 val chartTimeLabels =
                                     remember {
