@@ -102,9 +102,21 @@ def get_steps(start_time: str, end_time: str) -> dict:
 
 def get_notification_history(hours: int) -> dict:
     """최근 N시간 동안 발송된 알림 이력을 반환한다."""
+    from datetime import datetime, timedelta
+    from app.agent.mock_data import DEMO_DATE
+
+    # 시연 날짜 기준 "현재 시각"을 07:00으로 고정
+    reference = datetime.strptime(f"{DEMO_DATE['today']} 07:00", "%Y-%m-%d %H:%M")
+    cutoff = reference - timedelta(hours=hours)
+
+    filtered = [
+        n for n in NOTIFICATION_HISTORY
+        if datetime.strptime(n["sent_at"], "%Y-%m-%d %H:%M") > cutoff
+    ]
     return {
         "hours": hours,
-        "notifications": NOTIFICATION_HISTORY,
+        "today": DEMO_DATE["today"],   # Claude가 날짜 비교해 중복 여부 판단하도록
+        "notifications": filtered,
     }
 
 
