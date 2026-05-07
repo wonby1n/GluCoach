@@ -49,4 +49,6 @@ public interface MealRecordRepository extends JpaRepository<MealRecord, Integer>
       "SELECT m FROM MealRecord m WHERE m.isProcessed = false AND m.recordedAt BETWEEN :expiry AND :cutoff")
   List<MealRecord> findUnprocessedBetween(
       @Param("expiry") LocalDateTime expiry, @Param("cutoff") LocalDateTime cutoff);
+
+  java.util.Optional<MealRecord> findFirstByUserIdOrderByRecordedAtDesc(Integer userId);
 }
