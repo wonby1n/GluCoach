@@ -31,12 +31,7 @@ public class GuardianNotification {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Integer id;
 
-  /** 레거시. alerts DROP(V13) 시 컬럼 제거 예정. 신규 INSERT는 chatMessageId 사용. */
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "alert_id")
-  private Alert alert;
-
-  @Column(name = "chat_message_id")
+  @Column(name = "chat_message_id", nullable = false)
   private Long chatMessageId;
 
   @ManyToOne(fetch = FetchType.LAZY)
