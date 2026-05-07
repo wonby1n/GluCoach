@@ -162,25 +162,33 @@ public class FoodDetectClientImpl implements FoodDetectClient {
   AiServiceException mapRestClientException(
       RestClientException e, String correlationId, int attempt, long elapsedMs) {
     Throwable root = NestedExceptionUtils.getRootCause(e);
+    // root 클래스명을 로그에 함께 남겨 다단 wrap 케이스에서 SocketTimeout/SocketException/EOFException 등 구분 가능.
+    String rootName = root != null ? root.getClass().getSimpleName() : "none";
     if (root instanceof SocketTimeoutException) {
       log.warn(
-          "[{}] AI 음식 인식 응답 처리 타임아웃 (attempt={}, elapsedMs={})", correlationId, attempt, elapsedMs);
+          "[{}] AI 음식 인식 응답 처리 타임아웃 (attempt={}, elapsedMs={}, root={})",
+          correlationId,
+          attempt,
+          elapsedMs,
+          rootName);
       return new AiServiceException(ErrorType.TIMEOUT, "AI 서비스 응답 처리 시간 초과", e);
     }
     if (root instanceof IOException) {
       log.warn(
-          "[{}] AI 음식 인식 응답 처리 I/O 실패 (attempt={}, elapsedMs={}): {}",
+          "[{}] AI 음식 인식 응답 처리 I/O 실패 (attempt={}, elapsedMs={}, root={}): {}",
           correlationId,
           attempt,
           elapsedMs,
+          rootName,
           e.getMessage());
       return new AiServiceException(ErrorType.SERVICE_UNAVAILABLE, "AI 서비스 응답 처리 실패", e);
     }
     log.warn(
-        "[{}] AI 음식 인식 처리 실패 (attempt={}, elapsedMs={}): {}",
+        "[{}] AI 음식 인식 처리 실패 (attempt={}, elapsedMs={}, root={}): {}",
         correlationId,
         attempt,
         elapsedMs,
+        rootName,
         e.getMessage());
     return new AiServiceException(ErrorType.MODEL_ERROR, "AI 서비스 처리 실패", e);
   }

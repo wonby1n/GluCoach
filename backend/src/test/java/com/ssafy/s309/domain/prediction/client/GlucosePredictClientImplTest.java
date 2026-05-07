@@ -39,6 +39,9 @@ class GlucosePredictClientImplTest {
   private GlucosePredictRequest request;
   private GlucosePredictResponse response;
 
+  /** 헬퍼 메서드 단위 테스트(spy 불필요)에서 사용하는 plain 인스턴스. spy 가 필요한 테스트는 각자 spy(new ...) 그대로. */
+  private GlucosePredictClientImpl helperClient;
+
   @BeforeEach
   void setUp() {
     MealInfo meal = new MealInfo(56.0, "2026-05-06T10:00:00");
@@ -46,6 +49,7 @@ class GlucosePredictClientImplTest {
         new UserProfileWithPattern(100.0, 70.0, "medium", "T2D", "regular_3");
     request = new GlucosePredictRequest("1", List.of(100.0), meal, profile);
     response = new GlucosePredictResponse(List.of(), 168.0, 45, "base", 0.82);
+    helperClient = new GlucosePredictClientImpl(restClient);
     MDC.remove(GlucosePredictClientImpl.CORRELATION_ID_MDC_KEY);
   }
 
@@ -169,45 +173,41 @@ class GlucosePredictClientImplTest {
 
   @Test
   void mapRestClientException_SocketTimeout_root는_TIMEOUT() {
-    GlucosePredictClientImpl client = new GlucosePredictClientImpl(restClient);
     RestClientException e =
         new RestClientException(
             "Error while extracting response", new SocketTimeoutException("read"));
 
-    AiServiceException result = client.mapRestClientException(e, "corr", 1, 100);
+    AiServiceException result = helperClient.mapRestClientException(e, "corr", 1, 100);
 
     assertThat(result.getErrorType()).isEqualTo(ErrorType.TIMEOUT);
   }
 
   @Test
   void mapRestClientException_IOException_root는_SERVICE_UNAVAILABLE() {
-    GlucosePredictClientImpl client = new GlucosePredictClientImpl(restClient);
     RestClientException e =
         new RestClientException("Error while extracting response", new IOException("disconnect"));
 
-    AiServiceException result = client.mapRestClientException(e, "corr", 1, 100);
+    AiServiceException result = helperClient.mapRestClientException(e, "corr", 1, 100);
 
     assertThat(result.getErrorType()).isEqualTo(ErrorType.SERVICE_UNAVAILABLE);
   }
 
   @Test
   void mapRestClientException_기타_root는_MODEL_ERROR() {
-    GlucosePredictClientImpl client = new GlucosePredictClientImpl(restClient);
     RestClientException e = new RestClientException("Unexpected processing error");
 
-    AiServiceException result = client.mapRestClientException(e, "corr", 1, 100);
+    AiServiceException result = helperClient.mapRestClientException(e, "corr", 1, 100);
 
     assertThat(result.getErrorType()).isEqualTo(ErrorType.MODEL_ERROR);
   }
 
   @Test
   void mapRestClientException_중첩된_cause도_root까지_파헤침() {
-    GlucosePredictClientImpl client = new GlucosePredictClientImpl(restClient);
     RestClientException e =
         new RestClientException(
             "outer", new RuntimeException("middle wrap", new SocketTimeoutException("read")));
 
-    AiServiceException result = client.mapRestClientException(e, "corr", 1, 100);
+    AiServiceException result = helperClient.mapRestClientException(e, "corr", 1, 100);
 
     assertThat(result.getErrorType()).isEqualTo(ErrorType.TIMEOUT);
   }
