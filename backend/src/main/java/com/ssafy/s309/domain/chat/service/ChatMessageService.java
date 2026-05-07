@@ -28,7 +28,7 @@ public class ChatMessageService {
   @Transactional
   public ChatMessage insertAgent(
       Integer userId,
-      String alertType,
+      String messageType,
       String message,
       List<Map<String, String>> options,
       Map<String, Object> displayTrace) {
@@ -39,7 +39,7 @@ public class ChatMessageService {
         ChatMessage.builder()
             .userId(userId)
             .sender(ChatMessage.SENDER_AGENT)
-            .alertType(alertType)
+            .messageType(messageType)
             .message(message)
             .options(options)
             .displayTrace(displayTrace)
@@ -49,12 +49,12 @@ public class ChatMessageService {
 
   /** BE 룰 발신 메시지 (HIGH/LOW/SOS/WEEKLY_REPORT 등). */
   @Transactional
-  public ChatMessage insertSystem(Integer userId, String alertType, String message) {
+  public ChatMessage insertSystem(Integer userId, String messageType, String message) {
     return chatMessageRepository.save(
         ChatMessage.builder()
             .userId(userId)
             .sender(ChatMessage.SENDER_SYSTEM)
-            .alertType(alertType)
+            .messageType(messageType)
             .message(message)
             .source(ChatMessage.SOURCE_BE)
             .build());
@@ -128,16 +128,16 @@ public class ChatMessageService {
 
   /** dedup 30분 윈도우 체크. */
   @Transactional(readOnly = true)
-  public boolean isDuplicateWithin(Integer userId, String alertType, LocalDateTime since) {
-    return chatMessageRepository.existsByUserIdAndAlertTypeAndResolvedAtIsNullAndCreatedAtAfter(
-        userId, alertType, since);
+  public boolean isDuplicateWithin(Integer userId, String messageType, LocalDateTime since) {
+    return chatMessageRepository.existsByUserIdAndMessageTypeAndResolvedAtIsNullAndCreatedAtAfter(
+        userId, messageType, since);
   }
 
   /** 룰 알림 정상복귀 — 미해결 메시지 모두 resolved_at 갱신. */
   @Transactional
-  public int resolveOpenRule(Integer userId, List<String> alertTypes) {
+  public int resolveOpenRule(Integer userId, List<String> messageTypes) {
     List<ChatMessage> open =
-        chatMessageRepository.findByUserIdAndAlertTypeInAndResolvedAtIsNull(userId, alertTypes);
+        chatMessageRepository.findByUserIdAndMessageTypeInAndResolvedAtIsNull(userId, messageTypes);
     open.forEach(ChatMessage::resolve);
     return open.size();
   }

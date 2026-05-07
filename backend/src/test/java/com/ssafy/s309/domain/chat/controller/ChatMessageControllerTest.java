@@ -77,7 +77,7 @@ class ChatMessageControllerTest {
             ChatMessage.builder()
                 .userId(USER_ID)
                 .sender(ChatMessage.SENDER_AGENT)
-                .alertType("AGENT_MEAL_FOLLOWUP")
+                .messageType("AGENT_MEAL_FOLLOWUP")
                 .message("산책할까요?")
                 .options(
                     List.of(

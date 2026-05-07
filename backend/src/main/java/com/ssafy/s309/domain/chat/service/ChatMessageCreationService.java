@@ -27,20 +27,20 @@ public class ChatMessageCreationService {
   private final ChatFcmDispatcher chatFcmDispatcher;
 
   @Transactional
-  public CreationResult createIfNotDuplicate(Integer userId, String alertType, String message) {
+  public CreationResult createIfNotDuplicate(Integer userId, String messageType, String message) {
     LocalDateTime since = LocalDateTime.now().minus(DEDUP_WINDOW);
-    if (chatMessageService.isDuplicateWithin(userId, alertType, since)) {
+    if (chatMessageService.isDuplicateWithin(userId, messageType, since)) {
       log.debug(
           "system message dedup skip: user={}, type={}, window={}m",
           userId,
-          alertType,
+          messageType,
           DEDUP_WINDOW.toMinutes());
       return CreationResult.skipped();
     }
 
-    ChatMessage saved = chatMessageService.insertSystem(userId, alertType, message);
+    ChatMessage saved = chatMessageService.insertSystem(userId, messageType, message);
 
-    chatFcmDispatcher.dispatch(userId, alertType, message);
+    chatFcmDispatcher.dispatch(userId, messageType, message);
 
     return CreationResult.created(saved.getId());
   }

@@ -38,7 +38,7 @@ public class AgentNotificationService {
     int safeHours = (hours == null || hours <= 0) ? 24 : Math.min(hours, 24 * 30);
     LocalDateTime since = LocalDateTime.now().minusHours(safeHours);
     return chatMessageRepository
-        .findByUserIdAndAlertTypeIsNotNullAndCreatedAtAfterOrderByCreatedAtDesc(userId, since)
+        .findByUserIdAndMessageTypeIsNotNullAndCreatedAtAfterOrderByCreatedAtDesc(userId, since)
         .stream()
         .map(AgentNotificationItem::from)
         .toList();
