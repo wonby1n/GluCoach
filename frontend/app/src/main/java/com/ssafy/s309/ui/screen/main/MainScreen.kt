@@ -9,7 +9,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,11 +58,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ssafy.s309.R
 import com.ssafy.s309.ui.component.BottomNavBar
 import com.ssafy.s309.ui.component.BottomNavItem
 import com.ssafy.s309.ui.component.CurrentGlucoseCard
@@ -90,6 +95,7 @@ fun MainScreen(
     onGuardianClick: () -> Unit = {},
     onProjectorClick: () -> Unit = {},
     onAccountClick: () -> Unit = {},
+    onKikiChatClick: () -> Unit = {},
     userEmail: String = "",
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -112,6 +118,7 @@ fun MainScreen(
         onGuardianClick = onGuardianClick,
         onProjectorClick = onProjectorClick,
         onAccountClick = onAccountClick,
+        onKikiChatClick = onKikiChatClick,
         userEmail = userEmail,
         // [DEBUG_KIKI_TEST]
         onDebugSetGlucose = viewModel::debugSetGlucose,
@@ -137,6 +144,7 @@ fun MainScreenContent(
     onGuardianClick: () -> Unit = {},
     onProjectorClick: () -> Unit = {},
     onAccountClick: () -> Unit = {},
+    onKikiChatClick: () -> Unit = {},
     userEmail: String = "",
     // [DEBUG_KIKI_TEST]
     onDebugSetGlucose: (Int, Float) -> Unit = { _, _ -> },
@@ -225,6 +233,7 @@ fun MainScreenContent(
                                     onBellClick = onBellClick,
                                     hasUnread = state.notifications.any { it.isUnread },
                                     bellIcon = bellIcon,
+                                    onKikiChatClick = onKikiChatClick,
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
 
@@ -446,6 +455,7 @@ private fun TodayConditionHeader(
     onBellClick: () -> Unit,
     hasUnread: Boolean,
     bellIcon: (@Composable () -> Unit)? = null,
+    onKikiChatClick: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -458,31 +468,53 @@ private fun TodayConditionHeader(
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
         )
-        Box(
-            modifier =
-                Modifier
-                    .size(32.dp)
-                    .clickable(onClick = onBellClick),
-            contentAlignment = Alignment.Center,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.sm),
         ) {
-            if (bellIcon != null) {
-                bellIcon()
-            } else {
-                Icon(
-                    imageVector = Icons.Outlined.Notifications,
-                    contentDescription = if (hasUnread) "새 알림" else "알림",
-                    tint = GlucoachColors.Primary,
-                    modifier = Modifier.size(24.dp),
+            Box(
+                modifier =
+                    Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFE8F6F9))
+                        .border(1.dp, GlucoachColors.Primary.copy(alpha = 0.4f), CircleShape)
+                        .clickable(onClick = onKikiChatClick),
+                contentAlignment = Alignment.Center,
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.kiki_main),
+                    contentDescription = "키키 채팅",
+                    modifier = Modifier.size(28.dp),
+                    contentScale = ContentScale.Fit,
                 )
             }
-            if (hasUnread) {
-                Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.TopEnd)
-                            .size(8.dp)
-                            .background(Color(0xFFE53935), shape = CircleShape),
-                )
+            Box(
+                modifier =
+                    Modifier
+                        .size(32.dp)
+                        .clickable(onClick = onBellClick),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (bellIcon != null) {
+                    bellIcon()
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.Notifications,
+                        contentDescription = if (hasUnread) "새 알림" else "알림",
+                        tint = GlucoachColors.Primary,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+                if (hasUnread) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .size(8.dp)
+                                .background(Color(0xFFE53935), shape = CircleShape),
+                    )
+                }
             }
         }
     }
