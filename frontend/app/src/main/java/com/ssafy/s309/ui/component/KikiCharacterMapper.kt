@@ -21,12 +21,12 @@ object KikiCharacterMapper {
         trendRateMgDlPerMin: Float,
         diabetesType: String = "NONE",
     ): Int {
-        val glucose = glucoseMgDl ?: return R.drawable.kiki_main
+        val glucose = glucoseMgDl ?: return R.drawable.kiki_main_anim
 
         val adjusted = applyTrend(glucose, trendRateMgDlPerMin)
         val thresholds = THRESHOLDS[diabetesType] ?: THRESHOLDS.getValue("NONE")
 
-        val severity = classifySeverity(adjusted, thresholds) ?: return R.drawable.kiki_main
+        val severity = classifySeverity(adjusted, thresholds) ?: return R.drawable.kiki_main_anim
         val symptom = classifySymptom(trendRateMgDlPerMin)
         return drawableFor(severity, symptom)
     }

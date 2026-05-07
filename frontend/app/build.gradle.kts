@@ -100,6 +100,7 @@ dependencies {
 
     // Coil (이미지 로딩)
     implementation(libs.coil.compose)
+    implementation(libs.coil.gif)
     implementation(libs.coil.network.okhttp)
 
     // kotlinx.serialization (JSON)

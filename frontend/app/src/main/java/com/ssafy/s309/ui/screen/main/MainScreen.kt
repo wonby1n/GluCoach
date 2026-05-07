@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -57,8 +56,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -69,6 +66,7 @@ import com.ssafy.s309.ui.component.BottomNavItem
 import com.ssafy.s309.ui.component.CurrentGlucoseCard
 import com.ssafy.s309.ui.component.GlucoseChartCard
 import com.ssafy.s309.ui.component.KikiCharacterMapper
+import com.ssafy.s309.ui.component.KikiImage
 import com.ssafy.s309.ui.component.SummaryStatCard
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
@@ -241,11 +239,9 @@ fun MainScreenContent(
                                     currentMgDl = state.currentGlucoseMgDl ?: 0,
                                     diffFromPrevious = state.diffFromPrevious,
                                     mascotSlot = {
-                                        Image(
-                                            painter = painterResource(id = kikiDrawable),
-                                            contentDescription = "키키 캐릭터",
+                                        KikiImage(
+                                            drawableRes = kikiDrawable,
                                             modifier = Modifier.fillMaxSize(),
-                                            contentScale = ContentScale.Fit,
                                         )
                                     },
                                 )
