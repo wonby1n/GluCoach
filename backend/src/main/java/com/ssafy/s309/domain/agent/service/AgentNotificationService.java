@@ -51,24 +51,37 @@ public class AgentNotificationService {
           "alert_type은 AGENT_ prefix로 시작해야 합니다. (룰 type은 BE 룰 트리거에서만 INSERT)");
     }
 
-    LocalDateTime since = LocalDateTime.now().minus(DEDUP_WINDOW);
-    if (chatMessageService.isDuplicateWithin(req.userId(), req.alertType(), since)) {
-      log.debug(
-          "Agent notification dedup skip: user={}, type={}, window={}m",
-          req.userId(),
-          req.alertType(),
-          DEDUP_WINDOW.toMinutes());
-      return new CreationOutcome(false, AgentNotificationCreateResponse.ofSkipped());
+    boolean isCommandReply = req.parentChatMessageId() != null;
+
+    if (!isCommandReply) {
+      LocalDateTime since = LocalDateTime.now().minus(DEDUP_WINDOW);
+      if (chatMessageService.isDuplicateWithin(req.userId(), req.alertType(), since)) {
+        log.debug(
+            "Agent notification dedup skip: user={}, type={}, window={}m",
+            req.userId(),
+            req.alertType(),
+            DEDUP_WINDOW.toMinutes());
+        return new CreationOutcome(false, AgentNotificationCreateResponse.ofSkipped());
+      }
     }
 
     ChatMessage saved =
-        chatMessageService.insertAgent(
-            req.userId(),
-            req.alertType(),
-            req.message(),
-            req.options(),
-            req.displayTrace(),
-            req.payload());
+        isCommandReply
+            ? chatMessageService.insertAgentResponse(
+                req.userId(),
+                req.parentChatMessageId(),
+                req.alertType(),
+                req.message(),
+                req.options(),
+                req.displayTrace(),
+                req.payload())
+            : chatMessageService.insertAgent(
+                req.userId(),
+                req.alertType(),
+                req.message(),
+                req.options(),
+                req.displayTrace(),
+                req.payload());
 
     chatFcmDispatcher.dispatch(req.userId(), req.alertType(), req.message(), saved.getId());
 

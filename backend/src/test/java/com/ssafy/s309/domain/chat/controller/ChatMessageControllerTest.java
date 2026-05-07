@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.s309.config.SecurityConfig;
 import com.ssafy.s309.config.TestSecurityConfig;
+import com.ssafy.s309.domain.agent.service.AiAgentCommandClient;
 import com.ssafy.s309.domain.auth.principal.CustomUserPrincipal;
 import com.ssafy.s309.domain.chat.dto.ChatCommandRequest;
 import com.ssafy.s309.domain.chat.dto.ChatReplyRequest;
@@ -51,6 +52,7 @@ class ChatMessageControllerTest {
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;
   @MockitoBean private ChatMessageService chatMessageService;
+  @MockitoBean private AiAgentCommandClient aiAgentCommandClient;
 
   private static final Integer USER_ID = 1;
 

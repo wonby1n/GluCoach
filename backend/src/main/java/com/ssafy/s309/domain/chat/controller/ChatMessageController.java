@@ -1,5 +1,6 @@
 package com.ssafy.s309.domain.chat.controller;
 
+import com.ssafy.s309.domain.agent.service.AiAgentCommandClient;
 import com.ssafy.s309.domain.auth.principal.CustomUserPrincipal;
 import com.ssafy.s309.domain.chat.dto.ChatCommandRequest;
 import com.ssafy.s309.domain.chat.dto.ChatMessageItem;
@@ -32,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ChatMessageController {
 
   private final ChatMessageService chatMessageService;
+  private final AiAgentCommandClient aiAgentCommandClient;
 
   @Operation(
       summary = "본인 채팅 메시지 페이징 조회",
@@ -84,6 +86,8 @@ public class ChatMessageController {
     ChatMessage saved =
         chatMessageService.insertUserCommand(
             principal.userId(), req.commandType(), req.message(), req.payload());
+    aiAgentCommandClient.dispatchAsync(
+        principal.userId(), saved.getId(), req.commandType(), req.payload());
     return ResponseEntity.status(HttpStatus.CREATED).body(ChatMessageItem.from(saved));
   }
 
