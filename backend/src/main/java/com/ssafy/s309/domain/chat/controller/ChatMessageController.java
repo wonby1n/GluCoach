@@ -16,6 +16,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -68,4 +70,22 @@ public class ChatMessageController {
         chatMessageService.replyByOption(principal.userId(), req.parentId(), req.optionId());
     return ResponseEntity.status(HttpStatus.CREATED).body(ChatMessageItem.from(saved));
   }
+
+  @Operation(summary = "메시지 읽음 처리", description = "본인 메시지가 아니면 403.")
+  @PatchMapping("/{id}/read")
+  public ResponseEntity<Void> markRead(
+      @AuthenticationPrincipal CustomUserPrincipal principal, @PathVariable Long id) {
+    chatMessageService.markRead(principal.userId(), id);
+    return ResponseEntity.noContent().build();
+  }
+
+  @Operation(summary = "안 읽음 카운트", description = "본인 메시지 중 is_read=false 개수.")
+  @GetMapping("/unread-count")
+  public ResponseEntity<UnreadCountResponse> unreadCount(
+      @AuthenticationPrincipal CustomUserPrincipal principal) {
+    return ResponseEntity.ok(
+        new UnreadCountResponse(chatMessageService.countUnread(principal.userId())));
+  }
+
+  public record UnreadCountResponse(long unreadCount) {}
 }
