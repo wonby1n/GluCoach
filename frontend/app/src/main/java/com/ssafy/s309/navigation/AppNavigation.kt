@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -38,6 +39,7 @@ import com.ssafy.s309.ui.screen.main.AddMenuSheet
 import com.ssafy.s309.ui.screen.main.GuardianScreen
 import com.ssafy.s309.ui.screen.main.KikiChatScreen
 import com.ssafy.s309.ui.screen.main.MainScreen
+import com.ssafy.s309.ui.screen.main.MainViewModel
 import com.ssafy.s309.ui.screen.main.MyAccountScreen
 import com.ssafy.s309.ui.screen.main.ReportMenuSheet
 import com.ssafy.s309.ui.screen.main.SettingsScreen
@@ -392,10 +394,14 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             }
         }
         composable(Screen.Graph.route) {
+            val mainEntry = remember(it) { navController.getBackStackEntry(Screen.Main.route) }
+            val mainViewModel = hiltViewModel<MainViewModel>(mainEntry)
+            val mainUiState by mainViewModel.uiState.collectAsStateWithLifecycle()
             SubScreenWithBottomNav(navController = navController, selectedId = "home") {
                 GraphScreen(
                     onBack = { navController.popBackStack() },
                     onNavigateToBle = { navController.navigate(Screen.Ble.route) },
+                    diabetesType = mainUiState.diabetesType,
                 )
             }
         }

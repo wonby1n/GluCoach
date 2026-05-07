@@ -33,6 +33,4 @@ class FoodRepository
                     )
                 aiFoodApi.detectFood(imagePart)
             }
-
-        suspend fun getFoodGrades(): Result<List<FoodGradeResponse>> = runCatching { foodApi.getFoodGrades() }
     }
