@@ -20,6 +20,11 @@ android {
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        val props = java.util.Properties()
+        val localPropsFile = File(rootDir, "local.properties")
+        if (localPropsFile.exists()) props.load(localPropsFile.inputStream())
+        buildConfigField("String", "GOOGLE_TTS_API_KEY", "\"${props.getProperty("GOOGLE_TTS_API_KEY", "")}\"")
     }
 
     buildTypes {
@@ -39,7 +44,9 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
+
 }
 
 kotlin {
