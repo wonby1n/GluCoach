@@ -79,10 +79,16 @@ public class PredictionService {
     return new AbPredictResponse(futureA.join(), futureB.join());
   }
 
-  /** AI 호출 (tx 밖) → DB 저장 (짧은 tx) → 응답 변환. predict / comparePredict 의 핵심 흐름 공통. */
+  /**
+   * AI 호출 (tx 밖) → DB 저장 (짧은 tx) → 응답 변환. predict / comparePredict 의 핵심 흐름 공통.
+   *
+   * <p>buildAiRequest 는 user 객체의 단순 칼럼(weight/diabetesType)만 접근하므로 detached 상태로 OK. savePrediction
+   * 은 userId 만 넘겨 새 tx 에서 proxy 를 발급하게 함 — detached entity 가 새 tx 의 association 으로 흘러들어가는 fragility
+   * 회피.
+   */
   private PredictResponse predictWithUser(User user, PredictRequest request) {
     GlucosePredictResponse aiResponse = glucosePredictClient.predict(buildAiRequest(user, request));
-    GlucosePrediction saved = tx.savePrediction(user, request, aiResponse);
+    GlucosePrediction saved = tx.savePrediction(user.getId(), request, aiResponse);
     return toResponse(saved.getId(), aiResponse);
   }
 

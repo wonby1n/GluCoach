@@ -31,12 +31,20 @@ class PredictionTxHelper {
         .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저: " + userId));
   }
 
+  /**
+   * 새 tx 안에서 User reference (proxy) 를 만들어 GlucosePrediction.user 에 연결.
+   *
+   * <p>호출자가 detached User 객체를 그대로 association 으로 넘기면 cascade 설정 변경 시 silent regression
+   * (PersistentObjectException / LazyInitializationException) 위험이 있음. userId 만 받고 새 tx 안에서 proxy 를
+   * 발급받아 안전하게 영속화. comparePredict 의 두 async worker 도 각자 자체 proxy 를 갖게 되어 동시성 자동 안전.
+   */
   @Transactional
   public GlucosePrediction savePrediction(
-      User user, PredictRequest request, GlucosePredictResponse aiResponse) {
+      Integer userId, PredictRequest request, GlucosePredictResponse aiResponse) {
+    User userRef = userRepository.getReferenceById(userId);
     return predictionRepository.save(
         GlucosePrediction.builder()
-            .user(user)
+            .user(userRef)
             .foodId(request.foodId())
             .foodName(request.foodName())
             .predictedCurve(aiResponse.curve())

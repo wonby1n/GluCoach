@@ -78,7 +78,7 @@ class PredictionServiceTest {
     given(glucosePredictClient.predict(any(GlucosePredictRequest.class))).willReturn(aiResp());
     given(
             tx.savePrediction(
-                any(User.class), any(PredictRequest.class), any(GlucosePredictResponse.class)))
+                any(Integer.class), any(PredictRequest.class), any(GlucosePredictResponse.class)))
         .willReturn(savedPrediction());
 
     assertThatCode(() -> predictionService.predictForFood(USER_ID, food))
@@ -99,14 +99,14 @@ class PredictionServiceTest {
     given(glucosePredictClient.predict(any(GlucosePredictRequest.class))).willReturn(aiResp());
     given(
             tx.savePrediction(
-                any(User.class), any(PredictRequest.class), any(GlucosePredictResponse.class)))
+                any(Integer.class), any(PredictRequest.class), any(GlucosePredictResponse.class)))
         .willReturn(savedPrediction());
 
     predictionService.predictForFood(USER_ID, food);
 
     ArgumentCaptor<PredictRequest> reqCaptor = ArgumentCaptor.forClass(PredictRequest.class);
     verify(tx)
-        .savePrediction(any(User.class), reqCaptor.capture(), any(GlucosePredictResponse.class));
+        .savePrediction(any(Integer.class), reqCaptor.capture(), any(GlucosePredictResponse.class));
     PredictRequest captured = reqCaptor.getValue();
     assertThat(captured.foodId()).isEqualTo(60);
     assertThat(captured.foodName()).isEqualTo("김치_배추");
@@ -120,7 +120,7 @@ class PredictionServiceTest {
     given(glucosePredictClient.predict(any(GlucosePredictRequest.class))).willReturn(aiResp());
     given(
             tx.savePrediction(
-                any(User.class), any(PredictRequest.class), any(GlucosePredictResponse.class)))
+                any(Integer.class), any(PredictRequest.class), any(GlucosePredictResponse.class)))
         .willReturn(savedPrediction());
 
     predictionService.predictForFood(USER_ID, food);
@@ -131,6 +131,6 @@ class PredictionServiceTest {
     inOrder
         .verify(tx)
         .savePrediction(
-            any(User.class), any(PredictRequest.class), any(GlucosePredictResponse.class));
+            any(Integer.class), any(PredictRequest.class), any(GlucosePredictResponse.class));
   }
 }
