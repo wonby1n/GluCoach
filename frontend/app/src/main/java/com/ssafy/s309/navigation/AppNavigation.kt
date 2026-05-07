@@ -25,6 +25,7 @@ import com.ssafy.s309.ui.screen.auth.SignUpScreen
 import com.ssafy.s309.ui.screen.ble.BleScreen
 import com.ssafy.s309.ui.screen.health.HealthSourceScreen
 import com.ssafy.s309.ui.screen.main.GuardianScreen
+import com.ssafy.s309.ui.screen.main.KikiChatScreen
 import com.ssafy.s309.ui.screen.main.MainScreen
 import com.ssafy.s309.ui.screen.main.MyAccountScreen
 import com.ssafy.s309.ui.screen.main.SettingsScreen
@@ -68,6 +69,8 @@ sealed class Screen(val route: String) {
     object Projector : Screen("projector")
 
     object MyAccount : Screen("my_account")
+
+    object KikiChat : Screen("kiki_chat")
 }
 
 @Composable
@@ -232,6 +235,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 onSettingsClick = { navController.navigate(Screen.Settings.route) },
                 onGuardianClick = { navController.navigate(Screen.Guardian.route) },
                 onAccountClick = { navController.navigate(Screen.MyAccount.route) },
+                onKikiChatClick = { navController.navigate(Screen.KikiChat.route) },
                 userEmail = authViewModel.userEmail,
             )
         }
@@ -280,6 +284,11 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         }
         composable(Screen.HealthSource.route) {
             HealthSourceScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(Screen.KikiChat.route) {
+            KikiChatScreen(
                 onBack = { navController.popBackStack() },
             )
         }
