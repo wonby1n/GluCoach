@@ -12,19 +12,21 @@ import com.ssafy.s309.domain.prediction.dto.CurvePoint;
 import com.ssafy.s309.domain.prediction.dto.PredictRequest;
 import com.ssafy.s309.domain.prediction.dto.PredictResponse;
 import com.ssafy.s309.domain.prediction.entity.GlucosePrediction;
-import com.ssafy.s309.domain.prediction.repository.GlucosePredictionRepository;
 import com.ssafy.s309.domain.user.entity.DiabetesType;
 import com.ssafy.s309.domain.user.entity.User;
-import com.ssafy.s309.domain.user.repository.UserRepository;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 식전 혈당 예측. AI 모델 호출 + 결과 저장.
+ *
+ * <p>트랜잭션 분리: AI 외부 호출(GlucosePredictClient)을 트랜잭션 밖에서 수행하기 위해 본 클래스 자체는 {@code @Transactional} 을
+ * 갖지 않는다. DB 조회(findUser)와 쓰기(savePrediction)는 {@link PredictionTxHelper} 의 짧은 tx 메서드들로 분리.
+ */
 @Service
 @RequiredArgsConstructor
 public class PredictionService {
@@ -39,28 +41,19 @@ public class PredictionService {
   private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
   private final GlucosePredictClient glucosePredictClient;
-  private final GlucosePredictionRepository predictionRepository;
-  private final UserRepository userRepository;
+  private final PredictionTxHelper tx;
 
-  @Transactional
   public PredictResponse predict(Integer userId, PredictRequest request) {
-    User user = findUser(userId);
-    GlucosePredictResponse aiResponse = glucosePredictClient.predict(buildAiRequest(user, request));
-    GlucosePrediction saved = savePrediction(user, request, aiResponse);
-    return toResponse(saved.getId(), aiResponse);
+    User user = tx.findUser(userId);
+    return predictWithUser(user, request);
   }
 
   /**
    * Food 엔티티 직접 입력 변종 — 사진 통합 예측({@code /from-image}) 흐름에서 사용.
    *
-   * <p>호출자(orchestrator)는 {@code food.carbsG NOT NULL} 보장 시점에만 호출해야 한다 (PENDING_NUTRITION 분기는 별도).
-   * protein/fat/kcal/sugar 는 그대로 통과 (NULL 허용) — AI 모델은 carbs 만 사용하고 {@link #savePrediction} 도 이
-   * 필드들을 저장하지 않으므로 무관. 향후 AI 입력 확장 시 NULL 이 silent regression 으로 흘러가지 않도록 폴백 0 을 의도적으로 도입하지 않음.
-   *
-   * <p>{@link PredictRequest} 의 {@code @NotNull} 제약은 {@code @Valid} 바인딩 시점에만 발동 — 본 메서드 내부 구성 호출에는
-   * 적용되지 않는다.
+   * <p>호출자(orchestrator)는 {@code food.carbsG NOT NULL} 보장 시점에만 호출해야 한다. protein/fat/kcal/sugar 는
+   * 그대로 통과 (NULL 허용) — AI 모델은 carbs 만 사용하고 savePrediction 도 이 필드들을 저장하지 않으므로 무관.
    */
-  @Transactional
   public PredictResponse predictForFood(Integer userId, Food food) {
     PredictRequest request =
         new PredictRequest(
@@ -76,33 +69,21 @@ public class PredictionService {
   }
 
   public AbPredictResponse comparePredict(Integer userId, AbPredictRequest request) {
-    User user = findUser(userId);
+    User user = tx.findUser(userId);
 
     CompletableFuture<PredictResponse> futureA =
-        CompletableFuture.supplyAsync(
-            () -> {
-              GlucosePredictResponse r =
-                  glucosePredictClient.predict(buildAiRequest(user, request.foodA()));
-              GlucosePrediction saved = savePrediction(user, request.foodA(), r);
-              return toResponse(saved.getId(), r);
-            });
-
+        CompletableFuture.supplyAsync(() -> predictWithUser(user, request.foodA()));
     CompletableFuture<PredictResponse> futureB =
-        CompletableFuture.supplyAsync(
-            () -> {
-              GlucosePredictResponse r =
-                  glucosePredictClient.predict(buildAiRequest(user, request.foodB()));
-              GlucosePrediction saved = savePrediction(user, request.foodB(), r);
-              return toResponse(saved.getId(), r);
-            });
+        CompletableFuture.supplyAsync(() -> predictWithUser(user, request.foodB()));
 
     return new AbPredictResponse(futureA.join(), futureB.join());
   }
 
-  private User findUser(Integer userId) {
-    return userRepository
-        .findById(userId)
-        .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저: " + userId));
+  /** AI 호출 (tx 밖) → DB 저장 (짧은 tx) → 응답 변환. predict / comparePredict 의 핵심 흐름 공통. */
+  private PredictResponse predictWithUser(User user, PredictRequest request) {
+    GlucosePredictResponse aiResponse = glucosePredictClient.predict(buildAiRequest(user, request));
+    GlucosePrediction saved = tx.savePrediction(user, request, aiResponse);
+    return toResponse(saved.getId(), aiResponse);
   }
 
   private GlucosePredictRequest buildAiRequest(User user, PredictRequest request) {
@@ -132,19 +113,6 @@ public class PredictionService {
       case T1D -> "T1D";
       case T2D -> "T2D";
     };
-  }
-
-  private GlucosePrediction savePrediction(
-      User user, PredictRequest request, GlucosePredictResponse aiResponse) {
-    return predictionRepository.save(
-        GlucosePrediction.builder()
-            .user(user)
-            .foodId(request.foodId())
-            .foodName(request.foodName())
-            .predictedCurve(aiResponse.curve())
-            .predictedPeak(
-                aiResponse.peakMgdl() != null ? BigDecimal.valueOf(aiResponse.peakMgdl()) : null)
-            .build());
   }
 
   private PredictResponse toResponse(Integer predictionId, GlucosePredictResponse aiResponse) {
