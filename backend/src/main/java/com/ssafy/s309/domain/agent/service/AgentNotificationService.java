@@ -63,7 +63,12 @@ public class AgentNotificationService {
 
     ChatMessage saved =
         chatMessageService.insertAgent(
-            req.userId(), req.alertType(), req.message(), req.options(), req.displayTrace());
+            req.userId(),
+            req.alertType(),
+            req.message(),
+            req.options(),
+            req.displayTrace(),
+            req.payload());
 
     chatFcmDispatcher.dispatch(req.userId(), req.alertType(), req.message());
 

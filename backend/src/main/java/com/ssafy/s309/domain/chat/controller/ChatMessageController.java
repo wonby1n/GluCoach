@@ -1,6 +1,7 @@
 package com.ssafy.s309.domain.chat.controller;
 
 import com.ssafy.s309.domain.auth.principal.CustomUserPrincipal;
+import com.ssafy.s309.domain.chat.dto.ChatCommandRequest;
 import com.ssafy.s309.domain.chat.dto.ChatMessageItem;
 import com.ssafy.s309.domain.chat.dto.ChatMessageListResponse;
 import com.ssafy.s309.domain.chat.dto.ChatReplyRequest;
@@ -68,6 +69,21 @@ public class ChatMessageController {
       @Valid @RequestBody ChatReplyRequest req) {
     ChatMessage saved =
         chatMessageService.replyByOption(principal.userId(), req.parentId(), req.optionId());
+    return ResponseEntity.status(HttpStatus.CREATED).body(ChatMessageItem.from(saved));
+  }
+
+  @Operation(
+      summary = "사용자 명령 발화",
+      description =
+          "사용자가 채팅 화면에서 미리 정의된 명령(예: 음식 추천)을 클릭. sender='user', command_type=NOT NULL, parent_id=NULL. "
+              + "후속 agent 응답이 INSERT 시 이 메시지의 id를 parent_id로 참조.")
+  @PostMapping("/command")
+  public ResponseEntity<ChatMessageItem> command(
+      @AuthenticationPrincipal CustomUserPrincipal principal,
+      @Valid @RequestBody ChatCommandRequest req) {
+    ChatMessage saved =
+        chatMessageService.insertUserCommand(
+            principal.userId(), req.commandType(), req.message(), req.payload());
     return ResponseEntity.status(HttpStatus.CREATED).body(ChatMessageItem.from(saved));
   }
 

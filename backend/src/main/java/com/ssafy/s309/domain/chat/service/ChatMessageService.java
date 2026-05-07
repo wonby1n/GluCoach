@@ -24,17 +24,21 @@ public class ChatMessageService {
 
   private final ChatMessageRepository chatMessageRepository;
 
-  /** Agent 발신 메시지. options 정확히 3개 필수. */
+  private static final int MAX_OPTIONS = 10;
+
+  /**
+   * Agent 발신 메시지(push). options는 nullable, 최대 10개. push 흐름이라 parent_id는 항상 NULL. command 응답으로 보내는
+   * 경우는 {@link #insertAgentResponse}를 사용.
+   */
   @Transactional
   public ChatMessage insertAgent(
       Integer userId,
       String messageType,
       String message,
       List<Map<String, String>> options,
-      Map<String, Object> displayTrace) {
-    if (options == null || options.size() != 3) {
-      throw new IllegalArgumentException("agent message requires exactly 3 options");
-    }
+      Map<String, Object> displayTrace,
+      Map<String, Object> payload) {
+    validateOptions(options);
     return chatMessageRepository.save(
         ChatMessage.builder()
             .userId(userId)
@@ -43,8 +47,66 @@ public class ChatMessageService {
             .message(message)
             .options(options)
             .displayTrace(displayTrace)
+            .payload(payload)
             .source(ChatMessage.SOURCE_AGENT)
             .build());
+  }
+
+  /**
+   * Agent가 사용자 command(parent)에 대한 응답으로 INSERT. parent 소유자/sender 검증 후 parent_id 채워서 저장. 외부
+   * 호출자(Agent 통합 시 BE 내부 트리거)에서 사용.
+   */
+  @Transactional
+  public ChatMessage insertAgentResponse(
+      Integer userId,
+      Long parentId,
+      String messageType,
+      String message,
+      List<Map<String, String>> options,
+      Map<String, Object> displayTrace,
+      Map<String, Object> payload) {
+    ChatMessage parent =
+        chatMessageRepository
+            .findByIdAndUserId(parentId, userId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN));
+    if (!ChatMessage.SENDER_USER.equals(parent.getSender()) || parent.getCommandType() == null) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, "parent must be a user command message");
+    }
+    validateOptions(options);
+    return chatMessageRepository.save(
+        ChatMessage.builder()
+            .userId(userId)
+            .sender(ChatMessage.SENDER_AGENT)
+            .messageType(messageType)
+            .message(message)
+            .options(options)
+            .displayTrace(displayTrace)
+            .payload(payload)
+            .parentId(parentId)
+            .source(ChatMessage.SOURCE_AGENT)
+            .build());
+  }
+
+  /** 사용자가 채팅 화면에서 자발적으로 발화한 명령. parent_id NULL, command_type NOT NULL. */
+  @Transactional
+  public ChatMessage insertUserCommand(
+      Integer userId, String commandType, String message, Map<String, Object> payload) {
+    String body = (message != null && !message.isBlank()) ? message : commandType;
+    return chatMessageRepository.save(
+        ChatMessage.builder()
+            .userId(userId)
+            .sender(ChatMessage.SENDER_USER)
+            .commandType(commandType)
+            .message(body)
+            .payload(payload)
+            .build());
+  }
+
+  private void validateOptions(List<Map<String, String>> options) {
+    if (options != null && options.size() > MAX_OPTIONS) {
+      throw new IllegalArgumentException("options must contain at most " + MAX_OPTIONS + " items");
+    }
   }
 
   /** BE 룰 발신 메시지 (HIGH/LOW/SOS/WEEKLY_REPORT 등). */
