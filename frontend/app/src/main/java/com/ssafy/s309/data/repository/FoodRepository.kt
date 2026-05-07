@@ -3,6 +3,7 @@ package com.ssafy.s309.data.repository
 import com.ssafy.s309.data.api.AiFoodApi
 import com.ssafy.s309.data.api.FoodApi
 import com.ssafy.s309.data.model.DetectResponse
+import com.ssafy.s309.data.model.FoodGradeResponse
 import com.ssafy.s309.data.model.FoodSearchItem
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -30,4 +31,6 @@ class FoodRepository
                     )
                 aiFoodApi.detectFood(imagePart)
             }
+
+        suspend fun getFoodGrades(): Result<List<FoodGradeResponse>> = runCatching { foodApi.getFoodGrades() }
     }
