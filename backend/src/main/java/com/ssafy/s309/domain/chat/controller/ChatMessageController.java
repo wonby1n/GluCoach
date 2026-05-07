@@ -1,0 +1,51 @@
+package com.ssafy.s309.domain.chat.controller;
+
+import com.ssafy.s309.domain.auth.principal.CustomUserPrincipal;
+import com.ssafy.s309.domain.chat.dto.ChatMessageItem;
+import com.ssafy.s309.domain.chat.dto.ChatMessageListResponse;
+import com.ssafy.s309.domain.chat.service.ChatMessageService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/chat/messages")
+@RequiredArgsConstructor
+@Tag(name = "ChatMessages", description = "사용자 채팅 메시지 (agent/system 발신 + user 응답)")
+public class ChatMessageController {
+
+  private final ChatMessageService chatMessageService;
+
+  @Operation(
+      summary = "본인 채팅 메시지 페이징 조회",
+      description =
+          "최신순 (created_at DESC). agent/system/user 모든 sender 포함. unreadCount는 sender 무관 미읽음 개수.")
+  @GetMapping
+  public ResponseEntity<ChatMessageListResponse> list(
+      @AuthenticationPrincipal CustomUserPrincipal principal,
+      @Parameter(description = "page index (0부터)", example = "0")
+          @RequestParam(value = "page", defaultValue = "0")
+          int page,
+      @Parameter(description = "page size", example = "20")
+          @RequestParam(value = "size", defaultValue = "20")
+          int size) {
+    Page<com.ssafy.s309.domain.chat.entity.ChatMessage> result =
+        chatMessageService.pageByUser(principal.userId(), page, size);
+    long unreadCount = chatMessageService.countUnread(principal.userId());
+    return ResponseEntity.ok(
+        new ChatMessageListResponse(
+            result.getContent().stream().map(ChatMessageItem::from).toList(),
+            result.getNumber(),
+            result.getSize(),
+            result.getTotalElements(),
+            unreadCount));
+  }
+}
