@@ -187,9 +187,11 @@ Content-Type: application/json
 
 | 기능명 | Method | 엔드포인트 | 상세 설명 | 구현 | 우선순위 |
 |--------|--------|-----------|-----------|------|---------|
-| 음식 사진 인식 + 공공데이터 자동 연동 | POST | `/ai/food/recognize-and-fetch` | 사진 → CV 모델 인식 → 식품안전처 API 자동 조회 → 영양 정보 반환 (원스텝) | ⬜ | 🔴 Highest |
+| 음식 사진 인식 + 공공데이터 자동 연동 | POST | `/ai/food/recognize-and-fetch` | 사진 → CV 모델 인식 → 식품안전처 API 자동 조회 → 영양 정보 반환 (원스텝). **사용 시나리오: 식사 *기록* 흐름** (예측 곡선 불필요) | ⬜ | 🔴 Highest |
 | 음식 사진 인식 (CV만) | POST | `/ai/food/recognize` | Camera2 API 촬영 → FastAPI CV 모델. confidence 0.6 미만 시 확인 UI. 실패 시 텍스트 입력 fallback | ⬜ | 🔴 Highest |
 | 음식명으로 영양 정보 조회 | GET | `/api/food/search?q={keyword}` | **공공데이터포털 식품영양성분 API(`FoodNtrCpntDbInfo02`)** 호출 후 `foods` 캐싱 (30일 TTL). 캐시 우선 조회. 응답: 영양표시 9대 항목 + 식이섬유 + category(food_lv3_nm) | 🟩 | 🔴 Highest |
+
+> **§7 `/api/predict/glucose/from-image` 와의 책임 구분**: from-image 는 **식전 시뮬레이션** 용 통합 엔드포인트로 CV 인식 + foods 조회 + 예측 모델까지 단일 호출에서 처리. 위 `/ai/food/recognize-and-fetch` 는 **식사 기록** 흐름에서 예측 없이 영양 정보만 필요할 때 사용 (POST `/api/meals` 직전). 두 엔드포인트는 ① CV ② foods 조회 단계의 내부 구현을 공유하지만 호출 시나리오가 다르다.
 
 ---
 
@@ -210,6 +212,7 @@ Content-Type: application/json
 |--------|--------|-----------|-----------|------|---------|
 | 식후 혈당 곡선 예측 | POST | `/api/predict/glucose` | 음식 영양 데이터 + 유저 프로필(JWT) → AI 예측 모델 호출 → 식후 2시간 혈당 곡선(5분 간격 25포인트) 반환. 현재 `generic` 모드 고정 (personalized 미구현). 결과는 `glucose_predictions` 히스토리에 저장 | 🟩 | 🔴 Highest |
 | A/B 비교 모드 | POST | `/api/predict/glucose/compare` | 2개 음식 동시 입력 → 예측 API 병렬 2회 호출 (`CompletableFuture`). 동일 시간축 곡선 비교. 최고 혈당 차이 강조 | 🟩 | 🔴 Highest |
+| **사진 통합 식전 예측** | POST | `/api/predict/glucose/from-image` | multipart 이미지 1장 → BE 내부에서 ① CV 인식 ② foods 조회/식약처 API ③ 예측 모델 호출까지 단일 호출 처리. confidence 미달·인식 실패·영양정보 결측은 `Status` enum 으로 분기. 인식 음식이 DB·API 모두 미스면 `customized=true` 로 신규 등록 후 `PENDING_NUTRITION` 응답 | 🟩 | 🔴 Highest |
 
 ### 요청 DTO 핵심 타입
 
@@ -223,7 +226,71 @@ Content-Type: application/json
 
 | 구간 | Method | 엔드포인트 | 설명 |
 |------|--------|-----------|------|
-| BE → AI | POST | `{AI_SERVICE_URL}/inference/glucose` | AI 모델 추론 요청. BE가 음식 + 유저 데이터를 조합하여 호출. 재시도 3회, 백오프 200/400/800ms, Correlation ID 추적. UserProfile은 외부 DTO라 BigDecimal → `floatValue()`로 변환 |
+| BE → AI | POST | `{AI_SERVICE_URL}/inference/glucose/meal` | AI 혈당 예측 모델 추론 요청. BE 가 음식 + 유저 데이터를 조합하여 호출. 재시도 3회, 백오프 200/400/800ms, Correlation ID 추적. UserProfile은 외부 DTO라 BigDecimal → `floatValue()`로 변환 |
+| BE → AI | POST | `{AI_SERVICE_URL}/api/v1/food/detect` | AI 음식 인식 모델 추론. multipart `file` 파트로 이미지 전송. 재시도/백오프/Correlation ID 정책은 위와 동일 (`FoodDetectClientImpl`). 응답은 `{count, detections[]}` (snake_case JSON), `detections` 는 confidence DESC 정렬됨 |
+
+### `/api/predict/glucose/from-image` 상세
+
+**요청** — `multipart/form-data`, 인증 필수
+- `image`: 이미지 파일 (`image/*` content-type, 빈 파일 금지). 위반 시 400.
+
+**응답 — `FromImagePredictResponse`**
+```jsonc
+{
+  "status": "OK | LOW_CONFIDENCE | PENDING_NUTRITION",
+  "detected": [                     // CV 가 반환한 모든 항목 (confidence DESC 정렬)
+    { "name_ko": "비빔밥", "name_en": "bibimbap", "confidence": 0.91 }
+  ],
+  "foodId":   1,                    // OK / PENDING_NUTRITION 일 때 채워짐, LOW_CONFIDENCE 는 null
+  "foodName": "비빔밥",              // 위와 동일
+  "prediction": { /* PredictResponse */ },  // OK 일 때만, 그 외는 null
+  "requireConfirmation": false      // LOW_CONFIDENCE 만 true
+}
+```
+
+**`Status` 분기**
+
+| Status | 트리거 조건 | FE 처리 |
+|---|---|---|
+| `OK` | 인식 confidence ≥ 0.6 + foods 영양정보 확보 (DB 캐시 hit 또는 식약처 API fetch) | `prediction.curve` 표시 |
+| `LOW_CONFIDENCE` | `detections` 비어있음 / top confidence < 0.6 / top `name_ko` blank | `detected[]` 노출, 사용자 선택·텍스트 입력 fallback. `requireConfirmation=true` |
+| `PENDING_NUTRITION` | 인식 OK 지만 foods·식약처 API 모두 미스 → `customized=true` row 신규 저장. 영양정보 결측 | "탄수화물 직접 입력" UI. 입력 시 `POST /api/predict/glucose` 재호출, 미입력 시 빈 prediction 그대로 표시 |
+
+> 임계값 `CONFIDENCE_THRESHOLD = 0.6` 은 `FromImagePredictionService` 상수. 변경 시 BE 코드 + 본 스펙 동시 갱신 필요.
+
+**FE 4단계 진행 애니메이션 매핑**
+
+단일 호출이지만 BE 내부 4단계 진행을 FE 가 시각적으로 표현:
+
+| 단계 | 단계명 | 매핑 |
+|---|---|---|
+| ① | 인식 중 | `FoodDetectClient.detect()` 호출 |
+| ② | 영양 정보 조회 중 | `FoodResolutionService.resolve()` (DB → 식약처 API → customized 폴백) |
+| ③ | 혈당 예측 중 | `PredictionService.predictForFood()` |
+| ④ | 결과 표시 | 응답 수신 |
+
+LOW_CONFIDENCE 는 ① 직후 종료, PENDING_NUTRITION 은 ② 직후 종료 (③ 미실행). FE 는 응답의 `status` 로 어느 단계까지 진행됐는지 역추적 가능.
+
+**호출 시퀀스**
+
+```
+FE                     PredictionController         FromImagePredictionService
+ │  multipart image     │                            │
+ ├──────────────────────►│ 검증(image/* + non-empty)   │
+ │                      ├────────────────────────────►│ predict(userId, image)
+ │                      │                            │  ├─ FoodDetectClient.detect       (① CV)
+ │                      │                            │  │    confidence < 0.6 / blank ko
+ │                      │                            │  │    └─ return LOW_CONFIDENCE
+ │                      │                            │  ├─ FoodResolutionService.resolve (② foods)
+ │                      │                            │  │    PENDING_NUTRITION 분기
+ │                      │                            │  │    └─ return PENDING_NUTRITION
+ │                      │                            │  └─ PredictionService.predictForFood (③ 예측)
+ │                      │                            │       └─ return OK
+ │  FromImagePredictResponse                         │
+ │◄──────────────────────────────────────────────────│
+```
+
+**관련 코드**: [FromImagePredictionService.java](../src/main/java/com/ssafy/s309/domain/prediction/service/FromImagePredictionService.java) · [FromImagePredictResponse.java](../src/main/java/com/ssafy/s309/domain/prediction/dto/FromImagePredictResponse.java) · [PredictionController.java](../src/main/java/com/ssafy/s309/domain/prediction/controller/PredictionController.java)
 
 
 ### 식전 예측 vs 식후 기록 역할 구분

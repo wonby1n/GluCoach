@@ -53,32 +53,46 @@ public class FoodDetectClientImpl implements FoodDetectClient {
             ? image.getContentType()
             : DEFAULT_CONTENT_TYPE;
 
-    String correlationId = ensureCorrelationId();
-    long backoffMs = INITIAL_BACKOFF_MS;
-    AiServiceException lastException = null;
+    // MDC 소유권: 호출 전 비어있던 경우만 put + 종료 시점에 remove.
+    // 외부에서 주입된 correlationId 는 보존 (Tomcat 스레드 풀 재사용 시 잔류값 방지 + 외부 컨텍스트 존중).
+    String existing = MDC.get(CORRELATION_ID_MDC_KEY);
+    boolean ownsCorrelationId = existing == null || existing.isBlank();
+    String correlationId = ownsCorrelationId ? UUID.randomUUID().toString() : existing;
+    if (ownsCorrelationId) {
+      MDC.put(CORRELATION_ID_MDC_KEY, correlationId);
+    }
 
-    for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      try {
-        return doDetect(bytes, filename, contentType, correlationId, attempt);
-      } catch (AiServiceException e) {
-        lastException = e;
-        if (!isRetryable(e)) {
-          throw e;
-        }
-        if (attempt < MAX_ATTEMPTS) {
-          log.warn(
-              "[{}] AI 음식 인식 실패 (attempt={}/{}, errorType={}) — {}ms 후 재시도",
-              correlationId,
-              attempt,
-              MAX_ATTEMPTS,
-              e.getErrorType(),
-              backoffMs);
-          sleep(backoffMs);
-          backoffMs = (long) (backoffMs * BACKOFF_MULTIPLIER);
+    try {
+      long backoffMs = INITIAL_BACKOFF_MS;
+      AiServiceException lastException = null;
+
+      for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+          return doDetect(bytes, filename, contentType, correlationId, attempt);
+        } catch (AiServiceException e) {
+          lastException = e;
+          if (!isRetryable(e)) {
+            throw e;
+          }
+          if (attempt < MAX_ATTEMPTS) {
+            log.warn(
+                "[{}] AI 음식 인식 실패 (attempt={}/{}, errorType={}) — {}ms 후 재시도",
+                correlationId,
+                attempt,
+                MAX_ATTEMPTS,
+                e.getErrorType(),
+                backoffMs);
+            sleep(backoffMs);
+            backoffMs = (long) (backoffMs * BACKOFF_MULTIPLIER);
+          }
         }
       }
+      throw lastException;
+    } finally {
+      if (ownsCorrelationId) {
+        MDC.remove(CORRELATION_ID_MDC_KEY);
+      }
     }
-    throw lastException;
   }
 
   FoodDetectResponse doDetect(
@@ -153,16 +167,6 @@ public class FoodDetectClientImpl implements FoodDetectClient {
   private boolean isRetryable(AiServiceException e) {
     return e.getErrorType() == ErrorType.TIMEOUT
         || e.getErrorType() == ErrorType.SERVICE_UNAVAILABLE;
-  }
-
-  private String ensureCorrelationId() {
-    String existing = MDC.get(CORRELATION_ID_MDC_KEY);
-    if (existing != null && !existing.isBlank()) {
-      return existing;
-    }
-    String generated = UUID.randomUUID().toString();
-    MDC.put(CORRELATION_ID_MDC_KEY, generated);
-    return generated;
   }
 
   private static void sleep(long ms) {

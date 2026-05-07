@@ -121,6 +121,12 @@ services:
       - "8000"
     environment:
       DEBUG: ${AI_DEBUG:-false}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://gms.ssafy.io/gmsapi/api.openai.com/v1}
+      AWS_ACCESS_KEY_ID: ${AWS_S3_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${AWS_S3_SECRET_KEY}
+      AWS_REGION: ${AWS_S3_REGION:-ap-northeast-2}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
     volumes:
       - ai-models:/app/models
     healthcheck:
