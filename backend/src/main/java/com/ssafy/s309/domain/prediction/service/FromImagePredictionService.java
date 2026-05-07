@@ -40,12 +40,22 @@ public class FromImagePredictionService {
     FoodDetectResponse detection = foodDetectClient.detect(image);
     List<FoodDetection> detections = detection.detections();
 
-    if (detections.isEmpty() || detections.get(0).confidence() < CONFIDENCE_THRESHOLD) {
+    // detections 는 AI 측에서 confidence DESC 정렬됨 (FoodDetectResponse javadoc 참조).
+    // nameKo blank 가드는 AI FOOD_LABELS 에 ko 라벨 누락된 신규 클래스가 추가될 때 silent break 막기 위함.
+    // 현재 AI 구현은 보장하지만 모델 업데이트 시점의 안전망.
+    boolean lowConfidence =
+        detections.isEmpty()
+            || detections.get(0).confidence() < CONFIDENCE_THRESHOLD
+            || isBlank(detections.get(0).nameKo());
+    if (lowConfidence) {
+      String topName = detections.isEmpty() ? null : detections.get(0).nameKo();
+      Double topConfidence = detections.isEmpty() ? null : detections.get(0).confidence();
       log.info(
-          "[FromImagePredict] LOW_CONFIDENCE userId={} count={} topConfidence={}",
+          "[FromImagePredict] LOW_CONFIDENCE userId={} count={} topName={} topConfidence={}",
           userId,
           detections.size(),
-          detections.isEmpty() ? null : detections.get(0).confidence());
+          topName,
+          topConfidence);
       return new FromImagePredictResponse(
           Status.LOW_CONFIDENCE, detections, null, null, null, true);
     }
@@ -72,5 +82,9 @@ public class FromImagePredictionService {
         resolution.status());
     return new FromImagePredictResponse(
         Status.OK, detections, food.getId(), food.getName(), prediction, false);
+  }
+
+  private static boolean isBlank(String s) {
+    return s == null || s.isBlank();
   }
 }

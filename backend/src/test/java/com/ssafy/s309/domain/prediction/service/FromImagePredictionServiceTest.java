@@ -149,6 +149,32 @@ class FromImagePredictionServiceTest {
   }
 
   @Test
+  void top_nameKo가_blank이면_LOW_CONFIDENCE로_폴백() {
+    // AI FOOD_LABELS 에 ko 라벨 누락된 신규 클래스가 추가되는 경우 방어.
+    FoodDetection blankKo =
+        new FoodDetection("", "unknown_class", 0.95, new FoodBBox(0, 0, 10, 10));
+    given(foodDetectClient.detect(IMAGE)).willReturn(new FoodDetectResponse(1, List.of(blankKo)));
+
+    FromImagePredictResponse result = service.predict(USER_ID, IMAGE);
+
+    assertThat(result.status()).isEqualTo(Status.LOW_CONFIDENCE);
+    assertThat(result.requireConfirmation()).isTrue();
+    verify(foodResolutionService, never()).resolve(anyString());
+  }
+
+  @Test
+  void top_nameKo가_null이면_LOW_CONFIDENCE로_폴백() {
+    FoodDetection nullKo =
+        new FoodDetection(null, "unknown_class", 0.95, new FoodBBox(0, 0, 10, 10));
+    given(foodDetectClient.detect(IMAGE)).willReturn(new FoodDetectResponse(1, List.of(nullKo)));
+
+    FromImagePredictResponse result = service.predict(USER_ID, IMAGE);
+
+    assertThat(result.status()).isEqualTo(Status.LOW_CONFIDENCE);
+    verify(foodResolutionService, never()).resolve(anyString());
+  }
+
+  @Test
   void 임계값_경계_정확히_0_6은_OK_경로_진입() {
     FoodDetection top = detection("비빔밥", FromImagePredictionService.CONFIDENCE_THRESHOLD);
     Food food = foodWithCarbs(40, "비빔밥");

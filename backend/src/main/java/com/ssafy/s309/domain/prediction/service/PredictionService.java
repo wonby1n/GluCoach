@@ -54,8 +54,11 @@ public class PredictionService {
    * Food 엔티티 직접 입력 변종 — 사진 통합 예측({@code /from-image}) 흐름에서 사용.
    *
    * <p>호출자(orchestrator)는 {@code food.carbsG NOT NULL} 보장 시점에만 호출해야 한다 (PENDING_NUTRITION 분기는 별도).
-   * protein/fat/kcal 결측은 0 으로 폴백 — AI 모델은 carbs 만 사용하므로 예측 정확도에 영향 없고, glucose_predictions 테이블에 0
-   * 으로 기록될 뿐이다.
+   * protein/fat/kcal/sugar 는 그대로 통과 (NULL 허용) — AI 모델은 carbs 만 사용하고 {@link #savePrediction} 도 이
+   * 필드들을 저장하지 않으므로 무관. 향후 AI 입력 확장 시 NULL 이 silent regression 으로 흘러가지 않도록 폴백 0 을 의도적으로 도입하지 않음.
+   *
+   * <p>{@link PredictRequest} 의 {@code @NotNull} 제약은 {@code @Valid} 바인딩 시점에만 발동 — 본 메서드 내부 구성 호출에는
+   * 적용되지 않는다.
    */
   @Transactional
   public PredictResponse predictForFood(Integer userId, Food food) {
@@ -64,9 +67,9 @@ public class PredictionService {
             food.getId(),
             food.getName(),
             food.getCarbsG(),
-            food.getProteinG() != null ? food.getProteinG() : BigDecimal.ZERO,
-            food.getFatG() != null ? food.getFatG() : BigDecimal.ZERO,
-            food.getKcal() != null ? food.getKcal() : BigDecimal.ZERO,
+            food.getProteinG(),
+            food.getFatG(),
+            food.getKcal(),
             food.getSugarG(),
             null);
     return predict(userId, request);
