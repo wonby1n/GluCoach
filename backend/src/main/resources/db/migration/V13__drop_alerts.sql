@@ -30,4 +30,11 @@ ALTER TABLE guardian_notifications
 ALTER TABLE guardian_notifications
   ALTER COLUMN chat_message_id SET NOT NULL;
 
+-- chat_messages.alert_id 고아 컬럼/인덱스 정리 (V10에서 만든 alerts FK)
+DROP INDEX IF EXISTS idx_chat_messages_alert;
+ALTER TABLE chat_messages
+  DROP CONSTRAINT IF EXISTS fk_chat_messages_alert;
+ALTER TABLE chat_messages
+  DROP COLUMN IF EXISTS alert_id;
+
 DROP TABLE alerts CASCADE;
