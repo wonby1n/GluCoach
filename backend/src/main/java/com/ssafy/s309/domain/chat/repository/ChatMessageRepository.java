@@ -23,4 +23,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
   /** 정상 복귀 시 해소할 활성 룰 메시지 조회. */
   List<ChatMessage> findByUserIdAndAlertTypeInAndResolvedAtIsNull(
       Integer userId, List<String> alertTypes);
+
+  /** Agent #6 notification_history — alert_type이 있는 메시지(agent/system 발신)만, 최근 N시간. */
+  List<ChatMessage> findByUserIdAndAlertTypeIsNotNullAndCreatedAtAfterOrderByCreatedAtDesc(
+      Integer userId, LocalDateTime since);
 }
