@@ -10,9 +10,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Component;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
@@ -134,7 +136,8 @@ public class FoodDetectClientImpl implements FoodDetectClient {
     }
   }
 
-  private static Object buildMultipartBody(byte[] bytes, String filename, String contentType) {
+  private static MultiValueMap<String, HttpEntity<?>> buildMultipartBody(
+      byte[] bytes, String filename, String contentType) {
     MultipartBodyBuilder builder = new MultipartBodyBuilder();
     ByteArrayResource resource =
         new ByteArrayResource(bytes) {
