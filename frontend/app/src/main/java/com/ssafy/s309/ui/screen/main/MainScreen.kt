@@ -97,6 +97,8 @@ fun MainScreen(
     onAccountClick: () -> Unit = {},
     onKikiChatClick: () -> Unit = {},
     userEmail: String = "",
+    requestedTab: String? = null,
+    onTabHandled: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -120,6 +122,8 @@ fun MainScreen(
         onAccountClick = onAccountClick,
         onKikiChatClick = onKikiChatClick,
         userEmail = userEmail,
+        requestedTab = requestedTab,
+        onTabHandled = onTabHandled,
         // [DEBUG_KIKI_TEST]
         onDebugSetGlucose = viewModel::debugSetGlucose,
     )
@@ -146,6 +150,8 @@ fun MainScreenContent(
     onAccountClick: () -> Unit = {},
     onKikiChatClick: () -> Unit = {},
     userEmail: String = "",
+    requestedTab: String? = null,
+    onTabHandled: () -> Unit = {},
     // [DEBUG_KIKI_TEST]
     onDebugSetGlucose: (Int, Float) -> Unit = { _, _ -> },
 ) {
@@ -155,6 +161,21 @@ fun MainScreenContent(
     var capturedPhotoFile by remember { mutableStateOf<java.io.File?>(null) }
     var showReportSheet by remember { mutableStateOf(false) }
     var showAddSheet by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.LaunchedEffect(requestedTab) {
+        if (requestedTab != null) {
+            showReportSheet = false
+            showAddSheet = false
+            if (requestedTab == "food-scan") {
+                scanSessionId++
+                showCamera = true
+                selectedTab = "add"
+            } else {
+                selectedTab = requestedTab
+            }
+            onTabHandled()
+        }
+    }
 
     Box(
         modifier =
@@ -546,7 +567,7 @@ private fun SummaryRow(
     }
 }
 
-private fun defaultBottomNavItems(): List<BottomNavItem> =
+internal fun defaultBottomNavItems(): List<BottomNavItem> =
     listOf(
         BottomNavItem(id = "home", label = "홈", icon = Icons.Outlined.Home),
         BottomNavItem(id = "report", label = "리포트", icon = Icons.Outlined.Description),
@@ -556,7 +577,7 @@ private fun defaultBottomNavItems(): List<BottomNavItem> =
     )
 
 @Composable
-private fun ReportMenuSheet(
+internal fun ReportMenuSheet(
     onAIReport: () -> Unit,
     onFoodReport: () -> Unit,
     onClose: () -> Unit,
@@ -643,7 +664,7 @@ private fun ReportMenuSheet(
 }
 
 @Composable
-private fun AddMenuSheet(
+internal fun AddMenuSheet(
     onABComparison: () -> Unit,
     onFoodScan: () -> Unit,
     onClose: () -> Unit,
