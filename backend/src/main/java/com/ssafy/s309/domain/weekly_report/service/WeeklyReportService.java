@@ -7,6 +7,7 @@ import com.ssafy.s309.domain.notification.repository.NotificationTokenRepository
 import com.ssafy.s309.domain.user.entity.User;
 import com.ssafy.s309.domain.weekly_report.dto.WeeklyReportAiRequest;
 import com.ssafy.s309.domain.weekly_report.dto.WeeklyReportAiResponse;
+import com.ssafy.s309.domain.weekly_report.dto.WeeklyReportResponse;
 import com.ssafy.s309.domain.weekly_report.dto.projection.WeeklyFoodItemProjection;
 import com.ssafy.s309.domain.weekly_report.entity.WeeklyFood;
 import com.ssafy.s309.domain.weekly_report.entity.WeeklyReport;
@@ -17,11 +18,15 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @Service
@@ -105,6 +110,34 @@ public class WeeklyReportService {
     }
 
     log.info("주간 보고서 생성 완료: userId={} reportId={} pdfKey={}", user.getId(), saved.getId(), pdfKey);
+  }
+
+  @Transactional(readOnly = true)
+  public List<WeeklyReportResponse> findAllByUserId(Integer userId) {
+    List<WeeklyReport> reports = weeklyReportRepository.findByUserIdOrderByWeekStartDesc(userId);
+    if (reports.isEmpty()) {
+      return List.of();
+    }
+    List<Integer> reportIds = reports.stream().map(WeeklyReport::getId).toList();
+    Map<Integer, List<WeeklyFood>> foodsByReportId =
+        weeklyFoodRepository.findByReportIdInWithFood(reportIds).stream()
+            .collect(Collectors.groupingBy(WeeklyFood::getReportId));
+    return reports.stream()
+        .map(r -> WeeklyReportResponse.from(r, foodsByReportId.getOrDefault(r.getId(), List.of())))
+        .toList();
+  }
+
+  @Transactional(readOnly = true)
+  public String getPdfPresignedUrl(Integer reportId, Integer userId) {
+    WeeklyReport report =
+        weeklyReportRepository
+            .findById(reportId)
+            .orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "보고서를 찾을 수 없습니다."));
+    if (!report.getUserId().equals(userId)) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
+    }
+    return s3Service.getPresignedDownloadUrl(report.getPdfKey());
   }
 
   private WeeklyFood toWeeklyFood(Integer reportId, WeeklyFoodItemProjection p, String type) {

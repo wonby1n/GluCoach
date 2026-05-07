@@ -63,18 +63,19 @@ public interface MealRecordRepository extends JpaRepository<MealRecord, Integer>
   @Query(
       value =
           """
-          SELECT f.id   AS food_id,
-                 f.name AS food_name,
-                 ROUND(AVG(mgr.slope)::numeric, 1) AS avg_slope
+          SELECT f.id         AS food_id,
+                 f.name       AS food_name,
+                 ufg.avg_slope AS avg_slope
           FROM meal_records mr
-          JOIN meal_glucose_responses mgr ON mr.id = mgr.meal_id
           JOIN foods f ON mr.food_id = f.id
+          JOIN user_food_grades ufg ON ufg.user_id = :userId AND ufg.food_id = f.id
           WHERE mr.user_id = :userId
             AND mr.recorded_at >= :from
             AND mr.recorded_at < :to
             AND mr.food_id IS NOT NULL
-          GROUP BY f.id, f.name
-          ORDER BY avg_slope ASC
+            AND ufg.grade IN ('S', 'A', 'B')
+          GROUP BY f.id, f.name, ufg.avg_slope
+          ORDER BY ufg.avg_slope ASC
           LIMIT 5
           """,
       nativeQuery = true)
@@ -86,18 +87,19 @@ public interface MealRecordRepository extends JpaRepository<MealRecord, Integer>
   @Query(
       value =
           """
-          SELECT f.id   AS food_id,
-                 f.name AS food_name,
-                 ROUND(AVG(mgr.slope)::numeric, 1) AS avg_slope
+          SELECT f.id         AS food_id,
+                 f.name       AS food_name,
+                 ufg.avg_slope AS avg_slope
           FROM meal_records mr
-          JOIN meal_glucose_responses mgr ON mr.id = mgr.meal_id
           JOIN foods f ON mr.food_id = f.id
+          JOIN user_food_grades ufg ON ufg.user_id = :userId AND ufg.food_id = f.id
           WHERE mr.user_id = :userId
             AND mr.recorded_at >= :from
             AND mr.recorded_at < :to
             AND mr.food_id IS NOT NULL
-          GROUP BY f.id, f.name
-          ORDER BY avg_slope DESC
+            AND ufg.grade IN ('C', 'D')
+          GROUP BY f.id, f.name, ufg.avg_slope
+          ORDER BY ufg.avg_slope DESC
           LIMIT 5
           """,
       nativeQuery = true)
