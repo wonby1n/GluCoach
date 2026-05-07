@@ -1,6 +1,5 @@
 package com.ssafy.s309.ui.screen.main
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,8 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -283,15 +280,21 @@ private fun FoodDetailItem(
                 .padding(GlucoachSpacing.lg),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Image(
-            painter = painterResource(id = food.imageResId),
-            contentDescription = food.name,
+        Box(
             modifier =
                 Modifier
                     .size(48.dp)
-                    .clip(CircleShape),
-            contentScale = ContentScale.Crop,
-        )
+                    .clip(CircleShape)
+                    .background(gradeColor.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = food.name.take(1),
+                color = gradeColor,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
 
         Spacer(Modifier.width(GlucoachSpacing.md))
 
