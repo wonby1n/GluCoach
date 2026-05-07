@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -30,13 +31,23 @@ public class GuardianNotification {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Integer id;
 
+  /** 레거시. alerts DROP(V13) 시 컬럼 제거 예정. 신규 INSERT는 chatMessageId 사용. */
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "alert_id", nullable = false)
+  @JoinColumn(name = "alert_id")
   private Alert alert;
+
+  @Column(name = "chat_message_id")
+  private Long chatMessageId;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "guard_relation_id", nullable = false)
   private WardGuardian wardGuardian;
+
+  @Column(name = "latitude", precision = 9, scale = 6)
+  private BigDecimal latitude;
+
+  @Column(name = "longitude", precision = 9, scale = 6)
+  private BigDecimal longitude;
 
   @CreatedDate
   @Column(name = "sent_at", nullable = false, updatable = false)
@@ -46,8 +57,11 @@ public class GuardianNotification {
   private LocalDateTime respondedAt;
 
   @Builder
-  private GuardianNotification(Alert alert, WardGuardian wardGuardian) {
-    this.alert = alert;
+  private GuardianNotification(
+      Long chatMessageId, WardGuardian wardGuardian, BigDecimal latitude, BigDecimal longitude) {
+    this.chatMessageId = chatMessageId;
     this.wardGuardian = wardGuardian;
+    this.latitude = latitude;
+    this.longitude = longitude;
   }
 }
