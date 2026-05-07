@@ -41,21 +41,30 @@ public class FromImagePredictionService {
     List<FoodDetection> detections = detection.detections();
 
     // detections 는 AI 측에서 confidence DESC 정렬됨 (FoodDetectResponse javadoc 참조).
-    // nameKo blank 가드는 AI FOOD_LABELS 에 ko 라벨 누락된 신규 클래스가 추가될 때 silent break 막기 위함.
-    // 현재 AI 구현은 보장하지만 모델 업데이트 시점의 안전망.
-    boolean lowConfidence =
-        detections.isEmpty()
-            || detections.get(0).confidence() < CONFIDENCE_THRESHOLD
-            || isBlank(detections.get(0).nameKo());
-    if (lowConfidence) {
-      String topName = detections.isEmpty() ? null : detections.get(0).nameKo();
+    if (detections.isEmpty() || detections.get(0).confidence() < CONFIDENCE_THRESHOLD) {
+      String topNameKo = detections.isEmpty() ? null : detections.get(0).nameKo();
+      String topNameEn = detections.isEmpty() ? null : detections.get(0).nameEn();
       Double topConfidence = detections.isEmpty() ? null : detections.get(0).confidence();
       log.info(
-          "[FromImagePredict] LOW_CONFIDENCE userId={} count={} topName={} topConfidence={}",
+          "[FromImagePredict] LOW_CONFIDENCE userId={} count={} topKo={} topEn={} topConfidence={}",
           userId,
           detections.size(),
-          topName,
+          topNameKo,
+          topNameEn,
           topConfidence);
+      return new FromImagePredictResponse(
+          Status.LOW_CONFIDENCE, detections, null, null, null, true);
+    }
+
+    // 고신뢰지만 nameKo 누락 — AI FOOD_LABELS 에 ko 라벨 없는 신규 클래스가 추가됐다는 뜻 = AI 스펙 위반.
+    // 운영 alert 가 필요하므로 WARN. 사용자 UX 는 LOW_CONFIDENCE 와 동일하게 폴백.
+    if (isBlank(detections.get(0).nameKo())) {
+      FoodDetection top = detections.get(0);
+      log.warn(
+          "[FromImagePredict] AI nameKo 누락 — LOW_CONFIDENCE 폴백. userId={} topEn={} topConfidence={}",
+          userId,
+          top.nameEn(),
+          top.confidence());
       return new FromImagePredictResponse(
           Status.LOW_CONFIDENCE, detections, null, null, null, true);
     }
