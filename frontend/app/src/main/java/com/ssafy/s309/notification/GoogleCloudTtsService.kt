@@ -57,7 +57,7 @@ class GoogleCloudTtsService
                         Base64.decode(json.getString("audioContent"), Base64.DEFAULT)
                     }
                 }.getOrElse {
-                    Log.e(TAG, "Google TTS 호출 실패", it)
+                    Log.e(TAG, "Google TTS 호출 실패!", it)
                     null
                 }
             }
