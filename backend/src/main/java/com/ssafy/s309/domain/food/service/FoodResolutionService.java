@@ -49,8 +49,9 @@ public class FoodResolutionService {
     }
 
     List<Food> remote = fetchFromApi(normalized);
-    if (!remote.isEmpty()) {
-      Food food = remote.get(0);
+    Optional<Food> remoteMatch = pickBestRemoteMatch(remote, normalized);
+    if (remoteMatch.isPresent()) {
+      Food food = remoteMatch.get();
       food.incrementSearchCount();
       log.info("[FoodResolution] REMOTE_FETCHED name={} foodId={}", normalized, food.getId());
       return new FoodResolution(food, ResolutionStatus.REMOTE_FETCHED);
@@ -95,6 +96,30 @@ public class FoodResolutionService {
             name, EPOCH_THRESHOLD)
         .stream()
         .filter(f -> f.getCarbsG() != null)
+        .findFirst();
+  }
+
+  /**
+   * 식약처 API 결과 중 입력 음식명과 의미적으로 가까운 row 선별.
+   *
+   * <p>식약처 API 의 fuzzy 매칭이 무관한 음식까지 결과에 포함시키는 경우가 있다 (예: "비빔밥" 검색 시 "국밥_돼지머리"가 결과에 섞여 들어옴). 첫 원소를
+   * 무조건 채택하면 사용자에게 잘못된 음식 정보·예측 곡선이 제공돼 신뢰도 손상.
+   *
+   * <p>우선순위: ① 정확 일치 (case-insensitive) → ② input 이 candidate name 의 substring → 둘 다 없으면 빈 Optional
+   * → 호출자가 PENDING_NUTRITION 으로 분기. "그래도 의미 있는 fuzzy 결과(예: 전주비빔밥)" 는 ② 에서 잡힘.
+   */
+  private Optional<Food> pickBestRemoteMatch(List<Food> candidates, String input) {
+    if (candidates.isEmpty()) {
+      return Optional.empty();
+    }
+    Optional<Food> exact =
+        candidates.stream().filter(f -> f.getName().equalsIgnoreCase(input)).findFirst();
+    if (exact.isPresent()) {
+      return exact;
+    }
+    String inputLower = input.toLowerCase();
+    return candidates.stream()
+        .filter(f -> f.getName().toLowerCase().contains(inputLower))
         .findFirst();
   }
 
