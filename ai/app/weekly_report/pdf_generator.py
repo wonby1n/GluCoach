@@ -1,426 +1,854 @@
-"""주간 보고서 PDF 생성 모듈.
+"""주간 보고서 PDF 생성 모듈 (WeasyPrint + Jinja2).
 
-matplotlib PdfPages로 A4 4페이지 PDF를 생성한다.
-  Page 1: 표지 + 핵심 지표 + TIR 파이차트
-  Page 2: 주간 혈당 추이 선 그래프
-  Page 3: 시간대별 혈당 패턴 막대 그래프
-  Page 4: AI 요약 및 코칭 제안 텍스트
+  1. matplotlib으로 차트 생성 → base64 PNG
+  2. Jinja2 HTML 템플릿에 데이터 + 차트 주입
+  3. WeasyPrint로 HTML → PDF bytes 변환
 
-한글 폰트: Docker 환경에서 fonts-noto-cjk 설치 후 사용.
-로컬 환경에서는 시스템 한글 폰트(맑은 고딕, AppleGothic 등)를 자동 탐색.
+인터페이스: generate_pdf(req, ai_summary, ai_suggest) -> bytes  (변경 없음)
 """
 
+import base64
 import io
 import logging
-import unicodedata
 from datetime import datetime
 
 import matplotlib
 import matplotlib.font_manager as fm
-import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.pyplot as plt
+from jinja2 import Template
+from weasyprint import HTML
 
 from app.schemas.report import WeeklyReportRequest
 
 log = logging.getLogger(__name__)
 
-# A4 사이즈 (인치)
-A4_W, A4_H = 8.27, 11.69
-
-# 색상 팔레트
-COLOR_IN_RANGE = "#4CAF50"
-COLOR_ABOVE = "#F44336"
-COLOR_BELOW = "#FF9800"
-COLOR_LINE = "#1565C0"
-COLOR_FILL = "#90CAF9"
-COLOR_TARGET = "#E8F5E9"
-
-# 혈당 취약 시간대 기준 (평균 이상이면 강조)
-HIGH_HOUR_THRESHOLD = 180
+# ── 디자인 토큰 (HTML 템플릿 & 차트 공통) ────────────────────────────
+C_NAVY    = "#1E3A5F"
+C_BLUE    = "#1D4ED8"
+C_GREEN   = "#16A34A"   # TIR / 정상
+C_RED     = "#DC2626"   # TAR / 고혈당
+C_ORANGE  = "#D97706"   # TBR / 저혈당
+C_FILL    = "#BFDBFE"   # 범위 채움색
 
 
-def _setup_korean_font() -> str | None:
-    """사용 가능한 한글 폰트를 탐색해 matplotlib에 적용한다."""
+# ── 한글 폰트 (matplotlib) ────────────────────────────────────────────
+
+def _setup_korean_font() -> None:
     candidates = [
-        "Noto Sans CJK KR",
-        "NotoSansCJK-Regular",
-        "Malgun Gothic",
-        "AppleGothic",
-        "NanumGothic",
-        "Noto Sans KR",
+        "Noto Sans CJK KR", "NotoSansCJK-Regular",
+        "Malgun Gothic", "AppleGothic", "NanumGothic",
     ]
     available = {f.name for f in fm.fontManager.ttflist}
     for name in candidates:
         if name in available:
             matplotlib.rcParams["font.family"] = name
-            log.info("한글 폰트 적용: %s", name)
-            return name
-
-    # 파일 경로로 직접 탐색 (Docker fonts-noto-cjk 설치 경로)
+            return
     for f in fm.findSystemFonts(fontext="ttf"):
-        if any(k in f for k in ("NotoSansCJK", "NotoSans", "Malgun", "Nanum")):
+        if any(k in f for k in ("NotoSansCJK", "Malgun", "Nanum")):
             prop = fm.FontProperties(fname=f)
             matplotlib.rcParams["font.family"] = prop.get_name()
-            log.info("한글 폰트 파일 직접 적용: %s", f)
-            return prop.get_name()
-
-    log.warning("한글 폰트를 찾지 못함. 한글이 깨질 수 있음.")
-    return None
+            return
 
 
-def _char_width(c: str) -> int:
-    eaw = unicodedata.east_asian_width(c)
-    return 2 if eaw in ("W", "F") else 1
-
-
-def _wrap_text(text: str, width: int = 55) -> str:
-    """한글 전각 문자를 display column 기준으로 줄바꿈한다.
-
-    textwrap.fill은 한글처럼 공백 없는 텍스트를 줄바꿈하지 못하므로
-    문자 단위로 직접 처리한다.
-    """
-    lines = []
-    for para in text.split("\n"):
-        if not para:
-            lines.append("")
-            continue
-        current, col = "", 0
-        for char in para:
-            w = _char_width(char)
-            if col + w > width:
-                lines.append(current)
-                current, col = char, w
-            else:
-                current += char
-                col += w
-        if current:
-            lines.append(current)
-    return "\n".join(lines)
-
-
-# ── Page 1: 표지 + 핵심 지표 + TIR 파이차트 ─────────────────────────
-
-def _page_cover(pdf: PdfPages, req: WeeklyReportRequest) -> None:
-    gmi = 3.31 + (0.02392 * req.avg_glucose)
-    cv = (req.glucose_sd / req.avg_glucose * 100) if req.avg_glucose > 0 else 0
-
-    fig = plt.figure(figsize=(A4_W, A4_H))
+def _fig_to_b64(fig: plt.Figure) -> str:
+    buf = io.BytesIO()
     try:
-        fig.patch.set_facecolor("white")
-
-        # ── 헤더 영역 ─────────────────────────────────────────────────────
-        ax_header = fig.add_axes([0.05, 0.82, 0.9, 0.14])
-        ax_header.set_axis_off()
-        ax_header.set_facecolor("#1565C0")
-        ax_header.add_patch(mpatches.FancyBboxPatch(
-            (0, 0), 1, 1, boxstyle="round,pad=0", fc="#1565C0", ec="none",
-            transform=ax_header.transAxes,
-        ))
-        ax_header.text(
-            0.5, 0.65, "주간 혈당 관리 리포트",
-            ha="center", va="center", fontsize=20, fontweight="bold",
-            color="white", transform=ax_header.transAxes,
-        )
-        ax_header.text(
-            0.5, 0.25, f"{req.user_name}님 | {req.week_start} ~ {req.week_end}",
-            ha="center", va="center", fontsize=11,
-            color="#BBDEFB", transform=ax_header.transAxes,
-        )
-
-        # ── 핵심 지표 카드 6개 ────────────────────────────────────────────
-        metrics = [
-            ("평균 혈당", f"{req.avg_glucose:.1f}", "mg/dL"),
-            ("최저 / 최고", f"{req.min_glucose:.0f} / {req.max_glucose:.0f}", "mg/dL"),
-            ("표준편차", f"{req.glucose_sd:.1f}", "mg/dL"),
-            ("GMI (예상 HbA1c)", f"{gmi:.1f}", "%"),
-            ("CV% (변동계수)", f"{cv:.1f}", "%"),
-            ("식사 기록", f"{req.meal_count}", "회"),
-        ]
-
-        cols, rows = 3, 2
-        card_w, card_h = 0.28, 0.11
-        start_x, start_y = 0.05, 0.64
-        gap_x, gap_y = 0.32, 0.14
-
-        for i, (label, value, unit) in enumerate(metrics):
-            col, row = i % cols, i // cols
-            x = start_x + col * gap_x
-            y = start_y - row * gap_y
-            ax_c = fig.add_axes([x, y, card_w, card_h])
-            ax_c.set_axis_off()
-            ax_c.add_patch(mpatches.FancyBboxPatch(
-                (0.03, 0.05), 0.94, 0.9,
-                boxstyle="round,pad=0.02", fc="#F5F5F5", ec="#E0E0E0", linewidth=0.8,
-                transform=ax_c.transAxes,
-            ))
-            ax_c.text(0.5, 0.75, label, ha="center", va="center",
-                      fontsize=7.5, color="#757575", transform=ax_c.transAxes)
-            ax_c.text(0.5, 0.38, value, ha="center", va="center",
-                      fontsize=14, fontweight="bold", color="#212121", transform=ax_c.transAxes)
-            ax_c.text(0.5, 0.1, unit, ha="center", va="center",
-                      fontsize=7, color="#9E9E9E", transform=ax_c.transAxes)
-
-        # ── TIR 파이차트 ──────────────────────────────────────────────────
-        ax_pie = fig.add_axes([0.08, 0.05, 0.45, 0.42])
-        sizes = [req.time_in_range, req.time_above_range, req.time_below_range]
-        labels = [
-            f"목표 범위\n{req.time_in_range:.1f}%",
-            f"고혈당\n{req.time_above_range:.1f}%",
-            f"저혈당\n{req.time_below_range:.1f}%",
-        ]
-        colors = [COLOR_IN_RANGE, COLOR_ABOVE, COLOR_BELOW]
-        explode = (0.04, 0, 0)
-        wedges, texts = ax_pie.pie(
-            sizes, labels=labels, colors=colors, explode=explode,
-            startangle=90, textprops={"fontsize": 8},
-            wedgeprops={"linewidth": 1, "edgecolor": "white"},
-        )
-        ax_pie.set_title("혈당 분포 (TIR)", fontsize=10, fontweight="bold", pad=8)
-
-        # ── TIR 목표 대비 범례 ────────────────────────────────────────────
-        ax_legend = fig.add_axes([0.56, 0.05, 0.38, 0.42])
-        ax_legend.set_axis_off()
-        targets = [
-            (COLOR_IN_RANGE, f"목표 범위 내 (TIR)", req.time_in_range, "≥ 70%"),
-            (COLOR_ABOVE,    f"고혈당 (TAR)", req.time_above_range, "< 25%"),
-            (COLOR_BELOW,    f"저혈당 (TBR)", req.time_below_range, "< 4%"),
-        ]
-        for idx, (color, name, value, target) in enumerate(targets):
-            y_pos = 0.80 - idx * 0.28
-            ax_legend.add_patch(mpatches.Rectangle(
-                (0.0, y_pos - 0.04), 0.06, 0.12, fc=color, ec="none",
-                transform=ax_legend.transAxes,
-            ))
-            ax_legend.text(0.12, y_pos + 0.02, name, fontsize=8,
-                           va="center", transform=ax_legend.transAxes)
-            ax_legend.text(0.12, y_pos - 0.08, f"{value:.1f}%  (권장: {target})",
-                           fontsize=7, color="#757575", va="center", transform=ax_legend.transAxes)
-
-        # ── 생성 시각 ─────────────────────────────────────────────────────
-        fig.text(0.5, 0.02, f"생성: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-                 ha="center", fontsize=7, color="#9E9E9E")
-
-        pdf.savefig(fig, bbox_inches="tight")
+        fig.savefig(buf, format="png", dpi=150, bbox_inches="tight",
+                    facecolor="white", edgecolor="none")
+        return base64.b64encode(buf.getvalue()).decode()
     finally:
         plt.close(fig)
 
 
-# ── Page 2: 주간 혈당 추이 선 그래프 ────────────────────────────────
+# ── 차트 ─────────────────────────────────────────────────────────────
 
-def _page_weekly_trend(pdf: PdfPages, req: WeeklyReportRequest) -> None:
+def _build_tir_chart(req: WeeklyReportRequest) -> str:
+    """TIR 도넛 차트."""
+    fig, ax = plt.subplots(figsize=(3.6, 3.6), subplot_kw={"aspect": "equal"})
+    fig.patch.set_facecolor("white")
+    sizes = [
+        max(req.time_in_range, 0.01),
+        max(req.time_above_range, 0.01),
+        max(req.time_below_range, 0.01),
+    ]
+    ax.pie(
+        sizes,
+        colors=[C_GREEN, C_RED, C_ORANGE],
+        startangle=90,
+        counterclock=False,
+        wedgeprops={"width": 0.46, "edgecolor": "white", "linewidth": 3},
+    )
+    ax.text(0, 0.1, f"{req.time_in_range:.1f}%",
+            ha="center", va="center", fontsize=21, fontweight="bold", color=C_NAVY)
+    ax.text(0, -0.22, "목표 범위",
+            ha="center", va="center", fontsize=9, color="#94A3B8")
+    return _fig_to_b64(fig)
+
+
+def _build_trend_chart(req: WeeklyReportRequest) -> str:
+    """주간 혈당 추이 차트."""
     if not req.daily_avg_glucose:
-        return
+        return ""
 
-    fig, ax = plt.subplots(figsize=(A4_W, A4_H))
-    try:
-        fig.patch.set_facecolor("white")
+    fig, ax = plt.subplots(figsize=(7.0, 4.2))
+    fig.patch.set_facecolor("white")
+    ax.set_facecolor("white")
 
-        dates = [d.date[5:] for d in req.daily_avg_glucose]   # "MM-DD"
-        avgs = [d.avg for d in req.daily_avg_glucose]
-        mins = [d.min for d in req.daily_avg_glucose]
-        maxs = [d.max for d in req.daily_avg_glucose]
-        x = list(range(len(dates)))
+    dates = [d.date[5:] for d in req.daily_avg_glucose]
+    avgs  = [d.avg for d in req.daily_avg_glucose]
+    mins  = [d.min for d in req.daily_avg_glucose]
+    maxs  = [d.max for d in req.daily_avg_glucose]
+    x = list(range(len(dates)))
 
-        # 목표 범위 배경
-        ax.axhspan(req.target_low, req.target_high,
-                   alpha=0.12, color=COLOR_IN_RANGE, label="목표 범위")
+    # 목표 범위 배경
+    ax.axhspan(req.target_low, req.target_high,
+               alpha=0.08, color=C_GREEN, zorder=0)
 
-        # 최저~최고 범위 음영
-        ax.fill_between(x, mins, maxs, alpha=0.25, color=COLOR_FILL, label="최저~최고 범위")
+    # 최저~최고 범위
+    ax.fill_between(x, mins, maxs,
+                    alpha=0.12, color=C_FILL, label="최저~최고 범위", zorder=1)
 
-        # 평균선
-        ax.plot(x, avgs, "-o", color=COLOR_LINE, linewidth=2.5,
-                markersize=7, label="일평균 혈당", zorder=3)
+    # 평균 선
+    ax.plot(x, avgs, "-", color=C_NAVY, linewidth=2.5, zorder=4, label="일평균 혈당")
+    ax.plot(x, avgs, "o", color=C_NAVY, markersize=8,
+            markerfacecolor="white", markeredgewidth=2.5, zorder=5)
 
-        # 수치 레이블
-        for xi, avg in zip(x, avgs):
-            ax.annotate(f"{avg:.0f}", (xi, avg), textcoords="offset points",
-                        xytext=(0, 10), ha="center", fontsize=8, color=COLOR_LINE)
-
-        # 목표 범위 경계선
-        ax.axhline(req.target_high, color=COLOR_ABOVE, linewidth=0.8,
-                   linestyle="--", alpha=0.6, label=f"고혈당 기준 ({req.target_high:.0f})")
-        ax.axhline(req.target_low, color=COLOR_BELOW, linewidth=0.8,
-                   linestyle="--", alpha=0.6, label=f"저혈당 기준 ({req.target_low:.0f})")
-
-        ax.set_xticks(x)
-        ax.set_xticklabels(dates, fontsize=9)
-        ax.set_ylabel("혈당 (mg/dL)", fontsize=10)
-        ax.set_title("주간 혈당 추이", fontsize=14, fontweight="bold", pad=15)
-        ax.legend(loc="upper right", fontsize=8, framealpha=0.9)
-        ax.grid(axis="y", linestyle="--", alpha=0.4)
-        ax.set_ylim(
-            max(0, min(mins) - 20),
-            max(maxs) + 30,
+    # 수치 레이블
+    for xi, avg in zip(x, avgs):
+        ax.annotate(
+            f"{avg:.0f}", (xi, avg),
+            textcoords="offset points", xytext=(0, 13),
+            ha="center", fontsize=8.5, color=C_NAVY, fontweight="bold",
         )
-        ax.spines[["top", "right"]].set_visible(False)
 
-        fig.tight_layout(rect=[0.03, 0.03, 0.97, 0.97])
-        pdf.savefig(fig, bbox_inches="tight")
-    finally:
-        plt.close(fig)
+    # 기준선
+    ax.axhline(req.target_high, color=C_RED,    lw=1.2, ls="--", alpha=0.65,
+               label=f"고혈당 기준 ({req.target_high:.0f})")
+    ax.axhline(req.target_low,  color=C_ORANGE, lw=1.2, ls="--", alpha=0.65,
+               label=f"저혈당 기준 ({req.target_low:.0f})")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(dates, fontsize=9, color="#475569")
+    ax.set_ylabel("혈당 (mg/dL)", fontsize=9, color="#475569")
+    ax.tick_params(axis="both", colors="#475569", length=0)
+    ax.legend(loc="upper right", fontsize=8, framealpha=0.95,
+              edgecolor="#E2E8F0", fancybox=False)
+    ax.grid(axis="y", ls="--", alpha=0.25, color="#CBD5E0", zorder=0)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.set_ylim(max(0, min(mins) - 28), max(maxs) + 52)
+
+    fig.tight_layout(pad=1.5)
+    return _fig_to_b64(fig)
 
 
-# ── Page 3: 시간대별 혈당 패턴 ──────────────────────────────────────
-
-def _page_hourly_pattern(pdf: PdfPages, req: WeeklyReportRequest) -> None:
+def _build_hourly_chart(req: WeeklyReportRequest) -> str:
+    """시간대별 혈당 패턴 차트."""
     if not req.hourly_avg_glucose:
-        return
+        return ""
 
-    fig, ax = plt.subplots(figsize=(A4_W, A4_H))
-    try:
-        fig.patch.set_facecolor("white")
+    fig, ax = plt.subplots(figsize=(7.0, 4.2))
+    fig.patch.set_facecolor("white")
+    ax.set_facecolor("white")
 
-        hour_map = {h.hour: h.avg for h in req.hourly_avg_glucose}
-        hours = list(range(24))
-        avgs = [hour_map.get(h, None) for h in hours]
+    # 시간대 배경 밴드 (야간 / 식사 시간대)
+    ax.axvspan(-0.5,  5.5, alpha=0.28, color="#EFF6FF", zorder=0, lw=0)  # 야간
+    ax.axvspan( 6.5,  9.5, alpha=0.28, color="#FFFBEB", zorder=0, lw=0)  # 아침
+    ax.axvspan(11.5, 13.5, alpha=0.28, color="#FFFBEB", zorder=0, lw=0)  # 점심
+    ax.axvspan(17.5, 20.5, alpha=0.28, color="#FFFBEB", zorder=0, lw=0)  # 저녁
 
-        # 데이터 있는 시간대만 표시
-        valid_hours = [h for h, v in zip(hours, avgs) if v is not None]
-        valid_avgs = [v for v in avgs if v is not None]
+    hour_map    = {h.hour: h.avg for h in req.hourly_avg_glucose}
+    valid_hours = sorted(hour_map)
+    valid_avgs  = [hour_map[h] for h in valid_hours]
 
-        bar_colors = [
-            COLOR_ABOVE if v > req.target_high
-            else COLOR_BELOW if v < req.target_low
-            else COLOR_IN_RANGE
-            for v in valid_avgs
-        ]
+    bar_colors = [
+        C_RED    if v > req.target_high else
+        C_ORANGE if v < req.target_low  else
+        C_GREEN
+        for v in valid_avgs
+    ]
 
-        bars = ax.bar(valid_hours, valid_avgs, color=bar_colors,
-                      width=0.7, edgecolor="white", linewidth=0.5, zorder=2)
+    bars = ax.bar(valid_hours, valid_avgs, color=bar_colors,
+                  width=0.7, edgecolor="white", linewidth=0.8,
+                  zorder=2, alpha=0.87)
 
-        # 목표 범위 배경
-        ax.axhspan(req.target_low, req.target_high,
-                   alpha=0.08, color=COLOR_IN_RANGE)
-        ax.axhline(req.target_high, color=COLOR_ABOVE, linewidth=0.8,
-                   linestyle="--", alpha=0.6)
-        ax.axhline(req.target_low, color=COLOR_BELOW, linewidth=0.8,
-                   linestyle="--", alpha=0.6)
+    ax.axhspan(req.target_low, req.target_high,
+               alpha=0.06, color=C_GREEN, zorder=0)
+    ax.axhline(req.target_high, color=C_RED,    lw=1.1, ls="--", alpha=0.6, zorder=1)
+    ax.axhline(req.target_low,  color=C_ORANGE, lw=1.1, ls="--", alpha=0.6, zorder=1)
 
-        # 수치 레이블 (공간 있을 때만)
-        for bar, val in zip(bars, valid_avgs):
-            ax.text(bar.get_x() + bar.get_width() / 2, val + 2,
-                    f"{val:.0f}", ha="center", va="bottom", fontsize=6.5)
+    for bar, val in zip(bars, valid_avgs):
+        ax.text(bar.get_x() + bar.get_width() / 2, val + 2,
+                f"{val:.0f}", ha="center", va="bottom",
+                fontsize=6.2, color="#334155")
 
-        # 시간대 구간 배경
-        ax.axvspan(-0.5, 5.5, alpha=0.04, color="#9E9E9E", label="야간 (0~5시)")
-        ax.axvspan(5.5, 9.5, alpha=0.04, color="#FFF9C4", label="아침 (6~9시)")
+    patches = [
+        mpatches.Patch(fc=C_GREEN,  label="목표 범위"),
+        mpatches.Patch(fc=C_RED,    label=f"고혈당 (>{req.target_high:.0f})"),
+        mpatches.Patch(fc=C_ORANGE, label=f"저혈당 (<{req.target_low:.0f})"),
+    ]
+    ax.legend(handles=patches, loc="upper right", fontsize=8,
+              framealpha=0.95, edgecolor="#E2E8F0", fancybox=False)
 
-        # 범례
-        patches = [
-            mpatches.Patch(fc=COLOR_IN_RANGE, label="목표 범위"),
-            mpatches.Patch(fc=COLOR_ABOVE, label=f"고혈당 (>{req.target_high:.0f})"),
-            mpatches.Patch(fc=COLOR_BELOW, label=f"저혈당 (<{req.target_low:.0f})"),
-        ]
-        ax.legend(handles=patches, loc="upper right", fontsize=8)
+    ax.set_xticks(range(0, 24, 2))
+    ax.set_xticklabels([f"{h}시" for h in range(0, 24, 2)], fontsize=8.5, color="#475569")
+    ax.set_xlabel("시간대", fontsize=9, color="#475569")
+    ax.set_ylabel("평균 혈당 (mg/dL)", fontsize=9, color="#475569")
+    ax.tick_params(axis="both", colors="#475569", length=0)
+    ax.grid(axis="y", ls="--", alpha=0.25, color="#CBD5E0", zorder=0)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
 
-        ax.set_xticks(list(range(0, 24, 2)))
-        ax.set_xticklabels([f"{h}시" for h in range(0, 24, 2)], fontsize=8)
-        ax.set_xlabel("시간대", fontsize=10)
-        ax.set_ylabel("평균 혈당 (mg/dL)", fontsize=10)
-        ax.set_title("시간대별 혈당 패턴 (주간 평균)", fontsize=14, fontweight="bold", pad=15)
-        ax.grid(axis="y", linestyle="--", alpha=0.4, zorder=0)
-        ax.spines[["top", "right"]].set_visible(False)
+    # 시간대 레이블
+    y_top = (max(valid_avgs) if valid_avgs else req.target_high) + 18
+    for x_pos, label in [(2.5, "야간"), (8, "아침"), (12.5, "점심"), (19, "저녁")]:
+        ax.text(x_pos, y_top, label, ha="center", va="bottom",
+                fontsize=6.5, color="#94A3B8", style="italic")
 
-        fig.tight_layout(rect=[0.03, 0.03, 0.97, 0.97])
-        pdf.savefig(fig, bbox_inches="tight")
-    finally:
-        plt.close(fig)
-
-
-# ── Page 4: AI 요약 + 코칭 제안 ─────────────────────────────────────
-
-def _page_ai_text(pdf: PdfPages, ai_summary: str, ai_suggest: str,
-                  good_foods: list, bad_foods: list) -> None:
-    fig = plt.figure(figsize=(A4_W, A4_H))
-    try:
-        fig.patch.set_facecolor("white")
-
-        def _section(y_top: float, title: str, body: str,
-                     header_color: str, y_end_out: list) -> None:
-            title_h = 0.06
-            body_lines = _wrap_text(body, width=60).split("\n")
-            line_h = 0.022
-            body_h = max(len(body_lines) * line_h + 0.04, 0.12)
-
-            ax_t = fig.add_axes([0.05, y_top - title_h, 0.9, title_h])
-            ax_t.set_axis_off()
-            ax_t.add_patch(mpatches.FancyBboxPatch(
-                (0, 0), 1, 1, boxstyle="round,pad=0", fc=header_color, ec="none",
-                transform=ax_t.transAxes,
-            ))
-            ax_t.text(0.03, 0.5, title, va="center", fontsize=11,
-                      fontweight="bold", color="white", transform=ax_t.transAxes)
-
-            ax_b = fig.add_axes([0.05, y_top - title_h - body_h, 0.9, body_h])
-            ax_b.set_axis_off()
-            ax_b.add_patch(mpatches.FancyBboxPatch(
-                (0, 0), 1, 1, boxstyle="round,pad=0", fc="#FAFAFA", ec="#E0E0E0", linewidth=0.8,
-                transform=ax_b.transAxes,
-            ))
-            ax_b.text(0.03, 0.97, body, va="top", fontsize=9, linespacing=1.6,
-                      color="#212121", transform=ax_b.transAxes, wrap=True)
-            y_end_out.append(y_top - title_h - body_h - 0.02)
-
-        y_ref: list[float] = []
-        _section(0.93, "이번 주 혈당 요약", ai_summary, "#1565C0", y_ref)
-
-        y_next = y_ref[-1] if y_ref else 0.55
-        y_ref2: list[float] = []
-        _section(y_next, "다음 주 코칭 제안", ai_suggest, "#2E7D32", y_ref2)
-
-        y_food = y_ref2[-1] if y_ref2 else 0.2
-        if good_foods or bad_foods:
-            ax_food = fig.add_axes([0.05, y_food - 0.22, 0.9, 0.18])
-            ax_food.set_axis_off()
-            ax_food.add_patch(mpatches.FancyBboxPatch(
-                (0, 0), 1, 1, boxstyle="round,pad=0", fc="#FAFAFA", ec="#E0E0E0", linewidth=0.8,
-                transform=ax_food.transAxes,
-            ))
-            ax_food.text(0.03, 0.92, "이번 주 식품 등급", va="top", fontsize=10,
-                         fontweight="bold", color="#212121", transform=ax_food.transAxes)
-            good_str = "  ".join(f.food_name for f in good_foods[:5]) or "-"
-            bad_str = "  ".join(f.food_name for f in bad_foods[:5]) or "-"
-            ax_food.text(0.03, 0.65, f"혈당에 좋은 음식 ✓  {good_str}",
-                         va="top", fontsize=8.5, color="#2E7D32", transform=ax_food.transAxes)
-            ax_food.text(0.03, 0.38, f"혈당에 주의할 음식 ✗  {bad_str}",
-                         va="top", fontsize=8.5, color="#C62828", transform=ax_food.transAxes)
-
-        fig.text(0.5, 0.02, "본 리포트는 AI가 생성한 참고 자료이며, 의료적 진단을 대체하지 않습니다.",
-                 ha="center", fontsize=7, color="#9E9E9E", style="italic")
-
-        pdf.savefig(fig, bbox_inches="tight")
-    finally:
-        plt.close(fig)
+    fig.tight_layout(pad=1.5)
+    return _fig_to_b64(fig)
 
 
-# ── 메인 진입점 ──────────────────────────────────────────────────────
+# ── HTML 템플릿 ───────────────────────────────────────────────────────
+
+_REPORT_HTML = """<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<style>
+@page { size: A4; margin: 0; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Noto Sans CJK KR', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    font-size: 10pt;
+    color: #1E293B;
+    background: white;
+}
+
+.page {
+    width: 210mm;
+    background: white;
+    page-break-after: always;
+    overflow: hidden;
+}
+.page:last-child { page-break-after: avoid; }
+
+
+/* ══ HEADER ══════════════════════════════════════════════════════════ */
+.header {
+    background: linear-gradient(135deg, #0F2552 0%, #1E3A8A 55%, #1D4ED8 100%);
+    padding: 26px 30px 22px;
+    color: white;
+}
+.header-eyebrow {
+    font-size: 7.5pt;
+    font-weight: 600;
+    color: rgba(255,255,255,0.55);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    margin-bottom: 8px;
+}
+.header-title {
+    font-size: 21pt;
+    font-weight: 700;
+    color: white;
+    letter-spacing: -0.4px;
+    line-height: 1.15;
+    margin-bottom: 14px;
+}
+.header-title span { color: #93C5FD; }
+.header-meta {
+    display: flex;
+    gap: 0;
+    border-top: 1px solid rgba(255,255,255,0.15);
+    padding-top: 12px;
+}
+.header-meta-item {
+    padding-right: 20px;
+    margin-right: 20px;
+    border-right: 1px solid rgba(255,255,255,0.2);
+}
+.header-meta-item:last-child { border-right: none; }
+.header-meta-label {
+    font-size: 6.5pt;
+    color: rgba(255,255,255,0.5);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 3px;
+}
+.header-meta-value {
+    font-size: 9.5pt;
+    font-weight: 600;
+    color: white;
+}
+
+
+/* ══ TIR STRIP ════════════════════════════════════════════════════════ */
+.tir-strip-section {
+    padding: 14px 30px 12px;
+    border-bottom: 1px solid #F1F5F9;
+}
+.tir-strip-title {
+    font-size: 7.5pt;
+    font-weight: 600;
+    color: #94A3B8;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 7px;
+}
+.tir-strip {
+    display: flex;
+    height: 20px;
+    border-radius: 6px;
+    overflow: hidden;
+    gap: 2px;
+}
+.tir-strip-seg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7.5pt;
+    font-weight: 700;
+    color: rgba(255,255,255,0.95);
+}
+.tir-strip-legend {
+    display: flex;
+    gap: 18px;
+    margin-top: 7px;
+}
+.tir-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 7.5pt;
+    color: #64748B;
+}
+.tir-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+
+/* ══ METRIC CARDS ════════════════════════════════════════════════════ */
+.metrics-section { padding: 14px 30px 10px; }
+.metrics-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.metrics-row:last-child { margin-bottom: 0; }
+.metric-card {
+    flex: 1;
+    background: white;
+    border: 1px solid #E2E8F0;
+    border-top: 3px solid #2563EB;
+    border-radius: 10px;
+    padding: 12px 10px 10px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.metric-label {
+    font-size: 7pt;
+    font-weight: 600;
+    color: #94A3B8;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 7px;
+}
+.metric-value {
+    font-size: 17pt;
+    font-weight: 700;
+    color: #1E3A5F;
+    line-height: 1;
+    margin-bottom: 3px;
+}
+.metric-value.sm { font-size: 12pt; }
+.metric-unit { font-size: 6.5pt; color: #CBD5E1; font-weight: 500; }
+
+
+/* ══ TIR + LIFESTYLE ═════════════════════════════════════════════════ */
+.lower-section {
+    display: flex;
+    gap: 16px;
+    padding: 10px 30px 14px;
+}
+.tir-donut-col { flex: 0 0 152px; text-align: center; }
+.tir-donut-col img { width: 100%; }
+.tir-donut-caption {
+    font-size: 7pt;
+    color: #94A3B8;
+    margin-top: -6px;
+}
+.tir-detail-col { flex: 1; padding-top: 2px; }
+.tir-detail-title {
+    font-size: 7.5pt;
+    font-weight: 700;
+    color: #64748B;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+}
+.tir-bar-group { margin-bottom: 10px; }
+.tir-bar-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
+}
+.tir-bar-name { font-size: 8pt; color: #475569; font-weight: 500; }
+.tir-bar-pct  { font-size: 9.5pt; font-weight: 700; }
+.tir-bar-hint { font-size: 6.5pt; color: #94A3B8; margin-top: 3px; }
+.tir-track {
+    width: 100%;
+    height: 8px;
+    background: #F1F5F9;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.tir-fill { height: 8px; border-radius: 4px; }
+
+.lifestyle {
+    display: flex;
+    gap: 7px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid #F1F5F9;
+}
+.lifestyle-card {
+    flex: 1;
+    background: #F8FAFC;
+    border-radius: 8px;
+    padding: 8px 6px;
+    text-align: center;
+}
+.lifestyle-label { font-size: 6pt; color: #94A3B8; margin-bottom: 4px; }
+.lifestyle-val   { font-size: 9pt; font-weight: 700; color: #334155; }
+
+.page-footer {
+    padding: 4px 30px 7px;
+    text-align: right;
+    font-size: 6.5pt;
+    color: #CBD5E1;
+}
+
+
+/* ══ CHART PAGES ═════════════════════════════════════════════════════ */
+.chart-header {
+    background: linear-gradient(90deg, #0F2552 0%, #1D4ED8 100%);
+    padding: 18px 30px;
+}
+.chart-header-title { font-size: 15pt; font-weight: 700; color: white; }
+.chart-header-sub {
+    font-size: 8.5pt;
+    color: rgba(255,255,255,0.7);
+    margin-top: 4px;
+}
+.chart-accent {
+    height: 3px;
+    background: linear-gradient(90deg, #60A5FA, #93C5FD, transparent);
+}
+.chart-body { padding: 18px 24px; }
+.chart-body img { width: 100%; border-radius: 6px; }
+.chart-caption {
+    margin: 14px 24px 0;
+    padding: 10px 14px;
+    background: #F8FAFC;
+    border-left: 3px solid #BFDBFE;
+    border-radius: 0 6px 6px 0;
+    font-size: 7.5pt;
+    color: #64748B;
+    line-height: 1.7;
+}
+
+
+/* ══ AI PAGE ══════════════════════════════════════════════════════════ */
+.ai-page { padding: 24px 28px; }
+.ai-section { margin-bottom: 18px; }
+.ai-section-header {
+    border-radius: 8px 8px 0 0;
+    padding: 12px 18px;
+    color: white;
+}
+.ai-section-title { font-size: 11pt; font-weight: 700; }
+.ai-section-body {
+    background: #FAFBFC;
+    border: 1px solid #E2E8F0;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    padding: 15px 18px;
+    font-size: 9.5pt;
+    line-height: 1.85;
+    color: #334155;
+    white-space: pre-wrap;
+}
+
+.food-title {
+    font-size: 7.5pt;
+    font-weight: 700;
+    color: #64748B;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+}
+.food-grid { display: flex; gap: 12px; }
+.food-card {
+    flex: 1;
+    border-radius: 10px;
+    padding: 13px 14px;
+}
+.food-card-good { background: #F0FDF4; border: 1px solid #BBF7D0; }
+.food-card-bad  { background: #FFF7ED; border: 1px solid #FED7AA; }
+.food-card-label { font-size: 8pt; font-weight: 700; margin-bottom: 9px; }
+.food-tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 8pt;
+    font-weight: 500;
+    margin: 2px 2px;
+}
+.food-tag-good { background: #16A34A; color: white; }
+.food-tag-bad  { background: #EA580C; color: white; }
+
+.disclaimer {
+    margin-top: 20px;
+    padding: 10px 14px;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 7.5pt;
+    color: #94A3B8;
+    font-style: italic;
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════ PAGE 1 ════════════════════ -->
+<div class="page">
+
+  <div class="header">
+    <div class="header-eyebrow">주간 혈당 관리 리포트</div>
+    <div class="header-title"><span>{{ user_name }}</span>님의 혈당 리포트</div>
+    <div class="header-meta">
+      <div class="header-meta-item">
+        <div class="header-meta-label">측정 기간</div>
+        <div class="header-meta-value">{{ week_start }} ~ {{ week_end }}</div>
+      </div>
+      <div class="header-meta-item">
+        <div class="header-meta-label">당뇨 유형</div>
+        <div class="header-meta-value">{{ diabetes_type }}형</div>
+      </div>
+      <div class="header-meta-item">
+        <div class="header-meta-label">목표 혈당</div>
+        <div class="header-meta-value">{{ target_low }}~{{ target_high }} mg/dL</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TIR Strip -->
+  <div class="tir-strip-section">
+    <div class="tir-strip-title">혈당 범위 분포 — 이번 주 전체</div>
+    <div class="tir-strip">
+      <div class="tir-strip-seg"
+           style="flex:{{ tir_flex }}; background:#16A34A;">
+        {% if tir_label %}{{ tir }}%{% endif %}
+      </div>
+      <div class="tir-strip-seg"
+           style="flex:{{ tar_flex }}; background:#DC2626;">
+        {% if tar_label %}{{ tar }}%{% endif %}
+      </div>
+      <div class="tir-strip-seg"
+           style="flex:{{ tbr_flex }}; background:#D97706;">
+        {% if tbr_label %}{{ tbr }}%{% endif %}
+      </div>
+    </div>
+    <div class="tir-strip-legend">
+      <div class="tir-legend-item">
+        <div class="tir-legend-dot" style="background:#16A34A;"></div>
+        목표 범위 {{ tir }}% &nbsp;(권장 70% 이상)
+      </div>
+      <div class="tir-legend-item">
+        <div class="tir-legend-dot" style="background:#DC2626;"></div>
+        고혈당 {{ tar }}% &nbsp;(권장 25% 미만)
+      </div>
+      <div class="tir-legend-item">
+        <div class="tir-legend-dot" style="background:#D97706;"></div>
+        저혈당 {{ tbr }}% &nbsp;(권장 4% 미만)
+      </div>
+    </div>
+  </div>
+
+  <!-- Metric Cards -->
+  <div class="metrics-section">
+    <div class="metrics-row">
+      <div class="metric-card">
+        <div class="metric-label">평균 혈당</div>
+        <div class="metric-value">{{ avg_glucose }}</div>
+        <div class="metric-unit">mg/dL</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">최저 / 최고</div>
+        <div class="metric-value sm">{{ min_glucose }} / {{ max_glucose }}</div>
+        <div class="metric-unit">mg/dL</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">표준편차 (SD)</div>
+        <div class="metric-value">{{ glucose_sd }}</div>
+        <div class="metric-unit">mg/dL</div>
+      </div>
+    </div>
+    <div class="metrics-row">
+      <div class="metric-card">
+        <div class="metric-label">GMI</div>
+        <div class="metric-value">{{ gmi }}</div>
+        <div class="metric-unit">% (예상 HbA1c)</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">CV% (변동계수)</div>
+        <div class="metric-value">{{ cv }}</div>
+        <div class="metric-unit">%</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">이번 주 식사</div>
+        <div class="metric-value">{{ meal_count }}</div>
+        <div class="metric-unit">회</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TIR Donut + Bars + Lifestyle -->
+  <div class="lower-section">
+    <div class="tir-donut-col">
+      <img src="data:image/png;base64,{{ tir_chart }}">
+      <div class="tir-donut-caption">혈당 분포 (TIR)</div>
+    </div>
+    <div class="tir-detail-col">
+      <div class="tir-detail-title">범위별 상세</div>
+
+      <div class="tir-bar-group">
+        <div class="tir-bar-row">
+          <span class="tir-bar-name">목표 범위 내 (TIR)</span>
+          <span class="tir-bar-pct" style="color:#16A34A;">{{ tir }}%</span>
+        </div>
+        <div class="tir-track">
+          <div class="tir-fill"
+               style="width:{{ tir_w }}%; background:linear-gradient(90deg,#4ADE80,#16A34A);"></div>
+        </div>
+        <div class="tir-bar-hint">권장 70% 이상</div>
+      </div>
+
+      <div class="tir-bar-group">
+        <div class="tir-bar-row">
+          <span class="tir-bar-name">고혈당 (TAR)</span>
+          <span class="tir-bar-pct" style="color:#DC2626;">{{ tar }}%</span>
+        </div>
+        <div class="tir-track">
+          <div class="tir-fill"
+               style="width:{{ tar_w }}%; background:linear-gradient(90deg,#F87171,#DC2626);"></div>
+        </div>
+        <div class="tir-bar-hint">권장 25% 미만</div>
+      </div>
+
+      <div class="tir-bar-group">
+        <div class="tir-bar-row">
+          <span class="tir-bar-name">저혈당 (TBR)</span>
+          <span class="tir-bar-pct" style="color:#D97706;">{{ tbr }}%</span>
+        </div>
+        <div class="tir-track">
+          <div class="tir-fill"
+               style="width:{{ tbr_w }}%; background:linear-gradient(90deg,#FBBF24,#D97706);"></div>
+        </div>
+        <div class="tir-bar-hint">권장 4% 미만</div>
+      </div>
+
+      {% if steps or sleep_total or medication %}
+      <div class="lifestyle">
+        {% if steps %}
+        <div class="lifestyle-card">
+          <div class="lifestyle-label">평균 걸음수</div>
+          <div class="lifestyle-val">{{ steps }}보</div>
+        </div>
+        {% endif %}
+        {% if sleep_total %}
+        <div class="lifestyle-card">
+          <div class="lifestyle-label">평균 수면</div>
+          <div class="lifestyle-val">{{ sleep_h }}h {{ sleep_m }}m</div>
+        </div>
+        {% endif %}
+        {% if medication %}
+        <div class="lifestyle-card">
+          <div class="lifestyle-label">복약 횟수</div>
+          <div class="lifestyle-val">{{ medication }}회</div>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="page-footer">생성: {{ generated_at }}</div>
+</div>
+
+
+<!-- ════════════════════ PAGE 2: WEEKLY TREND ════════════════════ -->
+<div class="page">
+  <div class="chart-header">
+    <div class="chart-header-title">주간 혈당 추이</div>
+    <div class="chart-header-sub">{{ week_start }} ~ {{ week_end }} &nbsp;|&nbsp; 일별 평균 · 최저 · 최고 혈당</div>
+  </div>
+  <div class="chart-accent"></div>
+  <div class="chart-body">
+    <img src="data:image/png;base64,{{ trend_chart }}">
+  </div>
+  <div class="chart-caption">
+    녹색 음영은 목표 혈당 범위({{ target_low }}~{{ target_high }} mg/dL)입니다.
+    진한 파란 실선은 일평균 혈당이며, 하늘색 영역은 해당 일의 최저~최고 범위입니다.
+    주황/빨간 점선은 각각 저혈당·고혈당 기준선입니다.
+  </div>
+</div>
+
+
+<!-- ════════════════════ PAGE 3: HOURLY PATTERN ════════════════════ -->
+<div class="page">
+  <div class="chart-header">
+    <div class="chart-header-title">시간대별 혈당 패턴</div>
+    <div class="chart-header-sub">이번 주 시간대별 평균 혈당 (0~23시)</div>
+  </div>
+  <div class="chart-accent"></div>
+  <div class="chart-body">
+    <img src="data:image/png;base64,{{ hourly_chart }}">
+  </div>
+  <div class="chart-caption">
+    초록색은 목표 범위 내, 빨간색은 고혈당({{ target_high }} mg/dL 초과),
+    주황색은 저혈당({{ target_low }} mg/dL 미만) 시간대입니다.
+    음영 배경은 야간(0~5시)·아침·점심·저녁 식사 시간대를 나타냅니다.
+  </div>
+</div>
+
+
+<!-- ════════════════════ PAGE 4: AI ANALYSIS ════════════════════ -->
+<div class="page ai-page">
+
+  <div class="ai-section">
+    <div class="ai-section-header"
+         style="background:linear-gradient(90deg,#0F2552,#1D4ED8);">
+      <div class="ai-section-title">이번 주 혈당 요약</div>
+    </div>
+    <div class="ai-section-body">{{ ai_summary }}</div>
+  </div>
+
+  <div class="ai-section">
+    <div class="ai-section-header"
+         style="background:linear-gradient(90deg,#064E3B,#059669);">
+      <div class="ai-section-title">다음 주 코칭 제안</div>
+    </div>
+    <div class="ai-section-body">{{ ai_suggest }}</div>
+  </div>
+
+  {% if good_foods or bad_foods %}
+  <div>
+    <div class="food-title">이번 주 식품 혈당 반응</div>
+    <div class="food-grid">
+      {% if good_foods %}
+      <div class="food-card food-card-good">
+        <div class="food-card-label" style="color:#15803D;">혈당에 좋은 음식</div>
+        {% for food in good_foods %}
+        <span class="food-tag food-tag-good">{{ food.food_name }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if bad_foods %}
+      <div class="food-card food-card-bad">
+        <div class="food-card-label" style="color:#C2410C;">혈당에 주의할 음식</div>
+        {% for food in bad_foods %}
+        <span class="food-tag food-tag-bad">{{ food.food_name }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="disclaimer">
+    본 리포트는 AI가 생성한 참고 자료이며, 의료적 진단을 대체하지 않습니다.
+  </div>
+</div>
+
+</body>
+</html>"""
+
+
+# ── 메인 진입점 ───────────────────────────────────────────────────────
 
 def generate_pdf(req: WeeklyReportRequest, ai_summary: str, ai_suggest: str) -> bytes:
-    """
-    주간 보고서 PDF를 생성하고 bytes로 반환한다.
-
-    Args:
-        req: BE에서 전달한 집계 데이터
-        ai_summary: LLM이 생성한 주간 요약
-        ai_suggest: LLM이 생성한 코칭 제안
-
-    Returns:
-        PDF bytes
-    """
+    """주간 보고서 PDF를 생성하고 bytes로 반환한다."""
     _setup_korean_font()
 
-    buf = io.BytesIO()
-    with PdfPages(buf) as pdf:
-        meta = pdf.infodict()
-        meta["Title"] = f"주간 혈당 관리 리포트 {req.week_start}"
-        meta["Author"] = "GlucoAI"
-        meta["Subject"] = f"{req.user_name} 주간 보고서"
+    tir_chart    = _build_tir_chart(req)
+    trend_chart  = _build_trend_chart(req)
+    hourly_chart = _build_hourly_chart(req)
 
-        _page_cover(pdf, req)
-        _page_weekly_trend(pdf, req)
-        _page_hourly_pattern(pdf, req)
-        _page_ai_text(pdf, ai_summary, ai_suggest, req.good_foods, req.bad_foods)
+    gmi         = round(3.31 + 0.02392 * req.avg_glucose, 1)
+    cv          = round(req.glucose_sd / req.avg_glucose * 100, 1)
+    sleep_total = int(req.weekly_avg_sleep_minutes or 0)
 
-    return buf.getvalue()
+    # TIR 스트립: flex 비율, 라벨 표시 여부(8% 미만은 공간 부족)
+    tir_v = req.time_in_range
+    tar_v = req.time_above_range
+    tbr_v = req.time_below_range
+
+    ctx = {
+        "user_name":     req.user_name,
+        "week_start":    req.week_start,
+        "week_end":      req.week_end,
+        "diabetes_type": req.diabetes_type,
+        "target_low":    f"{req.target_low:.0f}",
+        "target_high":   f"{req.target_high:.0f}",
+        "avg_glucose":   f"{req.avg_glucose:.1f}",
+        "min_glucose":   f"{req.min_glucose:.0f}",
+        "max_glucose":   f"{req.max_glucose:.0f}",
+        "glucose_sd":    f"{req.glucose_sd:.1f}",
+        "gmi":           f"{gmi:.1f}",
+        "cv":            f"{cv:.1f}",
+        "meal_count":    req.meal_count,
+        # TIR strip
+        "tir":           f"{tir_v:.1f}",
+        "tar":           f"{tar_v:.1f}",
+        "tbr":           f"{tbr_v:.1f}",
+        "tir_flex":      f"{tir_v:.1f}",
+        "tar_flex":      f"{tar_v:.1f}",
+        "tbr_flex":      f"{max(tbr_v, 0.01):.2f}",
+        "tir_label":     tir_v >= 10,
+        "tar_label":     tar_v >= 10,
+        "tbr_label":     tbr_v >= 10,
+        # TIR progress bars
+        "tir_w":         f"{min(tir_v, 100):.1f}",
+        "tar_w":         f"{min(tar_v, 100):.1f}",
+        "tbr_w":         f"{min(tbr_v, 100):.1f}",
+        # Lifestyle
+        "steps":         f"{req.weekly_avg_steps:,.0f}" if req.weekly_avg_steps else None,
+        "sleep_total":   sleep_total,
+        "sleep_h":       sleep_total // 60,
+        "sleep_m":       sleep_total % 60,
+        "medication":    req.medication_count,
+        # Foods
+        "good_foods":    req.good_foods[:5],
+        "bad_foods":     req.bad_foods[:5],
+        # AI
+        "ai_summary":    ai_summary,
+        "ai_suggest":    ai_suggest,
+        # Charts
+        "tir_chart":     tir_chart,
+        "trend_chart":   trend_chart,
+        "hourly_chart":  hourly_chart,
+        "generated_at":  datetime.now().strftime("%Y-%m-%d %H:%M"),
+    }
+
+    html_str = Template(_REPORT_HTML).render(**ctx)
+    return HTML(string=html_str).write_pdf()

@@ -2,7 +2,7 @@
 
 흐름:
   1. LLM 호출 → ai_summary, ai_suggest 생성
-  2. PDF 생성 (matplotlib)
+  2. PDF 생성 (WeasyPrint + Jinja2)
   3. S3 업로드 → pdf_key 반환
 """
 
@@ -34,7 +34,7 @@ def run_weekly_report(req: WeeklyReportRequest) -> WeeklyReportResponse:
         log.error("LLM 호출 예외: %s", e)
         return WeeklyReportResponse(status="error", error=f"llm_failed: {e}")
 
-    # ── Step 2: PDF 생성 ─────────────────────────────────────────────
+    # ── Step 2: PDF 생성 (WeasyPrint) ───────────────────────────────
     try:
         pdf_bytes = generate_pdf(req, ai_summary, ai_suggest)
         log.info("PDF 생성 완료: size=%d bytes", len(pdf_bytes))

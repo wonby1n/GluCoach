@@ -30,6 +30,10 @@ openai>=1.30.0
 # AWS S3
 boto3>=1.35.0
 
+# 주간 보고서 PDF
+weasyprint>=61.0
+jinja2>=3.1.0
+
 # 유틸
 python-dotenv>=1.0
 loguru>=0.7
