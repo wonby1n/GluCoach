@@ -3,10 +3,14 @@ package com.ssafy.s309.data.api
 import com.ssafy.s309.data.model.AlertListResponse
 import com.ssafy.s309.data.model.CgmRecordResponse
 import com.ssafy.s309.data.model.DailyHealthSummaryResponse
+import com.ssafy.s309.data.model.DailyHealthSummaryUpsertRequest
+import com.ssafy.s309.data.model.HealthSnapshotBatchRequest
+import com.ssafy.s309.data.model.HealthSnapshotBatchResponse
 import com.ssafy.s309.data.model.MealCreateResponse
 import com.ssafy.s309.data.model.MealRecordResponse
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.PATCH
@@ -57,4 +61,16 @@ interface HealthApi {
     suspend fun markAlertRead(
         @Path("id") id: Int,
     )
+
+    /** 1분 폴 시계열 5분 배치 INSERT */
+    @POST("api/health/snapshots")
+    suspend fun saveSnapshotBatch(
+        @Body request: HealthSnapshotBatchRequest,
+    ): HealthSnapshotBatchResponse
+
+    /** 일별 헬스 요약 upsert (대시보드/AI Report 원천) */
+    @POST("api/health/daily-summary")
+    suspend fun upsertDailySummary(
+        @Body request: DailyHealthSummaryUpsertRequest,
+    ): DailyHealthSummaryResponse
 }

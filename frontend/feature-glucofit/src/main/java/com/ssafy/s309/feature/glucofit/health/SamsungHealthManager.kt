@@ -161,6 +161,33 @@ class SamsungHealthManager(private val activity: Activity) {
         }
     }
 
+    /**
+     * [수면] 최근 수면 세션 (시작/종료 시각 포함). BE의 sleep_sessions 테이블 INSERT 용도.
+     * 기록 없거나 실패 시 null.
+     */
+    suspend fun getLatestSleepSession(): SleepSessionData? {
+        return try {
+            val response =
+                store.read(DataTypes.SLEEP) {
+                    setOrdering(Ordering.DESC)
+                    setLimit(1)
+                }
+            val sleep = response.dataList.firstOrNull() ?: return null
+            val start = sleep.startTime ?: return null
+            val end = sleep.endTime ?: return null
+            SleepSessionData(startTime = start, endTime = end)
+        } catch (e: Exception) {
+            Log.e(tag, "수면 세션 읽기 실패", e)
+            null
+        }
+    }
+
+    /** Samsung Health 단일 수면 세션 (start/end Instant). */
+    data class SleepSessionData(
+        val startTime: java.time.Instant,
+        val endTime: java.time.Instant,
+    )
+
     /** [심박수] 최근 1건 (Float) */
     suspend fun getLatestHeartRate(): Float? {
         return try {

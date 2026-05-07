@@ -2,18 +2,23 @@ package com.ssafy.s309.data.repository
 
 import android.util.Log
 import com.ssafy.s309.data.api.HealthApi
+import com.ssafy.s309.data.api.SleepSessionApi
 import com.ssafy.s309.data.ble.BleConnectionState
 import com.ssafy.s309.data.ble.BleManager
 import com.ssafy.s309.data.ble.BleProcessingSettings
 import com.ssafy.s309.data.ble.ScannedDevice
 import com.ssafy.s309.data.model.DailyHealthSummary
+import com.ssafy.s309.data.model.DailyHealthSummaryUpsertRequest
 import com.ssafy.s309.data.model.GlucoseRange
 import com.ssafy.s309.data.model.GlucoseReading
+import com.ssafy.s309.data.model.HealthSnapshotBatchRequest
+import com.ssafy.s309.data.model.HealthSnapshotItem
 import com.ssafy.s309.data.model.MealCreateRequest
 import com.ssafy.s309.data.model.MealCreateResponse
 import com.ssafy.s309.data.model.MealEvent
 import com.ssafy.s309.data.model.MealRecordResponse
 import com.ssafy.s309.data.model.NotificationItem
+import com.ssafy.s309.data.model.SleepSessionCreateRequest
 import com.ssafy.s309.data.repository.source.HealthConnectDataSource
 import com.ssafy.s309.data.repository.source.HealthDataSource
 import com.ssafy.s309.data.repository.source.MockHealthDataSource
@@ -43,6 +48,7 @@ class HealthRepository
     @Inject
     constructor(
         private val healthApi: HealthApi,
+        private val sleepSessionApi: SleepSessionApi,
         private val mockDataSource: MockHealthDataSource,
         samsungDataSource: SamsungHealthDataSource,
         healthConnectDataSource: HealthConnectDataSource,
@@ -204,6 +210,80 @@ class HealthRepository
                 .onFailure { Log.w(TAG, "알림 읽음 처리 실패 id=$alertId", it) }
         }
 
+        /**
+         * 워치 최근 수면 세션을 BE에 송신. 동일 startedAt 재호출 시 BE가 idempotent하게 기존 row 반환.
+         * 추가 안전장치: 직전 송신과 동일한 startedAt이면 네트워크 호출 자체 생략.
+         * 실패는 swallow — 폴러를 죽이지 않는다.
+         */
+        suspend fun syncSleepSession(
+            startedAt: LocalDateTime,
+            endedAt: LocalDateTime,
+            source: String,
+        ) {
+            val key = startedAt.toString()
+            if (key == lastSyncedSleepStartedAt) return
+            runCatching {
+                sleepSessionApi.create(
+                    SleepSessionCreateRequest(
+                        startedAt = startedAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                        endedAt = endedAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                        source = source,
+                    ),
+                )
+                lastSyncedSleepStartedAt = key
+                Log.d(TAG, "수면 세션 송신 완료: $startedAt ~ $endedAt")
+            }.onFailure { Log.w(TAG, "수면 세션 송신 실패", it) }
+        }
+
+        @Volatile private var lastSyncedSleepStartedAt: String? = null
+
+        /**
+         * 1분 폴링 시점 메트릭을 in-memory 버퍼에 누적. 5개(=5분) 모이면 batch INSERT.
+         * 실패는 swallow — 폴 루프 보호.
+         */
+        suspend fun bufferSnapshot(item: HealthSnapshotItem) {
+            val toFlush: List<HealthSnapshotItem>?
+            synchronized(snapshotBuffer) {
+                snapshotBuffer.add(item)
+                toFlush =
+                    if (snapshotBuffer.size >= SNAPSHOT_FLUSH_SIZE) {
+                        val copy = snapshotBuffer.toList()
+                        snapshotBuffer.clear()
+                        copy
+                    } else {
+                        null
+                    }
+            }
+            if (toFlush != null) {
+                runCatching { healthApi.saveSnapshotBatch(HealthSnapshotBatchRequest(items = toFlush)) }
+                    .onSuccess { Log.d(TAG, "snapshot batch 송신 ok: inserted=${it.inserted} skipped=${it.skipped}") }
+                    .onFailure { Log.w(TAG, "snapshot batch 송신 실패", it) }
+            }
+        }
+
+        /** 일별 누적값 upsert. 1분 폴링마다 호출 가능 (BE는 같은 (user_id,date) 키에 UPDATE). */
+        suspend fun upsertDailySummary(
+            date: LocalDate,
+            steps: Int?,
+            caloriesBurned: Double?,
+            sleepMinutes: Int?,
+            avgHeartRate: Double?,
+        ) {
+            runCatching {
+                healthApi.upsertDailySummary(
+                    DailyHealthSummaryUpsertRequest(
+                        date = date.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                        steps = steps,
+                        caloriesBurned = caloriesBurned,
+                        sleepMinutes = sleepMinutes,
+                        avgHeartRate = avgHeartRate,
+                    ),
+                )
+            }.onFailure { Log.w(TAG, "daily summary upsert 실패", it) }
+        }
+
+        private val snapshotBuffer = mutableListOf<HealthSnapshotItem>()
+
         // ── helpers ──────────────────────────────────────────────────
 
         private suspend fun <T> firstNonEmptyList(fetch: suspend (HealthDataSource) -> List<T>): List<T>? {
@@ -259,5 +339,6 @@ class HealthRepository
 
         private companion object {
             const val TAG = "HealthRepository"
+            const val SNAPSHOT_FLUSH_SIZE = 5
         }
     }
