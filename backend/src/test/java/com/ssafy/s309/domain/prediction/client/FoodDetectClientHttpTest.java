@@ -76,6 +76,40 @@ class FoodDetectClientHttpTest {
   }
 
   @Test
+  void AI가_bbox_등_미지의_필드_포함해도_무시하고_파싱() {
+    // VISION 에픽의 AI 측 분류기 전환 머지 전까지 AI 가 여전히 bbox 를 함께 보낼 수 있다.
+    // FoodDetection / FoodDetectResponse 의 @JsonIgnoreProperties(ignoreUnknown=true) 가
+    // 글로벌 Jackson 설정 변경(예: FAIL_ON_UNKNOWN_PROPERTIES=true)에도 깨지지 않도록 보장.
+    String legacyBody =
+        """
+        {
+          "count": 1,
+          "extra_top_level": "ignored",
+          "detections": [
+            {
+              "name_ko": "비빔밥",
+              "name_en": "bibimbap",
+              "confidence": 0.91,
+              "bbox": {"x1": 10.0, "y1": 20.0, "x2": 100.0, "y2": 200.0}
+            }
+          ]
+        }
+        """;
+
+    server
+        .expect(requestTo(DETECT_URL))
+        .andRespond(withSuccess(legacyBody, MediaType.APPLICATION_JSON));
+
+    FoodDetectResponse response =
+        client.doDetect(IMAGE_BYTES, "test.jpg", "image/jpeg", CORRELATION_ID, 1);
+
+    assertThat(response.count()).isEqualTo(1);
+    assertThat(response.detections()).hasSize(1);
+    assertThat(response.detections().get(0).nameKo()).isEqualTo("비빔밥");
+    assertThat(response.detections().get(0).confidence()).isEqualTo(0.91);
+  }
+
+  @Test
   void HTTP_400_INVALID_INPUT으로_매핑() {
     server.expect(requestTo(DETECT_URL)).andRespond(withBadRequest());
 

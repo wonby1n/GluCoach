@@ -21,12 +21,11 @@ from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from typing import Literal
 
 # 실제 AI 서버의 glucose 라우터 그대로 임포트해서 혈당 예측만 진짜로 동작하게.
+# (agent 라우터는 BE from-image 흐름과 무관 + LLM/MCP 의존성 끌어와 부팅 무거워져 제외)
 from app.api import glucose as glucose_router
-from app.api.agent import router as agent_router
 
 app = FastAPI(title="S309 mock AI (food detect 만 mock)")
 app.include_router(glucose_router.router)
-app.include_router(agent_router)
 
 
 @app.get("/health")
