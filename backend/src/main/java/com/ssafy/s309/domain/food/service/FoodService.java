@@ -48,9 +48,7 @@ public class FoodService {
 
     try {
       List<FoodApiItem> items = foodApiClient.search(normalized);
-      // 탄수화물 누락/0 음식은 ingest 단계에서 차단. 혈당 예측 모델의 핵심 입력이라
-      // 결측 시 비교 시뮬레이션이 무의미한 결과를 낸다.
-      List<Food> saved = items.stream().filter(this::hasValidCarbs).map(this::upsert).toList();
+      List<Food> saved = upsertFromApi(items);
       log.info(
           "[FoodSearch] cache=MISS query={} count={} elapsedMs={}",
           normalized,
@@ -69,6 +67,11 @@ public class FoodService {
           e.getMessage());
       return stale.stream().map(FoodSearchResult::from).toList();
     }
+  }
+
+  /** 식약처 API 결과를 foods 테이블에 upsert. 탄수화물 결측 항목은 차단 — 혈당 예측 모델 핵심 입력이라 NULL 이면 비교 시뮬레이션이 무의미해진다. */
+  public List<Food> upsertFromApi(List<FoodApiItem> items) {
+    return items.stream().filter(this::hasValidCarbs).map(this::upsert).toList();
   }
 
   private Food upsert(FoodApiItem item) {
