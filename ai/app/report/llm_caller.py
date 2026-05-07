@@ -34,11 +34,14 @@ def _call_with_retry(client: OpenAI, system_prompt: str) -> str:
                 model=MODEL,
                 max_tokens=MAX_TOKENS,
                 temperature=0.7,
+                timeout=60.0,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": "주간 보고서를 생성해주세요."},
                 ],
             )
+            if not response.choices:
+                raise RuntimeError("GPT-4o 빈 응답 (choices 없음)")
             return response.choices[0].message.content or ""
 
         except APIStatusError as e:
