@@ -4,18 +4,22 @@ Glucocoach 음식 추천 Agent — 전용 도구
 사용자 command(`recommend_food`) 발화 시 호출되는 추천 agent의 tool 셋.
 기존 tools.py와 분리. 컨텍스트도 별도(_context).
 
-데이터 소스 (시연):
-- user_food_grades: 사용자별 음식 등급 S/A/B/C/D + avg_slope (mock)
-- recent_meals: 최근 식사 기록 (mock)
-- user_profile: 알레르기/선호 (mock — 실제 DB에는 알레르기 컬럼 부재)
-- glucose_recent: 최근 혈당 (mock)
+데이터 소스 (BE 실데이터):
+- get_user_food_grades   → GET  /api/agent/users/{id}/food-grades
+- get_recent_meals       → GET  /api/agent/users/{id}/recent-meals?days=N
+- get_user_profile       → GET  /api/agent/users/{id}/profile
+- get_glucose_recent     → GET  /api/agent/users/{id}/glucose-recent
 
 행동:
-- send_command_response: parentChatMessageId 포함 BE POST → chat_messages INSERT (sender=agent, parent_id 채워짐)
+- send_command_response  → POST /api/agent/notifications  (parentChatMessageId 포함)
+
+모든 호출 X-Agent-Api-Key 헤더 필요 (env: AGENT_API_KEY).
+BACKEND_API_URL 미설정 시 fallback dict 반환 (로컬 테스트용).
 """
 
 import os
 import requests as _requests
+
 
 # ── 컨텍스트 (runner가 set) ──────────────────────────────────
 
@@ -26,42 +30,32 @@ _context: dict = {
 }
 
 
-def set_food_agent_context(user_id: int, parent_chat_message_id: int, alert_type: str = "AGENT_FOOD_RECOMMEND") -> None:
+def set_food_agent_context(
+    user_id: int, parent_chat_message_id: int, alert_type: str = "AGENT_FOOD_RECOMMEND"
+) -> None:
     _context["user_id"] = user_id
     _context["parent_chat_message_id"] = parent_chat_message_id
     _context["alert_type"] = alert_type
 
 
-# ── 시연용 Mock 데이터 ─────────────────────────────────────
-
-_MOCK_GRADES = {
-    5: [
-        {"food_id": 101, "name": "현미밥",      "grade": "S", "avg_slope": 1.2, "meal_count": 8},
-        {"food_id": 102, "name": "닭가슴살 샐러드", "grade": "S", "avg_slope": 1.4, "meal_count": 6},
-        {"food_id": 103, "name": "두부조림",    "grade": "A", "avg_slope": 1.8, "meal_count": 5},
-        {"food_id": 104, "name": "고등어구이",   "grade": "A", "avg_slope": 2.0, "meal_count": 4},
-        {"food_id": 105, "name": "잡곡밥",      "grade": "B", "avg_slope": 2.5, "meal_count": 5},
-        {"food_id": 201, "name": "흰쌀밥",      "grade": "C", "avg_slope": 3.5, "meal_count": 7},
-        {"food_id": 202, "name": "라면",       "grade": "D", "avg_slope": 4.8, "meal_count": 3},
-        {"food_id": 203, "name": "떡볶이",     "grade": "D", "avg_slope": 5.1, "meal_count": 2},
-    ],
-}
-
-_MOCK_RECENT_MEALS = {
-    5: [
-        {"date": "2026-05-07", "time": "08:00", "name": "현미밥+계란",  "carbs_g": 45},
-        {"date": "2026-05-06", "time": "19:30", "name": "닭가슴살 샐러드", "carbs_g": 20},
-        {"date": "2026-05-06", "time": "12:00", "name": "흰쌀밥+제육",   "carbs_g": 70},
-    ],
-}
-
-_MOCK_PROFILE = {
-    5: {"age": 45, "gender": "M", "diabetes_type": "2", "diet_pref": "한식", "allergies": []},
-}
-
-_MOCK_GLUCOSE_RECENT = {
-    5: {"latest_mg_dl": 135, "trend_30m": "stable", "last_meal_min_ago": 180},
-}
+def _be_get(path: str, params: dict | None = None) -> dict | list | None:
+    """BE GET 호출 헬퍼. 실패 시 None 반환."""
+    backend_url = os.getenv("BACKEND_API_URL", "")
+    agent_api_key = os.getenv("AGENT_API_KEY", "dev-agent-key-change-in-prod")
+    if not backend_url:
+        return None
+    try:
+        resp = _requests.get(
+            f"{backend_url}{path}",
+            headers={"X-Agent-Api-Key": agent_api_key},
+            params=params or {},
+            timeout=5,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        print(f"[FoodRecommend BE GET 실패] {path} err={e}")
+        return None
 
 
 # ── 조회 도구 ─────────────────────────────────────────────
@@ -70,11 +64,22 @@ _MOCK_GLUCOSE_RECENT = {
 def get_user_food_grades(min_meal_count: int = 2) -> dict:
     """사용자 음식 등급(S/A/B/C/D) 조회. min_meal_count 이상의 기록만."""
     user_id = _context.get("user_id")
-    grades = _MOCK_GRADES.get(user_id, [])
-    filtered = [g for g in grades if g["meal_count"] >= min_meal_count]
+    raw = _be_get(f"/api/agent/users/{user_id}/food-grades")
+    if raw is None:
+        return {"total": 0, "by_grade": {"S": [], "A": [], "B": [], "C": [], "D": []}, "is_cold_start": True, "error": "be_unavailable"}
+    filtered = [g for g in raw if (g.get("mealCount") or 0) >= min_meal_count]
     by_grade: dict = {"S": [], "A": [], "B": [], "C": [], "D": []}
     for g in filtered:
-        by_grade[g["grade"]].append(g)
+        item = {
+            "food_id": g.get("foodId"),
+            "name": g.get("foodName"),
+            "grade": g.get("grade"),
+            "avg_slope": float(g.get("avgSlope")) if g.get("avgSlope") is not None else None,
+            "meal_count": g.get("mealCount"),
+        }
+        grade_key = item["grade"] or "C"
+        if grade_key in by_grade:
+            by_grade[grade_key].append(item)
     return {
         "total": len(filtered),
         "by_grade": by_grade,
@@ -85,20 +90,50 @@ def get_user_food_grades(min_meal_count: int = 2) -> dict:
 def get_recent_meals(days: int = 2) -> dict:
     """최근 N일 식사 기록."""
     user_id = _context.get("user_id")
-    meals = _MOCK_RECENT_MEALS.get(user_id, [])
-    return {"days": days, "meals": meals[: days * 3]}
+    raw = _be_get(f"/api/agent/users/{user_id}/recent-meals", params={"days": days})
+    if raw is None:
+        return {"days": days, "meals": [], "error": "be_unavailable"}
+    meals = [
+        {
+            "meal_id": m.get("mealId"),
+            "recorded_at": m.get("timestamp"),
+            "name": m.get("foodName"),
+            "carbs_g": m.get("carbs"),
+            "kcal": m.get("calories"),
+        }
+        for m in raw
+    ]
+    return {"days": days, "meals": meals}
 
 
 def get_user_profile() -> dict:
-    """사용자 프로필 (당뇨 타입, 식이 선호, 알레르기)."""
+    """사용자 프로필 (당뇨 타입/타겟 범위)."""
     user_id = _context.get("user_id")
-    return _MOCK_PROFILE.get(user_id, {})
+    raw = _be_get(f"/api/agent/users/{user_id}/profile")
+    if raw is None:
+        return {"error": "be_unavailable"}
+    return {
+        "age": raw.get("age"),
+        "gender": raw.get("gender"),
+        "diabetes_type": raw.get("diabetesType"),
+        "is_medicated": raw.get("isMedicated"),
+        "target_low": raw.get("targetLow"),
+        "target_high": raw.get("targetHigh"),
+        "allergies": [],
+    }
 
 
 def get_glucose_recent() -> dict:
-    """최근 혈당 + 식후 경과 분."""
+    """최근 혈당 + 마지막 식사 경과 분."""
     user_id = _context.get("user_id")
-    return _MOCK_GLUCOSE_RECENT.get(user_id, {})
+    raw = _be_get(f"/api/agent/users/{user_id}/glucose-recent")
+    if raw is None:
+        return {"error": "be_unavailable"}
+    return {
+        "latest_mg_dl": float(raw["latestMgDl"]) if raw.get("latestMgDl") is not None else None,
+        "measured_at": raw.get("measuredAt"),
+        "last_meal_min_ago": raw.get("lastMealMinAgo"),
+    }
 
 
 # ── 행동 도구 ─────────────────────────────────────────────
@@ -176,7 +211,7 @@ FOOD_RECOMMEND_TOOL_SCHEMAS = [
     },
     {
         "name": "get_user_profile",
-        "description": "사용자 프로필 (당뇨 타입, 식이 선호, 알레르기). 알레르기 음식 추천 회피에 사용.",
+        "description": "사용자 프로필 (당뇨 타입/타겟 범위/약 복용 여부). 알레르기 필드는 현재 DB 부재로 빈 배열.",
         "input_schema": {"type": "object", "properties": {}},
     },
     {
