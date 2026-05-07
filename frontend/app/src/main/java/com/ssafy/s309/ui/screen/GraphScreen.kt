@@ -29,8 +29,11 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -49,6 +52,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -56,7 +60,9 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ssafy.s309.data.ble.BleConnectionState
+import com.ssafy.s309.feature.glucofit.glucose.GlucoseSimulator
 import com.ssafy.s309.ui.screen.ble.BleViewModel
+import com.ssafy.s309.ui.screen.main.MainViewModel
 import com.ssafy.s309.ui.theme.Primary
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -116,25 +122,49 @@ fun GraphScreen(
     onBack: () -> Unit = {},
     onNavigateToBle: () -> Unit = {},
     bleViewModel: BleViewModel = hiltViewModel(),
+    mainViewModel: MainViewModel = hiltViewModel(),
 ) {
     val connectionState by bleViewModel.connectionState.collectAsStateWithLifecycle()
     val glucoseReadings by bleViewModel.glucoseReadings.collectAsStateWithLifecycle()
     val isDeviceConnected = connectionState is BleConnectionState.Connected
+    val mainUiState by mainViewModel.uiState.collectAsStateWithLifecycle()
+    val diabetesType = mainUiState.diabetesType
 
+    // 시뮬레이터 롤링 버퍼 (BLE 미연결 시 사용)
+    val context = LocalContext.current
+    var simHistory by remember { mutableStateOf(dummyGlucoseData) }
+    val simGlucose by GlucoseSimulator.glucoseState.collectAsStateWithLifecycle()
+
+    DisposableEffect(diabetesType) {
+        GlucoseSimulator.stop()
+        GlucoseSimulator.start(context, diabetesType)
+        onDispose { GlucoseSimulator.stop() }
+    }
+
+    LaunchedEffect(simGlucose) {
+        val v = simGlucose?.toFloat() ?: return@LaunchedEffect
+        simHistory = (simHistory + v).takeLast(8)
+    }
+
+    // BLE 실데이터 우선, 없으면 시뮬레이터 데이터
     val displayData =
         if (glucoseReadings.isNotEmpty()) {
             glucoseReadings.map { it.valueMgDl.toFloat() }
-        } else if (isDeviceConnected) {
-            listOf(0f, 0f)
         } else {
-            dummyGlucoseData
+            simHistory
         }
 
     val (weekDates, todayIndex) = remember { getCurrentWeekDates() }
     var selectedDay by remember { mutableIntStateOf(todayIndex) }
-    val currentValue = glucoseReadings.lastOrNull()?.valueMgDl?.toFloat() ?: 0f
+    val currentValue =
+        glucoseReadings.lastOrNull()?.valueMgDl?.toFloat()
+            ?: simGlucose?.toFloat()
+            ?: 0f
     val currentColor = glucoseColor(currentValue)
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    // 항상 그래프 표시 (BLE 연결 여부와 무관하게 시뮬레이터가 데이터 제공)
+    val showGraph = true
 
     if (isLandscape) {
         GraphScreenLandscape(
@@ -146,7 +176,7 @@ fun GraphScreen(
             currentColor = currentColor,
             onBack = onBack,
             onNavigateToBle = onNavigateToBle,
-            isDeviceConnected = isDeviceConnected,
+            isDeviceConnected = showGraph,
             chartData = displayData,
         )
     } else {
@@ -159,7 +189,7 @@ fun GraphScreen(
             currentColor = currentColor,
             onBack = onBack,
             onNavigateToBle = onNavigateToBle,
-            isDeviceConnected = isDeviceConnected,
+            isDeviceConnected = showGraph,
             chartData = displayData,
         )
     }

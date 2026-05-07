@@ -1,6 +1,7 @@
 package com.ssafy.s309.domain.prediction.service;
 
 import com.ssafy.s309.domain.food.entity.Food;
+import com.ssafy.s309.domain.food.repository.FoodRepository;
 import com.ssafy.s309.domain.prediction.client.GlucosePredictClient;
 import com.ssafy.s309.domain.prediction.client.dto.GlucosePredictRequest;
 import com.ssafy.s309.domain.prediction.client.dto.GlucosePredictResponse;
@@ -42,6 +43,9 @@ public class PredictionService {
 
   private final GlucosePredictClient glucosePredictClient;
   private final PredictionTxHelper tx;
+  private final GlucosePredictionRepository predictionRepository;
+  private final UserRepository userRepository;
+  private final FoodRepository foodRepository;
 
   public PredictResponse predict(Integer userId, PredictRequest request) {
     User user = tx.findUser(userId);
@@ -93,7 +97,10 @@ public class PredictionService {
   }
 
   private GlucosePredictRequest buildAiRequest(User user, PredictRequest request) {
-    MealInfo meal = new MealInfo(request.carbsG().doubleValue(), LocalDateTime.now(KST).toString());
+    // foodId가 있으면 DB에서 실제 carbsG를 가져온다.
+    // 프론트가 null → 0 으로 변환해 보내는 경우 동일 곡선이 반환되는 문제를 방지.
+    double carbs = resolveCarbs(request);
+    MealInfo meal = new MealInfo(carbs, LocalDateTime.now(KST).toString());
 
     double weightKg = user.getWeight() != null ? user.getWeight().doubleValue() : DEFAULT_WEIGHT_KG;
 
@@ -109,6 +116,22 @@ public class PredictionService {
     // 마지막 값을 baseline 으로 사용). 향후 최근 60분 5분 간격 시계열로 교체 예정.
     return new GlucosePredictRequest(
         String.valueOf(user.getId()), List.of(DEFAULT_FASTING_BG), meal, profile);
+  }
+
+  /**
+   * 클라이언트가 보낸 carbsG 대신, foodId 가 있을 때 foods 테이블의 실제 값을 우선 사용한다. foods.carbs_g 가 NULL 이면 클라이언트 값으로
+   * fallback.
+   */
+  private double resolveCarbs(PredictRequest request) {
+    if (request.foodId() != null) {
+      return foodRepository
+          .findById(request.foodId())
+          .map(Food::getCarbsG)
+          .filter(v -> v != null && v.compareTo(BigDecimal.ZERO) > 0)
+          .map(BigDecimal::doubleValue)
+          .orElseGet(() -> request.carbsG().doubleValue());
+    }
+    return request.carbsG().doubleValue();
   }
 
   // AI 측 Literal["T1D", "T2D", "Normal"] 과 일치시키기 위해 Title Case 변환.
