@@ -51,18 +51,8 @@ class FoodDetectClientHttpTest {
         {
           "count": 2,
           "detections": [
-            {
-              "name_ko": "비빔밥",
-              "name_en": "bibimbap",
-              "confidence": 0.91,
-              "bbox": {"x1": 10.0, "y1": 20.0, "x2": 100.0, "y2": 200.0}
-            },
-            {
-              "name_ko": "김치",
-              "name_en": "kimchi",
-              "confidence": 0.65,
-              "bbox": {"x1": 30.0, "y1": 40.0, "x2": 80.0, "y2": 120.0}
-            }
+            {"name_ko": "비빔밥", "name_en": "bibimbap", "confidence": 0.91},
+            {"name_ko": "김치",   "name_en": "kimchi",   "confidence": 0.65}
           ]
         }
         """;
@@ -82,8 +72,6 @@ class FoodDetectClientHttpTest {
     assertThat(response.detections().get(0).nameKo()).isEqualTo("비빔밥");
     assertThat(response.detections().get(0).nameEn()).isEqualTo("bibimbap");
     assertThat(response.detections().get(0).confidence()).isEqualTo(0.91);
-    assertThat(response.detections().get(0).bbox().x1()).isEqualTo(10.0);
-    assertThat(response.detections().get(0).bbox().y2()).isEqualTo(200.0);
     assertThat(response.detections().get(1).nameEn()).isEqualTo("kimchi");
   }
 
