@@ -73,7 +73,7 @@ public class AlertCreationService {
     }
     String title = AlertChannelResolver.resolveTitle(alertType);
     String channelId = AlertChannelResolver.resolveChannelId(alertType);
-    fcmService.sendToTokens(tokens, title, message, channelId);
+    fcmService.sendToTokens(tokens, title, message, channelId, alertType);
   }
 
   public record CreationResult(boolean created, Integer alertId) {

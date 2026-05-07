@@ -19,6 +19,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.google.firebase.messaging.FirebaseMessaging
+import com.ssafy.s309.data.repository.HealthRepository
 import com.ssafy.s309.data.repository.source.SamsungHealthHolder
 import com.ssafy.s309.navigation.AppNavigation
 import com.ssafy.s309.ui.theme.S309Theme
@@ -46,12 +47,20 @@ class MainActivity : ComponentActivity() {
     @InstallIn(SingletonComponent::class)
     interface MainActivityEntryPoint {
         fun samsungHealthHolder(): SamsungHealthHolder
+
+        fun healthRepository(): HealthRepository
     }
 
     private val samsungHealthHolder: SamsungHealthHolder by lazy {
         EntryPointAccessors
             .fromApplication(applicationContext, MainActivityEntryPoint::class.java)
             .samsungHealthHolder()
+    }
+
+    private val healthRepository: HealthRepository by lazy {
+        EntryPointAccessors
+            .fromApplication(applicationContext, MainActivityEntryPoint::class.java)
+            .healthRepository()
     }
 
     // Samsung Health 권한 자동 요청은 Activity 라이프타임당 1회만. onResume 마다 다시 띄우면
@@ -141,10 +150,39 @@ class MainActivity : ComponentActivity() {
                         Log.i(POLL_TAG, "── Samsung Health poll 시작 ──")
                         runCatching {
                             realSteps = mgr.getTodaySteps()
-                            mgr.getTodayActiveCalories()
-                            mgr.getLastSleepDurationMinutes()
+                            val calories = mgr.getTodayActiveCalories()
+                            val sleepMinutes = mgr.getLastSleepDurationMinutes()
                             mgr.getLatestBloodGlucose()
-                            mgr.getLatestHeartRate()
+                            val heartRate = mgr.getLatestHeartRate()
+                            mgr.getLatestSleepSession()?.let { s ->
+                                healthRepository.syncSleepSession(
+                                    startedAt = java.time.LocalDateTime.ofInstant(s.startTime, java.time.ZoneId.systemDefault()),
+                                    endedAt = java.time.LocalDateTime.ofInstant(s.endTime, java.time.ZoneId.systemDefault()),
+                                    source = "samsung_health",
+                                )
+                            }
+
+                            // 1분 시계열 한 점 — health_snapshots (5개 모이면 batch INSERT)
+                            healthRepository.bufferSnapshot(
+                                com.ssafy.s309.data.model.HealthSnapshotItem(
+                                    recordedAt =
+                                        java.time.LocalDateTime.now().format(
+                                            java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME,
+                                        ),
+                                    stepsTotal = realSteps?.toInt(),
+                                    caloriesBurned = calories.takeIf { it > 0 }?.toDouble(),
+                                    heartRate = heartRate?.toDouble(),
+                                ),
+                            )
+
+                            // 일별 누적값 upsert — daily_health_summaries
+                            healthRepository.upsertDailySummary(
+                                date = java.time.LocalDate.now(),
+                                steps = realSteps?.toInt(),
+                                caloriesBurned = calories.takeIf { it > 0 }?.toDouble(),
+                                sleepMinutes = sleepMinutes.takeIf { it > 0 },
+                                avgHeartRate = heartRate?.toDouble(),
+                            )
                         }.onFailure { Log.w(POLL_TAG, "poll 중 오류", it) }
                         Log.i(POLL_TAG, "── Samsung Health poll 완료 ──")
                     }
