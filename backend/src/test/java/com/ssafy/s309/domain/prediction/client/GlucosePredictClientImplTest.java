@@ -18,6 +18,8 @@ import com.ssafy.s309.domain.prediction.client.dto.MealInfo;
 import com.ssafy.s309.domain.prediction.client.dto.UserProfileWithPattern;
 import com.ssafy.s309.domain.prediction.exception.AiServiceException;
 import com.ssafy.s309.domain.prediction.exception.AiServiceException.ErrorType;
+import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +28,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.MDC;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 @ExtendWith(MockitoExtension.class)
 @SuppressWarnings("NonAsciiCharacters")
@@ -158,6 +161,55 @@ class GlucosePredictClientImplTest {
 
     verify(client).doPredict(any(), anyString(), eq(1));
     assertThat(MDC.get(GlucosePredictClientImpl.CORRELATION_ID_MDC_KEY)).isNull();
+  }
+
+  // ───────────────────────────────────────────────────────────────
+  // mapRestClientException — body 파싱 단계에서 발생한 RestClientException 매핑.
+  // ───────────────────────────────────────────────────────────────
+
+  @Test
+  void mapRestClientException_SocketTimeout_root는_TIMEOUT() {
+    GlucosePredictClientImpl client = new GlucosePredictClientImpl(restClient);
+    RestClientException e =
+        new RestClientException(
+            "Error while extracting response", new SocketTimeoutException("read"));
+
+    AiServiceException result = client.mapRestClientException(e, "corr", 1, 100);
+
+    assertThat(result.getErrorType()).isEqualTo(ErrorType.TIMEOUT);
+  }
+
+  @Test
+  void mapRestClientException_IOException_root는_SERVICE_UNAVAILABLE() {
+    GlucosePredictClientImpl client = new GlucosePredictClientImpl(restClient);
+    RestClientException e =
+        new RestClientException("Error while extracting response", new IOException("disconnect"));
+
+    AiServiceException result = client.mapRestClientException(e, "corr", 1, 100);
+
+    assertThat(result.getErrorType()).isEqualTo(ErrorType.SERVICE_UNAVAILABLE);
+  }
+
+  @Test
+  void mapRestClientException_기타_root는_MODEL_ERROR() {
+    GlucosePredictClientImpl client = new GlucosePredictClientImpl(restClient);
+    RestClientException e = new RestClientException("Unexpected processing error");
+
+    AiServiceException result = client.mapRestClientException(e, "corr", 1, 100);
+
+    assertThat(result.getErrorType()).isEqualTo(ErrorType.MODEL_ERROR);
+  }
+
+  @Test
+  void mapRestClientException_중첩된_cause도_root까지_파헤침() {
+    GlucosePredictClientImpl client = new GlucosePredictClientImpl(restClient);
+    RestClientException e =
+        new RestClientException(
+            "outer", new RuntimeException("middle wrap", new SocketTimeoutException("read")));
+
+    AiServiceException result = client.mapRestClientException(e, "corr", 1, 100);
+
+    assertThat(result.getErrorType()).isEqualTo(ErrorType.TIMEOUT);
   }
 
   @Test

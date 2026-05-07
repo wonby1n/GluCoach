@@ -12,6 +12,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import com.ssafy.s309.domain.prediction.client.dto.FoodDetectResponse;
 import com.ssafy.s309.domain.prediction.exception.AiServiceException;
 import com.ssafy.s309.domain.prediction.exception.AiServiceException.ErrorType;
+import java.io.IOException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import org.hamcrest.Matchers;
@@ -21,6 +22,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 /**
  * RestClient 직호출 경로 검증 — 멀티파트 헤더, 상관관계ID 헤더, HTTP 응답코드별 ErrorType 매핑까지. 재시도/백오프 로직은 retry 단위 테스트가
@@ -145,6 +147,55 @@ class FoodDetectClientHttpTest {
         .isInstanceOf(AiServiceException.class)
         .extracting("errorType")
         .isEqualTo(ErrorType.TIMEOUT);
+  }
+
+  // ───────────────────────────────────────────────────────────────
+  // mapRestClientException — body 파싱 단계에서 발생한 RestClientException 매핑.
+  // 실제 production 케이스: 응답 헤더/body 읽는 중 SocketTimeout → Spring 6 RestClient 가
+  // RestClientException 으로 wrap → 기존 ResourceAccessException catch 못 잡음.
+  // ───────────────────────────────────────────────────────────────
+
+  @Test
+  void mapRestClientException_SocketTimeout_root는_TIMEOUT() {
+    RestClientException e =
+        new RestClientException(
+            "Error while extracting response", new SocketTimeoutException("read"));
+
+    AiServiceException result = client.mapRestClientException(e, CORRELATION_ID, 1, 100);
+
+    assertThat(result.getErrorType()).isEqualTo(ErrorType.TIMEOUT);
+  }
+
+  @Test
+  void mapRestClientException_IOException_root는_SERVICE_UNAVAILABLE() {
+    RestClientException e =
+        new RestClientException("Error while extracting response", new IOException("disconnect"));
+
+    AiServiceException result = client.mapRestClientException(e, CORRELATION_ID, 1, 100);
+
+    assertThat(result.getErrorType()).isEqualTo(ErrorType.SERVICE_UNAVAILABLE);
+  }
+
+  @Test
+  void mapRestClientException_기타_root는_MODEL_ERROR() {
+    RestClientException e = new RestClientException("Unexpected processing error");
+
+    AiServiceException result = client.mapRestClientException(e, CORRELATION_ID, 1, 100);
+
+    assertThat(result.getErrorType()).isEqualTo(ErrorType.MODEL_ERROR);
+  }
+
+  @Test
+  void mapRestClientException_중첩된_cause도_root까지_파헤침() {
+    // RestClientException → RuntimeException → SocketTimeoutException 의 3단 wrap.
+    // NestedExceptionUtils.getRootCause 가 가장 깊은 cause 까지 따라가는지 검증.
+    RestClientException e =
+        new RestClientException(
+            "outer", new RuntimeException("middle wrap", new SocketTimeoutException("read")));
+
+    AiServiceException result = client.mapRestClientException(e, CORRELATION_ID, 1, 100);
+
+    assertThat(result.getErrorType()).isEqualTo(ErrorType.TIMEOUT);
   }
 
   @Test
