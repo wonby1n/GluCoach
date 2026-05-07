@@ -3,15 +3,21 @@ package com.ssafy.s309.domain.chat.controller;
 import com.ssafy.s309.domain.auth.principal.CustomUserPrincipal;
 import com.ssafy.s309.domain.chat.dto.ChatMessageItem;
 import com.ssafy.s309.domain.chat.dto.ChatMessageListResponse;
+import com.ssafy.s309.domain.chat.dto.ChatReplyRequest;
+import com.ssafy.s309.domain.chat.entity.ChatMessage;
 import com.ssafy.s309.domain.chat.service.ChatMessageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -47,5 +53,19 @@ public class ChatMessageController {
             result.getSize(),
             result.getTotalElements(),
             unreadCount));
+  }
+
+  @Operation(
+      summary = "사용자 응답 (옵션 선택)",
+      description =
+          "parent agent 메시지의 options 중 하나 선택. parent.options에서 label lookup 후 chat_messages INSERT(sender='user'). "
+              + "parent 소유자 검증 / sender=agent 검증 / optionId 검증 실패 시 4xx.")
+  @PostMapping("/reply")
+  public ResponseEntity<ChatMessageItem> reply(
+      @AuthenticationPrincipal CustomUserPrincipal principal,
+      @Valid @RequestBody ChatReplyRequest req) {
+    ChatMessage saved =
+        chatMessageService.replyByOption(principal.userId(), req.parentId(), req.optionId());
+    return ResponseEntity.status(HttpStatus.CREATED).body(ChatMessageItem.from(saved));
   }
 }

@@ -74,6 +74,37 @@ public class ChatMessageService {
             .build());
   }
 
+  /**
+   * 사용자가 parent agent 메시지의 옵션 중 하나를 선택했을 때 호출. parent 검증 + label lookup + insertUserReply 위임.
+   *
+   * <ul>
+   *   <li>parent가 본인 메시지가 아니면 403
+   *   <li>parent.sender != 'agent'이면 400 (시스템/사용자 메시지에는 응답 불가)
+   *   <li>optionId가 parent.options에 없으면 400
+   * </ul>
+   */
+  @Transactional
+  public ChatMessage replyByOption(Integer userId, Long parentId, String optionId) {
+    ChatMessage parent =
+        chatMessageRepository
+            .findByIdAndUserId(parentId, userId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN));
+    if (!ChatMessage.SENDER_AGENT.equals(parent.getSender()) || parent.getOptions() == null) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, "parent must be an agent message with options");
+    }
+    String label =
+        parent.getOptions().stream()
+            .filter(opt -> optionId.equals(opt.get("id")))
+            .map(opt -> opt.get("label"))
+            .findFirst()
+            .orElseThrow(
+                () ->
+                    new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "optionId not found in parent.options"));
+    return insertUserReply(userId, parentId, optionId, label);
+  }
+
   /** 본인 메시지 페이징 (최신순). */
   @Transactional(readOnly = true)
   public Page<ChatMessage> pageByUser(Integer userId, int page, int size) {
