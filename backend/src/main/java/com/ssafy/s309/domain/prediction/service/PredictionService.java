@@ -1,5 +1,6 @@
 package com.ssafy.s309.domain.prediction.service;
 
+import com.ssafy.s309.domain.food.entity.Food;
 import com.ssafy.s309.domain.prediction.client.GlucosePredictClient;
 import com.ssafy.s309.domain.prediction.client.dto.GlucosePredictRequest;
 import com.ssafy.s309.domain.prediction.client.dto.GlucosePredictResponse;
@@ -47,6 +48,28 @@ public class PredictionService {
     GlucosePredictResponse aiResponse = glucosePredictClient.predict(buildAiRequest(user, request));
     GlucosePrediction saved = savePrediction(user, request, aiResponse);
     return toResponse(saved.getId(), aiResponse);
+  }
+
+  /**
+   * Food 엔티티 직접 입력 변종 — 사진 통합 예측({@code /from-image}) 흐름에서 사용.
+   *
+   * <p>호출자(orchestrator)는 {@code food.carbsG NOT NULL} 보장 시점에만 호출해야 한다 (PENDING_NUTRITION 분기는 별도).
+   * protein/fat/kcal 결측은 0 으로 폴백 — AI 모델은 carbs 만 사용하므로 예측 정확도에 영향 없고, glucose_predictions 테이블에 0
+   * 으로 기록될 뿐이다.
+   */
+  @Transactional
+  public PredictResponse predictForFood(Integer userId, Food food) {
+    PredictRequest request =
+        new PredictRequest(
+            food.getId(),
+            food.getName(),
+            food.getCarbsG(),
+            food.getProteinG() != null ? food.getProteinG() : BigDecimal.ZERO,
+            food.getFatG() != null ? food.getFatG() : BigDecimal.ZERO,
+            food.getKcal() != null ? food.getKcal() : BigDecimal.ZERO,
+            food.getSugarG(),
+            null);
+    return predict(userId, request);
   }
 
   public AbPredictResponse comparePredict(Integer userId, AbPredictRequest request) {
