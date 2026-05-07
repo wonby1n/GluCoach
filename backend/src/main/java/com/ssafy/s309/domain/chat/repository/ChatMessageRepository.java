@@ -7,6 +7,8 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
 
@@ -27,4 +29,9 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
   /** Agent #6 notification_history — message_type이 있는 메시지(agent/system 발신)만, 최근 N시간. */
   List<ChatMessage> findByUserIdAndMessageTypeIsNotNullAndCreatedAtAfterOrderByCreatedAtDesc(
       Integer userId, LocalDateTime since);
+
+  /** 본인 미읽음 일괄 읽음 처리 — 채팅방 진입 시 호출. */
+  @Modifying
+  @Query("UPDATE ChatMessage m SET m.isRead = true WHERE m.userId = ?1 AND m.isRead = false")
+  int markAllReadByUserId(Integer userId);
 }

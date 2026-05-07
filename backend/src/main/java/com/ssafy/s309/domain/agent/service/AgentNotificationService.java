@@ -70,7 +70,7 @@ public class AgentNotificationService {
             req.displayTrace(),
             req.payload());
 
-    chatFcmDispatcher.dispatch(req.userId(), req.alertType(), req.message());
+    chatFcmDispatcher.dispatch(req.userId(), req.alertType(), req.message(), saved.getId());
 
     return new CreationOutcome(true, AgentNotificationCreateResponse.ofCreated(saved.getId()));
   }

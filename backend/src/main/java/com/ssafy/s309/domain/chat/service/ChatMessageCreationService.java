@@ -40,7 +40,7 @@ public class ChatMessageCreationService {
 
     ChatMessage saved = chatMessageService.insertSystem(userId, messageType, message);
 
-    chatFcmDispatcher.dispatch(userId, messageType, message);
+    chatFcmDispatcher.dispatch(userId, messageType, message, saved.getId());
 
     return CreationResult.created(saved.getId());
   }

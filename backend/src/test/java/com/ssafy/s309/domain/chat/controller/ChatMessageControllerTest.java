@@ -180,6 +180,14 @@ class ChatMessageControllerTest {
   }
 
   @Test
+  void POST_mark_all_read_204() throws Exception {
+    mockMvc
+        .perform(post("/api/chat/messages/mark-all-read").with(authedUser))
+        .andExpect(status().isNoContent());
+    verify(chatMessageService).markAllRead(USER_ID);
+  }
+
+  @Test
   void POST_command_정상_201_반환() throws Exception {
     ChatMessage userCmd =
         withId(

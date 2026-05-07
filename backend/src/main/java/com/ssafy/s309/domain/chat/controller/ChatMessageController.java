@@ -95,6 +95,15 @@ public class ChatMessageController {
     return ResponseEntity.noContent().build();
   }
 
+  @Operation(
+      summary = "본인 미읽음 일괄 읽음 처리",
+      description = "채팅방 진입 시 호출. 단일 UPDATE로 본인 sender 무관 모든 미읽음 메시지를 is_read=true로 갱신.")
+  @PostMapping("/mark-all-read")
+  public ResponseEntity<Void> markAllRead(@AuthenticationPrincipal CustomUserPrincipal principal) {
+    chatMessageService.markAllRead(principal.userId());
+    return ResponseEntity.noContent().build();
+  }
+
   @Operation(summary = "안 읽음 카운트", description = "본인 메시지 중 is_read=false 개수.")
   @GetMapping("/unread-count")
   public ResponseEntity<UnreadCountResponse> unreadCount(

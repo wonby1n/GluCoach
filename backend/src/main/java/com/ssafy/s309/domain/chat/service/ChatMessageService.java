@@ -188,6 +188,12 @@ public class ChatMessageService {
     msg.markRead();
   }
 
+  /** 채팅방 진입 시 본인 미읽음 일괄 처리. 단일 UPDATE로 처리되어 N+1 없음. */
+  @Transactional
+  public void markAllRead(Integer userId) {
+    chatMessageRepository.markAllReadByUserId(userId);
+  }
+
   /** dedup 30분 윈도우 체크. */
   @Transactional(readOnly = true)
   public boolean isDuplicateWithin(Integer userId, String messageType, LocalDateTime since) {

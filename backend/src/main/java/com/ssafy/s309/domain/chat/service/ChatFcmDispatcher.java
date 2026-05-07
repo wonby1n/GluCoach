@@ -27,9 +27,10 @@ public class ChatFcmDispatcher {
   /**
    * 사용자의 active 토큰들에 channel_id 매핑한 발송. 토큰 0개면 silently skip.
    *
-   * <p>FCM data payload 키 alertType은 FE 호환을 위해 그대로 유지 (값은 messageType).
+   * <p>FCM data payload: alertType(=messageType, FE 호환) + chatMessageId(=INSERT된 row id, FE가 푸시 클릭
+   * 시 단건 read에 사용).
    */
-  public void dispatch(Integer userId, String messageType, String message) {
+  public void dispatch(Integer userId, String messageType, String message, Long chatMessageId) {
     List<String> tokens =
         tokenRepository.findByUser_IdAndIsActiveTrue(userId).stream()
             .map(NotificationToken::getToken)
@@ -40,6 +41,6 @@ public class ChatFcmDispatcher {
     }
     String title = AlertChannelResolver.resolveTitle(messageType);
     String channelId = AlertChannelResolver.resolveChannelId(messageType);
-    fcmService.sendToTokens(tokens, title, message, channelId);
+    fcmService.sendToTokens(tokens, title, message, channelId, messageType, chatMessageId);
   }
 }
