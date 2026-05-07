@@ -2,8 +2,9 @@
 
 POST /report/weekly  : BE 스케줄러가 호출하는 보고서 생성 엔드포인트.
   - 집계 데이터(WeeklyReportRequest)를 받아
-  - LLM 호출 → PDF 생성 → S3 업로드 후
-  - {ai_summary, ai_suggest, pdf_key}를 반환한다.
+  - LLM 호출 → PDF 생성 후
+  - {ai_summary, ai_suggest, pdf_bytes(base64)}를 반환한다.
+  - S3 업로드는 백엔드가 담당한다.
 """
 
 import logging
