@@ -98,12 +98,13 @@ def _build_stage2_input(request: dict[str, Any], baseline: float) -> dict[str, A
         hour = datetime.fromisoformat(time_iso).hour
     except (ValueError, TypeError):
         hour = 12
+    kcal_raw = meal.get("kcal")
     return {
         "carbs_g":          float(meal.get("carbs", 0.0)),
         "protein_g":        float(meal.get("protein_g") or 0.0),
         "fat_g":            float(meal.get("fat_g") or 0.0),
         "fiber_g":          float(meal.get("fiber_g") or 0.0),
-        "kcal":             float(meal.get("kcal") or 0.0),
+        "kcal":             float(kcal_raw) if kcal_raw is not None else None,
         "pre_meal_glucose": baseline,
         "meal_hour":        float(hour),
         "diabetes_type":    str(profile.get("diabetes_type", "T2D")),

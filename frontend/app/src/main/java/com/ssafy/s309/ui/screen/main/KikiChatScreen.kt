@@ -164,6 +164,7 @@ class KikiChatViewModel
 @Composable
 fun KikiChatScreen(
     onBack: () -> Unit,
+    onItemClick: (com.ssafy.s309.data.model.NotificationItem) -> Unit = {},
     viewModel: KikiChatViewModel = hiltViewModel(),
 ) {
     val messages by viewModel.messages.collectAsStateWithLifecycle()
@@ -225,7 +226,12 @@ fun KikiChatScreen(
                 item { Spacer(modifier = Modifier.height(GlucoachSpacing.sm)) }
                 items(messages) { message ->
                     when (message) {
-                        is ChatMessage.KikiMessage -> KikiChatBubble(item = message.item, fontSize = fontSize)
+                        is ChatMessage.KikiMessage ->
+                            KikiChatBubble(
+                                item = message.item,
+                                fontSize = fontSize,
+                                onClick = { onItemClick(message.item) },
+                            )
                         is ChatMessage.UserMessage -> UserChatBubble(message = message, fontSize = fontSize)
                     }
                 }
@@ -368,9 +374,10 @@ private fun StatusChipsBar(onChipClick: (label: String, replyText: String) -> Un
 private fun KikiChatBubble(
     item: NotificationItem,
     fontSize: Float,
+    onClick: () -> Unit = {},
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         verticalAlignment = Alignment.Top,
     ) {
         KikiAvatar(size = 40)

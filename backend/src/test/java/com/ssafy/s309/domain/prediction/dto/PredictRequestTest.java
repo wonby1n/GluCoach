@@ -38,6 +38,7 @@ class PredictRequestTest {
             new BigDecimal("35.50"),
             new BigDecimal("4.20"),
             new BigDecimal("0.80"),
+            new BigDecimal("2.00"),
             new BigDecimal("180.00"),
             new BigDecimal("0.30"),
             65);
@@ -56,6 +57,7 @@ class PredictRequestTest {
             new BigDecimal("35.50"),
             new BigDecimal("4.20"),
             new BigDecimal("0.80"),
+            null,
             new BigDecimal("180.00"),
             null,
             65);
@@ -67,7 +69,8 @@ class PredictRequestTest {
 
   @Test
   void 필수_영양소_null_거부() {
-    PredictRequest request = new PredictRequest(null, "음식", null, null, null, null, null, null);
+    PredictRequest request =
+        new PredictRequest(null, "음식", null, null, null, null, null, null, null);
 
     Set<ConstraintViolation<PredictRequest>> violations = validator.validate(request);
 
@@ -85,6 +88,7 @@ class PredictRequestTest {
             new BigDecimal("-1.00"),
             new BigDecimal("10.00"),
             new BigDecimal("10.00"),
+            null,
             new BigDecimal("100.00"),
             new BigDecimal("10.00"),
             50);
@@ -106,6 +110,7 @@ class PredictRequestTest {
             new BigDecimal("1000.01"),
             new BigDecimal("10.00"),
             new BigDecimal("10.00"),
+            null,
             new BigDecimal("100.00"),
             new BigDecimal("10.00"),
             50);
@@ -124,6 +129,7 @@ class PredictRequestTest {
             new BigDecimal("10.00"),
             new BigDecimal("10.00"),
             new BigDecimal("10.00"),
+            null,
             new BigDecimal("10000.01"),
             new BigDecimal("10.00"),
             50);
@@ -142,6 +148,7 @@ class PredictRequestTest {
             new BigDecimal("10.00"),
             new BigDecimal("10.00"),
             new BigDecimal("10.00"),
+            null,
             new BigDecimal("100.00"),
             new BigDecimal("10.00"),
             50);

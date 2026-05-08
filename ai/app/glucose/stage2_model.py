@@ -116,7 +116,8 @@ class Stage2Predictor:
         protein = float(inp.get("protein_g", 0.0))
         fat     = float(inp.get("fat_g",     0.0))
         fiber   = float(inp.get("fiber_g",   0.0))
-        kcal    = float(inp.get("kcal",      carbs * 4 + protein * 4 + fat * 9))
+        kcal_raw = inp.get("kcal")
+        kcal     = float(kcal_raw) if kcal_raw is not None else carbs * 4 + protein * 4 + fat * 9
         pre_gl  = float(inp.get("pre_meal_glucose", inp.get("current_glucose", 100.0)))
         hour    = float(inp.get("meal_hour", 12.0))
         dtype   = _DTYPE_MAP.get(str(inp.get("diabetes_type", "T2D")), 2)

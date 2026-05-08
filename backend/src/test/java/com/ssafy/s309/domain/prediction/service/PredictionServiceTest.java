@@ -146,6 +146,7 @@ class PredictionServiceTest {
             new BigDecimal("32.5"),
             new BigDecimal("0"),
             new BigDecimal("0"),
+            null,
             new BigDecimal("0"),
             null,
             null);
@@ -156,6 +157,7 @@ class PredictionServiceTest {
             new BigDecimal("45.0"),
             new BigDecimal("0"),
             new BigDecimal("0"),
+            null,
             new BigDecimal("0"),
             null,
             null);
