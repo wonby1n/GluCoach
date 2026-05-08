@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import androidx.annotation.RawRes
 import androidx.core.app.NotificationCompat
 import com.ssafy.s309.MainActivity
 import com.ssafy.s309.R
@@ -96,12 +97,24 @@ class GlucoseAlertManager
             when {
                 value <= alertLow -> {
                     if (canAlert(AlertType.LOW, now)) {
-                        fire(AlertType.LOW, "저혈당 위험 ⚠️", buildLowMessage(value), CHANNEL_ALERT, now)
+                        val sound =
+                            when {
+                                value < 55 -> R.raw.alert_very_low
+                                value < 65 -> R.raw.alert_low
+                                else -> R.raw.alert_borderline
+                            }
+                        fire(AlertType.LOW, "저혈당 위험 ⚠️", buildLowMessage(value), CHANNEL_ALERT, now, sound)
                     }
                 }
                 value >= alertHigh -> {
                     if (canAlert(AlertType.HIGH, now)) {
-                        fire(AlertType.HIGH, "혈당이 높아요", buildHighMessage(value), CHANNEL_COACH, now)
+                        val sound =
+                            when {
+                                value > 250 -> R.raw.alert_very_high
+                                value > 200 -> R.raw.alert_high
+                                else -> R.raw.alert_slightly_high
+                            }
+                        fire(AlertType.HIGH, "혈당이 높아요", buildHighMessage(value), CHANNEL_COACH, now, sound)
                     }
                 }
                 else -> {
@@ -114,6 +127,7 @@ class GlucoseAlertManager
                                 "혈당이 빠르게 오르고 있어요 (+${delta}mg/dL). 방금 드신 음식의 영향인 것 같아요. 물 한 잔 드시면 도움이 돼요 💧",
                                 CHANNEL_COACH,
                                 now,
+                                R.raw.alert_rising,
                             )
                         delta <= -RAPID_FALL_THRESHOLD && canAlert(AlertType.FALLING, now) ->
                             fire(
@@ -122,6 +136,7 @@ class GlucoseAlertManager
                                 "혈당이 빠르게 내려가고 있어요 (${delta}mg/dL). 저혈당 예방을 위해 간식을 준비해두세요 🍪",
                                 CHANNEL_COACH,
                                 now,
+                                R.raw.alert_falling,
                             )
                     }
                 }
@@ -150,6 +165,7 @@ class GlucoseAlertManager
             message: String,
             channel: String,
             now: Long,
+            @RawRes soundResId: Int,
         ) {
             lastAlertMs[type] = now
             val id = notifIdCounter.incrementAndGet()
@@ -179,7 +195,7 @@ class GlucoseAlertManager
                     .build(),
             )
 
-            ttsManager.speak("$title. $message", urgent)
+            ttsManager.playSound(soundResId, urgent)
 
             _alertStream.tryEmit(
                 NotificationItem(
