@@ -165,16 +165,18 @@ class HealthRepository
         /** 알림 목록. BE 기록이 있으면 우선 사용. */
         suspend fun getNotifications(): List<NotificationItem> {
             runCatching {
-                val response = healthApi.getAlerts()
-                if (response.content.isNotEmpty()) {
-                    return response.content.map { a ->
+                val response = healthApi.getChatMessages()
+                val items = response.content.filter { it.sender != "user" }
+                if (items.isNotEmpty()) {
+                    return items.map { m ->
                         NotificationItem(
-                            id = a.id.toLong(),
-                            title = resolveAlertTitle(a.alertType),
-                            message = a.message,
-                            timeAgoText = formatTimeAgo(a.createdAt),
-                            isUnread = !a.isRead,
-                            alertType = a.alertType,
+                            id = m.id,
+                            title = resolveAlertTitle(m.messageType ?: ""),
+                            message = m.message ?: "",
+                            timeAgoText = formatTimeAgo(m.createdAt),
+                            isUnread = !m.isRead,
+                            alertType = m.messageType ?: "",
+                            displayTrace = m.displayTrace,
                         )
                     }
                 }
@@ -212,10 +214,10 @@ class HealthRepository
                 healthApi.createMeal(request = requestBody, image = imagePart)
             }
 
-        /** 알림 읽음 처리 (백엔드 반영). 실패해도 UI 상태는 유지. */
-        suspend fun markAlertRead(alertId: Int) {
-            runCatching { healthApi.markAlertRead(alertId) }
-                .onFailure { Log.w(TAG, "알림 읽음 처리 실패 id=$alertId", it) }
+        /** 채팅 메시지 읽음 처리 (백엔드 반영). 실패해도 UI 상태는 유지. */
+        suspend fun markAlertRead(alertId: Long) {
+            runCatching { healthApi.markChatMessageRead(alertId) }
+                .onFailure { Log.w(TAG, "채팅 메시지 읽음 처리 실패 id=$alertId", it) }
         }
 
         /**

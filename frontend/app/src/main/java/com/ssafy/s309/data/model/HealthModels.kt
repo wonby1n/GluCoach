@@ -31,6 +31,23 @@ data class DailyHealthSummary(
     val sleepMinutes: Int,
 )
 
+/** 키키가 확인한 내용 — 카드 1개 */
+@Serializable
+data class DisplayTraceCard(
+    val type: String = "",
+    val title: String = "",
+    val description: String = "",
+    val severity: String = "normal",
+)
+
+/** 키키가 확인한 내용 — 전체 구조 */
+@Serializable
+data class DisplayTrace(
+    val summary: String = "",
+    val cards: List<DisplayTraceCard> = emptyList(),
+    val decision: String = "",
+)
+
 /** 알림 패널 항목 */
 @Serializable
 data class NotificationItem(
@@ -40,6 +57,7 @@ data class NotificationItem(
     val timeAgoText: String,
     val isUnread: Boolean,
     val alertType: String = "",
+    val displayTrace: DisplayTrace? = null,
 )
 
 // ── 백엔드 응답 DTO ─────────────────────────────────────────────────
@@ -89,6 +107,28 @@ data class MealCreateRequest(
 @Serializable
 data class MealCreateResponse(
     val mealId: Int,
+)
+
+/** GET /api/chat/messages 응답 항목 */
+@Serializable
+data class ChatMessageItemResponse(
+    val id: Long,
+    val sender: String,
+    val message: String? = null,
+    val messageType: String? = null,
+    val displayTrace: DisplayTrace? = null,
+    val isRead: Boolean,
+    val createdAt: String,
+)
+
+/** GET /api/chat/messages 페이지 응답 */
+@Serializable
+data class ChatMessageListResponse(
+    val content: List<ChatMessageItemResponse>,
+    val page: Int,
+    val size: Int,
+    val total: Long,
+    val unreadCount: Long,
 )
 
 /** GET /api/v1/alerts 응답 항목 */

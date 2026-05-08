@@ -1,27 +1,27 @@
 {
   "agent": "morning",
-  "triggered_at": "2026-05-07 11:30:24",
-  "message": "어젯밤 잠이 짧았고 혈당 변화도 컸어요. 오늘 아침은 편안하게 시작해볼까요? 🌤️",
+  "triggered_at": "2026-05-08 15:11:24",
+  "message": "어젯밤 휴식이 짧았네요. 오늘 아침은 가볍게 시작해볼까요?",
   "display_trace": {
-    "title": "왜 이 알림이 떴나요?",
+    "title": "키키가 확인한 내용",
     "summary": "어젯밤 수면, 혈당 흐름, 전날 식사 기록을 함께 확인해 오늘 아침 전략을 정했어요.",
     "cards": [
       {
         "type": "sleep",
-        "title": "수면이 평소보다 짧았어요",
+        "title": "수면 시간",
         "description": "어젯밤 수면은 5시간으로, 평소보다 2시간 부족했어요.",
         "severity": "caution"
       },
       {
         "type": "glucose",
-        "title": "저녁 이후 혈당 변화폭이 컸어요",
-        "description": "저녁 식후 최고 220mg/dL, 새벽 최저 75mg/dL로 변화폭이 145mg/dL였어요.",
+        "title": "혈당 흐름",
+        "description": "전날 밤~기상 전 최고 220mg/dL, 최저 75mg/dL로 변화폭이 145mg/dL였어요.",
         "severity": "caution"
       },
       {
         "type": "meal",
-        "title": "전날 저녁 식사도 함께 확인했어요",
-        "description": "전날 저녁 식사는 비빔밥 + 콜라였어요. 탄수화물은 95g으로 기록됐어요.",
+        "title": "식사 기록",
+        "description": "전날 마지막 식사는 비빔밥 + 콜라였어요. 탄수화물은 95g으로 기록됐어요.",
         "severity": "info"
       }
     ],
@@ -35,7 +35,7 @@
       "reason": "여러 신호 중 사용자가 가장 부담 없이 이해할 수 있는 수면 부족을 중심으로 메시지를 구성했어요.",
       "message_rule": "수치와 경고 표현은 줄이고, 오늘 아침 행동 제안 1개만 담았어요."
     },
-    "notification_message": "어젯밤 잠이 짧았고 혈당 변화도 컸어요. 오늘 아침은 편안하게 시작해볼까요? 🌤️"
+    "notification_message": "어젯밤 휴식이 짧았네요. 오늘 아침은 가볍게 시작해볼까요?"
   },
   "turns": 4,
   "tool_calls": [
@@ -168,25 +168,11 @@
         "today": "2026-05-04",
         "notifications": [
           {
-            "id": "notif_001",
-            "sent_at": "2026-05-03 08:05",
-            "type": "오늘의 혈당 전략",
-            "message": "오늘 점심 가볍게 가봐요!",
-            "user_action": "clicked"
-          },
-          {
             "id": "notif_002",
             "sent_at": "2026-05-03 14:00",
             "type": "식후 활동 유도",
             "message": "10분만 걸어볼까요?",
             "user_action": "ignored"
-          },
-          {
-            "id": "notif_003",
-            "sent_at": "2026-05-03 07:10",
-            "type": "오늘의 혈당 전략",
-            "message": "어제 잠이 조금 부족했어요. 오늘 점심은 메뉴를 한 번 확인해볼까요? 🍃",
-            "user_action": "clicked"
           }
         ]
       }
@@ -194,11 +180,44 @@
     {
       "name": "send_notification",
       "input": {
-        "message": "어젯밤 잠이 짧았고 혈당 변화도 컸어요. 오늘 아침은 편안하게 시작해볼까요? 🌤️"
+        "message": "어젯밤 휴식이 짧았네요. 오늘 아침은 가볍게 시작해볼까요?",
+        "options": [
+          {
+            "id": "light_start",
+            "label": "그렇게 할게요"
+          },
+          {
+            "id": "remind_30",
+            "label": "30분 뒤"
+          },
+          {
+            "id": "skip",
+            "label": "괜찮아요"
+          }
+        ],
+        "display_trace": {
+          "summary": "수면 부족, 밤사이 변화폭 큼",
+          "cards": [
+            {
+              "type": "sleep",
+              "title": "수면",
+              "description": "평소보다 짧은 휴식 시간이었어요"
+            },
+            {
+              "type": "glucose",
+              "title": "혈당",
+              "description": "밤사이 변화폭이 컸지만 아침엔 안정 범위예요"
+            }
+          ],
+          "decision": {
+            "reason": "수면 부족과 혈당 변화를 고려해 오늘은 부담 적은 시작을 제안했어요"
+          }
+        }
       },
       "result": {
-        "status": "sent",
-        "message": "어젯밤 잠이 짧았고 혈당 변화도 컸어요. 오늘 아침은 편안하게 시작해볼까요? 🌤️"
+        "status": "error",
+        "message": "어젯밤 휴식이 짧았네요. 오늘 아침은 가볍게 시작해볼까요?",
+        "error": "HTTPSConnectionPool(host='k14s309.p.ssafy.io', port=443): Max retries exceeded with url: /api/agent/notifications (Caused by NewConnectionError(\"HTTPSConnection(host='k14s309.p.ssafy.io', port=443): Failed to establish a new connection: [WinError 10061] 대상 컴퓨터에서 연결을 거부했으므로 연결하지 못했습니다\"))"
       }
     }
   ]

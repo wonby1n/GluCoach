@@ -184,6 +184,7 @@ class GlucoseAlertManager
                     message = message,
                     timeAgoText = "방금",
                     isUnread = true,
+                    alertType = type.name,
                 ),
             )
         }

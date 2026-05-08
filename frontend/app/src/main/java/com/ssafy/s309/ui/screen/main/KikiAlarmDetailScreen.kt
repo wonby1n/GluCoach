@@ -1,5 +1,6 @@
 package com.ssafy.s309.ui.screen.main
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -130,7 +131,7 @@ fun KikiAlarmDetailScreen(
                             },
                 )
                 KikiImage(
-                    drawableRes = R.drawable.kiki_agent,
+                    drawableRes = kikiImageRes(notification?.alertType ?: ""),
                     modifier = Modifier.size(220.dp),
                 )
             }
@@ -145,7 +146,12 @@ fun KikiAlarmDetailScreen(
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
 
-            ExpandableInfoCard(label = "키키가 확인한 내용 보기")
+            if (notification?.displayTrace != null) {
+                ExpandableInfoCard(
+                    label = "키키가 확인한 내용 보기",
+                    displayTrace = notification.displayTrace,
+                )
+            }
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
@@ -217,6 +223,7 @@ private fun SpeechBubble(
 @Composable
 private fun ExpandableInfoCard(
     label: String,
+    displayTrace: com.ssafy.s309.data.model.DisplayTrace,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -266,42 +273,56 @@ private fun ExpandableInfoCard(
                 HorizontalDivider(color = GlucoachColors.Border)
                 Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
 
-                ExpandedDetailRow(
-                    icon = Icons.Outlined.Restaurant,
-                    label = "식사 12:00",
-                    value = "김치찌개 + 공기밥",
-                )
-                Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
-                ExpandedDetailRow(
-                    icon = Icons.Outlined.ShowChart,
-                    label = "혈당 흐름",
-                    value = "125 → 145 → 165 mg/dL",
-                )
-                Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
-                ExpandedDetailRow(
-                    icon = Icons.Outlined.LocationOn,
-                    label = "최근 30분 걸음수",
-                    value = "23보",
-                )
+                displayTrace.cards.forEachIndexed { index, card ->
+                    val icon =
+                        when (card.type) {
+                            "meal" -> Icons.Outlined.Restaurant
+                            "glucose" -> Icons.Outlined.ShowChart
+                            "activity" -> Icons.Outlined.LocationOn
+                            else -> Icons.Outlined.HelpOutline
+                        }
+                    ExpandedDetailRow(
+                        icon = icon,
+                        label = card.title,
+                        value = card.description,
+                    )
+                    if (index < displayTrace.cards.lastIndex) {
+                        Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+                    }
+                }
 
-                Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
-                HorizontalDivider(color = GlucoachColors.Border)
-                Spacer(modifier = Modifier.height(GlucoachSpacing.md))
-
-                Text(
-                    text = "그래서 지금은 가벼운 활동을 제안했어요.",
-                    color = GlucoachColors.TextSecondary,
-                    fontSize = 13.sp,
-                    textAlign = TextAlign.Center,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                )
+                if (displayTrace.decision.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+                    HorizontalDivider(color = GlucoachColors.Border)
+                    Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+                    Text(
+                        text = displayTrace.decision,
+                        color = GlucoachColors.TextSecondary,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                    )
+                }
             }
         }
     }
 }
+
+@DrawableRes
+private fun kikiImageRes(alertType: String): Int =
+    when {
+        alertType == "HIGH" -> R.drawable.kiki_severe_tired
+        alertType == "LOW" -> R.drawable.kiki_low
+        alertType == "SOS" -> R.drawable.kiki_sos
+        alertType == "RISING" -> R.drawable.kiki_severe_tired
+        alertType == "FALLING" -> R.drawable.kiki_low
+        alertType.startsWith("AGENT_") -> R.drawable.kiki_agent
+        alertType == "WEEKLY_REPORT" -> R.drawable.kiki_weekly_report
+        else -> R.drawable.kiki_main
+    }
 
 @Composable
 private fun ExpandedDetailRow(
