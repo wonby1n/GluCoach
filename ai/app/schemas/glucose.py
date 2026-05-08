@@ -60,6 +60,11 @@ class UserProfileWithPattern(UserProfile):
 class MealInfo(BaseModel):
     carbs: float = Field(ge=0, le=300, description="탄수화물 g")
     time_iso: str = Field(description="식사 시각 ISO 8601 (예: 2026-04-29T08:30:00)")
+    # Stage 2 macro fields — optional, 제공 시 XGBoost+linear prior 모델 사용
+    protein_g: float | None = Field(default=None, ge=0, le=300, description="단백질 g")
+    fat_g: float | None = Field(default=None, ge=0, le=300, description="지방 g")
+    fiber_g: float | None = Field(default=None, ge=0, le=100, description="식이섬유 g")
+    kcal: float | None = Field(default=None, ge=0, le=5000, description="열량 kcal")
 
 
 class GlucosePoint(BaseModel):
