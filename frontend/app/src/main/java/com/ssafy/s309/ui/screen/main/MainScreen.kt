@@ -288,7 +288,8 @@ fun MainScreenContent(
 
                                 KikiSuggestionCard(
                                     notifications = state.notifications,
-                                    onClick = onKikiAlarmClick,
+                                    onAlarmClick = onKikiAlarmClick,
+                                    onChatClick = onKikiChatClick,
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
@@ -559,11 +560,13 @@ private fun TodayConditionHeader(
 @Composable
 private fun KikiSuggestionCard(
     notifications: List<com.ssafy.s309.data.model.NotificationItem>,
-    onClick: () -> Unit,
+    onAlarmClick: () -> Unit,
+    onChatClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val unread = notifications.filter { it.isUnread }
     val bannerText = resolveBannerText(unread)
+    val onClick = if (unread.size >= 2) onChatClick else onAlarmClick
 
     Row(
         modifier =
