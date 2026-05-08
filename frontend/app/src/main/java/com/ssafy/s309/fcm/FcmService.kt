@@ -57,7 +57,7 @@ class FcmService : FirebaseMessagingService() {
             message.data["alertType"]
                 ?: if (title == MEAL_FOLLOWUP_TITLE) ALERT_TYPE_MEAL_FOLLOWUP else null
 
-        if (alertType == ALERT_TYPE_MEAL_FOLLOWUP) {
+        if (alertType?.startsWith(ALERT_TYPE_MEAL_FOLLOWUP) == true) {
             showMealFollowupNotification(title, body)
         } else {
             showNotification(title, body)
@@ -152,11 +152,12 @@ class FcmService : FirebaseMessagingService() {
 
     @androidx.annotation.RawRes
     private fun resIdForAlertType(alertType: String?): Int =
-        when (alertType) {
-            "AGENT_WAKE_UP" -> R.raw.kiki_morning // 좋은 아침이에요. 어젯밤 수면이 부족했어요. 저녁 혈당이 200까지 올라서 조심하셔야 돼요. 오늘 식사를 같이 확인해볼까요?
-            "AGENT_MEAL_FOLLOWUP" -> R.raw.kiki_walk // 지금 10분만 걸으면 좋아요.
-            "AGENT_MEAL_RETRY" -> R.raw.kiki_stretch // 회의 끝났나요? 잠깐 스트레칭 어때요?
-            "AGENT_SLEEP_INSIGHT" -> R.raw.kiki_daily_done // 오늘 하루 수고했어요. 어제보다 혈당 변동 폭이 안정적이에요.
+        when {
+            alertType == null -> R.raw.kiki_morning
+            alertType.startsWith("AGENT_WAKE_UP") -> R.raw.kiki_morning
+            alertType.startsWith("AGENT_MEAL_FOLLOWUP") -> R.raw.kiki_walk
+            alertType.startsWith("AGENT_MEAL_RETRY") -> R.raw.kiki_stretch
+            alertType.startsWith("AGENT_SLEEP_INSIGHT") -> R.raw.kiki_daily_done
             else -> R.raw.kiki_morning
         }
 

@@ -1,8 +1,37 @@
 {
   "agent": "postmeal_followup",
-  "triggered_at": "2026-05-07 11:08:57",
-  "message": "회의 끝나셨나요? 잠깐 물 마시러 가볼까요?",
-  "display_trace": null,
+  "triggered_at": "2026-05-09 03:00:02",
+  "message": "하원님, 회의 끝나셨나요? 잠깐 스트레칭하러 일어나볼까요?",
+  "display_trace": {
+    "title": "키키가 확인한 내용",
+    "summary": "식사 기록, 식후 혈당 흐름, 활동량을 함께 확인해 활동을 제안했어요.",
+    "cards": [
+      {
+        "type": "meal",
+        "title": "식사 기록",
+        "description": "12:00에 김치찌개 + 공기밥을(를) 드셨어요. 탄수화물 75g.",
+        "severity": "info"
+      },
+      {
+        "type": "glucose",
+        "title": "식후 혈당 흐름",
+        "description": "125 → 145 → 165 → 180 mg/dL (식후 +55mg/dL)",
+        "severity": "caution"
+      },
+      {
+        "type": "activity",
+        "title": "식후 활동량",
+        "description": "식후 걸음수 41보",
+        "severity": "caution"
+      }
+    ],
+    "decision": {
+      "action": "send_notification",
+      "reason": "혈당 상승과 활동 부족이 함께 감지되어 가벼운 활동을 제안했어요.",
+      "message_rule": "부담 없는 톤으로 활동 1가지를 제안했어요."
+    },
+    "notification_message": "하원님, 회의 끝나셨나요? 잠깐 스트레칭하러 일어나볼까요?"
+  },
   "turns": 3,
   "tool_calls": [
     {
@@ -40,57 +69,19 @@
     {
       "name": "get_steps",
       "input": {
-        "start_time": "2026-05-04T12:00:00",
+        "start_time": "2026-05-04T13:00:00",
         "end_time": "2026-05-04T13:30:00"
       },
       "result": {
-        "start_time": "2026-05-04 12:00",
+        "start_time": "2026-05-04 13:00",
         "end_time": "2026-05-04 13:30",
-        "total_steps": 64,
+        "total_steps": 41,
         "periods": [
-          {
-            "start": "2026-05-04 12:30",
-            "end": "2026-05-04 13:00",
-            "steps": 23,
-            "period_minutes": 30
-          },
           {
             "start": "2026-05-04 13:00",
             "end": "2026-05-04 13:30",
             "steps": 41,
             "period_minutes": 30
-          }
-        ]
-      }
-    },
-    {
-      "name": "get_notification_history",
-      "input": {
-        "hours": 2
-      },
-      "result": {
-        "hours": 2,
-        "notifications": [
-          {
-            "id": "notif_001",
-            "sent_at": "2026-05-03 08:05",
-            "type": "오늘의 혈당 전략",
-            "message": "오늘 점심 가볍게 가봐요!",
-            "user_action": "clicked"
-          },
-          {
-            "id": "notif_002",
-            "sent_at": "2026-05-03 14:00",
-            "type": "식후 활동 유도",
-            "message": "10분만 걸어볼까요?",
-            "user_action": "ignored"
-          },
-          {
-            "id": "notif_003",
-            "sent_at": "2026-05-03 07:10",
-            "type": "오늘의 혈당 전략",
-            "message": "어제 잠이 조금 부족했어요. 오늘 점심은 메뉴를 한 번 확인해볼까요? 🍃",
-            "user_action": "clicked"
           }
         ]
       }
@@ -118,13 +109,81 @@
       }
     },
     {
+      "name": "get_notification_history",
+      "input": {
+        "hours": 2
+      },
+      "result": {
+        "hours": 2,
+        "today": "2026-05-04",
+        "notifications": []
+      }
+    },
+    {
+      "name": "trigger_projection",
+      "input": {
+        "command": "SHOW"
+      },
+      "result": {
+        "status": "error",
+        "message": "timed out",
+        "command": "SHOW"
+      }
+    },
+    {
       "name": "send_notification",
       "input": {
-        "message": "회의 끝나셨나요? 잠깐 물 마시러 가볼까요?"
+        "message": "하원님, 회의 끝나셨나요? 잠깐 스트레칭하러 일어나볼까요?",
+        "options": [
+          {
+            "id": "stretch_now",
+            "label": "지금 할게요"
+          },
+          {
+            "id": "later_30",
+            "label": "조금 있다가"
+          },
+          {
+            "id": "skip",
+            "label": "괜찮아요"
+          }
+        ],
+        "display_trace": {
+          "summary": "식후 90분, 최근 활동량 적음",
+          "cards": [
+            {
+              "type": "glucose",
+              "title": "혈당",
+              "description": "점심 식사 후 125에서 시작해 90분 뒤 180까지 올라왔어요."
+            },
+            {
+              "type": "steps",
+              "title": "활동량",
+              "description": "최근 30분간 걸음 수는 41보였어요."
+            }
+          ],
+          "decision": {
+            "reason": "회의 중이셨던 하원님께 회의 후 가벼운 실내 활동을 제안드려요. 혈당이 목표 기준선에 도달했고 최근 활동량이 적어, 잠깐 스트레칭으로 몸을 풀어보시면 좋을 것 같아요."
+          }
+        }
       },
       "result": {
         "status": "sent",
-        "message": "회의 끝나셨나요? 잠깐 물 마시러 가볼까요?"
+        "message": "하원님, 회의 끝나셨나요? 잠깐 스트레칭하러 일어나볼까요?",
+        "options": [
+          {
+            "id": "stretch_now",
+            "label": "지금 할게요"
+          },
+          {
+            "id": "later_30",
+            "label": "조금 있다가"
+          },
+          {
+            "id": "skip",
+            "label": "괜찮아요"
+          }
+        ]
       }
     }
   ]

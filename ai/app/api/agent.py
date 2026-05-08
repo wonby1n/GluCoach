@@ -5,9 +5,11 @@
 - POST /trigger          : 백엔드 스케줄러가 호출하는 트리거 디스패처
 """
 
+import asyncio
 import logging
+from datetime import datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 from fastapi.concurrency import run_in_threadpool
 
 from app.schemas.agent import (
@@ -22,6 +24,28 @@ from app.agent.postmeal_agent_run import run_postmeal_agent
 log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/agent", tags=["Agent"])
+
+# 시연용: 실제 30분 대신 이 값(초)만큼 대기 후 followup 실행
+DEMO_FOLLOWUP_DELAY_SECONDS = 30
+
+
+async def _run_followup_after_delay(delay_seconds: int, trigger_base: dict, user_id: str):
+    """delay_seconds 후에 schedule_followup 트리거로 에이전트를 재실행한다."""
+    await asyncio.sleep(delay_seconds)
+    followup_trigger = {
+        "reason": "schedule_followup",
+        "meal_time": trigger_base.get("meal_time", ""),
+        "original_reply": trigger_base.get("user_reply", ""),
+        "followup_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+    }
+    log.info("schedule_followup 실행: user_id=%s trigger=%s", user_id, followup_trigger)
+    try:
+        await run_in_threadpool(
+            run_postmeal_agent, followup_trigger,
+            user_id=user_id, alert_type="AGENT_MEAL_RETRY",
+        )
+    except Exception as e:
+        log.error("schedule_followup 실행 실패: %s", e)
 
 
 @router.post("/morning", response_model=AgentResponse)
@@ -51,7 +75,7 @@ async def morning_agent(req: MorningRequest):
 
 
 @router.post("/post-meal", response_model=AgentResponse)
-async def postmeal_agent(req: PostMealRequest):
+async def postmeal_agent(req: PostMealRequest, background_tasks: BackgroundTasks):
     """식후 활동 유도 agent를 실행한다."""
     trigger = req.trigger.model_dump(exclude_none=True)
 
@@ -70,6 +94,20 @@ async def postmeal_agent(req: PostMealRequest):
         status = "fallback" if result["error"] == "llm_call_failed" else "error"
     else:
         status = "success"
+
+    # schedule_followup이 있으면 백그라운드에서 지연 후 재실행
+    if result.get("scheduled_followup"):
+        delay_min = result["scheduled_followup"].get("delay_minutes", 30)
+        log.info(
+            "schedule_followup 예약: %d분 후 실행 (시연 모드: %d초 후)",
+            delay_min, DEMO_FOLLOWUP_DELAY_SECONDS,
+        )
+        background_tasks.add_task(
+            _run_followup_after_delay,
+            delay_seconds=DEMO_FOLLOWUP_DELAY_SECONDS,
+            trigger_base=trigger,
+            user_id=req.user_id,
+        )
 
     return AgentResponse(
         status=status,
