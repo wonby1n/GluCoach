@@ -13,7 +13,7 @@ _predictor: FoodPredictor | None = None
 
 
 def get_predictor() -> FoodPredictor:
-    """Lazy 초기화. 첫 요청 시 모델 + prototype DB 로드 (~수백 MB RAM)."""
+    """Lazy 초기화. 첫 요청 시 모델 + prototype DB 로드 (~수십 MB RAM, EfficientNet-B0 21MB + DB 1.6MB + 활성화)."""
     global _predictor
     if _predictor is None:
         _predictor = FoodPredictor(

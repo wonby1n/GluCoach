@@ -1,15 +1,18 @@
-import argparse, torch, sys
+import argparse
+import sys
 from pathlib import Path
+
+import torch
+from PIL import Image
 from tqdm import tqdm
-from PIL import Image, UnidentifiedImageError
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from feature_extractor import load_extractor, TRANSFORM
+from app.models.feature_extractor import TRANSFORM, load_extractor  # noqa: E402
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model-path",  default="outputs/food_v2/best.pt")
-    parser.add_argument("--db-path",     default="outputs/food_v2/prototype_db.pt")
+    parser.add_argument("--model-path",  default="models/food/best.pt")
+    parser.add_argument("--db-path",     default="models/food/prototype_db.pt")
     parser.add_argument("--name",        required=True)
     parser.add_argument("--images-dir",  required=True)
     parser.add_argument("--num-classes", type=int, default=307)
@@ -43,7 +46,12 @@ def main():
         return
 
     prototype = torch.stack(vectors).mean(0)
-    db[args.name] = prototype / prototype.norm()
+    norm = prototype.norm()
+    if norm.item() == 0:
+        # 모든 벡터 평균이 0 — 방어선. 사용자 직접 입력이라 가드 필요.
+        print(f"⚠️ prototype norm 0 — '{args.name}' 등록 중단")
+        return
+    db[args.name] = prototype / norm
     torch.save(db, args.db_path)
     print(f"✅ '{args.name}' 등록 완료 ({len(vectors)}장)")
     print(f"DB 총 클래스 수: {len(db)}")
