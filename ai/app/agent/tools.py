@@ -123,26 +123,50 @@ def get_notification_history(hours: int) -> dict:
 # ── 행동 함수 2개 ──────────────────────────────────────────
 
 
-def send_notification(message: str) -> dict:
-    """사용자에게 알림 메시지를 발송한다. BACKEND_API_URL 설정 시 실제 FCM 발송."""
+def send_notification(message: str, options: list, display_trace: dict) -> dict:
+    """사용자에게 알림 메시지 + 응답 선택지 3개 + AI 추론 카드를 발송한다.
+
+    options: [{"id": str, "label": str}, ...] 정확히 3개
+    display_trace: {"summary": str, "cards": [...], "decision": {"reason": str}}
+    """
     user_id = _agent_context.get("user_id")
     alert_type = _agent_context.get("alert_type", "AGENT_GENERIC")
     backend_url = os.getenv("BACKEND_API_URL", "")
     agent_api_key = os.getenv("AGENT_API_KEY", "dev-agent-key-change-in-prod")
 
+    # ── 입력 검증 ──────────────────────────────────────
+    if not isinstance(options, list) or len(options) != 3:
+        return {"status": "error", "error": "options must be exactly 3 items", "got": options}
+    for opt in options:
+        if not isinstance(opt, dict) or "id" not in opt or "label" not in opt:
+            return {"status": "error", "error": "each option must be {id, label}", "got": opt}
+    if not isinstance(display_trace, dict):
+        return {"status": "error", "error": "display_trace must be an object"}
+
     if not backend_url or user_id is None:
-        return {"status": "sent", "message": message}
+        return {
+            "status": "sent",
+            "message": message,
+            "options": options,
+            "display_trace": display_trace,
+        }
 
     try:
         resp = _requests.post(
             f"{backend_url}/api/agent/notifications",
             headers={"X-Agent-Api-Key": agent_api_key},
-            json={"userId": user_id, "alertType": alert_type, "message": message},
+            json={
+                "userId": user_id,
+                "alertType": alert_type,
+                "message": message,
+                "options": options,
+                "displayTrace": display_trace,
+            },
             timeout=5,
         )
-        print(f"[API 응답] status={resp.status_code}, body={resp.text}")  # 추가
+        print(f"[API 응답] status={resp.status_code}, body={resp.text}")
         resp.raise_for_status()
-        return {"status": "sent", "message": message}
+        return {"status": "sent", "message": message, "options": options}
     except Exception as e:
         return {"status": "error", "message": message, "error": str(e)}
 
@@ -270,16 +294,86 @@ TOOL_SCHEMAS = [
     },
     {
         "name": "send_notification",
-        "description": "사용자에게 알림 메시지를 발송한다. agent의 최종 행동으로 사용한다. 메시지는 후보 3개 중 사용자 컨텍스트에 가장 적절한 하나를 선택해 전달한다. 사용자 응답 옵션은 시스템에서 자동으로 표시되므로 별도 지정하지 않아도 된다.",
+        "description": (
+            "사용자에게 알림 메시지 + 응답 선택지 3개 + AI 추론 카드를 발송한다. "
+            "agent의 최종 행동으로 사용한다. options는 정확히 3개여야 하며 "
+            "사용자가 채팅 화면에서 클릭할 수 있는 응답 버튼이다. "
+            "display_trace는 사용자에게 노출 가능한 추론 과정 카드다."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "message": {
                     "type": "string",
-                    "description": "발송할 알림 메시지 본문 (한국어, 친근한 톤)",
+                    "description": "발송할 알림 메시지 본문 (한국어, 친근한 톤, 60자 이내)",
+                },
+                "options": {
+                    "type": "array",
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "description": (
+                        "사용자 응답 선택지 정확히 3개. 컨텍스트에 맞게 동적으로 생성. "
+                        "관례적 순서: 1) 긍정/수락 2) 미루기/나중에 3) 거절/패스. "
+                        "label은 8자 이내 짧게."
+                    ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "description": "응답 식별자 (snake_case, 예: walk_now, later_30, skip)",
+                            },
+                            "label": {
+                                "type": "string",
+                                "description": "버튼에 표시될 한국어 라벨 (8자 이내)",
+                            },
+                        },
+                        "required": ["id", "label"],
+                    },
+                },
+                "display_trace": {
+                    "type": "object",
+                    "description": (
+                        "AI 추론 과정 카드 (사용자 노출 가능). 사용자가 메시지를 받은 이유를 "
+                        "이해할 수 있게 한다."
+                    ),
+                    "properties": {
+                        "summary": {
+                            "type": "string",
+                            "description": "1줄 요약 (예: '식후 60분, 활동량 적음')",
+                        },
+                        "cards": {
+                            "type": "array",
+                            "description": "확인한 신호 카드 N개. 비어있어도 됨.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "description": "신호 종류 (glucose/sleep/meal/steps 등)",
+                                    },
+                                    "title": {"type": "string", "description": "카드 제목"},
+                                    "description": {
+                                        "type": "string",
+                                        "description": "카드 본문 (수치 직접 언급 금지)",
+                                    },
+                                },
+                                "required": ["type", "title", "description"],
+                            },
+                        },
+                        "decision": {
+                            "type": "object",
+                            "description": "메시지 선택 이유",
+                            "properties": {
+                                "reason": {"type": "string"},
+                            },
+                            "required": ["reason"],
+                        },
+                    },
+                    "required": ["summary", "cards", "decision"],
                 },
             },
-            "required": ["message"],
+            "required": ["message", "options", "display_trace"],
         },
     },
     {
@@ -377,8 +471,22 @@ if __name__ == "__main__":
            get_notification_history(24))
 
     # 행동 함수
-    _print("send_notification('test message')",
-           send_notification("테스트 메시지"))
+    _print(
+        "send_notification('test message', options, display_trace)",
+        send_notification(
+            "테스트 메시지",
+            [
+                {"id": "ack", "label": "알겠어요"},
+                {"id": "later_30", "label": "30분 뒤"},
+                {"id": "skip", "label": "패스"},
+            ],
+            {
+                "summary": "테스트 요약",
+                "cards": [],
+                "decision": {"reason": "테스트"},
+            },
+        ),
+    )
 
     _print("schedule_followup(30, 'meeting')",
            schedule_followup(30, "회의 중"))

@@ -11,7 +11,7 @@ public interface NotificationTokenRepository extends JpaRepository<NotificationT
 
   List<NotificationToken> findByUserAndIsActiveTrue(User user);
 
-  /** User 엔티티 lookup 없이 user_id로 active 토큰만 조회 (AlertCreationService 발송 wire-up용). */
+  /** User 엔티티 lookup 없이 user_id로 active 토큰만 조회 (ChatFcmDispatcher 발송 wire-up용). */
   List<NotificationToken> findByUser_IdAndIsActiveTrue(Integer userId);
 
   Optional<NotificationToken> findByUserAndDeviceType(User user, DeviceType deviceType);

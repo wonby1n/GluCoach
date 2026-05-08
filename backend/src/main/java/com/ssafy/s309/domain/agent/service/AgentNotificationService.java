@@ -1,15 +1,12 @@
 package com.ssafy.s309.domain.agent.service;
 
-import com.ssafy.s309.common.service.FcmService;
 import com.ssafy.s309.domain.agent.dto.AgentNotificationCreateRequest;
 import com.ssafy.s309.domain.agent.dto.AgentNotificationCreateResponse;
 import com.ssafy.s309.domain.agent.dto.AgentNotificationItem;
-import com.ssafy.s309.domain.alert.service.AlertChannelResolver;
 import com.ssafy.s309.domain.chat.entity.ChatMessage;
 import com.ssafy.s309.domain.chat.repository.ChatMessageRepository;
+import com.ssafy.s309.domain.chat.service.ChatFcmDispatcher;
 import com.ssafy.s309.domain.chat.service.ChatMessageService;
-import com.ssafy.s309.domain.notification.entity.NotificationToken;
-import com.ssafy.s309.domain.notification.repository.NotificationTokenRepository;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -34,15 +31,14 @@ public class AgentNotificationService {
 
   private final ChatMessageService chatMessageService;
   private final ChatMessageRepository chatMessageRepository;
-  private final NotificationTokenRepository tokenRepository;
-  private final FcmService fcmService;
+  private final ChatFcmDispatcher chatFcmDispatcher;
 
   @Transactional(readOnly = true)
   public List<AgentNotificationItem> listRecent(Integer userId, Integer hours) {
     int safeHours = (hours == null || hours <= 0) ? 24 : Math.min(hours, 24 * 30);
     LocalDateTime since = LocalDateTime.now().minusHours(safeHours);
     return chatMessageRepository
-        .findByUserIdAndAlertTypeIsNotNullAndCreatedAtAfterOrderByCreatedAtDesc(userId, since)
+        .findByUserIdAndMessageTypeIsNotNullAndCreatedAtAfterOrderByCreatedAtDesc(userId, since)
         .stream()
         .map(AgentNotificationItem::from)
         .toList();
@@ -55,38 +51,41 @@ public class AgentNotificationService {
           "alert_type은 AGENT_ prefix로 시작해야 합니다. (룰 type은 BE 룰 트리거에서만 INSERT)");
     }
 
-    LocalDateTime since = LocalDateTime.now().minus(DEDUP_WINDOW);
-    if (chatMessageService.isDuplicateWithin(req.userId(), req.alertType(), since)) {
-      log.debug(
-          "Agent notification dedup skip: user={}, type={}, window={}m",
-          req.userId(),
-          req.alertType(),
-          DEDUP_WINDOW.toMinutes());
-      return new CreationOutcome(false, AgentNotificationCreateResponse.ofSkipped());
+    boolean isCommandReply = req.parentChatMessageId() != null;
+
+    if (!isCommandReply) {
+      LocalDateTime since = LocalDateTime.now().minus(DEDUP_WINDOW);
+      if (chatMessageService.isDuplicateWithin(req.userId(), req.alertType(), since)) {
+        log.debug(
+            "Agent notification dedup skip: user={}, type={}, window={}m",
+            req.userId(),
+            req.alertType(),
+            DEDUP_WINDOW.toMinutes());
+        return new CreationOutcome(false, AgentNotificationCreateResponse.ofSkipped());
+      }
     }
 
     ChatMessage saved =
-        chatMessageService.insertAgent(
-            req.userId(), req.alertType(), req.message(), req.options(), req.displayTrace());
+        isCommandReply
+            ? chatMessageService.insertAgentResponse(
+                req.userId(),
+                req.parentChatMessageId(),
+                req.alertType(),
+                req.message(),
+                req.options(),
+                req.displayTrace(),
+                req.payload())
+            : chatMessageService.insertAgent(
+                req.userId(),
+                req.alertType(),
+                req.message(),
+                req.options(),
+                req.displayTrace(),
+                req.payload());
 
-    dispatchFcm(req.userId(), req.alertType(), req.message());
+    chatFcmDispatcher.dispatch(req.userId(), req.alertType(), req.message(), saved.getId());
 
     return new CreationOutcome(true, AgentNotificationCreateResponse.ofCreated(saved.getId()));
-  }
-
-  /** chat_messages INSERT 직후 FCM 발사. 토큰 0개면 silently skip. */
-  private void dispatchFcm(Integer userId, String alertType, String message) {
-    List<String> tokens =
-        tokenRepository.findByUser_IdAndIsActiveTrue(userId).stream()
-            .map(NotificationToken::getToken)
-            .toList();
-    if (tokens.isEmpty()) {
-      log.debug("FCM dispatch skip: no active tokens for user={}", userId);
-      return;
-    }
-    String title = AlertChannelResolver.resolveTitle(alertType);
-    String channelId = AlertChannelResolver.resolveChannelId(alertType);
-    fcmService.sendToTokens(tokens, title, message, channelId);
   }
 
   /** Controller가 status code(201 vs 200) 분기에 사용. */

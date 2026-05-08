@@ -84,14 +84,12 @@ private fun glucoseColor(value: Float) =
         else -> colorNormal
     }
 
-private fun getKrTimeLabels(
-    count: Int = 8,
-    intervalMinutes: Int = 5,
-): List<String> {
+private fun getKrTimeLabels(totalMinutes: Int = 35): List<String> {
     val sdf = SimpleDateFormat("HH:mm", Locale.KOREA)
     sdf.timeZone = TimeZone.getTimeZone("Asia/Seoul")
     val cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Seoul"))
-    return (count - 1 downTo 0).map { i ->
+    val intervalMinutes = totalMinutes / 3
+    return (3 downTo 0).map { i ->
         if (i == 0) {
             "현재"
         } else {
@@ -138,7 +136,7 @@ fun GraphScreen(
     DisposableEffect(diabetesType) {
         GlucoseSimulator.stop()
         GlucoseSimulator.start(context, diabetesType)
-        onDispose { GlucoseSimulator.stop() }
+        onDispose { }
     }
 
     LaunchedEffect(simGlucose) {
@@ -147,12 +145,16 @@ fun GraphScreen(
     }
 
     // BLE 실데이터 우선, 없으면 시뮬레이터 데이터
-    val displayData =
+    val allData =
         if (glucoseReadings.isNotEmpty()) {
             glucoseReadings.map { it.valueMgDl.toFloat() }
         } else {
             simHistory
         }
+
+    var selectedRangeMinutes by remember { mutableIntStateOf(120) }
+    val pointsToShow = (selectedRangeMinutes / 5).coerceAtLeast(2)
+    val displayData: List<Float> = allData.takeLast(pointsToShow)
 
     val (weekDates, todayIndex) = remember { getCurrentWeekDates() }
     var selectedDay by remember { mutableIntStateOf(todayIndex) }
@@ -178,6 +180,8 @@ fun GraphScreen(
             onNavigateToBle = onNavigateToBle,
             isDeviceConnected = showGraph,
             chartData = displayData,
+            selectedRangeMinutes = selectedRangeMinutes,
+            onRangeChange = { selectedRangeMinutes = it },
         )
     } else {
         GraphScreenPortrait(
@@ -191,6 +195,8 @@ fun GraphScreen(
             onNavigateToBle = onNavigateToBle,
             isDeviceConnected = showGraph,
             chartData = displayData,
+            selectedRangeMinutes = selectedRangeMinutes,
+            onRangeChange = { selectedRangeMinutes = it },
         )
     }
 }
@@ -209,6 +215,8 @@ private fun GraphScreenPortrait(
     onNavigateToBle: () -> Unit = {},
     isDeviceConnected: Boolean = false,
     chartData: List<Float> = dummyGlucoseData,
+    selectedRangeMinutes: Int = 120,
+    onRangeChange: (Int) -> Unit = {},
 ) {
     Column(
         modifier =
@@ -296,7 +304,18 @@ private fun GraphScreenPortrait(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    GlucoseCanvas(modifier = Modifier.fillMaxWidth().height(300.dp), data = chartData)
+                    TimeRangeChips(
+                        selectedRangeMinutes = selectedRangeMinutes,
+                        onRangeChange = onRangeChange,
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    GlucoseCanvas(
+                        modifier = Modifier.fillMaxWidth().height(300.dp),
+                        data = chartData,
+                        totalMinutes = selectedRangeMinutes,
+                    )
                 }
             }
         }
@@ -317,6 +336,8 @@ private fun GraphScreenLandscape(
     onNavigateToBle: () -> Unit = {},
     isDeviceConnected: Boolean = false,
     chartData: List<Float> = dummyGlucoseData,
+    selectedRangeMinutes: Int = 120,
+    onRangeChange: (Int) -> Unit = {},
 ) {
     Box(
         modifier =
@@ -430,14 +451,24 @@ private fun GraphScreenLandscape(
                                 .background(Color(0xFFEEEEEE)),
                     )
 
-                    GlucoseCanvas(
+                    Column(
                         modifier =
                             Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
                                 .padding(horizontal = 12.dp, vertical = 12.dp),
-                        data = chartData,
-                    )
+                    ) {
+                        TimeRangeChips(
+                            selectedRangeMinutes = selectedRangeMinutes,
+                            onRangeChange = onRangeChange,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        GlucoseCanvas(
+                            modifier = Modifier.fillMaxWidth().weight(1f),
+                            data = chartData,
+                            totalMinutes = selectedRangeMinutes,
+                        )
+                    }
                 }
             }
         }
@@ -457,6 +488,40 @@ private fun GraphScreenLandscape(
 }
 
 // ── 공용 컴포넌트 ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun TimeRangeChips(
+    selectedRangeMinutes: Int,
+    onRangeChange: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        listOf(30 to "30분", 60 to "1시간", 120 to "2시간", 360 to "6시간").forEach { (minutes, label) ->
+            val selected = selectedRangeMinutes == minutes
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier =
+                    Modifier
+                        .background(
+                            if (selected) Primary else Color(0xFFE8F7FA),
+                            RoundedCornerShape(20.dp),
+                        )
+                        .clickable { onRangeChange(minutes) }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+            ) {
+                Text(
+                    text = label,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (selected) Color.White else Primary,
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun DeviceNotConnectedPlaceholder(onNavigateToBle: () -> Unit = {}) {
@@ -655,8 +720,9 @@ private fun HighLowRow(chartData: List<Float> = dummyGlucoseData) {
 private fun GlucoseCanvas(
     modifier: Modifier = Modifier,
     data: List<Float> = dummyGlucoseData,
+    totalMinutes: Int = 35,
 ) {
-    val timeLabels = remember { getKrTimeLabels() }
+    val timeLabels = remember(totalMinutes) { getKrTimeLabels(totalMinutes = totalMinutes) }
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
