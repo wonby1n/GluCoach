@@ -21,12 +21,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -57,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -190,22 +192,43 @@ fun CameraScreen(
     val imageCapture = remember { ImageCapture.Builder().build() }
     var isTaking by remember { mutableStateOf(false) }
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color.Black),
     ) {
-        Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+        // 전체화면 카메라 프리뷰
+        if (hasCameraPermission) {
+            CameraPreviewView(imageCapture = imageCapture)
+        } else {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(text = "카메라 권한이 필요합니다", color = Color.White, fontSize = 14.sp)
+            }
+        }
 
-        Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        // 상단 그라디언트 오버레이
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(160.dp)
+                    .align(Alignment.TopCenter)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Black.copy(alpha = 0.65f), Color.Transparent),
+                        ),
+                    ),
+        )
+
+        // 상단 컨트롤 (닫기 버튼 + 제목)
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(horizontal = 4.dp, vertical = 4.dp),
+        ) {
             IconButton(onClick = onClose, modifier = Modifier.align(Alignment.CenterStart)) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = "닫기",
-                    tint = Color.White,
-                )
+                Icon(imageVector = Icons.Filled.Close, contentDescription = "닫기", tint = Color.White)
             }
             Text(
                 text = "음식 촬영",
@@ -216,79 +239,77 @@ fun CameraScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
-
+        // 힌트 칩 (상단 바 아래)
         Box(
             modifier =
                 Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(GlucoachColors.PrimaryDark.copy(alpha = 0.6f))
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
-        ) {
-            Text(
-                text = "음식을 프레임 안에 맞춰주세요",
-                color = Color.White,
-                fontSize = 14.sp,
-            )
-        }
-
-        Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
-
-        Box(
-            modifier =
-                Modifier
-                    .padding(horizontal = 40.dp)
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(16.dp))
-                    .border(2.dp, GlucoachColors.Primary, RoundedCornerShape(16.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (hasCameraPermission) {
-                CameraPreviewView(imageCapture = imageCapture)
-            } else {
-                Text(
-                    text = "카메라 권한이 필요합니다",
-                    color = Color.White,
-                    fontSize = 14.sp,
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
-
-        Text(
-            text = "AI가 음식을 자동으로 인식합니다",
-            color = Color.White.copy(alpha = 0.7f),
-            fontSize = 14.sp,
-        )
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        Box(
-            modifier =
-                Modifier
-                    .size(72.dp)
-                    .clip(CircleShape)
-                    .border(3.dp, Color.White, CircleShape)
-                    .clickable {
-                        if (!isTaking) {
-                            isTaking = true
-                            takePhoto(imageCapture, context) { file -> onPhotoTaken(file) }
-                        }
-                    },
-            contentAlignment = Alignment.Center,
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 64.dp),
         ) {
             Box(
                 modifier =
                     Modifier
-                        .size(58.dp)
-                        .clip(CircleShape)
-                        .background(Color.White),
-            )
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(GlucoachColors.PrimaryDark.copy(alpha = 0.6f))
+                        .padding(horizontal = 20.dp, vertical = 8.dp),
+            ) {
+                Text(text = "음식을 화면에 맞춰주세요", color = Color.White, fontSize = 14.sp)
+            }
         }
 
-        Spacer(modifier = Modifier.height(48.dp))
+        // 하단 그라디언트 오버레이
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f)),
+                        ),
+                    ),
+        )
+
+        // 하단 컨트롤 (AI 안내 + 셔터)
+        Column(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 48.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = "AI가 음식을 자동으로 인식합니다",
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 14.sp,
+            )
+            Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+            Box(
+                modifier =
+                    Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .border(3.dp, Color.White, CircleShape)
+                        .clickable {
+                            if (!isTaking) {
+                                isTaking = true
+                                takePhoto(imageCapture, context) { file -> onPhotoTaken(file) }
+                            }
+                        },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(58.dp)
+                            .clip(CircleShape)
+                            .background(Color.White),
+                )
+            }
+        }
     }
 }
 
