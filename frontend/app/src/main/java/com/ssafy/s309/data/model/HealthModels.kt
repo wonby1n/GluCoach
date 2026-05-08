@@ -40,12 +40,18 @@ data class DisplayTraceCard(
     val severity: String = "normal",
 )
 
+/** 키키가 확인한 내용 — decision 객체 */
+@Serializable
+data class DisplayTraceDecision(
+    val reason: String = "",
+)
+
 /** 키키가 확인한 내용 — 전체 구조 */
 @Serializable
 data class DisplayTrace(
     val summary: String = "",
     val cards: List<DisplayTraceCard> = emptyList(),
-    val decision: String = "",
+    val decision: DisplayTraceDecision = DisplayTraceDecision(),
 )
 
 /** 알림 패널 항목 */

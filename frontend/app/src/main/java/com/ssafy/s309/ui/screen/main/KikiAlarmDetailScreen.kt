@@ -291,12 +291,12 @@ private fun ExpandableInfoCard(
                     }
                 }
 
-                if (displayTrace.decision.isNotBlank()) {
+                if (displayTrace.decision.reason.isNotBlank()) {
                     Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
                     HorizontalDivider(color = GlucoachColors.Border)
                     Spacer(modifier = Modifier.height(GlucoachSpacing.md))
                     Text(
-                        text = displayTrace.decision,
+                        text = displayTrace.decision.reason,
                         color = GlucoachColors.TextSecondary,
                         fontSize = 13.sp,
                         textAlign = TextAlign.Center,
