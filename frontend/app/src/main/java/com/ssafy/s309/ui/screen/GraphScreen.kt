@@ -138,7 +138,7 @@ fun GraphScreen(
     DisposableEffect(diabetesType) {
         GlucoseSimulator.stop()
         GlucoseSimulator.start(context, diabetesType)
-        onDispose { GlucoseSimulator.stop() }
+        onDispose { }
     }
 
     LaunchedEffect(simGlucose) {
