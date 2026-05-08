@@ -2,3 +2,14 @@ fastapi>=0.115.0
 uvicorn[standard]>=0.34.0
 pydantic>=2.10.0
 pydantic-settings>=2.7.0
+
+# ML
+torch>=2.2.0
+scikit-learn>=1.4.0
+numpy>=1.24
+pandas>=2.0
+
+# 유틸
+python-dotenv>=1.0
+loguru>=0.7
+requests>=2.31
