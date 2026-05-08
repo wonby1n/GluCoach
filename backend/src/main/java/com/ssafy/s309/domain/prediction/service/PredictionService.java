@@ -57,10 +57,11 @@ public class PredictionService {
   /**
    * Food 엔티티 직접 입력 변종 — 사진 통합 예측({@code /from-image}) 흐름에서 사용.
    *
-   * <p>호출자(orchestrator)는 {@code food.carbsG NOT NULL} 보장 시점에만 호출해야 한다. protein/fat/kcal/sugar 는
-   * 그대로 통과 (NULL 허용) — AI 모델은 carbs 만 사용하고 savePrediction 도 이 필드들을 저장하지 않으므로 무관.
+   * <p>호출자(orchestrator)는 {@code food.carbsG NOT NULL} 보장 시점에만 호출해야 한다. Food 엔티티를 직접 받으므로 DB 재조회 없이
+   * macro 필드를 AI 요청에 전달한다.
    */
   public PredictResponse predictForFood(Integer userId, Food food) {
+    User user = tx.findUser(userId);
     PredictRequest request =
         new PredictRequest(
             food.getId(),
@@ -68,10 +69,14 @@ public class PredictionService {
             food.getCarbsG(),
             food.getProteinG(),
             food.getFatG(),
+            food.getFiberG(),
             food.getKcal(),
             food.getSugarG(),
             null);
-    return predict(userId, request);
+    GlucosePredictResponse aiResponse =
+        glucosePredictClient.predict(buildAiRequest(user, request, Optional.of(food)));
+    GlucosePrediction saved = tx.savePrediction(userId, request, aiResponse);
+    return toResponse(saved.getId(), aiResponse);
   }
 
   public AbPredictResponse comparePredict(Integer userId, AbPredictRequest request) {
@@ -95,15 +100,16 @@ public class PredictionService {
    * 회피.
    */
   private PredictResponse predictWithUser(User user, PredictRequest request) {
-    GlucosePredictResponse aiResponse = glucosePredictClient.predict(buildAiRequest(user, request));
+    Optional<Food> foodOpt =
+        request.foodId() != null ? foodRepository.findById(request.foodId()) : Optional.empty();
+    GlucosePredictResponse aiResponse =
+        glucosePredictClient.predict(buildAiRequest(user, request, foodOpt));
     GlucosePrediction saved = tx.savePrediction(user.getId(), request, aiResponse);
     return toResponse(saved.getId(), aiResponse);
   }
 
-  private GlucosePredictRequest buildAiRequest(User user, PredictRequest request) {
-    Optional<Food> foodOpt =
-        request.foodId() != null ? foodRepository.findById(request.foodId()) : Optional.empty();
-
+  private GlucosePredictRequest buildAiRequest(
+      User user, PredictRequest request, Optional<Food> foodOpt) {
     // foodId가 있으면 DB 값 우선. foods.carbs_g 가 NULL/0이면 클라이언트 값으로 fallback.
     double carbs =
         foodOpt
@@ -123,7 +129,11 @@ public class PredictionService {
             .map(Food::getFatG)
             .map(BigDecimal::doubleValue)
             .orElse(request.fatG() != null ? request.fatG().doubleValue() : null);
-    Double fiberG = foodOpt.map(Food::getFiberG).map(BigDecimal::doubleValue).orElse(null);
+    Double fiberG =
+        foodOpt
+            .map(Food::getFiberG)
+            .map(BigDecimal::doubleValue)
+            .orElse(request.fiberG() != null ? request.fiberG().doubleValue() : null);
     Double kcal =
         foodOpt
             .map(Food::getKcal)
