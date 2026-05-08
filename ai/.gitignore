@@ -18,6 +18,9 @@ ENV/
 *.swp
 *.swo
 
+# 임시 분석/디버깅 산출물 (커밋 금지)
+.tmp_*
+
 # 테스트 / 커버리지
 .pytest_cache/
 .coverage

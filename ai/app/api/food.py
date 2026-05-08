@@ -21,6 +21,7 @@ def get_predictor() -> FoodPredictor:
             db_path=settings.food_db_path,
             num_classes=settings.food_num_classes,
             device=settings.model_device,
+            code_to_name_path=settings.food_code_to_name_path,
         )
     return _predictor
 

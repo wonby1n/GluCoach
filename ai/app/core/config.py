@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     # 음식 인식 (EfficientNet-B0 임베딩 + prototype DB cosine 검색)
     food_model_path: str = "models/food/best.pt"
     food_db_path: str = "models/food/prototype_db.pt"
+    # AI Hub 코드 → 한글 음식명 매핑. PDF 가이드 표에서 추출 (96% 커버리지).
+    food_code_to_name_path: str = "models/food/code_to_name.json"
     # 학습 시점 클래스 수. state_dict 모양 매칭에만 사용 — 추론은 head 거치지 않음.
     food_num_classes: int = 307
     model_device: str = "cpu"
