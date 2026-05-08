@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import glucose as glucose_router
 from app.api.agent import router as agent_router
+from app.api.agent_command import router as agent_command_router
 from app.api.report import router as report_router
 from app.core.config import settings
 from app.api.food import router as food_router
@@ -22,6 +23,7 @@ app.add_middleware(
 
 app.include_router(food_router, prefix="/api/v1")
 app.include_router(agent_router)
+app.include_router(agent_command_router)
 app.include_router(report_router)
 
 

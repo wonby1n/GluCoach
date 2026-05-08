@@ -1,9 +1,8 @@
 package com.ssafy.s309.domain.alert.service;
 
-import com.ssafy.s309.domain.alert.entity.Alert;
-import com.ssafy.s309.domain.alert.repository.AlertRepository;
 import com.ssafy.s309.domain.cgm.event.GlucoseReceivedEvent;
 import com.ssafy.s309.domain.chat.service.ChatMessageCreationService;
+import com.ssafy.s309.domain.chat.service.ChatMessageService;
 import java.math.BigDecimal;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +25,7 @@ public class AlertTriggerService {
   private static final List<String> RULE_ALERT_TYPES = List.of("HIGH", "LOW");
 
   private final ChatMessageCreationService chatMessageCreationService;
-  private final AlertRepository alertRepository;
+  private final ChatMessageService chatMessageService;
 
   @Async("alertExecutor")
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -48,14 +47,11 @@ public class AlertTriggerService {
     }
   }
 
-  /** 70 < value < 180 정상 복귀: 해당 사용자의 미해결 HIGH/LOW alert를 모두 종결. */
+  /** 70 < value < 180 정상 복귀: 해당 사용자의 미해결 HIGH/LOW chat 메시지를 모두 종결. */
   private void resolveOpenAlerts(Integer userId) {
-    List<Alert> open =
-        alertRepository.findByUserIdAndAlertTypeInAndResolvedAtIsNull(userId, RULE_ALERT_TYPES);
-    if (open.isEmpty()) {
-      return;
+    int resolved = chatMessageService.resolveOpenRule(userId, RULE_ALERT_TYPES);
+    if (resolved > 0) {
+      log.debug("Resolved {} open rule chat messages: user={}", resolved, userId);
     }
-    open.forEach(Alert::resolve);
-    log.debug("Resolved {} open rule alerts: user={}", open.size(), userId);
   }
 }

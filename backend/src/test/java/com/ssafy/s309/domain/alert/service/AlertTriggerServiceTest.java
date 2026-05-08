@@ -8,11 +8,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import com.ssafy.s309.domain.alert.entity.Alert;
-import com.ssafy.s309.domain.alert.repository.AlertRepository;
 import com.ssafy.s309.domain.cgm.event.GlucoseReceivedEvent;
+import com.ssafy.s309.domain.chat.service.ChatMessageCreationService;
+import com.ssafy.s309.domain.chat.service.ChatMessageService;
 import java.math.BigDecimal;
-import java.util.Collection;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,13 +24,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @SuppressWarnings("NonAsciiCharacters")
 class AlertTriggerServiceTest {
 
-  @Mock
-  private com.ssafy.s309.domain.chat.service.ChatMessageCreationService chatMessageCreationService;
-
-  @Mock private AlertRepository alertRepository;
+  @Mock private ChatMessageCreationService chatMessageCreationService;
+  @Mock private ChatMessageService chatMessageService;
   @InjectMocks private AlertTriggerService alertTriggerService;
 
   private static final Integer USER_ID = 1;
+  private static final List<String> RULE_TYPES = List.of("HIGH", "LOW");
 
   private GlucoseReceivedEvent event(BigDecimal value) {
     return new GlucoseReceivedEvent(USER_ID, value, 100L);
@@ -45,7 +43,7 @@ class AlertTriggerServiceTest {
     verify(chatMessageCreationService)
         .createIfNotDuplicate(eq(USER_ID), eq("HIGH"), messageCaptor.capture());
     assertThat(messageCaptor.getValue()).contains("180");
-    verify(alertRepository, never()).findByUserIdAndAlertTypeInAndResolvedAtIsNull(any(), any());
+    verify(chatMessageService, never()).resolveOpenRule(any(), any());
   }
 
   @Test
@@ -60,7 +58,7 @@ class AlertTriggerServiceTest {
     alertTriggerService.handle(event(new BigDecimal("70")));
 
     verify(chatMessageCreationService).createIfNotDuplicate(eq(USER_ID), eq("LOW"), any());
-    verify(alertRepository, never()).findByUserIdAndAlertTypeInAndResolvedAtIsNull(any(), any());
+    verify(chatMessageService, never()).resolveOpenRule(any(), any());
   }
 
   @Test
@@ -72,59 +70,31 @@ class AlertTriggerServiceTest {
 
   @Test
   void 정상_120_미해결_알림_있으면_모두_종결() {
-    Alert openHigh =
-        Alert.builder()
-            .userId(USER_ID)
-            .alertType("HIGH")
-            .message("..")
-            .source("be")
-            .isRead(false)
-            .build();
-    Alert openLow =
-        Alert.builder()
-            .userId(USER_ID)
-            .alertType("LOW")
-            .message("..")
-            .source("be")
-            .isRead(false)
-            .build();
-    given(
-            alertRepository.findByUserIdAndAlertTypeInAndResolvedAtIsNull(
-                eq(USER_ID), any(Collection.class)))
-        .willReturn(List.of(openHigh, openLow));
+    given(chatMessageService.resolveOpenRule(eq(USER_ID), eq(RULE_TYPES))).willReturn(2);
 
     alertTriggerService.handle(event(new BigDecimal("120")));
 
     verify(chatMessageCreationService, never()).createIfNotDuplicate(any(), any(), any());
-    assertThat(openHigh.getResolvedAt()).isNotNull();
-    assertThat(openLow.getResolvedAt()).isNotNull();
+    verify(chatMessageService).resolveOpenRule(eq(USER_ID), eq(RULE_TYPES));
   }
 
   @Test
   void 정상_120_미해결_알림_없으면_no_op() {
-    given(
-            alertRepository.findByUserIdAndAlertTypeInAndResolvedAtIsNull(
-                eq(USER_ID), any(Collection.class)))
-        .willReturn(List.of());
+    given(chatMessageService.resolveOpenRule(eq(USER_ID), eq(RULE_TYPES))).willReturn(0);
 
     alertTriggerService.handle(event(new BigDecimal("120")));
 
     verify(chatMessageCreationService, never()).createIfNotDuplicate(any(), any(), any());
-    verify(alertRepository, times(1))
-        .findByUserIdAndAlertTypeInAndResolvedAtIsNull(eq(USER_ID), any(Collection.class));
+    verify(chatMessageService, times(1)).resolveOpenRule(eq(USER_ID), eq(RULE_TYPES));
   }
 
   @Test
   void 정상_71_경계_정상_복귀_분기() {
-    given(
-            alertRepository.findByUserIdAndAlertTypeInAndResolvedAtIsNull(
-                eq(USER_ID), any(Collection.class)))
-        .willReturn(List.of());
+    given(chatMessageService.resolveOpenRule(eq(USER_ID), eq(RULE_TYPES))).willReturn(0);
 
     alertTriggerService.handle(event(new BigDecimal("71")));
 
     verify(chatMessageCreationService, never()).createIfNotDuplicate(any(), any(), any());
-    verify(alertRepository)
-        .findByUserIdAndAlertTypeInAndResolvedAtIsNull(eq(USER_ID), any(Collection.class));
+    verify(chatMessageService).resolveOpenRule(eq(USER_ID), eq(RULE_TYPES));
   }
 }

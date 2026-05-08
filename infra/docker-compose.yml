@@ -120,9 +120,13 @@ services:
     expose:
       - "8000"
     environment:
+      TZ: Asia/Seoul
       DEBUG: ${AI_DEBUG:-false}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://gms.ssafy.io/gmsapi/api.openai.com/v1}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      AGENT_API_KEY: ${AGENT_API_KEY:-dev-agent-key-change-in-prod}
+      BACKEND_API_URL: ${BACKEND_API_URL:-http://backend:8080}
     volumes:
       - ai-models:/app/models
     healthcheck:
