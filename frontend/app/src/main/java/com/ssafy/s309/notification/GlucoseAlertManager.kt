@@ -184,6 +184,7 @@ class GlucoseAlertManager
                     message = message,
                     timeAgoText = "방금",
                     isUnread = true,
+                    alertType = type.name,
                 ),
             )
         }
@@ -206,6 +207,7 @@ class GlucoseAlertManager
         fun emitFcmAlert(
             title: String,
             body: String,
+            alertType: String = "",
         ) {
             _alertStream.tryEmit(
                 NotificationItem(
@@ -214,6 +216,7 @@ class GlucoseAlertManager
                     message = body,
                     timeAgoText = "방금",
                     isUnread = true,
+                    alertType = alertType,
                 ),
             )
         }
