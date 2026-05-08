@@ -58,6 +58,7 @@ import com.ssafy.s309.ui.theme.GlucoachSpacing
 
 @Composable
 fun KikiAlarmDetailScreen(
+    notification: com.ssafy.s309.data.model.NotificationItem? = null,
     onBack: () -> Unit = {},
     onChatClick: () -> Unit = {},
 ) {
@@ -138,10 +139,8 @@ fun KikiAlarmDetailScreen(
 
             SpeechBubble(
                 lines =
-                    listOf(
-                        "점심 먹고 한 시간이 지났어요.",
-                        "최근 움직임이 거의 없는데 스트레칭 어때요?",
-                    ),
+                    notification?.message?.split("\n")
+                        ?: listOf("키키가 오늘 컨디션을 보고 있어요."),
             )
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.lg))

@@ -39,6 +39,7 @@ import com.ssafy.s309.ui.screen.main.GuardianScreen
 import com.ssafy.s309.ui.screen.main.KikiAlarmDetailScreen
 import com.ssafy.s309.ui.screen.main.KikiChatScreen
 import com.ssafy.s309.ui.screen.main.MainScreen
+import com.ssafy.s309.ui.screen.main.MainViewModel
 import com.ssafy.s309.ui.screen.main.MyAccountScreen
 import com.ssafy.s309.ui.screen.main.ReportMenuSheet
 import com.ssafy.s309.ui.screen.main.SettingsScreen
@@ -447,8 +448,18 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             }
         }
         composable(Screen.KikiAlarmDetail.route) {
+            val mainEntry =
+                remember(navController) {
+                    navController.getBackStackEntry(Screen.Main.route)
+                }
+            val mainViewModel: MainViewModel = hiltViewModel(mainEntry)
+            val mainUiState by mainViewModel.uiState.collectAsState()
+            val notification =
+                mainUiState.selectedNotification
+                    ?: mainUiState.notifications.firstOrNull { it.isUnread }
             SubScreenWithBottomNav(navController = navController, selectedId = "home") {
                 KikiAlarmDetailScreen(
+                    notification = notification,
                     onBack = { navController.popBackStack() },
                     onChatClick = { navController.navigate(Screen.KikiChat.route) },
                 )
