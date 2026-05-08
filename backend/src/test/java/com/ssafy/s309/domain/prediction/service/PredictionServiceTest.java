@@ -18,6 +18,7 @@ import com.ssafy.s309.domain.user.entity.DiabetesType;
 import com.ssafy.s309.domain.user.entity.User;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.concurrent.Executor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -33,6 +34,7 @@ class PredictionServiceTest {
   @Mock private GlucosePredictClient glucosePredictClient;
   @Mock private PredictionTxHelper tx;
   @Mock private FoodRepository foodRepository;
+  @Mock private Executor asyncExecutor;
   @InjectMocks private PredictionService predictionService;
 
   private static final Integer USER_ID = 7;
