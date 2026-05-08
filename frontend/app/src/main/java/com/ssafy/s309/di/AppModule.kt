@@ -8,6 +8,7 @@ import com.ssafy.s309.data.api.HealthApi
 import com.ssafy.s309.data.api.PredictApi
 import com.ssafy.s309.data.api.SleepSessionApi
 import com.ssafy.s309.data.api.UserApi
+import com.ssafy.s309.data.api.WeeklyReportApi
 import com.ssafy.s309.data.network.AuthInterceptor
 import dagger.Module
 import dagger.Provides
@@ -122,4 +123,37 @@ object AppModule {
     fun provideAiFoodApi(
         @Named("authenticated") retrofit: Retrofit,
     ): AiFoodApi = retrofit.create(AiFoodApi::class.java)
+
+    @Provides
+    @Singleton
+    @Named("no-redirect")
+    fun provideNoRedirectOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient =
+        OkHttpClient.Builder()
+            .addInterceptor(authInterceptor)
+            .addInterceptor(
+                HttpLoggingInterceptor().apply {
+                    level = HttpLoggingInterceptor.Level.BODY
+                },
+            )
+            .followRedirects(false)
+            .build()
+
+    @Provides
+    @Singleton
+    @Named("no-redirect")
+    fun provideNoRedirectRetrofit(
+        @Named("no-redirect") okHttpClient: OkHttpClient,
+        json: Json,
+    ): Retrofit =
+        Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .build()
+
+    @Provides
+    @Singleton
+    fun provideWeeklyReportApi(
+        @Named("no-redirect") retrofit: Retrofit,
+    ): WeeklyReportApi = retrofit.create(WeeklyReportApi::class.java)
 }
