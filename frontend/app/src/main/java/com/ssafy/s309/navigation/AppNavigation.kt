@@ -36,6 +36,7 @@ import com.ssafy.s309.ui.screen.ble.BleScreen
 import com.ssafy.s309.ui.screen.health.HealthSourceScreen
 import com.ssafy.s309.ui.screen.main.AddMenuSheet
 import com.ssafy.s309.ui.screen.main.GuardianScreen
+import com.ssafy.s309.ui.screen.main.KikiAlarmDetailScreen
 import com.ssafy.s309.ui.screen.main.KikiChatScreen
 import com.ssafy.s309.ui.screen.main.MainScreen
 import com.ssafy.s309.ui.screen.main.MyAccountScreen
@@ -85,6 +86,8 @@ sealed class Screen(val route: String) {
     object MyAccount : Screen("my_account")
 
     object KikiChat : Screen("kiki_chat")
+
+    object KikiAlarmDetail : Screen("kiki_alarm_detail")
 }
 
 @Composable
@@ -368,6 +371,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 onGuardianClick = { navController.navigate(Screen.Guardian.route) },
                 onAccountClick = { navController.navigate(Screen.MyAccount.route) },
                 onKikiChatClick = { navController.navigate(Screen.KikiChat.route) },
+                onKikiAlarmClick = { navController.navigate(Screen.KikiAlarmDetail.route) },
                 userEmail = authViewModel.userEmail,
                 requestedTab = requestedTab,
                 onTabHandled = { backStackEntry.savedStateHandle.remove<String>("requestedTab") },
@@ -438,6 +442,13 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         composable(Screen.KikiChat.route) {
             SubScreenWithBottomNav(navController = navController, selectedId = "home") {
                 KikiChatScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+        }
+        composable(Screen.KikiAlarmDetail.route) {
+            SubScreenWithBottomNav(navController = navController, selectedId = "home") {
+                KikiAlarmDetailScreen(
                     onBack = { navController.popBackStack() },
                 )
             }
