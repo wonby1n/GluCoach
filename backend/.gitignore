@@ -38,3 +38,6 @@ out/
 
 ### 환경 변수 ###
 .env
+
+### Firebase 서비스 계정 (절대 커밋 금지) ###
+src/main/resources/firebase-service-account.json
