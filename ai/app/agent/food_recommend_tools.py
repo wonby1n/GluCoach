@@ -76,6 +76,7 @@ def get_user_food_grades(min_meal_count: int = 2) -> dict:
             "grade": g.get("grade"),
             "avg_slope": float(g.get("avgSlope")) if g.get("avgSlope") is not None else None,
             "meal_count": g.get("mealCount"),
+            "image_storage_key": g.get("latestMealImageKey"),
         }
         grade_key = item["grade"] or "C"
         if grade_key in by_grade:
@@ -100,6 +101,7 @@ def get_recent_meals(days: int = 2) -> dict:
             "name": m.get("foodName"),
             "carbs_g": m.get("carbs"),
             "kcal": m.get("calories"),
+            "image_storage_key": m.get("imageStorageKey"),
         }
         for m in raw
     ]
@@ -123,6 +125,29 @@ def get_user_profile() -> dict:
     }
 
 
+def get_unseen_food_candidates(limit: int = 20) -> dict:
+    """사용자가 아직 안 먹어본 음식 후보 (foods 테이블, search_count desc).
+
+    신규 음식 추천에만 사용. items[].food_id를 채우기 위해 반드시 이 도구의 결과에서만 신규 음식을 고른다.
+    """
+    user_id = _context.get("user_id")
+    raw = _be_get(f"/api/agent/users/{user_id}/unseen-foods", params={"limit": limit})
+    if raw is None:
+        return {"candidates": [], "error": "be_unavailable"}
+    return {
+        "candidates": [
+            {
+                "food_id": c.get("foodId"),
+                "name": c.get("name"),
+                "category": c.get("category"),
+                "kcal": c.get("kcal"),
+                "carbs_g": c.get("carbsG"),
+            }
+            for c in raw
+        ]
+    }
+
+
 def get_glucose_recent() -> dict:
     """최근 혈당 + 마지막 식사 경과 분."""
     user_id = _context.get("user_id")
@@ -139,9 +164,12 @@ def get_glucose_recent() -> dict:
 # ── 행동 도구 ─────────────────────────────────────────────
 
 
-def send_command_response(message: str, options: list, display_trace: dict) -> dict:
+def send_command_response(
+    message: str, display_trace: dict, payload: dict | None = None
+) -> dict:
     """사용자 command에 대한 agent 응답 발송. parent_id로 user 메시지를 참조한다.
 
+    options는 사용하지 않는다 (텍스트 응답 + 선택적 payload 구조화 카드만).
     BE POST /api/agent/notifications with parentChatMessageId.
     """
     user_id = _context.get("user_id")
@@ -150,20 +178,17 @@ def send_command_response(message: str, options: list, display_trace: dict) -> d
     backend_url = os.getenv("BACKEND_API_URL", "")
     agent_api_key = os.getenv("AGENT_API_KEY", "dev-agent-key-change-in-prod")
 
-    if not isinstance(options, list) or len(options) > 10:
-        return {"status": "error", "error": "options must be 0~10 items", "got": options}
-    for opt in options:
-        if not isinstance(opt, dict) or "id" not in opt or "label" not in opt:
-            return {"status": "error", "error": "each option must be {id, label}", "got": opt}
     if not isinstance(display_trace, dict):
         return {"status": "error", "error": "display_trace must be an object"}
+    if payload is not None and not isinstance(payload, dict):
+        return {"status": "error", "error": "payload must be an object or null"}
 
     if not backend_url or user_id is None:
         return {
             "status": "sent_local",
             "message": message,
-            "options": options,
             "display_trace": display_trace,
+            "payload": payload,
             "parent_chat_message_id": parent_id,
         }
 
@@ -175,15 +200,16 @@ def send_command_response(message: str, options: list, display_trace: dict) -> d
                 "userId": user_id,
                 "alertType": alert_type,
                 "message": message,
-                "options": options,
+                "options": [],
                 "displayTrace": display_trace,
+                "payload": payload,
                 "parentChatMessageId": parent_id,
             },
             timeout=5,
         )
         print(f"[FoodRecommend API] status={resp.status_code}, body={resp.text}")
         resp.raise_for_status()
-        return {"status": "sent", "message": message, "options": options}
+        return {"status": "sent", "message": message}
     except Exception as e:
         return {"status": "error", "message": message, "error": str(e)}
 
@@ -220,38 +246,57 @@ FOOD_RECOMMEND_TOOL_SCHEMAS = [
         "input_schema": {"type": "object", "properties": {}},
     },
     {
+        "name": "get_unseen_food_candidates",
+        "description": "사용자가 안 먹어본 음식 후보를 foods 테이블에서 가져온다. search_count 인기순. 신규 음식 추천에만 사용 (items[].food_id를 채우기 위해 필수).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "default": 20, "description": "최대 N개 (1~50)"}
+            },
+        },
+    },
+    {
         "name": "send_command_response",
         "description": (
             "사용자 command에 대한 agent 응답을 발송한다. parent_id로 user 메시지를 참조하므로 채팅 thread가 형성된다. "
-            "options는 0~10개, 각 항목은 {id, label}. display_trace는 추론 카드 (summary/cards/decision)."
+            "options는 사용하지 않는다 (텍스트 + 구조화 payload만). "
+            "message는 사용자가 읽을 자연어 본문, payload.items는 FE가 향후 카드로 그릴 음식 메타데이터."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "message": {"type": "string", "description": "사용자에게 보여줄 응답 메시지"},
-                "options": {
-                    "type": "array",
-                    "minItems": 0,
-                    "maxItems": 10,
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "id": {"type": "string"},
-                            "label": {"type": "string"},
-                        },
-                        "required": ["id", "label"],
-                    },
-                },
+                "message": {"type": "string", "description": "사용자에게 보여줄 응답 메시지 본문"},
                 "display_trace": {
                     "type": "object",
+                    "description": "추론 메타. 지금은 summary 1줄만 필수.",
                     "properties": {
-                        "summary": {"type": "string"},
-                        "cards": {"type": "array"},
-                        "decision": {"type": "object"},
+                        "summary": {"type": "string", "description": "어떤 기준으로 골랐는지 1줄"},
+                    },
+                    "required": ["summary"],
+                },
+                "payload": {
+                    "type": "object",
+                    "description": "구조화된 응답 콘텐츠. items 배열만 사용.",
+                    "properties": {
+                        "items": {
+                            "type": "array",
+                            "description": "추천 음식 카드. 목표 3개 (데이터 부족 시 1~2개 허용, 위험 영역이면 0개).",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "food_id": {"type": ["integer", "null"], "description": "foods.id. 신규(안 먹어본) 음식이면 null."},
+                                    "name": {"type": "string"},
+                                    "grade": {"type": ["string", "null"], "description": "S/A/B/C/D. 신규면 null."},
+                                    "reason": {"type": "string", "description": "왜 추천하는지 1줄"},
+                                    "image_storage_key": {"type": ["string", "null"], "description": "get_user_food_grades에서 받은 image_storage_key 그대로. 신규 음식이면 null."},
+                                },
+                                "required": ["name", "reason"],
+                            },
+                        },
                     },
                 },
             },
-            "required": ["message", "options", "display_trace"],
+            "required": ["message", "display_trace"],
         },
     },
 ]
@@ -262,5 +307,6 @@ FOOD_RECOMMEND_TOOL_MAP = {
     "get_recent_meals": get_recent_meals,
     "get_user_profile": get_user_profile,
     "get_glucose_recent": get_glucose_recent,
+    "get_unseen_food_candidates": get_unseen_food_candidates,
     "send_command_response": send_command_response,
 }

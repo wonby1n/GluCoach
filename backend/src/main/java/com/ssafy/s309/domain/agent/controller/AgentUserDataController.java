@@ -3,6 +3,7 @@ package com.ssafy.s309.domain.agent.controller;
 import com.ssafy.s309.domain.agent.dto.AgentFoodGradeItem;
 import com.ssafy.s309.domain.agent.dto.AgentGlucoseRecentItem;
 import com.ssafy.s309.domain.agent.dto.AgentMealItem;
+import com.ssafy.s309.domain.agent.dto.AgentUnseenFoodItem;
 import com.ssafy.s309.domain.agent.dto.AgentUserProfileItem;
 import com.ssafy.s309.domain.agent.service.AgentUserDataService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -52,5 +53,15 @@ public class AgentUserDataController {
   @GetMapping("/glucose-recent")
   public ResponseEntity<AgentGlucoseRecentItem> glucoseRecent(@PathVariable Integer userId) {
     return ResponseEntity.ok(service.getGlucoseRecent(userId));
+  }
+
+  @Operation(summary = "사용자가 아직 안 먹어본 음식 후보 (search_count desc)")
+  @GetMapping("/unseen-foods")
+  public ResponseEntity<List<AgentUnseenFoodItem>> unseenFoods(
+      @PathVariable Integer userId,
+      @Parameter(description = "최대 N개 (1~50)", example = "20")
+          @RequestParam(value = "limit", defaultValue = "20")
+          int limit) {
+    return ResponseEntity.ok(service.getUnseenFoodCandidates(userId, limit));
   }
 }

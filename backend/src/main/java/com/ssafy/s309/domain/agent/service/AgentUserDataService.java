@@ -3,9 +3,11 @@ package com.ssafy.s309.domain.agent.service;
 import com.ssafy.s309.domain.agent.dto.AgentFoodGradeItem;
 import com.ssafy.s309.domain.agent.dto.AgentGlucoseRecentItem;
 import com.ssafy.s309.domain.agent.dto.AgentMealItem;
+import com.ssafy.s309.domain.agent.dto.AgentUnseenFoodItem;
 import com.ssafy.s309.domain.agent.dto.AgentUserProfileItem;
 import com.ssafy.s309.domain.cgm.entity.GlucoseRecord;
 import com.ssafy.s309.domain.cgm.repository.GlucoseRecordRepository;
+import com.ssafy.s309.domain.food.repository.FoodRepository;
 import com.ssafy.s309.domain.meal.entity.MealRecord;
 import com.ssafy.s309.domain.meal.repository.MealRecordRepository;
 import com.ssafy.s309.domain.meal.repository.UserFoodGradeRepository;
@@ -15,6 +17,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,14 +36,27 @@ public class AgentUserDataService {
   private final UserRepository userRepository;
   private final MealRecordRepository mealRecordRepository;
   private final GlucoseRecordRepository glucoseRecordRepository;
+  private final FoodRepository foodRepository;
+
+  @Transactional(readOnly = true)
+  public List<AgentUnseenFoodItem> getUnseenFoodCandidates(Integer userId, int limit) {
+    int safeLimit = Math.max(1, Math.min(limit, 50));
+    LocalDateTime since = LocalDateTime.now().minusDays(7);
+    return foodRepository.findUnseenForAgent(userId, since, PageRequest.of(0, safeLimit));
+  }
 
   @Transactional(readOnly = true)
   public List<AgentFoodGradeItem> getFoodGrades(Integer userId) {
-    return foodGradeRepository.findGradesByUserId(userId).stream()
+    return foodGradeRepository.findAgentGradesWithImageByUserId(userId).stream()
         .map(
             g ->
                 new AgentFoodGradeItem(
-                    g.foodId(), g.foodName(), g.grade(), g.avgSlope(), g.mealCount()))
+                    g.getFoodId(),
+                    g.getFoodName(),
+                    g.getGrade(),
+                    g.getAvgSlope(),
+                    g.getMealCount(),
+                    g.getLatestMealImageKey()))
         .toList();
   }
 

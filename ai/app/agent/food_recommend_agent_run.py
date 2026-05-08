@@ -28,7 +28,7 @@ if sys.platform == "win32":
         pass
 
 BASE_URL = "https://gms.ssafy.io/gmsapi/api.anthropic.com"
-MODEL = "claude-sonnet-4-5-20250929"
+MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 4096
 MAX_TURNS = 10
 
