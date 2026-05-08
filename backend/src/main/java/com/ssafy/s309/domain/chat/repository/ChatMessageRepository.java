@@ -30,6 +30,10 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
   List<ChatMessage> findByUserIdAndMessageTypeIsNotNullAndCreatedAtAfterOrderByCreatedAtDesc(
       Integer userId, LocalDateTime since);
 
+  /** AutoSOS 체크 — 미읽음 HIGH/LOW 알림이 before 이전에 생성되어 아직 미해결인지 여부. */
+  boolean existsByUserIdAndMessageTypeInAndIsReadFalseAndResolvedAtIsNullAndCreatedAtBefore(
+      Integer userId, List<String> messageTypes, LocalDateTime before);
+
   /** 본인 미읽음 일괄 읽음 처리 — 채팅방 진입 시 호출. */
   @Modifying
   @Query("UPDATE ChatMessage m SET m.isRead = true WHERE m.userId = ?1 AND m.isRead = false")

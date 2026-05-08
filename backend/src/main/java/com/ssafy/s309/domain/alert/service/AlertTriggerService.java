@@ -26,6 +26,7 @@ public class AlertTriggerService {
 
   private final ChatMessageCreationService chatMessageCreationService;
   private final ChatMessageService chatMessageService;
+  private final AutoSosService autoSosService;
 
   @Async("alertExecutor")
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -37,10 +38,12 @@ public class AlertTriggerService {
     if (value.compareTo(THRESHOLD_HIGH) >= 0) {
       String message = String.format("혈당이 %.0f mg/dL로 기준치(180)를 초과했습니다.", value);
       chatMessageCreationService.createIfNotDuplicate(userId, "HIGH", message);
+      autoSosService.checkAndTrigger(userId);
       log.debug("HIGH alert triggered: user={}, value={}", userId, value);
     } else if (value.compareTo(THRESHOLD_LOW) <= 0) {
       String message = String.format("혈당이 %.0f mg/dL로 기준치(70) 이하입니다.", value);
       chatMessageCreationService.createIfNotDuplicate(userId, "LOW", message);
+      autoSosService.checkAndTrigger(userId);
       log.debug("LOW alert triggered: user={}, value={}", userId, value);
     } else {
       resolveOpenAlerts(userId);
