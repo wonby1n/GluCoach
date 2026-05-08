@@ -285,7 +285,10 @@ fun MainScreenContent(
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
-                                KikiSuggestionCard(onClick = onKikiAlarmClick)
+                                KikiSuggestionCard(
+                                    notifications = state.notifications,
+                                    onClick = onKikiAlarmClick,
+                                )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
                                 DebugKikiTestPanel(onDebugSetGlucose) // [DEBUG_KIKI_TEST]
@@ -555,9 +558,13 @@ private fun TodayConditionHeader(
 
 @Composable
 private fun KikiSuggestionCard(
+    notifications: List<com.ssafy.s309.data.model.NotificationItem>,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val unread = notifications.filter { it.isUnread }
+    val bannerText = resolveBannerText(unread)
+
     Row(
         modifier =
             modifier
@@ -578,43 +585,63 @@ private fun KikiSuggestionCard(
             Icon(
                 imageVector = Icons.Outlined.MailOutline,
                 contentDescription = null,
-                tint = GlucoachColors.TextPrimary,
+                tint = GlucoachColors.PrimaryDark,
                 modifier =
                     Modifier
                         .size(24.dp)
                         .align(Alignment.Center),
             )
-            Box(
-                modifier =
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .size(16.dp)
-                        .background(Color(0xFFE53935), shape = CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "1",
-                    color = Color.White,
-                    fontSize = 10.sp,
-                    lineHeight = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    style =
-                        LocalTextStyle.current.merge(
-                            TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false)),
-                        ),
-                )
+            if (unread.isNotEmpty()) {
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .size(16.dp)
+                            .background(Color(0xFFE53935), shape = CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "${unread.size}",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        lineHeight = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        style =
+                            LocalTextStyle.current.merge(
+                                TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false)),
+                            ),
+                    )
+                }
             }
         }
         Spacer(modifier = Modifier.width(12.dp))
         Text(
-            text = "키키가 식후 활동을 제안했어요!",
+            text = bannerText,
             color = GlucoachColors.TextPrimary,
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
         )
     }
 }
+
+private fun resolveBannerText(unread: List<com.ssafy.s309.data.model.NotificationItem>): String =
+    when {
+        unread.isEmpty() -> "키키가 오늘 컨디션을 보고 있어요"
+        unread.size >= 2 -> "키키가 기다리고 있어요"
+        else ->
+            when (unread.first().alertType) {
+                "HIGH" -> "혈당이 높아요"
+                "LOW" -> "저혈당 주의가 필요해요"
+                "SOS" -> "SOS 긴급 요청이 발생했어요"
+                "AGENT_WAKE_UP" -> "키키가 오늘의 혈당 전략을 알려줬어요!"
+                "AGENT_MEAL_FOLLOWUP" -> "키키가 식후 활동을 제안했어요!"
+                "AGENT_MEAL_REPLY" -> "키키가 답변을 보냈어요!"
+                "AGENT_MEAL_RETRY" -> "키키가 다시 확인하고 있어요!"
+                "WEEKLY_REPORT" -> "이번 주 건강 리포트가 도착했어요!"
+                else -> "키키가 오늘 컨디션을 보고 있어요"
+            }
+    }
 
 @Composable
 private fun SummaryRow(

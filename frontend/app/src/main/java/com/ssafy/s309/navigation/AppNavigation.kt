@@ -450,6 +450,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             SubScreenWithBottomNav(navController = navController, selectedId = "home") {
                 KikiAlarmDetailScreen(
                     onBack = { navController.popBackStack() },
+                    onChatClick = { navController.navigate(Screen.KikiChat.route) },
                 )
             }
         }
