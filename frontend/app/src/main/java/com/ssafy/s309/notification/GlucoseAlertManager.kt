@@ -38,7 +38,6 @@ class GlucoseAlertManager
         @ApplicationContext private val context: Context,
         private val bleManager: BleManager,
         private val projectorClient: ProjectorSocketClient,
-        private val ttsManager: TtsManager,
     ) {
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -153,7 +152,6 @@ class GlucoseAlertManager
         ) {
             lastAlertMs[type] = now
             val id = notifIdCounter.incrementAndGet()
-            val urgent = type == AlertType.LOW
 
             if (type == AlertType.HIGH || type == AlertType.LOW) {
                 scope.launch { projectorClient.alert() }
@@ -178,8 +176,6 @@ class GlucoseAlertManager
                     .setContentIntent(pendingIntent)
                     .build(),
             )
-
-            ttsManager.speak("$title. $message", urgent)
 
             _alertStream.tryEmit(
                 NotificationItem(

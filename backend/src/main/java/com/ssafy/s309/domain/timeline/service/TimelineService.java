@@ -11,6 +11,7 @@ import com.ssafy.s309.domain.timeline.dto.TimelineResponse;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,7 @@ public class TimelineService {
 
   private final GlucoseRecordRepository glucoseRepo;
   private final MealRecordRepository mealRepo;
+  private final Executor asyncExecutor;
 
   @Transactional(readOnly = true)
   public TimelineResponse getTimeline(Integer userId, TimelineRange range) {
@@ -34,7 +36,8 @@ public class TimelineService {
                     .findByUserIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(userId, from, to)
                     .stream()
                     .map(GlucosePoint::from)
-                    .toList());
+                    .toList(),
+            asyncExecutor);
 
     CompletableFuture<List<MealPin>> mealFuture =
         CompletableFuture.supplyAsync(
@@ -43,7 +46,8 @@ public class TimelineService {
                     .findByUserIdAndRecordedAtBetweenOrderByRecordedAtAsc(userId, from, to)
                     .stream()
                     .map(MealPin::from)
-                    .toList());
+                    .toList(),
+            asyncExecutor);
 
     List<ExercisePin> exercises = List.of();
     List<SleepPin> sleeps = List.of();
