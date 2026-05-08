@@ -49,7 +49,7 @@ def main():
     norm = prototype.norm()
     if norm.item() == 0:
         # 모든 벡터 평균이 0 — 방어선. 사용자 직접 입력이라 가드 필요.
-        print(f"⚠️ prototype norm 0 — '{args.name}' 등록 중단")
+        print(f"[warn] prototype norm 0 — '{args.name}' 등록 중단")
         return
     db[args.name] = prototype / norm
     torch.save(db, args.db_path)

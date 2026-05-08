@@ -102,7 +102,7 @@ def main():
         norm = proto.norm()
         if norm.item() == 0:
             # #2 fix 가 들어와도 모든 임베딩이 정확히 상쇄되는 극단 케이스 — 방어선.
-            print(f"⚠️ skip '{cname}' — prototype norm 0")
+            print(f"[skip] '{cname}' — prototype norm 0")
             skipped += 1
             continue
         db[cname] = proto / norm
