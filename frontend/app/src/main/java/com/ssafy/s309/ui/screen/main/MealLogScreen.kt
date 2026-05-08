@@ -79,6 +79,7 @@ import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
 import com.ssafy.s309.ui.viewmodel.FoodSearchViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
@@ -162,38 +163,42 @@ class MealLogViewModel
         val maxGlucoseMap: StateFlow<Map<Int, GlucoseDetail>> = _maxGlucoseMap.asStateFlow()
 
         private var loadedMonth: Pair<Int, Int>? = null
+        private var loadMealsJob: Job? = null
+        private var monthScanJob: Job? = null
 
         fun loadMeals(date: String) {
-            viewModelScope.launch {
-                var result = healthRepository.getMealsByDate(date)
-                if (result.isFailure) {
-                    delay(500)
-                    result = healthRepository.getMealsByDate(date)
+            loadMealsJob?.cancel()
+            loadMealsJob =
+                viewModelScope.launch {
+                    var result = healthRepository.getMealsByDate(date)
+                    if (result.isFailure) {
+                        delay(500)
+                        result = healthRepository.getMealsByDate(date)
+                    }
+                    result
+                        .onSuccess { meals ->
+                            _beMeals.value = meals
+                            _error.value = null
+                            if (meals.isNotEmpty()) {
+                                val day = LocalDate.parse(date).dayOfMonth
+                                _beDaysWithMeals.value = _beDaysWithMeals.value + day
+                            }
+                            meals.forEach { meal ->
+                                val foodId = meal.foodId ?: return@forEach
+                                if (foodId in _foodNutritionMap.value) return@forEach
+                                val name = meal.foodName ?: return@forEach
+                                launch { lookupFoodNutrition(foodId, name) }
+                            }
+                            meals.forEach { meal ->
+                                launch { lookupMaxGlucose(meal.mealId, meal.recordedAt) }
+                            }
+                        }
+                        .onFailure {
+                            Log.w("MealLogVM", "식사 조회 실패", it)
+                            _beMeals.value = emptyList()
+                            _error.value = "식사 기록을 불러올 수 없습니다"
+                        }
                 }
-                result
-                    .onSuccess { meals ->
-                        _beMeals.value = meals
-                        _error.value = null
-                        if (meals.isNotEmpty()) {
-                            val day = LocalDate.parse(date).dayOfMonth
-                            _beDaysWithMeals.value = _beDaysWithMeals.value + day
-                        }
-                        meals.forEach { meal ->
-                            val foodId = meal.foodId ?: return@forEach
-                            if (foodId in _foodNutritionMap.value) return@forEach
-                            val name = meal.foodName ?: return@forEach
-                            launch { lookupFoodNutrition(foodId, name) }
-                        }
-                        meals.forEach { meal ->
-                            launch { lookupMaxGlucose(meal.mealId, meal.recordedAt) }
-                        }
-                    }
-                    .onFailure {
-                        Log.w("MealLogVM", "식사 조회 실패", it)
-                        _beMeals.value = emptyList()
-                        _error.value = "식사 기록을 불러올 수 없습니다"
-                    }
-            }
         }
 
         private suspend fun lookupMaxGlucose(
@@ -248,21 +253,23 @@ class MealLogViewModel
             if (loadedMonth == year to month) return
             loadedMonth = year to month
             _beDaysWithMeals.value = emptySet()
-            viewModelScope.launch {
-                val yearMonth = YearMonth.of(year, month)
-                val days = yearMonth.lengthOfMonth()
-                val found = mutableSetOf<Int>()
-                for (chunk in (1..days).chunked(5)) {
-                    chunk.map { day ->
-                        async {
-                            val date = yearMonth.atDay(day).format(DateTimeFormatter.ISO_LOCAL_DATE)
-                            val meals = runCatching { healthRepository.getMealsByDate(date).getOrNull() }.getOrNull()
-                            if (!meals.isNullOrEmpty()) day else null
-                        }
-                    }.awaitAll().filterNotNull().let { found.addAll(it) }
-                    _beDaysWithMeals.value = found.toSet()
+            monthScanJob?.cancel()
+            monthScanJob =
+                viewModelScope.launch {
+                    val yearMonth = YearMonth.of(year, month)
+                    val days = yearMonth.lengthOfMonth()
+                    val found = mutableSetOf<Int>()
+                    for (chunk in (1..days).chunked(5)) {
+                        chunk.map { day ->
+                            async {
+                                val date = yearMonth.atDay(day).format(DateTimeFormatter.ISO_LOCAL_DATE)
+                                val meals = runCatching { healthRepository.getMealsByDate(date).getOrNull() }.getOrNull()
+                                if (!meals.isNullOrEmpty()) day else null
+                            }
+                        }.awaitAll().filterNotNull().let { found.addAll(it) }
+                        _beDaysWithMeals.value = found.toSet()
+                    }
                 }
-            }
         }
 
         fun createMeal(
@@ -503,6 +510,8 @@ private fun MealLogCalendarContent(
 
         if (showMemoDialog && pendingFood != null) {
             val initialDay = if (selectedDay > 0) selectedDay else today.third
+            val initialYear = if (selectedDay > 0) selectedYear else today.first
+            val initialMonth = if (selectedDay > 0) selectedMonth else today.second
             MemoInputDialog(
                 memo = memoInput,
                 onMemoChange = { memoInput = it },
@@ -515,8 +524,8 @@ private fun MealLogCalendarContent(
                 onRemovePhoto = { selectedPhotoUri = null },
                 initialDateTime =
                     LocalDateTime.of(
-                        displayYear,
-                        displayMonth,
+                        initialYear,
+                        initialMonth,
                         initialDay,
                         LocalDateTime.now().hour,
                         LocalDateTime.now().minute,
