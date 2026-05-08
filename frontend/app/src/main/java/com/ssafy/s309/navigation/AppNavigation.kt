@@ -10,6 +10,8 @@ import com.ssafy.s309.ui.screen.auth.LandingScreen
 import com.ssafy.s309.ui.screen.auth.LoginScreen
 import com.ssafy.s309.ui.screen.auth.SignInScreen
 import com.ssafy.s309.ui.screen.auth.SignUpScreen
+import com.ssafy.s309.ui.screen.ble.BleScreen
+import com.ssafy.s309.ui.screen.main.MainScreen
 
 sealed class Screen(val route: String) {
     object Landing : Screen("landing")
@@ -20,7 +22,11 @@ sealed class Screen(val route: String) {
 
     object SignUp : Screen("signup")
 
+    object Main : Screen("main")
+
     object Graph : Screen("graph")
+
+    object Ble : Screen("ble")
 }
 
 @Composable
@@ -47,8 +53,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         composable(Screen.SignIn.route) {
             SignInScreen(
                 onSignInClick = { _, _ ->
-                    // TODO: 백엔드 연동 후 실제 인증 로직으로 교체
-                    navController.navigate(Screen.Graph.route) {
+                    navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 },
@@ -59,8 +64,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         composable(Screen.SignUp.route) {
             SignUpScreen(
                 onSignUpClick = { _, _, _ ->
-                    // TODO: 백엔드 연동 후 실제 회원가입 로직으로 교체
-                    navController.navigate(Screen.Graph.route) {
+                    navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 },
@@ -68,8 +72,27 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 onBackClick = { navController.popBackStack() },
             )
         }
+        composable(Screen.Main.route) {
+            MainScreen(
+                onGraphClick = { navController.navigate(Screen.Graph.route) },
+                onConnectedDeviceClick = { navController.navigate(Screen.Ble.route) },
+                onLogoutClick = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Main.route) { inclusive = true }
+                    }
+                },
+            )
+        }
         composable(Screen.Graph.route) {
-            GraphScreen()
+            GraphScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToBle = { navController.navigate(Screen.Ble.route) },
+            )
+        }
+        composable(Screen.Ble.route) {
+            BleScreen(
+                onBack = { navController.popBackStack() },
+            )
         }
     }
 }

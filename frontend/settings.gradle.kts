@@ -17,8 +17,11 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://jitpack.io") }
     }
 }
 
 rootProject.name = "S309"
 include(":app")
+include(":feature-glucofit")
+include(":wear")
