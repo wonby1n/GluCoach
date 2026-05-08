@@ -3,10 +3,12 @@ package com.ssafy.s309.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "ai-service")
-public record AiServiceProperties(String baseUrl, int connectTimeoutMs, int readTimeoutMs) {
+public record AiServiceProperties(
+    String baseUrl, int connectTimeoutMs, int readTimeoutMs, int reportReadTimeoutMs) {
 
   public AiServiceProperties {
-    if (connectTimeoutMs <= 0) connectTimeoutMs = 3000;
-    if (readTimeoutMs <= 0) readTimeoutMs = 5000;
+    if (connectTimeoutMs <= 0) connectTimeoutMs = 3_000;
+    if (readTimeoutMs <= 0) readTimeoutMs = 5_000;
+    if (reportReadTimeoutMs <= 0) reportReadTimeoutMs = 180_000; // LLM + PDF 생성 고려 3분
   }
 }

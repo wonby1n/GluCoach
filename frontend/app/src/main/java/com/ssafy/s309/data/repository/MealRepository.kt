@@ -21,9 +21,13 @@ class MealRepository
             foodId: Int,
             recordedAt: LocalDateTime,
             photoFile: File?,
+            memo: String? = null,
         ): Result<Int> =
             runCatching {
-                val json = """{"foodId":$foodId,"recordedAt":"${recordedAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}","memo":null}"""
+                val memoJson = if (memo.isNullOrBlank()) "null" else "\"${memo.replace("\"", "\\\"")}\""
+                val json = """{"foodId":$foodId,"recordedAt":"${recordedAt.format(
+                    DateTimeFormatter.ISO_LOCAL_DATE_TIME,
+                )}","memo":$memoJson}"""
                 val requestBody = json.toRequestBody("application/json".toMediaType())
 
                 val imagePart =

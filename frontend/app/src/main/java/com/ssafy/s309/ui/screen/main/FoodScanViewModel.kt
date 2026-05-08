@@ -110,6 +110,8 @@ class FoodScanViewModel
         fun saveMeal(
             candidate: FoodScanCandidate,
             photoFile: File,
+            memo: String? = null,
+            recordedAt: LocalDateTime = LocalDateTime.now(),
         ) {
             val current = _state.value as? FoodScanState.Result ?: return
             viewModelScope.launch {
@@ -117,8 +119,9 @@ class FoodScanViewModel
                 val result =
                     mealRepository.createMeal(
                         foodId = candidate.foodId,
-                        recordedAt = LocalDateTime.now(),
+                        recordedAt = recordedAt,
                         photoFile = photoFile,
+                        memo = memo?.takeIf { it.isNotBlank() },
                     )
                 _state.value =
                     if (result.isSuccess) {
