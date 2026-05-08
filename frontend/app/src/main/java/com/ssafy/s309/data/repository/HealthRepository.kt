@@ -166,7 +166,7 @@ class HealthRepository
         suspend fun getNotifications(): List<NotificationItem> {
             runCatching {
                 val response = healthApi.getChatMessages()
-                val items = response.content.filter { it.sender != "user" }
+                val items = response.content.filter { it.sender != "user" && !it.isRead }
                 if (items.isNotEmpty()) {
                     return items.map { m ->
                         NotificationItem(
