@@ -63,7 +63,7 @@ class FcmService : FirebaseMessagingService() {
             showNotification(title, body)
         }
         ttsManager.speak("$title. $body")
-        glucoseAlertManager.emitFcmAlert(title, body)
+        glucoseAlertManager.emitFcmAlert(title, body, alertType ?: "")
     }
 
     private fun showMealFollowupNotification(

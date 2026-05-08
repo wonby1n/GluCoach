@@ -173,6 +173,7 @@ class HealthRepository
                             message = a.message,
                             timeAgoText = formatTimeAgo(a.createdAt),
                             isUnread = !a.isRead,
+                            alertType = a.alertType,
                         )
                     }
                 }
@@ -315,6 +316,27 @@ class HealthRepository
         }
 
         private fun resolveAlertTitle(alertType: String): String = "키키"
+
+        /** 홈 배너에 표시할 간략 멘트. 읽지 않은 알림 목록을 넘겨 받는다. */
+        fun resolveBannerText(unreadNotifications: List<NotificationItem>): String =
+            when {
+                unreadNotifications.isEmpty() -> "키키가 오늘 컨디션을 보고 있어요"
+                unreadNotifications.size >= 2 -> "키키가 기다리고 있어요"
+                else -> resolveSingleAlertBanner(unreadNotifications.first().alertType)
+            }
+
+        private fun resolveSingleAlertBanner(alertType: String): String =
+            when (alertType) {
+                "HIGH" -> "혈당이 높아요"
+                "LOW" -> "저혈당 주의가 필요해요"
+                "SOS" -> "SOS 긴급 요청이 발생했어요"
+                "AGENT_WAKE_UP" -> "키키가 오늘의 혈당 전략을 알려줬어요!"
+                "AGENT_MEAL_FOLLOWUP" -> "키키가 식후 활동을 제안했어요!"
+                "AGENT_MEAL_REPLY" -> "키키가 답변을 보냈어요!"
+                "AGENT_MEAL_RETRY" -> "키키가 다시 확인하고 있어요!"
+                "WEEKLY_REPORT" -> "이번 주 건강 리포트가 도착했어요!"
+                else -> "키키가 오늘 컨디션을 보고 있어요"
+            }
 
         private fun formatTimeAgo(isoDateTime: String): String =
             try {

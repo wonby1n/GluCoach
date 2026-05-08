@@ -39,6 +39,7 @@ data class NotificationItem(
     val message: String,
     val timeAgoText: String,
     val isUnread: Boolean,
+    val alertType: String = "",
 )
 
 // ── 백엔드 응답 DTO ─────────────────────────────────────────────────
