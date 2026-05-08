@@ -1,8 +1,8 @@
 package com.ssafy.s309.domain.alert.service;
 
 /**
- * alert_type → FCM channel_id + 알림 제목 매핑 (plan D7 3채널). 룰 알림은 즉시 발송 / agent 알림은
- * AlertCreationService를 거쳐 dedup 후 발송.
+ * alert_type → FCM channel_id + 알림 제목 매핑 (plan D7 3채널). chat_messages INSERT 직후 ChatFcmDispatcher가
+ * 호출.
  */
 public final class AlertChannelResolver {
 

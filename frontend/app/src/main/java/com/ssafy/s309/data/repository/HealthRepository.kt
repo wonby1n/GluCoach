@@ -7,6 +7,7 @@ import com.ssafy.s309.data.ble.BleConnectionState
 import com.ssafy.s309.data.ble.BleManager
 import com.ssafy.s309.data.ble.BleProcessingSettings
 import com.ssafy.s309.data.ble.ScannedDevice
+import com.ssafy.s309.data.model.CgmRecordResponse
 import com.ssafy.s309.data.model.DailyHealthSummary
 import com.ssafy.s309.data.model.DailyHealthSummaryUpsertRequest
 import com.ssafy.s309.data.model.GlucoseRange
@@ -184,6 +185,12 @@ class HealthRepository
 
         /** 날짜별 식사 기록 조회 */
         suspend fun getMealsByDate(date: String): Result<List<MealRecordResponse>> = runCatching { healthApi.getMeals(date = date) }
+
+        /** 기간별 CGM 혈당 기록 조회 */
+        suspend fun getGlucoseRecords(
+            from: String,
+            to: String,
+        ): List<CgmRecordResponse> = healthApi.getGlucoseRecords(from = from, to = to)
 
         /** 식사 기록 생성 (multipart, 이미지 선택) */
         suspend fun createMealRecord(

@@ -1,12 +1,16 @@
 package com.ssafy.s309.ui.screen.main
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ssafy.s309.data.ble.BleConnectionState
 import com.ssafy.s309.data.local.TokenManager
+import com.ssafy.s309.data.model.GlucoseReading
 import com.ssafy.s309.data.repository.HealthRepository
 import com.ssafy.s309.data.repository.UserRepository
+import com.ssafy.s309.feature.glucofit.glucose.GlucoseSimulator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,9 +25,12 @@ class MainViewModel
         private val healthRepository: HealthRepository,
         private val userRepository: UserRepository,
         private val tokenManager: TokenManager,
+        @ApplicationContext private val context: Context,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(MainUiState())
         val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+
+        private val simBuffer = ArrayDeque<GlucoseReading>()
 
         init {
             loadDashboard()
@@ -31,6 +38,8 @@ class MainViewModel
             observeGlucoseStream()
             observeGlucoseAlerts()
             registerPendingFcmToken()
+            GlucoseSimulator.start(context)
+            observeSimulatorStream()
         }
 
         fun loadDashboard() {
@@ -50,9 +59,12 @@ class MainViewModel
 
                 userRepository.getSettings()
                     .onSuccess { settings ->
+                        val diabetesType = settings.diabetesType ?: "NONE"
                         _uiState.update { s ->
-                            s.copy(diabetesType = settings.diabetesType ?: "NONE")
+                            s.copy(diabetesType = diabetesType)
                         }
+                        GlucoseSimulator.stop()
+                        GlucoseSimulator.start(context, diabetesType)
                         val low = settings.targetLow ?: return@onSuccess
                         val high = settings.targetHigh ?: return@onSuccess
                         healthRepository.updateAlertThresholds(low, high)
@@ -83,15 +95,51 @@ class MainViewModel
                     val connected = bleState is BleConnectionState.Connected
                     _uiState.update { state ->
                         if (connected) {
+                            simBuffer.clear()
                             state.copy(isDeviceConnected = true)
                         } else {
                             state.copy(
                                 isDeviceConnected = false,
-                                glucoseSeries = emptyList(),
                                 currentGlucoseMgDl = null,
                                 diffFromPrevious = 0,
                             )
                         }
+                    }
+                }
+            }
+        }
+
+        private fun observeSimulatorStream() {
+            viewModelScope.launch {
+                GlucoseSimulator.glucoseState.collect { value ->
+                    value ?: return@collect
+                    if (_uiState.value.isDeviceConnected) return@collect
+
+                    val reading =
+                        GlucoseReading(
+                            timestampMillis = System.currentTimeMillis(),
+                            valueMgDl = value.toInt(),
+                        )
+                    simBuffer.addLast(reading)
+                    if (simBuffer.size > 50) simBuffer.removeFirst()
+
+                    val series = simBuffer.toList()
+                    val current = series.lastOrNull() ?: return@collect
+                    val prev = if (series.size >= 2) series[series.lastIndex - 1] else null
+                    val diff = prev?.let { current.valueMgDl - it.valueMgDl } ?: 0
+                    val rate =
+                        prev?.let {
+                            val minutes = (current.timestampMillis - it.timestampMillis) / 60_000f
+                            if (minutes > 0f) (current.valueMgDl - it.valueMgDl) / minutes else 0f
+                        } ?: 0f
+
+                    _uiState.update { state ->
+                        state.copy(
+                            glucoseSeries = series,
+                            currentGlucoseMgDl = current.valueMgDl,
+                            diffFromPrevious = diff,
+                            trendRateMgDlPerMin = rate,
+                        )
                     }
                 }
             }
@@ -154,6 +202,11 @@ class MainViewModel
 
         fun clearAllNotifications() {
             _uiState.update { it.copy(notifications = emptyList()) }
+        }
+
+        override fun onCleared() {
+            super.onCleared()
+            GlucoseSimulator.stop()
         }
 
         // [DEBUG_KIKI_TEST] 배포 전 삭제

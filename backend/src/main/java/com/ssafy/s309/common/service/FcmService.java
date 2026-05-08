@@ -29,6 +29,20 @@ public class FcmService {
   /** alertType을 FCM data payload에 포함해 전송. FE가 message.data["alertType"]으로 버튼 분기를 결정한다. */
   public void sendToTokens(
       List<String> tokens, String title, String body, String channelId, String alertType) {
+    sendToTokens(tokens, title, body, channelId, alertType, null);
+  }
+
+  /**
+   * alertType + chatMessageId를 FCM data payload에 포함해 전송. FE가 푸시 클릭 시 chatMessageId로 단건 read 처리
+   * (PATCH /api/chat/messages/{id}/read).
+   */
+  public void sendToTokens(
+      List<String> tokens,
+      String title,
+      String body,
+      String channelId,
+      String alertType,
+      Long chatMessageId) {
     AndroidConfig androidConfig =
         channelId != null
             ? AndroidConfig.builder()
@@ -46,6 +60,9 @@ public class FcmService {
         }
         if (alertType != null) {
           builder.putData("alertType", alertType);
+        }
+        if (chatMessageId != null) {
+          builder.putData("chatMessageId", String.valueOf(chatMessageId));
         }
         FirebaseMessaging.getInstance().send(builder.build());
       } catch (FirebaseMessagingException e) {

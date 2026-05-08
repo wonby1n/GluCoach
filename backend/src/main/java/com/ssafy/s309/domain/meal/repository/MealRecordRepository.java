@@ -34,7 +34,8 @@ public interface MealRecordRepository extends JpaRepository<MealRecord, Integer>
   @Query(
       """
       SELECT new com.ssafy.s309.domain.agent.dto.AgentMealItem(
-        m.id, m.recordedAt, m.food.name, m.food.carbsG, m.food.proteinG, m.food.fatG, m.food.kcal
+        m.id, m.recordedAt, m.food.name, m.food.carbsG, m.food.proteinG, m.food.fatG, m.food.kcal,
+        m.imageStorageKey
       )
       FROM MealRecord m
       WHERE m.userId = :userId
@@ -50,6 +51,8 @@ public interface MealRecordRepository extends JpaRepository<MealRecord, Integer>
       "SELECT m FROM MealRecord m WHERE m.isProcessed = false AND m.recordedAt BETWEEN :expiry AND :cutoff")
   List<MealRecord> findUnprocessedBetween(
       @Param("expiry") LocalDateTime expiry, @Param("cutoff") LocalDateTime cutoff);
+
+  java.util.Optional<MealRecord> findFirstByUserIdOrderByRecordedAtDesc(Integer userId);
 
   @Query(
       "SELECT COUNT(m) FROM MealRecord m"

@@ -62,7 +62,7 @@ class FcmService : FirebaseMessagingService() {
         } else {
             showNotification(title, body)
         }
-        ttsManager.speak("$title. $body")
+        ttsManager.playSound(resIdForAlertType(alertType))
         glucoseAlertManager.emitFcmAlert(title, body, alertType ?: "")
     }
 
@@ -149,6 +149,16 @@ class FcmService : FirebaseMessagingService() {
                 .build(),
         )
     }
+
+    @androidx.annotation.RawRes
+    private fun resIdForAlertType(alertType: String?): Int =
+        when (alertType) {
+            "AGENT_WAKE_UP" -> R.raw.kiki_morning // 좋은 아침이에요. 어젯밤 수면이 부족했어요. 저녁 혈당이 200까지 올라서 조심하셔야 돼요. 오늘 식사를 같이 확인해볼까요?
+            "AGENT_MEAL_FOLLOWUP" -> R.raw.kiki_walk // 지금 10분만 걸으면 좋아요.
+            "AGENT_MEAL_RETRY" -> R.raw.kiki_stretch // 회의 끝났나요? 잠깐 스트레칭 어때요?
+            "AGENT_SLEEP_INSIGHT" -> R.raw.kiki_daily_done // 오늘 하루 수고했어요. 어제보다 혈당 변동 폭이 안정적이에요.
+            else -> R.raw.kiki_morning
+        }
 
     companion object {
         private const val TAG = "FcmService"
