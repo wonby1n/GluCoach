@@ -355,7 +355,7 @@ TOOL_SCHEMAS = [
                                     "title": {"type": "string", "description": "카드 제목"},
                                     "description": {
                                         "type": "string",
-                                        "description": "카드 본문 (수치 직접 언급 금지)",
+                                        "description": "카드 본문. 구체적인 수치와 항목명을 포함해 사용자가 이해하기 쉽게 작성. 예: '어젯밤 수면은 5시간으로, 평소보다 2시간 부족했어요.'",
                                     },
                                 },
                                 "required": ["type", "title", "description"],

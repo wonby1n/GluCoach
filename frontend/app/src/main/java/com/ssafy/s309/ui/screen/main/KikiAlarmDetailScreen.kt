@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBackIosNew
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowRight
@@ -279,6 +280,7 @@ private fun ExpandableInfoCard(
                             "meal" -> Icons.Outlined.Restaurant
                             "glucose" -> Icons.Outlined.ShowChart
                             "activity" -> Icons.Outlined.LocationOn
+                            "sleep" -> Icons.Outlined.Bedtime
                             else -> Icons.Outlined.HelpOutline
                         }
                     ExpandedDetailRow(
@@ -299,7 +301,7 @@ private fun ExpandableInfoCard(
                         text = displayTrace.decision.reason,
                         color = GlucoachColors.TextSecondary,
                         fontSize = 13.sp,
-                        textAlign = TextAlign.Center,
+                        textAlign = TextAlign.Start,
                         modifier =
                             Modifier
                                 .fillMaxWidth()
