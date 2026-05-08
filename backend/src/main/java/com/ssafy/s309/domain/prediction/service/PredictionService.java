@@ -15,6 +15,7 @@ import com.ssafy.s309.domain.prediction.dto.PredictResponse;
 import com.ssafy.s309.domain.prediction.entity.GlucosePrediction;
 import com.ssafy.s309.domain.user.entity.DiabetesType;
 import com.ssafy.s309.domain.user.entity.User;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -43,8 +44,6 @@ public class PredictionService {
 
   private final GlucosePredictClient glucosePredictClient;
   private final PredictionTxHelper tx;
-  private final GlucosePredictionRepository predictionRepository;
-  private final UserRepository userRepository;
   private final FoodRepository foodRepository;
 
   public PredictResponse predict(Integer userId, PredictRequest request) {

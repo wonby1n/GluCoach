@@ -8,6 +8,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
 import com.ssafy.s309.domain.food.entity.Food;
+import com.ssafy.s309.domain.food.repository.FoodRepository;
 import com.ssafy.s309.domain.prediction.client.GlucosePredictClient;
 import com.ssafy.s309.domain.prediction.client.dto.GlucosePredictRequest;
 import com.ssafy.s309.domain.prediction.client.dto.GlucosePredictResponse;
@@ -31,6 +32,7 @@ class PredictionServiceTest {
 
   @Mock private GlucosePredictClient glucosePredictClient;
   @Mock private PredictionTxHelper tx;
+  @Mock private FoodRepository foodRepository;
   @InjectMocks private PredictionService predictionService;
 
   private static final Integer USER_ID = 7;
