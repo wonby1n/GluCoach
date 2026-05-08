@@ -280,25 +280,24 @@ fun MainScreenContent(
                                 DebugKikiTestPanel(onDebugSetGlucose) // [DEBUG_KIKI_TEST]
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xl)) // [DEBUG_KIKI_TEST]
 
+                                val twoHoursAgoMs = remember { System.currentTimeMillis() - 2 * 60 * 60 * 1000L }
                                 val chartTimeLabels =
                                     remember {
                                         val sdf = SimpleDateFormat("HH:mm", Locale.KOREA)
                                         sdf.timeZone = TimeZone.getTimeZone("Asia/Seoul")
                                         val cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Seoul"))
-                                        val h = cal.get(Calendar.HOUR_OF_DAY)
-                                        val base = h - (h % 2)
-                                        listOf(-6, -4, -2, 0).map { offset ->
+                                        listOf(-2, -1, 0).map { offset ->
                                             val c = cal.clone() as Calendar
-                                            c.set(Calendar.HOUR_OF_DAY, base + offset)
+                                            c.add(Calendar.HOUR_OF_DAY, offset)
                                             c.set(Calendar.MINUTE, 0)
                                             sdf.format(c.time)
                                         }
                                     }
                                 GlucoseChartCard(
-                                    readings = state.glucoseSeries,
+                                    readings = state.glucoseSeries.filter { it.timestampMillis >= twoHoursAgoMs },
                                     range = state.glucoseRange,
                                     isDeviceConnected = state.isDeviceConnected,
-                                    hoursLabel = "최근 6시간",
+                                    hoursLabel = "최근 2시간",
                                     timeLabels = chartTimeLabels,
                                     onClick = onGraphClick,
                                 )
