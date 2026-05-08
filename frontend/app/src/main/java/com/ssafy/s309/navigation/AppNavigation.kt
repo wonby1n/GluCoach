@@ -434,6 +434,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     notification = notification,
                     onBack = { navController.popBackStack() },
                     onChatClick = { navController.navigate(Screen.KikiChat.route) },
+                    onMealReply = mainViewModel::sendMealReply,
                 )
             }
         }

@@ -1,6 +1,7 @@
 package com.ssafy.s309.data.repository
 
 import android.util.Log
+import com.ssafy.s309.data.api.AgentApi
 import com.ssafy.s309.data.api.HealthApi
 import com.ssafy.s309.data.api.SleepSessionApi
 import com.ssafy.s309.data.ble.BleConnectionState
@@ -19,6 +20,8 @@ import com.ssafy.s309.data.model.MealCreateResponse
 import com.ssafy.s309.data.model.MealEvent
 import com.ssafy.s309.data.model.MealRecordResponse
 import com.ssafy.s309.data.model.NotificationItem
+import com.ssafy.s309.data.model.PostMealReplyRequest
+import com.ssafy.s309.data.model.PostMealTriggerRequest
 import com.ssafy.s309.data.model.SleepSessionCreateRequest
 import com.ssafy.s309.data.repository.source.HealthConnectDataSource
 import com.ssafy.s309.data.repository.source.HealthDataSource
@@ -49,6 +52,7 @@ class HealthRepository
     @Inject
     constructor(
         private val healthApi: HealthApi,
+        private val agentApi: AgentApi,
         private val sleepSessionApi: SleepSessionApi,
         private val mockDataSource: MockHealthDataSource,
         samsungDataSource: SamsungHealthDataSource,
@@ -166,7 +170,10 @@ class HealthRepository
         suspend fun getNotifications(): List<NotificationItem> {
             runCatching {
                 val response = healthApi.getChatMessages()
-                val items = response.content.filter { it.sender != "user" && !it.isRead }
+                val items =
+                    response.content
+                        .filter { it.sender != "user" && !it.isRead }
+                        .sortedByDescending { it.id }
                 if (items.isNotEmpty()) {
                     return items.map { m ->
                         NotificationItem(
@@ -213,6 +220,25 @@ class HealthRepository
                     }
                 healthApi.createMeal(request = requestBody, image = imagePart)
             }
+
+        /** 식후 활동 유도 에이전트에 유저 응답 전달. 실패해도 UI 상태는 유지. */
+        suspend fun sendPostMealReply(
+            userId: String,
+            userReply: String,
+        ) {
+            runCatching {
+                agentApi.postMealReply(
+                    PostMealReplyRequest(
+                        user_id = userId,
+                        trigger =
+                            PostMealTriggerRequest(
+                                reason = "user_response",
+                                user_reply = userReply,
+                            ),
+                    ),
+                )
+            }.onFailure { Log.w(TAG, "식후 응답 전송 실패", it) }
+        }
 
         /** 채팅 메시지 읽음 처리 (백엔드 반영). 실패해도 UI 상태는 유지. */
         suspend fun markAlertRead(alertId: Long) {

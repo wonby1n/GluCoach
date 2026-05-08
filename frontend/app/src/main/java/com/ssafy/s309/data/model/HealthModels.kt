@@ -192,6 +192,21 @@ data class DailyHealthSummaryUpsertRequest(
     val avgHeartRate: Double? = null,
 )
 
+/** POST /ai/agent/post-meal trigger 페이로드 */
+@Serializable
+data class PostMealTriggerRequest(
+    val reason: String,
+    val meal_time: String = "",
+    val user_reply: String? = null,
+)
+
+/** POST /ai/agent/post-meal 요청 바디 */
+@Serializable
+data class PostMealReplyRequest(
+    val user_id: String,
+    val trigger: PostMealTriggerRequest,
+)
+
 /** POST /api/sleep-sessions 요청 — 워치 수면 세션 송신 */
 @Serializable
 data class SleepSessionCreateRequest(
