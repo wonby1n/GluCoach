@@ -18,6 +18,9 @@ ENV/
 *.swp
 *.swo
 
+# 임시 분석/디버깅 산출물 (커밋 금지)
+.tmp_*
+
 # 테스트 / 커버리지
 .pytest_cache/
 .coverage
@@ -56,6 +59,9 @@ models/*
 models/stage2_meal/*
 !models/stage2_meal/*.pkl
 !models/stage2_meal/meta.json
+!models/food/
+models/food/*
+!models/food/code_to_name.json
 
 # 평가 결과 (발표 자료라 시연 후 별도 관리)
 reports/
