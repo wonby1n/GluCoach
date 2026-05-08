@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SosService {
 
   private static final String SOS_MESSAGE = "SOS 긴급 요청이 발생했습니다.";
+  private static final String AUTO_SOS_MESSAGE = "혈당 위험 알림 미확인으로 보호자에게 자동 SOS가 발송되었습니다.";
 
   private final ChatMessageService chatMessageService;
   private final GuardianNotificationRepository guardianNotificationRepository;
@@ -53,6 +54,26 @@ public class SosService {
     }
 
     return new SosResponse(chat.getId(), "SOS 요청이 접수되었습니다.");
+  }
+
+  /** 혈당 위험 알림 미확인 시 자동 SOS. 위치 정보 없음(null). */
+  @Transactional
+  public void autoSos(Integer userId) {
+    ChatMessage chat = chatMessageService.insertSystem(userId, "SOS", AUTO_SOS_MESSAGE);
+    List<WardGuardian> guardians = wardGuardianRepository.findAllByWard_Id(userId);
+    if (guardians.isEmpty()) {
+      log.warn("AutoSOS: no guardians for user={}", userId);
+      return;
+    }
+    for (WardGuardian guardian : guardians) {
+      guardianNotificationRepository.save(
+          GuardianNotification.builder()
+              .chatMessageId(chat.getId())
+              .wardGuardian(guardian)
+              .build());
+      dispatchFcmToGuardian(guardian, userId);
+    }
+    log.info("AutoSOS dispatched: user={}, guardians={}", userId, guardians.size());
   }
 
   private void dispatchFcmToGuardian(WardGuardian guardian, Integer wardUserId) {
