@@ -3,6 +3,7 @@ package com.ssafy.s309.ui.screen.main
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ssafy.s309.data.model.FoodSearchItem
+import com.ssafy.s309.data.model.GlucosePrediction
 import com.ssafy.s309.data.repository.FoodRepository
 import com.ssafy.s309.data.repository.MealRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,10 +30,12 @@ data class FoodScanCandidate(
 sealed class FoodScanState {
     object Idle : FoodScanState()
 
-    data class Analyzing(val stage: Int) : FoodScanState() // 0=시작 1=AI인식 2=영양검색 3=완료
+    data class Analyzing(val stage: Int) : FoodScanState() // 0=시작 1=AI인식·매칭 2=영양보강 3=완료
 
     data class Result(
         val candidates: List<FoodScanCandidate>,
+        // 사진 통합 예측에서 받아오는 식전 혈당 곡선 (top-1 OK 시에만 채워짐).
+        val prediction: GlucosePrediction? = null,
         val isSaving: Boolean = false,
     ) : FoodScanState()
 
@@ -56,32 +59,77 @@ class FoodScanViewModel
             viewModelScope.launch {
                 _state.value = FoodScanState.Analyzing(0)
 
-                // Stage 1: AI 음식 탐지
+                // Stage 1: BE 사진 통합 예측 — CV 인식 + foods 매칭(top-1) + 예측 곡선
                 _state.value = FoodScanState.Analyzing(1)
-                val detectResult = foodRepository.detectFood(photoFile)
-                if (detectResult.isFailure) {
+                val predictResult = foodRepository.predictFromImage(photoFile)
+                if (predictResult.isFailure) {
                     _state.value =
                         FoodScanState.Error(
-                            detectResult.exceptionOrNull()?.message ?: "음식 인식에 실패했습니다",
+                            predictResult.exceptionOrNull()?.message ?: "음식 인식에 실패했습니다",
                         )
                     return@launch
                 }
-                val detections = detectResult.getOrNull()?.detections.orEmpty()
-                if (detections.isEmpty()) {
+                val response = predictResult.getOrNull()!!
+
+                if (response.status == "LOW_CONFIDENCE") {
                     _state.value = FoodScanState.Error("음식을 인식하지 못했습니다.\n다시 촬영해 주세요.")
                     return@launch
                 }
 
-                // Stage 2: 식약처 DB에서 영양 정보 검색
+                // Stage 2: 후보 영양정보 보강
+                // OK / PENDING_NUTRITION 시 BE 가 foodId/foodName 채움 → top-1 보강.
+                // BE 이상으로 foodId 가 null 이면 detected[] 전체에 대해 search 로 fallback 처리.
+                // 알 수 없는 신규 status 도 동일 분기로 forward-compatible.
                 _state.value = FoodScanState.Analyzing(2)
                 val candidates = mutableListOf<FoodScanCandidate>()
-                detections.take(3).forEachIndexed { idx, detection ->
-                    val searchResult = foodRepository.searchFoods(detection.nameKo)
-                    val foodItem: FoodSearchItem? = searchResult.getOrNull()?.firstOrNull()
+                val topConfidence = response.detected.firstOrNull()?.confidence ?: 0f
+                val topFoodId = response.foodId
+
+                if (topFoodId != null) {
+                    val topName = response.foodName ?: response.detected.firstOrNull()?.nameKo.orEmpty()
+                    // searchFoods 결과를 한 번만 받아 재사용 — 중복 호출 회피.
+                    val results = foodRepository.searchFoods(topName).getOrNull().orEmpty()
+                    val foodItem: FoodSearchItem? =
+                        results.firstOrNull { it.id == topFoodId } ?: results.firstOrNull()
                     if (foodItem != null) {
                         candidates.add(
                             FoodScanCandidate(
-                                rank = idx + 1,
+                                rank = 1,
+                                foodId = foodItem.id,
+                                name = foodItem.name,
+                                kcal = foodItem.kcal,
+                                carbsG = foodItem.carbsG,
+                                proteinG = foodItem.proteinG,
+                                fatG = foodItem.fatG,
+                                confidence = topConfidence,
+                            ),
+                        )
+                    } else {
+                        // PENDING_NUTRITION — 영양정보 없는 customized row. foodId 만 살려 등록 가능하게.
+                        candidates.add(
+                            FoodScanCandidate(
+                                rank = 1,
+                                foodId = topFoodId,
+                                name = topName,
+                                kcal = null,
+                                carbsG = null,
+                                proteinG = null,
+                                fatG = null,
+                                confidence = topConfidence,
+                            ),
+                        )
+                    }
+                }
+
+                // top-1 이 위에서 처리됐으면 detected[1..2], 아니면 detected[0..2] 까지 search 로 보강.
+                val remainingStart = if (topFoodId != null) 1 else 0
+                response.detected.drop(remainingStart).take(3 - candidates.size).forEach { detection ->
+                    val foodItem: FoodSearchItem? =
+                        foodRepository.searchFoods(detection.nameKo).getOrNull()?.firstOrNull()
+                    if (foodItem != null) {
+                        candidates.add(
+                            FoodScanCandidate(
+                                rank = candidates.size + 1,
                                 foodId = foodItem.id,
                                 name = foodItem.name,
                                 kcal = foodItem.kcal,
@@ -102,7 +150,7 @@ class FoodScanViewModel
                     if (candidates.isEmpty()) {
                         FoodScanState.Error("영양 정보를 찾을 수 없습니다.\n다시 촬영해 주세요.")
                     } else {
-                        FoodScanState.Result(candidates)
+                        FoodScanState.Result(candidates = candidates, prediction = response.prediction)
                     }
             }
         }

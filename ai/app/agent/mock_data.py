@@ -144,14 +144,6 @@ STEPS_DATA = [
 # =============================================
 
 NOTIFICATION_HISTORY = [
-    # 어제 아침 알림 — 아침 agent가 전날 이력 확인 시 참고
-    {
-        "id":          "notif_001",
-        "sent_at":     "2026-05-03 08:05",
-        "type":        "오늘의 혈당 전략",
-        "message":     "오늘 점심 가볍게 가봐요!",
-        "user_action": "clicked",
-    },
     # 어제 식후 알림 — 무시 이력 → 오늘 식후 agent가 부드러운 톤 선택하는 근거
     {
         "id":          "notif_002",
@@ -159,14 +151,6 @@ NOTIFICATION_HISTORY = [
         "type":        "식후 활동 유도",
         "message":     "10분만 걸어볼까요?",
         "user_action": "ignored",
-    },
-    # 어제 아침 알림 — 식후 agent가 중복 여부 확인 시 참고
-    {
-        "id":          "notif_003",
-        "sent_at":     "2026-05-03 07:10",
-        "type":        "오늘의 혈당 전략",
-        "message":     "어제 잠이 조금 부족했어요. 오늘 점심은 메뉴를 한 번 확인해볼까요? 🍃",
-        "user_action": "clicked",
     },
     # notif_004 (식후 1차 알림)은 817 agent 실행 결과로 생성됨
     # 818(재트리거) 시나리오에서는 트리거 컨텍스트로 별도 전달

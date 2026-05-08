@@ -2,6 +2,7 @@ package com.ssafy.s309.data.api
 
 import com.ssafy.s309.data.model.AlertListResponse
 import com.ssafy.s309.data.model.CgmRecordResponse
+import com.ssafy.s309.data.model.ChatMessageListResponse
 import com.ssafy.s309.data.model.DailyHealthSummaryResponse
 import com.ssafy.s309.data.model.DailyHealthSummaryUpsertRequest
 import com.ssafy.s309.data.model.HealthSnapshotBatchRequest
@@ -48,6 +49,13 @@ interface HealthApi {
         @Part image: MultipartBody.Part?,
     ): MealCreateResponse
 
+    /** 채팅 메시지 목록 조회 (displayTrace 포함) */
+    @GET("api/chat/messages")
+    suspend fun getChatMessages(
+        @Query("page") page: Int = 0,
+        @Query("size") size: Int = 50,
+    ): ChatMessageListResponse
+
     /** 알림 목록 조회 */
     @GET("api/v1/alerts")
     suspend fun getAlerts(
@@ -56,10 +64,10 @@ interface HealthApi {
         @Query("size") size: Int = 20,
     ): AlertListResponse
 
-    /** 알림 읽음 처리 */
-    @PATCH("api/v1/alerts/{id}/read")
-    suspend fun markAlertRead(
-        @Path("id") id: Int,
+    /** 채팅 메시지 읽음 처리 */
+    @PATCH("api/chat/messages/{id}/read")
+    suspend fun markChatMessageRead(
+        @Path("id") id: Long,
     )
 
     /** 1분 폴 시계열 5분 배치 INSERT */

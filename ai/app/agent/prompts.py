@@ -22,7 +22,7 @@ _NOTIFICATION_PAYLOAD_RULES = """[선택지 생성 규칙 — send_notification 
 - cards: 확인한 신호를 카드 배열로 표현 (없으면 빈 배열 [])
   · type: glucose / sleep / meal / steps 중 하나
   · title: 신호 분류 한국어 (예: "혈당", "수면", "활동량")
-  · description: 신호 본문 (수치 직접 언급 금지, 부드러운 톤)
+  · description: 신호 본문. 구체적인 수치와 항목명 포함 권장. 예: "어젯밤 수면은 5시간으로, 평소보다 2시간 부족했어요." / "전날 밤 최고 220mg/dL, 최저 75mg/dL였어요."
 - decision: {"reason": "..."} 메시지를 선택한 이유 (사용자 노출 가능 톤)
 - display_trace에서도 [금지] 섹션의 표현을 동일하게 적용할 것
 """

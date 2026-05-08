@@ -75,9 +75,13 @@ class MainViewModel
         private fun observeGlucoseAlerts() {
             viewModelScope.launch {
                 healthRepository.glucoseAlertStream.collect { alert ->
+                    // 즉시 반영 (배너 텍스트 빠르게 변경)
                     _uiState.update { state ->
                         state.copy(notifications = listOf(alert) + state.notifications)
                     }
+                    // BE에서 재조회 → displayTrace + 정확한 alertType(messageType) 획득
+                    val refreshed = healthRepository.getNotifications()
+                    _uiState.update { it.copy(notifications = refreshed) }
                 }
             }
         }
@@ -196,7 +200,7 @@ class MainViewModel
                 )
             }
             viewModelScope.launch {
-                healthRepository.markAlertRead(selected.id.toInt())
+                healthRepository.markAlertRead(selected.id)
             }
         }
 
