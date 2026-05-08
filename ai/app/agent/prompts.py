@@ -8,6 +8,26 @@ Agent 시스템 프롬프트 모음
 from app.agent.mock_data import USER_INFO, GLUCOSE_THRESHOLD, DEMO_DATE
 
 
+_NOTIFICATION_PAYLOAD_RULES = """[선택지 생성 규칙 — send_notification options]
+- 정확히 3개 항목, 각 항목은 {"id": snake_case 식별자, "label": 한국어 라벨 8자 이내}
+- 컨텍스트에 맞게 매번 새로 생성 (고정값 아님). 메시지 내용과 자연스럽게 이어질 것.
+- 관례적 순서:
+  · 1번째: 긍정/수락 (예: walk_now / ack / thanks)
+  · 2번째: 미루기/나중에 (예: later_30 / remind_30) — 30분 뒤 다시 알림 의미
+  · 3번째: 거절/패스 (예: skip / cancel)
+- label은 짧고 자연스러운 한국어 (예: "산책 갈게요", "30분 뒤", "패스")
+
+[추론 카드 생성 규칙 — send_notification display_trace]
+- summary: 1줄 요약 (예: "식후 60분, 활동량 적음" / "어젯밤 수면 부족 신호")
+- cards: 확인한 신호를 카드 배열로 표현 (없으면 빈 배열 [])
+  · type: glucose / sleep / meal / steps 중 하나
+  · title: 신호 분류 한국어 (예: "혈당", "수면", "활동량")
+  · description: 신호 본문 (수치 직접 언급 금지, 부드러운 톤)
+- decision: {"reason": "..."} 메시지를 선택한 이유 (사용자 노출 가능 톤)
+- display_trace에서도 [금지] 섹션의 표현을 동일하게 적용할 것
+"""
+
+
 def build_morning_prompt() -> str:
     """오늘의 혈당 전략 agent 시스템 프롬프트를 생성한다."""
     t = GLUCOSE_THRESHOLD
@@ -82,6 +102,7 @@ def build_morning_prompt() -> str:
 - reasoning은 사용자에게 노출될 수 있으므로 불안감을 주는 표현을 피할 것
 - "롤러코스터", "불안정", "위험", "경고" 대신 "변화폭이 큼", "주의 깊게 볼 신호"처럼 표현할 것
 
+{_NOTIFICATION_PAYLOAD_RULES}
 모든 결정 과정은 reasoning에 남겨."""
 
 
@@ -234,4 +255,5 @@ def build_postmeal_prompt(trigger: dict) -> str:
 - reasoning에서도 "거의 움직이지 않음", "운동 부족", "안 움직임" 같은 표현은 쓰지 말 것
 - 대신 "최근 활동량이 적은 상태"라고 표현할 것
 
+{_NOTIFICATION_PAYLOAD_RULES}
 모든 결정 과정은 reasoning에 남겨."""

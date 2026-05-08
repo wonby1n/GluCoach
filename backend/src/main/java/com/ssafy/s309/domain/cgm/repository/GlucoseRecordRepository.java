@@ -17,6 +17,8 @@ public interface GlucoseRecordRepository extends JpaRepository<GlucoseRecord, Lo
   List<GlucoseRecord> findByUserIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(
       Integer userId, LocalDateTime from, LocalDateTime to);
 
+  Optional<GlucoseRecord> findFirstByUserIdOrderByMeasuredAtDesc(Integer userId);
+
   @Query(
       value =
           """

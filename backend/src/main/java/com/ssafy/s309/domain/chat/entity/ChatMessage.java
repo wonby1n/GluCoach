@@ -54,8 +54,8 @@ public class ChatMessage {
   @JdbcTypeCode(SqlTypes.JSON)
   private List<Map<String, String>> options;
 
-  @Column(name = "alert_type", length = 50)
-  private String alertType;
+  @Column(name = "message_type", length = 50)
+  private String messageType;
 
   @Column(name = "resolved_at")
   private LocalDateTime resolvedAt;
@@ -72,6 +72,13 @@ public class ChatMessage {
 
   @Column(name = "selected_option_id", length = 50)
   private String selectedOptionId;
+
+  @Column(name = "command_type", length = 50)
+  private String commandType;
+
+  @Column(name = "payload", columnDefinition = "jsonb")
+  @JdbcTypeCode(SqlTypes.JSON)
+  private Map<String, Object> payload;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)

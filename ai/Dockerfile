@@ -23,10 +23,13 @@ WORKDIR /app
 COPY --from=builder /install /usr/local
 COPY app app
 COPY models models
+COPY models models_bak
+COPY docker-entrypoint.sh .
+RUN sed -i 's/\r//' docker-entrypoint.sh && chmod +x docker-entrypoint.sh
 
 # matplotlib 폰트 캐시 (패키지 복사 이후에 실행)
 RUN python -c "import matplotlib.font_manager; matplotlib.font_manager._load_fontmanager(try_read_cache=False)"
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/docker-entrypoint.sh"]

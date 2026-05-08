@@ -10,4 +10,5 @@ public record AgentMealItem(
     BigDecimal carbs,
     BigDecimal protein,
     BigDecimal fat,
-    BigDecimal calories) {}
+    BigDecimal calories,
+    String imageStorageKey) {}
