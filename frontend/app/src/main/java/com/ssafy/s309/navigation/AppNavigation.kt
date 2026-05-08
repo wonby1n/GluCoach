@@ -36,8 +36,10 @@ import com.ssafy.s309.ui.screen.ble.BleScreen
 import com.ssafy.s309.ui.screen.health.HealthSourceScreen
 import com.ssafy.s309.ui.screen.main.AddMenuSheet
 import com.ssafy.s309.ui.screen.main.GuardianScreen
+import com.ssafy.s309.ui.screen.main.KikiAlarmDetailScreen
 import com.ssafy.s309.ui.screen.main.KikiChatScreen
 import com.ssafy.s309.ui.screen.main.MainScreen
+import com.ssafy.s309.ui.screen.main.MainViewModel
 import com.ssafy.s309.ui.screen.main.MyAccountScreen
 import com.ssafy.s309.ui.screen.main.ReportMenuSheet
 import com.ssafy.s309.ui.screen.main.SettingsScreen
@@ -85,6 +87,8 @@ sealed class Screen(val route: String) {
     object MyAccount : Screen("my_account")
 
     object KikiChat : Screen("kiki_chat")
+
+    object KikiAlarmDetail : Screen("kiki_alarm_detail")
 }
 
 @Composable
@@ -368,6 +372,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 onGuardianClick = { navController.navigate(Screen.Guardian.route) },
                 onAccountClick = { navController.navigate(Screen.MyAccount.route) },
                 onKikiChatClick = { navController.navigate(Screen.KikiChat.route) },
+                onKikiAlarmClick = { navController.navigate(Screen.KikiAlarmDetail.route) },
                 userEmail = authViewModel.userEmail,
                 requestedTab = requestedTab,
                 onTabHandled = { backStackEntry.savedStateHandle.remove<String>("requestedTab") },
@@ -436,9 +441,36 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             }
         }
         composable(Screen.KikiChat.route) {
+            val mainEntry =
+                remember(navController) {
+                    navController.getBackStackEntry(Screen.Main.route)
+                }
+            val mainViewModel: MainViewModel = hiltViewModel(mainEntry)
             SubScreenWithBottomNav(navController = navController, selectedId = "home") {
                 KikiChatScreen(
                     onBack = { navController.popBackStack() },
+                    onItemClick = { item ->
+                        mainViewModel.selectNotification(item)
+                        navController.navigate(Screen.KikiAlarmDetail.route)
+                    },
+                )
+            }
+        }
+        composable(Screen.KikiAlarmDetail.route) {
+            val mainEntry =
+                remember(navController) {
+                    navController.getBackStackEntry(Screen.Main.route)
+                }
+            val mainViewModel: MainViewModel = hiltViewModel(mainEntry)
+            val mainUiState by mainViewModel.uiState.collectAsState()
+            val notification =
+                mainUiState.selectedNotification
+                    ?: mainUiState.notifications.firstOrNull { it.isUnread }
+            SubScreenWithBottomNav(navController = navController, selectedId = "home") {
+                KikiAlarmDetailScreen(
+                    notification = notification,
+                    onBack = { navController.popBackStack() },
+                    onChatClick = { navController.navigate(Screen.KikiChat.route) },
                 )
             }
         }
