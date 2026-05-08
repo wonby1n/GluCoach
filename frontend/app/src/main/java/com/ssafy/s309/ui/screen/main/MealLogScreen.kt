@@ -283,7 +283,7 @@ class MealLogViewModel
                 mealRepository.createMeal(
                     foodId = foodId,
                     recordedAt = LocalDateTime.parse(recordedAt),
-                    photoFile = null,
+                    photoFile = imageFile,
                     memo = memo,
                 ).onSuccess {
                     _error.value = null
@@ -965,8 +965,10 @@ private fun MealDetailContent(
     modifier: Modifier = Modifier,
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
+    var showPhotoViewer by remember { mutableStateOf(false) }
     val tabs = listOf("메모", "혈당 기록", "영양정보")
     val hasImage = meal.imageUrl != null || meal.imageResId != null
+    val cardFraction = 0.50f
 
     Box(
         modifier =
@@ -981,8 +983,9 @@ private fun MealDetailContent(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .fillMaxHeight(0.45f)
-                        .align(Alignment.TopCenter),
+                        .fillMaxHeight(1f - cardFraction + 0.05f)
+                        .align(Alignment.TopCenter)
+                        .clickable { showPhotoViewer = true },
                 contentScale = ContentScale.Crop,
             )
         } else if (meal.imageResId != null) {
@@ -992,18 +995,18 @@ private fun MealDetailContent(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .fillMaxHeight(0.45f)
-                        .align(Alignment.TopCenter),
+                        .fillMaxHeight(1f - cardFraction + 0.05f)
+                        .align(Alignment.TopCenter)
+                        .clickable { showPhotoViewer = true },
                 contentScale = ContentScale.Crop,
             )
-        } else {
         }
 
         Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.50f)
+                    .fillMaxHeight(cardFraction)
                     .align(Alignment.BottomCenter)
                     .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                     .background(GlucoachColors.Surface)
@@ -1120,6 +1123,53 @@ private fun MealDetailContent(
                     ),
             ) {
                 Text("음식 성적표로 가기", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+
+        AnimatedVisibility(
+            visible = showPhotoViewer && hasImage,
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black)
+                        .clickable(enabled = false) {},
+            ) {
+                if (meal.imageUrl != null) {
+                    AsyncImage(
+                        model = meal.imageUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                    )
+                } else if (meal.imageResId != null) {
+                    Image(
+                        painter = painterResource(id = meal.imageResId),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
+                IconButton(
+                    onClick = { showPhotoViewer = false },
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 40.dp, end = 16.dp)
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.5f)),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "닫기",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
         }
     }
