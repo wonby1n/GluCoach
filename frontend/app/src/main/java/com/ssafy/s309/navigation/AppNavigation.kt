@@ -441,9 +441,18 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             }
         }
         composable(Screen.KikiChat.route) {
+            val mainEntry =
+                remember(navController) {
+                    navController.getBackStackEntry(Screen.Main.route)
+                }
+            val mainViewModel: MainViewModel = hiltViewModel(mainEntry)
             SubScreenWithBottomNav(navController = navController, selectedId = "home") {
                 KikiChatScreen(
                     onBack = { navController.popBackStack() },
+                    onItemClick = { item ->
+                        mainViewModel.selectNotification(item)
+                        navController.navigate(Screen.KikiAlarmDetail.route)
+                    },
                 )
             }
         }
