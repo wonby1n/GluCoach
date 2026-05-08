@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -45,6 +46,7 @@ public class PredictionService {
   private final GlucosePredictClient glucosePredictClient;
   private final PredictionTxHelper tx;
   private final FoodRepository foodRepository;
+  private final Executor asyncExecutor;
 
   public PredictResponse predict(Integer userId, PredictRequest request) {
     User user = tx.findUser(userId);
@@ -74,10 +76,12 @@ public class PredictionService {
   public AbPredictResponse comparePredict(Integer userId, AbPredictRequest request) {
     User user = tx.findUser(userId);
 
+    // asyncExecutor 사용 — MdcTaskDecorator 가 호출 스레드 MDC(correlationId 포함) 를 워커로 전파.
+    // commonPool 로 두면 두 worker 가 각자 새 correlationId 를 발급해 추적성이 끊김.
     CompletableFuture<PredictResponse> futureA =
-        CompletableFuture.supplyAsync(() -> predictWithUser(user, request.foodA()));
+        CompletableFuture.supplyAsync(() -> predictWithUser(user, request.foodA()), asyncExecutor);
     CompletableFuture<PredictResponse> futureB =
-        CompletableFuture.supplyAsync(() -> predictWithUser(user, request.foodB()));
+        CompletableFuture.supplyAsync(() -> predictWithUser(user, request.foodB()), asyncExecutor);
 
     return new AbPredictResponse(futureA.join(), futureB.join());
   }

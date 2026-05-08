@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.ssafy.s309.domain.food.entity.Food;
@@ -12,12 +14,15 @@ import com.ssafy.s309.domain.food.repository.FoodRepository;
 import com.ssafy.s309.domain.prediction.client.GlucosePredictClient;
 import com.ssafy.s309.domain.prediction.client.dto.GlucosePredictRequest;
 import com.ssafy.s309.domain.prediction.client.dto.GlucosePredictResponse;
+import com.ssafy.s309.domain.prediction.dto.AbPredictRequest;
+import com.ssafy.s309.domain.prediction.dto.AbPredictResponse;
 import com.ssafy.s309.domain.prediction.dto.PredictRequest;
 import com.ssafy.s309.domain.prediction.entity.GlucosePrediction;
 import com.ssafy.s309.domain.user.entity.DiabetesType;
 import com.ssafy.s309.domain.user.entity.User;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.concurrent.Executor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -33,6 +38,7 @@ class PredictionServiceTest {
   @Mock private GlucosePredictClient glucosePredictClient;
   @Mock private PredictionTxHelper tx;
   @Mock private FoodRepository foodRepository;
+  @Mock private Executor asyncExecutor;
   @InjectMocks private PredictionService predictionService;
 
   private static final Integer USER_ID = 7;
@@ -112,6 +118,57 @@ class PredictionServiceTest {
     PredictRequest captured = reqCaptor.getValue();
     assertThat(captured.foodId()).isEqualTo(60);
     assertThat(captured.foodName()).isEqualTo("김치_배추");
+  }
+
+  @Test
+  void comparePredict_A와_B_둘다_AI_호출되고_응답_합쳐짐() {
+    // Mock Executor 는 execute 호출이 no-op — future.join() 영구 블록 회피하려 caller 스레드 동기 실행으로 stub.
+    // 본 패턴: 새 comparePredict 테스트 추가 시에도 동일.
+    doAnswer(
+            inv -> {
+              ((Runnable) inv.getArgument(0)).run();
+              return null;
+            })
+        .when(asyncExecutor)
+        .execute(any(Runnable.class));
+
+    given(tx.findUser(USER_ID)).willReturn(user());
+    given(glucosePredictClient.predict(any(GlucosePredictRequest.class))).willReturn(aiResp());
+    given(
+            tx.savePrediction(
+                any(Integer.class), any(PredictRequest.class), any(GlucosePredictResponse.class)))
+        .willReturn(savedPrediction());
+
+    PredictRequest reqA =
+        new PredictRequest(
+            50,
+            "비빔밥",
+            new BigDecimal("32.5"),
+            new BigDecimal("0"),
+            new BigDecimal("0"),
+            new BigDecimal("0"),
+            null,
+            null);
+    PredictRequest reqB =
+        new PredictRequest(
+            60,
+            "김밥",
+            new BigDecimal("45.0"),
+            new BigDecimal("0"),
+            new BigDecimal("0"),
+            new BigDecimal("0"),
+            null,
+            null);
+    AbPredictResponse response =
+        predictionService.comparePredict(USER_ID, new AbPredictRequest(reqA, reqB));
+
+    assertThat(response.foodA()).isNotNull();
+    assertThat(response.foodB()).isNotNull();
+    verify(asyncExecutor, times(2)).execute(any(Runnable.class));
+    verify(glucosePredictClient, times(2)).predict(any(GlucosePredictRequest.class));
+    verify(tx, times(2))
+        .savePrediction(
+            any(Integer.class), any(PredictRequest.class), any(GlucosePredictResponse.class));
   }
 
   @Test
