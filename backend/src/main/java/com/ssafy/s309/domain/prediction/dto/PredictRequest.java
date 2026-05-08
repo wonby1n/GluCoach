@@ -21,6 +21,9 @@ public record PredictRequest(
         @DecimalMin(value = "0.0", message = "지방은 0g 이상이어야 합니다")
         @DecimalMax(value = "1000.00", message = "지방은 1000g 이하여야 합니다")
         BigDecimal fatG,
+    @DecimalMin(value = "0.0", message = "식이섬유는 0g 이상이어야 합니다")
+        @DecimalMax(value = "100.00", message = "식이섬유는 100g 이하여야 합니다")
+        BigDecimal fiberG,
     @NotNull
         @DecimalMin(value = "0.0", message = "칼로리는 0kcal 이상이어야 합니다")
         @DecimalMax(value = "10000.00", message = "칼로리는 10000kcal 이하여야 합니다")

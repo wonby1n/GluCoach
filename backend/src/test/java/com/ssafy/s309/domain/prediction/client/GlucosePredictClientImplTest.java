@@ -44,7 +44,7 @@ class GlucosePredictClientImplTest {
 
   @BeforeEach
   void setUp() {
-    MealInfo meal = new MealInfo(56.0, "2026-05-06T10:00:00");
+    MealInfo meal = new MealInfo(56.0, "2026-05-06T10:00:00", null, null, null, null);
     UserProfileWithPattern profile =
         new UserProfileWithPattern(100.0, 70.0, "medium", "T2D", "regular_3");
     request = new GlucosePredictRequest("1", List.of(100.0), meal, profile);
