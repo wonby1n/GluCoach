@@ -1,6 +1,7 @@
 package com.ssafy.s309.domain.food.repository;
 
 import com.ssafy.s309.domain.agent.dto.AgentUnseenFoodItem;
+import com.ssafy.s309.domain.food.dto.KeyboardFoodItem;
 import com.ssafy.s309.domain.food.entity.Food;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,6 +29,20 @@ public interface FoodRepository extends JpaRepository<Food, Integer> {
    * Agent 음식 추천용 — 사용자가 등급(user_food_grades) 또는 최근 식사(meal_records 7일)에 없는 foods 후보. search_count
    * desc 정렬, Pageable로 limit 제어.
    */
+  /** IME 키보드용 — 사용자가 등급을 가진 음식 목록 (이름·카테고리·등급). */
+  @Query(
+      """
+      SELECT new com.ssafy.s309.domain.food.dto.KeyboardFoodItem(f.name, f.category, ufg.grade)
+      FROM Food f
+      JOIN UserFoodGrade ufg ON f.id = ufg.foodId
+      WHERE ufg.userId = :userId
+      ORDER BY ufg.updatedAt DESC
+      """)
+  List<KeyboardFoodItem> findKeyboardGradesByUserId(@Param("userId") Integer userId);
+
+  /** IME 키보드용 — search_count 상위 음식 (등급 없음 fallback). */
+  List<Food> findTop200ByOrderBySearchCountDesc();
+
   @Query(
       """
       SELECT new com.ssafy.s309.domain.agent.dto.AgentUnseenFoodItem(
