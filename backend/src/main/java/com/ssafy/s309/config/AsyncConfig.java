@@ -12,7 +12,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 @EnableScheduling
 public class AsyncConfig {
 
-  /** 트랜잭션 커밋 직후 fire-and-forget 알림용. in-request 와 풀 격리 — 알림 백로그가 요청 응답을 굶지 않게. */
+  /** 트랜잭션 커밋 직후 fire-and-forget 알림용. in-request 풀과 격리 — 알림 백로그가 요청 응답을 굶지 않게. */
   @Bean(name = "alertExecutor")
   public Executor alertExecutor() {
     ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
