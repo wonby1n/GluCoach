@@ -236,6 +236,7 @@ fun MainScreenContent(
                         "meallog" ->
                             MealLogContent(
                                 onBackToHome = { selectedTab = "home" },
+                                onNavigateToFoodReport = { selectedTab = "food-report" },
                             )
                         "food-comparison" -> FoodComparisonContent(onMealSaved = { selectedTab = "meallog" })
                         "report" -> AIReportContent()

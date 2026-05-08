@@ -1,11 +1,17 @@
 package com.ssafy.s309.ui.screen.main
 
+import android.net.Uri
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -30,10 +36,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.LocalCafe
-import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -53,6 +59,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -61,22 +68,29 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import coil3.compose.AsyncImage
 import com.ssafy.s309.data.model.FoodSearchItem
-import com.ssafy.s309.data.model.MealCreateRequest
 import com.ssafy.s309.data.model.MealRecordResponse
 import com.ssafy.s309.data.repository.FoodRepository
 import com.ssafy.s309.data.repository.HealthRepository
+import com.ssafy.s309.data.repository.MealRepository
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
 import com.ssafy.s309.ui.viewmodel.FoodSearchViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import javax.inject.Inject
@@ -92,11 +106,16 @@ data class MealRecord(
     val name: String,
     val description: String,
     @DrawableRes val imageResId: Int? = null,
+    val imageUrl: String? = null,
     val calories: Int,
     val carbs: Float,
     val protein: Float,
     val fat: Float,
     val ingredients: List<String> = emptyList(),
+    val recordedAt: String = "",
+    val maxGlucose: Int? = null,
+    val glucose1h: Int? = null,
+    val glucose2h: Int? = null,
 )
 
 enum class MealType(val label: String) {
@@ -105,6 +124,12 @@ enum class MealType(val label: String) {
     DINNER("저녁"),
     SNACK("간식"),
 }
+
+data class GlucoseDetail(
+    val max: Int,
+    val at1h: Int? = null,
+    val at2h: Int? = null,
+)
 
 private fun mealTypeDisplayName(type: MealType): String =
     when (type) {
@@ -120,6 +145,7 @@ class MealLogViewModel
     constructor(
         private val healthRepository: HealthRepository,
         private val foodRepository: FoodRepository,
+        private val mealRepository: MealRepository,
     ) : ViewModel() {
         private val _beMeals = MutableStateFlow<List<MealRecordResponse>>(emptyList())
         val beMeals: StateFlow<List<MealRecordResponse>> = _beMeals.asStateFlow()
@@ -133,30 +159,73 @@ class MealLogViewModel
         private val _error = MutableStateFlow<String?>(null)
         val error: StateFlow<String?> = _error.asStateFlow()
 
+        private val _maxGlucoseMap = MutableStateFlow<Map<Int, GlucoseDetail>>(emptyMap())
+        val maxGlucoseMap: StateFlow<Map<Int, GlucoseDetail>> = _maxGlucoseMap.asStateFlow()
+
         private var loadedMonth: Pair<Int, Int>? = null
+        private var loadMealsJob: Job? = null
+        private var monthScanJob: Job? = null
 
         fun loadMeals(date: String) {
-            viewModelScope.launch {
-                healthRepository.getMealsByDate(date)
-                    .onSuccess { meals ->
-                        _beMeals.value = meals
-                        _error.value = null
-                        if (meals.isNotEmpty()) {
-                            val day = LocalDate.parse(date).dayOfMonth
-                            _beDaysWithMeals.value = _beDaysWithMeals.value + day
-                        }
-                        meals.forEach { meal ->
-                            val foodId = meal.foodId ?: return@forEach
-                            if (foodId in _foodNutritionMap.value) return@forEach
-                            val name = meal.foodName ?: return@forEach
-                            launch { lookupFoodNutrition(foodId, name) }
-                        }
+            loadMealsJob?.cancel()
+            loadMealsJob =
+                viewModelScope.launch {
+                    var result = healthRepository.getMealsByDate(date)
+                    if (result.isFailure) {
+                        delay(500)
+                        result = healthRepository.getMealsByDate(date)
                     }
-                    .onFailure {
-                        Log.w("MealLogVM", "식사 조회 실패", it)
-                        _beMeals.value = emptyList()
-                        _error.value = "식사 기록을 불러올 수 없습니다"
-                    }
+                    result
+                        .onSuccess { meals ->
+                            _beMeals.value = meals
+                            _error.value = null
+                            if (meals.isNotEmpty()) {
+                                val day = LocalDate.parse(date).dayOfMonth
+                                _beDaysWithMeals.value = _beDaysWithMeals.value + day
+                            }
+                            meals.forEach { meal ->
+                                val foodId = meal.foodId ?: return@forEach
+                                if (foodId in _foodNutritionMap.value) return@forEach
+                                val name = meal.foodName ?: return@forEach
+                                launch { lookupFoodNutrition(foodId, name) }
+                            }
+                            meals.forEach { meal ->
+                                launch { lookupMaxGlucose(meal.mealId, meal.recordedAt) }
+                            }
+                        }
+                        .onFailure {
+                            Log.w("MealLogVM", "식사 조회 실패", it)
+                            _beMeals.value = emptyList()
+                            _error.value = "식사 기록을 불러올 수 없습니다"
+                        }
+                }
+        }
+
+        private suspend fun lookupMaxGlucose(
+            mealId: Int,
+            recordedAt: String,
+        ) {
+            if (mealId in _maxGlucoseMap.value) return
+            runCatching {
+                val mealTime = LocalDateTime.parse(recordedAt)
+                val to = mealTime.plusHours(2).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                val records = healthRepository.getGlucoseRecords(recordedAt, to)
+                if (records.isNotEmpty()) {
+                    val maxVal = records.maxOf { it.value.toInt() }
+                    val target1h = mealTime.plusHours(1)
+                    val target2h = mealTime.plusHours(2)
+                    val at1h =
+                        records.minByOrNull {
+                            kotlin.math.abs(Duration.between(LocalDateTime.parse(it.measuredAt), target1h).toMinutes())
+                        }?.value?.toInt()
+                    val at2h =
+                        records.minByOrNull {
+                            kotlin.math.abs(Duration.between(LocalDateTime.parse(it.measuredAt), target2h).toMinutes())
+                        }?.value?.toInt()
+                    _maxGlucoseMap.value = _maxGlucoseMap.value + (mealId to GlucoseDetail(maxVal, at1h, at2h))
+                }
+            }.onFailure {
+                Log.w("MealLogVM", "혈당 조회 실패 mealId=$mealId", it)
             }
         }
 
@@ -184,21 +253,44 @@ class MealLogViewModel
             if (loadedMonth == year to month) return
             loadedMonth = year to month
             _beDaysWithMeals.value = emptySet()
+            monthScanJob?.cancel()
+            monthScanJob =
+                viewModelScope.launch {
+                    val yearMonth = YearMonth.of(year, month)
+                    val days = yearMonth.lengthOfMonth()
+                    val found = mutableSetOf<Int>()
+                    for (chunk in (1..days).chunked(5)) {
+                        chunk.map { day ->
+                            async {
+                                val date = yearMonth.atDay(day).format(DateTimeFormatter.ISO_LOCAL_DATE)
+                                val meals = runCatching { healthRepository.getMealsByDate(date).getOrNull() }.getOrNull()
+                                if (!meals.isNullOrEmpty()) day else null
+                            }
+                        }.awaitAll().filterNotNull().let { found.addAll(it) }
+                        _beDaysWithMeals.value = found.toSet()
+                    }
+                }
         }
 
         fun createMeal(
             foodId: Int,
             recordedAt: String,
+            memo: String? = null,
+            imageFile: java.io.File? = null,
             onSuccess: () -> Unit,
         ) {
             viewModelScope.launch {
-                healthRepository.createMealRecord(
-                    MealCreateRequest(foodId = foodId, recordedAt = recordedAt),
+                mealRepository.createMeal(
+                    foodId = foodId,
+                    recordedAt = LocalDateTime.parse(recordedAt),
+                    photoFile = null,
+                    memo = memo,
                 ).onSuccess {
                     _error.value = null
                     onSuccess()
-                }.onFailure {
-                    Log.w("MealLogVM", "식사 기록 생성 실패", it)
+                }.onFailure { e ->
+                    val body = (e as? retrofit2.HttpException)?.response()?.errorBody()?.string()
+                    Log.w("MealLogVM", "식사 기록 생성 실패 code=${(e as? retrofit2.HttpException)?.code()} body=$body", e)
                     _error.value = "식사 기록 저장에 실패했습니다"
                 }
             }
@@ -210,6 +302,7 @@ class MealLogViewModel
 @Composable
 fun MealLogContent(
     onBackToHome: () -> Unit = {},
+    onNavigateToFoodReport: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val mealLogViewModel: MealLogViewModel = hiltViewModel()
@@ -235,10 +328,28 @@ fun MealLogContent(
             enter = fadeIn(),
             exit = fadeOut(),
         ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.4f))
+                        .clickable { selectedMeal = null },
+            )
+        }
+
+        AnimatedVisibility(
+            visible = selectedMeal != null,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+        ) {
             displayedMeal?.let { meal ->
                 MealDetailContent(
                     meal = meal,
                     onBack = { selectedMeal = null },
+                    onNavigateToFoodReport = {
+                        selectedMeal = null
+                        onNavigateToFoodReport()
+                    },
                 )
             }
         }
@@ -267,8 +378,19 @@ private fun MealLogCalendarContent(
 
     var displayYear by remember { mutableIntStateOf(today.first) }
     var displayMonth by remember { mutableIntStateOf(today.second) }
+    var selectedYear by remember { mutableIntStateOf(today.first) }
+    var selectedMonth by remember { mutableIntStateOf(today.second) }
     var selectedDay by remember { mutableIntStateOf(today.third) }
     var showSearchDialog by remember { mutableStateOf(false) }
+    var showMemoDialog by remember { mutableStateOf(false) }
+    var pendingFood by remember { mutableStateOf<FoodSearchItem?>(null) }
+    var memoInput by remember { mutableStateOf("") }
+    var selectedPhotoUri by remember { mutableStateOf<Uri?>(null) }
+    val context = LocalContext.current
+    val photoPickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.PickVisualMedia(),
+        ) { uri -> if (uri != null) selectedPhotoUri = uri }
     val recentKeywords = remember { mutableStateListOf<String>() }
 
     val beMeals by mealLogViewModel.beMeals.collectAsState()
@@ -280,23 +402,25 @@ private fun MealLogCalendarContent(
         mealLogViewModel.onMonthChanged(displayYear, displayMonth)
     }
 
-    LaunchedEffect(displayYear, displayMonth, selectedDay) {
+    LaunchedEffect(selectedYear, selectedMonth, selectedDay) {
         if (selectedDay > 0) {
             val date =
-                LocalDate.of(displayYear, displayMonth, selectedDay)
+                LocalDate.of(selectedYear, selectedMonth, selectedDay)
                     .format(DateTimeFormatter.ISO_LOCAL_DATE)
             mealLogViewModel.loadMeals(date)
         }
     }
 
+    val glucoseMap by mealLogViewModel.maxGlucoseMap.collectAsState()
+
     val selectedDateMeals =
-        remember(beMeals, displayYear, displayMonth, selectedDay, nutritionMap) {
+        remember(beMeals, selectedYear, selectedMonth, selectedDay, nutritionMap, glucoseMap) {
             beMeals.map { m ->
                 val food = m.foodId?.let { nutritionMap[it] }
                 MealRecord(
                     id = m.mealId,
-                    year = displayYear,
-                    month = displayMonth,
+                    year = selectedYear,
+                    month = selectedMonth,
                     day = selectedDay,
                     mealType = guessMealType(m.recordedAt),
                     name = m.foodName ?: "식사 기록",
@@ -305,6 +429,11 @@ private fun MealLogCalendarContent(
                     carbs = food?.carbsG?.toFloat() ?: 0f,
                     protein = food?.proteinG?.toFloat() ?: 0f,
                     fat = food?.fatG?.toFloat() ?: 0f,
+                    imageUrl = m.imageUrl,
+                    recordedAt = m.recordedAt,
+                    maxGlucose = glucoseMap[m.mealId]?.max,
+                    glucose1h = glucoseMap[m.mealId]?.at1h,
+                    glucose2h = glucoseMap[m.mealId]?.at2h,
                 )
             }
         }
@@ -366,27 +495,10 @@ private fun MealLogCalendarContent(
                 recentKeywords = recentKeywords,
                 onFoodSelected = { food ->
                     showSearchDialog = false
-                    val day = if (selectedDay > 0) selectedDay else today.third
-                    if (selectedDay <= 0) selectedDay = today.third
-                    val recordedAt =
-                        LocalDateTime.of(
-                            displayYear,
-                            displayMonth,
-                            day,
-                            LocalDateTime.now().hour,
-                            LocalDateTime.now().minute,
-                        )
-                            .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                    mealLogViewModel.createMeal(
-                        foodId = food.id,
-                        recordedAt = recordedAt,
-                        onSuccess = {
-                            val date =
-                                LocalDate.of(displayYear, displayMonth, day)
-                                    .format(DateTimeFormatter.ISO_LOCAL_DATE)
-                            mealLogViewModel.loadMeals(date)
-                        },
-                    )
+                    pendingFood = food
+                    memoInput = ""
+                    selectedPhotoUri = null
+                    showMemoDialog = true
                     foodSearchViewModel.clearSearch()
                 },
                 onDismiss = {
@@ -396,15 +508,96 @@ private fun MealLogCalendarContent(
             )
         }
 
+        if (showMemoDialog && pendingFood != null) {
+            val initialDay = if (selectedDay > 0) selectedDay else today.third
+            val initialYear = if (selectedDay > 0) selectedYear else today.first
+            val initialMonth = if (selectedDay > 0) selectedMonth else today.second
+            MemoInputDialog(
+                memo = memoInput,
+                onMemoChange = { memoInput = it },
+                photoUri = selectedPhotoUri,
+                onPickPhoto = {
+                    photoPickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                },
+                onRemovePhoto = { selectedPhotoUri = null },
+                initialDateTime =
+                    LocalDateTime.of(
+                        initialYear,
+                        initialMonth,
+                        initialDay,
+                        LocalDateTime.now().hour,
+                        LocalDateTime.now().minute,
+                    ),
+                onConfirm = { dateTime ->
+                    showMemoDialog = false
+                    val food = pendingFood ?: return@MemoInputDialog
+                    if (selectedDay <= 0) selectedDay = today.third
+                    val recordedAt = dateTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                    val imageFile =
+                        selectedPhotoUri?.let { uri ->
+                            runCatching {
+                                val file = java.io.File(context.cacheDir, "meal_${System.currentTimeMillis()}.jpg")
+                                val input = context.contentResolver.openInputStream(uri) ?: return@runCatching null
+                                val bitmap = android.graphics.BitmapFactory.decodeStream(input)
+                                input.close()
+                                if (bitmap == null) return@runCatching null
+                                val maxDim = 1024
+                                val scaled =
+                                    if (bitmap.width > maxDim || bitmap.height > maxDim) {
+                                        val s = maxDim.toFloat() / maxOf(bitmap.width, bitmap.height)
+                                        android.graphics.Bitmap.createScaledBitmap(
+                                            bitmap,
+                                            (bitmap.width * s).toInt(),
+                                            (bitmap.height * s).toInt(),
+                                            true,
+                                        )
+                                    } else {
+                                        bitmap
+                                    }
+                                file.outputStream().use { out ->
+                                    scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, out)
+                                }
+                                if (scaled !== bitmap) scaled.recycle()
+                                bitmap.recycle()
+                                file.takeIf { it.exists() && it.length() > 0 }
+                            }.getOrNull()
+                        }
+                    mealLogViewModel.createMeal(
+                        foodId = food.id,
+                        recordedAt = recordedAt,
+                        memo = memoInput,
+                        imageFile = imageFile,
+                        onSuccess = {
+                            val date = dateTime.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
+                            mealLogViewModel.loadMeals(date)
+                        },
+                    )
+                    pendingFood = null
+                    selectedPhotoUri = null
+                },
+                onDismiss = {
+                    showMemoDialog = false
+                    selectedPhotoUri = null
+                    pendingFood = null
+                },
+            )
+        }
+
         MonthCalendar(
             year = displayYear,
             month = displayMonth,
-            selectedDay = selectedDay,
+            selectedDay = if (displayYear == selectedYear && displayMonth == selectedMonth) selectedDay else 0,
             todayYear = today.first,
             todayMonth = today.second,
             todayDay = today.third,
             daysWithMeals = daysWithMeals,
-            onDayClick = { selectedDay = it },
+            onDayClick = {
+                selectedYear = displayYear
+                selectedMonth = displayMonth
+                selectedDay = it
+            },
             onPrevMonth = {
                 if (displayMonth == 1) {
                     displayMonth = 12
@@ -412,7 +605,6 @@ private fun MealLogCalendarContent(
                 } else {
                     displayMonth--
                 }
-                selectedDay = 0
             },
             onNextMonth = {
                 if (displayMonth == 12) {
@@ -421,7 +613,6 @@ private fun MealLogCalendarContent(
                 } else {
                     displayMonth++
                 }
-                selectedDay = 0
             },
         )
 
@@ -434,6 +625,7 @@ private fun MealLogCalendarContent(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(GlucoachCorner.card))
                         .background(Color(0xFFFFEBEE))
+                        .clickable { mealLogViewModel.clearError() }
                         .padding(horizontal = GlucoachSpacing.lg, vertical = GlucoachSpacing.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -443,7 +635,10 @@ private fun MealLogCalendarContent(
                     fontSize = 14.sp,
                 )
             }
-        } else if (selectedDateMeals.isEmpty()) {
+            Spacer(Modifier.height(GlucoachSpacing.sm))
+        }
+
+        if (selectedDateMeals.isEmpty()) {
             Row(
                 modifier =
                     Modifier
@@ -461,8 +656,8 @@ private fun MealLogCalendarContent(
             }
         } else {
             MealListSection(
-                year = displayYear,
-                month = displayMonth,
+                year = selectedYear,
+                month = selectedMonth,
                 day = selectedDay,
                 meals = selectedDateMeals,
                 onMealClick = onMealClick,
@@ -766,63 +961,84 @@ private fun MealCard(
 private fun MealDetailContent(
     meal: MealRecord,
     onBack: () -> Unit,
+    onNavigateToFoodReport: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    var selectedTab by remember { mutableIntStateOf(0) }
+    val tabs = listOf("메모", "혈당 기록", "영양정보")
+    val hasImage = meal.imageUrl != null || meal.imageResId != null
+
+    Box(
         modifier =
             modifier
                 .fillMaxSize()
-                .background(GlucoachColors.Background)
-                .verticalScroll(rememberScrollState()),
+                .background(Color.Transparent),
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 22.dp)
-                    .padding(top = GlucoachSpacing.xxl, bottom = GlucoachSpacing.lg),
-        ) {
-            Row(
-                modifier = Modifier.clickable(onClick = onBack),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                    contentDescription = "뒤로가기",
-                    tint = GlucoachColors.TextPrimary,
-                    modifier = Modifier.size(24.dp),
-                )
-                Spacer(Modifier.width(GlucoachSpacing.sm))
-                Text(
-                    text = "식사 캘린더",
-                    color = GlucoachColors.TextPrimary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
+        if (meal.imageUrl != null) {
+            AsyncImage(
+                model = meal.imageUrl,
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.45f)
+                        .align(Alignment.TopCenter),
+                contentScale = ContentScale.Crop,
+            )
+        } else if (meal.imageResId != null) {
+            Image(
+                painter = painterResource(id = meal.imageResId),
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.45f)
+                        .align(Alignment.TopCenter),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
         }
 
         Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .fillMaxHeight(0.50f)
+                    .align(Alignment.BottomCenter)
+                    .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                    .background(GlucoachColors.Surface)
                     .padding(horizontal = 22.dp),
         ) {
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier =
+                        Modifier
+                            .padding(top = 12.dp)
+                            .width(40.dp)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(GlucoachColors.Border),
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "${meal.year}",
+                        text = formatMealDateTimeLabel(meal),
                         color = GlucoachColors.TextSecondary,
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                     )
+                    Spacer(Modifier.height(4.dp))
                     Text(
-                        text = mealTypeDisplayName(meal.mealType),
+                        text = meal.name,
                         color = GlucoachColors.TextPrimary,
-                        fontSize = 24.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                     )
                 }
@@ -835,194 +1051,338 @@ private fun MealDetailContent(
                 }
             }
 
-            Spacer(Modifier.height(GlucoachSpacing.xl))
+            Spacer(Modifier.height(20.dp))
+
+            Row(modifier = Modifier.fillMaxWidth()) {
+                tabs.forEachIndexed { index, title ->
+                    Column(
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .clickable { selectedTab = index }
+                                .padding(bottom = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = title,
+                            color = if (selectedTab == index) GlucoachColors.TextPrimary else GlucoachColors.TextSecondary,
+                            fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                            fontSize = 14.sp,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Box(
+                            modifier =
+                                Modifier
+                                    .width(if (selectedTab == index) 48.dp else 0.dp)
+                                    .height(2.dp)
+                                    .clip(RoundedCornerShape(1.dp))
+                                    .background(if (selectedTab == index) GlucoachColors.Primary else Color.Transparent),
+                        )
+                    }
+                }
+            }
 
             Box(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(200.dp),
-                contentAlignment = Alignment.Center,
+                        .height(1.dp)
+                        .background(GlucoachColors.Border.copy(alpha = 0.3f)),
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            Column(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
             ) {
-                if (meal.imageResId != null) {
-                    Image(
-                        painter = painterResource(id = meal.imageResId),
-                        contentDescription = meal.name,
-                        modifier =
-                            Modifier
-                                .size(180.dp)
-                                .clip(CircleShape),
-                        contentScale = ContentScale.Crop,
-                    )
-                } else {
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(180.dp)
-                                .clip(CircleShape)
-                                .background(GlucoachColors.Border.copy(alpha = 0.3f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Restaurant,
-                            contentDescription = null,
-                            tint = GlucoachColors.TextSecondary,
-                            modifier = Modifier.size(64.dp),
-                        )
-                    }
+                when (selectedTab) {
+                    0 -> MemoTabContent(meal.description)
+                    1 -> GlucoseTabContent(meal)
+                    2 -> NutritionTabContent(meal)
                 }
             }
 
-            Spacer(Modifier.height(GlucoachSpacing.xl))
-
-            NutritionSummaryBar(
-                calories = meal.calories,
-                carbs = meal.carbs,
-                protein = meal.protein,
-                fat = meal.fat,
-            )
-
-            Spacer(Modifier.height(GlucoachSpacing.xxl))
-
-            Text(
-                text = "기록 상세",
-                color = GlucoachColors.TextPrimary,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(Modifier.height(GlucoachSpacing.md))
-            Text(
-                text = meal.description,
-                color = GlucoachColors.TextSecondary,
-                fontSize = 14.sp,
-                lineHeight = 22.sp,
-            )
-
-            if (meal.ingredients.isNotEmpty()) {
-                Spacer(Modifier.height(GlucoachSpacing.xxl))
-
-                Text(
-                    text = "Ingredients",
-                    color = GlucoachColors.TextPrimary,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-                Spacer(Modifier.height(GlucoachSpacing.md))
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.md),
-                ) {
-                    val ingredientColors =
-                        listOf(
-                            GlucoachColors.PrimaryLight,
-                            GlucoachColors.Primary.copy(alpha = 0.15f),
-                            GlucoachColors.Primary.copy(alpha = 0.20f),
-                            GlucoachColors.Primary.copy(alpha = 0.10f),
-                            GlucoachColors.Primary.copy(alpha = 0.18f),
-                        )
-                    meal.ingredients.take(4).forEachIndexed { idx, ingredient ->
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .size(56.dp)
-                                        .clip(CircleShape)
-                                        .background(ingredientColors[idx % ingredientColors.size])
-                                        .border(1.dp, GlucoachColors.Border, CircleShape),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    text = ingredient.first().toString(),
-                                    color = GlucoachColors.TextPrimary,
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                            }
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = ingredient,
-                                color = GlucoachColors.TextSecondary,
-                                fontSize = 11.sp,
-                            )
-                        }
-                    }
-                    if (meal.ingredients.size > 4) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .size(56.dp)
-                                        .clip(CircleShape)
-                                        .border(1.dp, GlucoachColors.Border, CircleShape),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    text = "View\nAll",
-                                    color = GlucoachColors.Primary,
-                                    fontSize = 11.sp,
-                                    textAlign = TextAlign.Center,
-                                    fontWeight = FontWeight.Medium,
-                                )
-                            }
-                        }
-                    }
-                }
+            androidx.compose.material3.Button(
+                onClick = onNavigateToFoodReport,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
+                        .height(48.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors =
+                    androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = GlucoachColors.Primary,
+                        contentColor = Color.White,
+                    ),
+            ) {
+                Text("음식 성적표로 가기", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             }
-
-            Spacer(Modifier.height(80.dp))
         }
     }
 }
 
-// ── 영양정보 바 ──────────────────────────────────────────
+// ── 메모 입력 다이얼로그 ──────────────────────────────────
 
 @Composable
-private fun NutritionSummaryBar(
-    calories: Int,
-    carbs: Float,
-    protein: Float,
-    fat: Float,
+private fun MemoInputDialog(
+    memo: String,
+    onMemoChange: (String) -> Unit,
+    photoUri: Uri? = null,
+    onPickPhoto: () -> Unit = {},
+    onRemovePhoto: () -> Unit = {},
+    initialDateTime: LocalDateTime = LocalDateTime.now(),
+    onConfirm: (LocalDateTime) -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(GlucoachColors.Primary.copy(alpha = 0.1f))
-                .padding(horizontal = GlucoachSpacing.lg, vertical = GlucoachSpacing.md),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-    ) {
-        NutritionItem("열량", "${calories}kcal")
-        NutritionItem("탄수화물", "${carbs}g")
-        NutritionItem("단백질", "${protein}g")
-        NutritionItem("지방", "${fat}g")
+    var selectedDateTime by remember { mutableStateOf(initialDateTime) }
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(GlucoachCorner.card))
+                    .background(GlucoachColors.Surface)
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState()),
+        ) {
+            Text(
+                text = "식사 기록",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(GlucoachSpacing.md))
+
+            Text(
+                text = "사진",
+                color = GlucoachColors.TextSecondary,
+                fontSize = 13.sp,
+            )
+            Spacer(Modifier.height(GlucoachSpacing.sm))
+            if (photoUri != null) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(160.dp)
+                            .clip(RoundedCornerShape(GlucoachCorner.card)),
+                ) {
+                    AsyncImage(
+                        model = photoUri,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                    IconButton(
+                        onClick = onRemovePhoto,
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp)
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.5f)),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "삭제",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+            } else {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(80.dp)
+                            .clip(RoundedCornerShape(GlucoachCorner.card))
+                            .border(1.dp, GlucoachColors.Border, RoundedCornerShape(GlucoachCorner.card))
+                            .clickable(onClick = onPickPhoto),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Outlined.CameraAlt,
+                            contentDescription = null,
+                            tint = GlucoachColors.TextSecondary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "사진 추가 (선택)",
+                            color = GlucoachColors.TextSecondary,
+                            fontSize = 14.sp,
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(GlucoachSpacing.lg))
+
+            Text(
+                text = "식사 시간",
+                color = GlucoachColors.TextSecondary,
+                fontSize = 13.sp,
+            )
+            Spacer(Modifier.height(GlucoachSpacing.sm))
+            com.ssafy.s309.ui.component.MealDateTimePicker(
+                initialDateTime = initialDateTime,
+                onDateTimeChanged = { selectedDateTime = it },
+            )
+            Spacer(Modifier.height(GlucoachSpacing.lg))
+            Text(
+                text = "메모",
+                color = GlucoachColors.TextSecondary,
+                fontSize = 13.sp,
+            )
+            Spacer(Modifier.height(GlucoachSpacing.sm))
+            androidx.compose.material3.OutlinedTextField(
+                value = memo,
+                onValueChange = onMemoChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = {
+                    Text(
+                        text = "메모를 입력하세요 (선택)",
+                        color = GlucoachColors.TextSecondary,
+                        fontSize = 14.sp,
+                    )
+                },
+                shape = RoundedCornerShape(GlucoachCorner.card),
+                colors =
+                    androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = GlucoachColors.Primary,
+                        unfocusedBorderColor = GlucoachColors.Border,
+                    ),
+                minLines = 2,
+                maxLines = 4,
+            )
+            Spacer(Modifier.height(GlucoachSpacing.xl))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.md),
+            ) {
+                androidx.compose.material3.OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).height(44.dp),
+                    shape = RoundedCornerShape(22.dp),
+                ) {
+                    Text("취소", fontSize = 14.sp)
+                }
+                androidx.compose.material3.Button(
+                    onClick = { onConfirm(selectedDateTime) },
+                    modifier = Modifier.weight(1f).height(44.dp),
+                    shape = RoundedCornerShape(22.dp),
+                    colors =
+                        androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = GlucoachColors.Primary,
+                            contentColor = Color.White,
+                        ),
+                ) {
+                    Text("확인", fontSize = 14.sp)
+                }
+            }
+        }
+    }
+}
+
+// ── 상세 탭 컨텐츠 ──────────────────────────────────────
+
+@Composable
+private fun MemoTabContent(description: String) {
+    if (description.isNotEmpty()) {
+        Text(
+            text = description,
+            color = GlucoachColors.TextSecondary,
+            fontSize = 14.sp,
+            lineHeight = 22.sp,
+        )
+    } else {
+        Text(
+            text = "메모가 없습니다",
+            color = GlucoachColors.TextSecondary.copy(alpha = 0.5f),
+            fontSize = 14.sp,
+        )
     }
 }
 
 @Composable
-private fun NutritionItem(
+private fun GlucoseTabContent(meal: MealRecord) {
+    if (meal.maxGlucose == null && meal.glucose1h == null && meal.glucose2h == null) {
+        Text(
+            text = "혈당 기록이 없습니다",
+            color = GlucoachColors.TextSecondary.copy(alpha = 0.5f),
+            fontSize = 14.sp,
+        )
+        return
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        meal.maxGlucose?.let { GlucoseRow("최고 혈당", "${it}mg/dL") }
+        meal.glucose1h?.let { GlucoseRow("식후 1시간", "${it}mg/dL") }
+        meal.glucose2h?.let { GlucoseRow("식후 2시간", "${it}mg/dL") }
+    }
+}
+
+@Composable
+private fun GlucoseRow(
     label: String,
     value: String,
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = label,
-            color = GlucoachColors.PrimaryDark,
-            fontSize = 11.sp,
-        )
-        Spacer(Modifier.height(2.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text = label, color = GlucoachColors.TextSecondary, fontSize = 14.sp)
         Text(
             text = value,
             color = GlucoachColors.TextPrimary,
             fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.SemiBold,
         )
     }
 }
+
+@Composable
+private fun NutritionTabContent(meal: MealRecord) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+    ) {
+        NutritionTabItem("열량", "${meal.calories}kcal", Color(0xFFE65100))
+        NutritionTabItem("탄수화물", String.format("%.2fg", meal.carbs), GlucoachColors.Primary)
+        NutritionTabItem("단백질", String.format("%.2fg", meal.protein), GlucoachColors.Primary)
+        NutritionTabItem("지방", String.format("%.1fg", meal.fat), GlucoachColors.Primary)
+    }
+}
+
+@Composable
+private fun NutritionTabItem(
+    label: String,
+    value: String,
+    color: Color,
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = label, color = GlucoachColors.TextSecondary, fontSize = 11.sp)
+        Spacer(Modifier.height(4.dp))
+        Text(text = value, color = color, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+private fun formatMealDateTimeLabel(meal: MealRecord): String =
+    try {
+        val dt = LocalDateTime.parse(meal.recordedAt)
+        val amPm = if (dt.hour < 12) "오전" else "오후"
+        val hour12 = if (dt.hour % 12 == 0) 12 else dt.hour % 12
+        "${dt.year}년 ${dt.monthValue}월 ${dt.dayOfMonth}일 ${mealTypeDisplayName(meal.mealType)}  $amPm ${hour12}시 ${dt.minute}분"
+    } catch (_: Exception) {
+        "${meal.year}년 ${meal.month}월 ${meal.day}일 ${mealTypeDisplayName(meal.mealType)}"
+    }
 
 private fun guessMealType(isoDateTime: String): MealType =
     try {

@@ -42,6 +42,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -115,13 +117,19 @@ fun FoodScanContent(
         is FoodScanState.Result -> {
             if (showSimulation && selectedIndex >= 0 && selectedIndex < s.candidates.size) {
                 val candidate = s.candidates[selectedIndex]
+                var memo by remember { mutableStateOf("") }
+                var selectedDateTime by remember { mutableStateOf(java.time.LocalDateTime.now()) }
                 BackHandler { showSimulation = false }
                 SimulationScreen(
                     food = candidate,
                     isSaving = s.isSaving,
+                    memo = memo,
+                    onMemoChange = { memo = it },
+                    selectedDateTime = selectedDateTime,
+                    onDateTimeChange = { selectedDateTime = it },
                     onBack = { showSimulation = false },
                     onRetakePhoto = onRetakePhoto,
-                    onRecordMeal = { viewModel.saveMeal(candidate, photoFile) },
+                    onRecordMeal = { viewModel.saveMeal(candidate, photoFile, memo, selectedDateTime) },
                 )
             } else {
                 BackHandler { onBack() }
@@ -655,6 +663,10 @@ private fun AnalyzingResultScreen(
 private fun SimulationScreen(
     food: FoodScanCandidate,
     isSaving: Boolean,
+    memo: String,
+    onMemoChange: (String) -> Unit,
+    selectedDateTime: java.time.LocalDateTime,
+    onDateTimeChange: (java.time.LocalDateTime) -> Unit,
     onBack: () -> Unit,
     onRetakePhoto: () -> Unit,
     onRecordMeal: () -> Unit,
@@ -751,6 +763,44 @@ private fun SimulationScreen(
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
             NutritionCard(food = food)
+
+            Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+            Text(
+                text = "식사 시간",
+                color = GlucoachColors.TextSecondary,
+                fontSize = 13.sp,
+            )
+            Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+            com.ssafy.s309.ui.component.MealDateTimePicker(
+                initialDateTime = selectedDateTime,
+                onDateTimeChanged = onDateTimeChange,
+            )
+
+            Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+            OutlinedTextField(
+                value = memo,
+                onValueChange = onMemoChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = {
+                    Text(
+                        text = "메모를 입력하세요",
+                        color = GlucoachColors.TextSecondary,
+                        fontSize = 14.sp,
+                    )
+                },
+                shape = RoundedCornerShape(GlucoachCorner.card),
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = GlucoachColors.Primary,
+                        unfocusedBorderColor = GlucoachColors.Border,
+                        focusedContainerColor = GlucoachColors.Surface,
+                        unfocusedContainerColor = GlucoachColors.Surface,
+                    ),
+                minLines = 2,
+                maxLines = 4,
+            )
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
