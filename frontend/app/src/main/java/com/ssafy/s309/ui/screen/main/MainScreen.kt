@@ -9,10 +9,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,9 +31,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.CameraAlt
-import androidx.compose.material.icons.outlined.CompareArrows
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.EditNote
@@ -50,6 +47,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,8 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -70,7 +67,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.ssafy.s309.R
 import com.ssafy.s309.ui.component.BottomNavBar
 import com.ssafy.s309.ui.component.BottomNavItem
 import com.ssafy.s309.ui.component.CurrentGlucoseCard
@@ -165,22 +161,24 @@ fun MainScreenContent(
     onDebugSetGlucose: (Int, Float) -> Unit = { _, _ -> },
 ) {
     var selectedTab by rememberSaveable { mutableStateOf("home") }
-    var showCamera by remember { mutableStateOf(false) }
-    var scanSessionId by remember { mutableIntStateOf(0) }
-    var capturedPhotoFile by remember { mutableStateOf<java.io.File?>(null) }
     var showReportSheet by remember { mutableStateOf(false) }
-    var showAddSheet by remember { mutableStateOf(false) }
+    var showCameraPanel by remember { mutableStateOf(false) }
+    var isAbMode by remember { mutableStateOf(false) }
+    var cumulativeDrag by remember { mutableFloatStateOf(0f) }
 
     androidx.compose.runtime.LaunchedEffect(requestedTab) {
         if (requestedTab != null) {
             showReportSheet = false
-            showAddSheet = false
-            if (requestedTab == "food-scan") {
-                scanSessionId++
-                showCamera = true
-                selectedTab = "add"
-            } else {
-                selectedTab = requestedTab
+            when (requestedTab) {
+                "food-scan" -> {
+                    showCameraPanel = true
+                    isAbMode = false
+                }
+                "food-comparison" -> {
+                    showCameraPanel = true
+                    isAbMode = true
+                }
+                else -> selectedTab = requestedTab
             }
             onTabHandled()
         }
@@ -193,7 +191,29 @@ fun MainScreenContent(
                 .background(GlucoachColors.Background),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Box(modifier = Modifier.weight(1f)) {
+            Box(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .pointerInput(showCameraPanel) {
+                            if (!showCameraPanel) {
+                                detectHorizontalDragGestures(
+                                    onDragStart = { cumulativeDrag = 0f },
+                                    onDragEnd = {
+                                        if (cumulativeDrag > 80.dp.toPx()) {
+                                            showCameraPanel = true
+                                            isAbMode = false
+                                        }
+                                        cumulativeDrag = 0f
+                                    },
+                                    onDragCancel = { cumulativeDrag = 0f },
+                                    onHorizontalDrag = { _, dragAmount ->
+                                        if (dragAmount > 0) cumulativeDrag += dragAmount
+                                    },
+                                )
+                            }
+                        },
+            ) {
                 Crossfade(
                     targetState = selectedTab,
                     animationSpec = tween(300),
@@ -212,42 +232,11 @@ fun MainScreenContent(
                                 onProjectorClick = onProjectorClick,
                                 userEmail = userEmail,
                             )
-                        "add" -> {
-                            if (!showCamera) {
-                                val photoFile = capturedPhotoFile
-                                if (photoFile != null) {
-                                    key(scanSessionId) {
-                                        FoodScanContent(
-                                            photoFile = photoFile,
-                                            onBack = { selectedTab = "home" },
-                                            onRetakePhoto = {
-                                                scanSessionId++
-                                                capturedPhotoFile = null
-                                                showCamera = true
-                                            },
-                                            onMealSaved = { selectedTab = "home" },
-                                        )
-                                    }
-                                } else {
-                                    androidx.compose.runtime.LaunchedEffect(Unit) {
-                                        selectedTab = "home"
-                                    }
-                                }
-                            } else {
-                                Box(
-                                    Modifier
-                                        .fillMaxSize()
-                                        .background(GlucoachColors.Background),
-                                )
-                            }
-                        }
-                        "edit" -> FoodComparisonContent(onMealSaved = { selectedTab = "meallog" })
                         "meallog" ->
                             MealLogContent(
                                 onBackToHome = { selectedTab = "home" },
                                 onNavigateToFoodReport = { selectedTab = "food-report" },
                             )
-                        "food-comparison" -> FoodComparisonContent(onMealSaved = { selectedTab = "meallog" })
                         "report" -> AIReportContent()
                         "food-report" -> FoodReportContent()
 
@@ -264,7 +253,6 @@ fun MainScreenContent(
                                     onBellClick = onBellClick,
                                     hasUnread = state.notifications.any { it.isUnread },
                                     bellIcon = bellIcon,
-                                    onKikiChatClick = onKikiChatClick,
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
 
@@ -329,7 +317,7 @@ fun MainScreenContent(
                 }
 
                 androidx.compose.animation.AnimatedVisibility(
-                    visible = showReportSheet || showAddSheet,
+                    visible = showReportSheet,
                     enter = fadeIn(animationSpec = tween(durationMillis = 280)),
                     exit = fadeOut(animationSpec = tween(durationMillis = 240)),
                 ) {
@@ -338,10 +326,7 @@ fun MainScreenContent(
                             Modifier
                                 .fillMaxSize()
                                 .background(Color.Black.copy(alpha = 0.3f))
-                                .clickable {
-                                    showReportSheet = false
-                                    showAddSheet = false
-                                },
+                                .clickable { showReportSheet = false },
                     )
                 }
 
@@ -371,53 +356,23 @@ fun MainScreenContent(
                         onClose = { showReportSheet = false },
                     )
                 }
-
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = showAddSheet,
-                    enter =
-                        expandVertically(
-                            expandFrom = Alignment.Bottom,
-                            animationSpec = tween(durationMillis = 280),
-                        ),
-                    exit =
-                        shrinkVertically(
-                            shrinkTowards = Alignment.Bottom,
-                            animationSpec = tween(durationMillis = 240),
-                        ),
-                    modifier = Modifier.align(Alignment.BottomCenter),
-                ) {
-                    AddMenuSheet(
-                        onABComparison = {
-                            showAddSheet = false
-                            selectedTab = "food-comparison"
-                        },
-                        onFoodScan = {
-                            showAddSheet = false
-                            scanSessionId++
-                            showCamera = true
-                            selectedTab = "add"
-                        },
-                        onClose = { showAddSheet = false },
-                    )
-                }
             }
 
+            val hasUnreadKiki = state.notifications.any { it.isUnread }
             BottomNavBar(
-                items = defaultBottomNavItems(),
+                items = defaultBottomNavItems(hasUnreadKiki = hasUnreadKiki),
                 selectedId = selectedTab,
                 onItemClick = { item ->
                     when (item.id) {
-                        "add" -> {
+                        "kiki" -> {
                             showReportSheet = false
-                            showAddSheet = !showAddSheet
+                            onKikiChatClick()
                         }
                         "report" -> {
-                            showAddSheet = false
                             showReportSheet = !showReportSheet
                         }
                         else -> {
                             showReportSheet = false
-                            showAddSheet = false
                             selectedTab = item.id
                         }
                     }
@@ -425,15 +380,19 @@ fun MainScreenContent(
             )
         }
 
-        if (showCamera) {
-            CameraScreen(
-                onClose = {
-                    showCamera = false
-                    selectedTab = "home"
-                },
-                onPhotoTaken = { file ->
-                    capturedPhotoFile = file
-                    showCamera = false
+        AnimatedVisibility(
+            visible = showCameraPanel,
+            enter = slideInHorizontally(animationSpec = tween(300)) { -it },
+            exit = slideOutHorizontally(animationSpec = tween(300)) { -it },
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            InstagramCameraPanel(
+                isAbMode = isAbMode,
+                onModeChange = { isAbMode = it },
+                onClose = { showCameraPanel = false },
+                onMealSaved = {
+                    showCameraPanel = false
+                    selectedTab = if (isAbMode) "meallog" else "home"
                 },
             )
         }
@@ -492,7 +451,6 @@ private fun TodayConditionHeader(
     onBellClick: () -> Unit,
     hasUnread: Boolean,
     bellIcon: (@Composable () -> Unit)? = null,
-    onKikiChatClick: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -505,53 +463,28 @@ private fun TodayConditionHeader(
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
         )
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.sm),
+        Box(
+            modifier = Modifier.size(32.dp).clickable(onClick = onBellClick),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFE8F6F9))
-                        .border(1.dp, GlucoachColors.Primary.copy(alpha = 0.4f), CircleShape)
-                        .clickable(onClick = onKikiChatClick),
-                contentAlignment = Alignment.Center,
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.kiki_main),
-                    contentDescription = "키키 채팅",
-                    modifier = Modifier.size(28.dp),
-                    contentScale = ContentScale.Fit,
+            if (bellIcon != null) {
+                bellIcon()
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.Notifications,
+                    contentDescription = if (hasUnread) "새 알림" else "알림",
+                    tint = GlucoachColors.Primary,
+                    modifier = Modifier.size(24.dp),
                 )
             }
-            Box(
-                modifier =
-                    Modifier
-                        .size(32.dp)
-                        .clickable(onClick = onBellClick),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (bellIcon != null) {
-                    bellIcon()
-                } else {
-                    Icon(
-                        imageVector = Icons.Outlined.Notifications,
-                        contentDescription = if (hasUnread) "새 알림" else "알림",
-                        tint = GlucoachColors.Primary,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-                if (hasUnread) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .align(Alignment.TopEnd)
-                                .size(8.dp)
-                                .background(Color(0xFFE53935), shape = CircleShape),
-                    )
-                }
+            if (hasUnread) {
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .size(8.dp)
+                            .background(Color(0xFFE53935), shape = CircleShape),
+                )
             }
         }
     }
@@ -672,11 +605,11 @@ private fun SummaryRow(
     }
 }
 
-internal fun defaultBottomNavItems(): List<BottomNavItem> =
+internal fun defaultBottomNavItems(hasUnreadKiki: Boolean = false): List<BottomNavItem> =
     listOf(
         BottomNavItem(id = "home", label = "홈", icon = Icons.Outlined.Home),
         BottomNavItem(id = "report", label = "리포트", icon = Icons.Outlined.Description),
-        BottomNavItem(id = "add", label = "추가", icon = Icons.Outlined.Add, isCenter = true),
+        BottomNavItem(id = "kiki", label = "키키", isCenter = true, hasUnread = hasUnreadKiki),
         BottomNavItem(id = "meallog", label = "기록", icon = Icons.Outlined.EditNote),
         BottomNavItem(id = "profile", label = "마이페이지", icon = Icons.Outlined.Person),
     )
@@ -769,88 +702,117 @@ internal fun ReportMenuSheet(
 }
 
 @Composable
-internal fun AddMenuSheet(
-    onABComparison: () -> Unit,
-    onFoodScan: () -> Unit,
+private fun InstagramCameraPanel(
+    isAbMode: Boolean,
+    onModeChange: (Boolean) -> Unit,
     onClose: () -> Unit,
+    onMealSaved: () -> Unit,
 ) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .shadow(8.dp, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                .background(GlucoachColors.Surface)
-                .padding(horizontal = 22.dp),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-        ) {
-            IconButton(
-                onClick = onClose,
-                modifier =
-                    Modifier
-                        .align(Alignment.CenterEnd)
-                        .size(32.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = "닫기",
-                    tint = GlucoachColors.TextSecondary,
-                    modifier = Modifier.size(20.dp),
+    var capturedFile by remember { mutableStateOf<File?>(null) }
+    var sessionId by remember { mutableIntStateOf(0) }
+
+    androidx.compose.runtime.LaunchedEffect(isAbMode) {
+        if (!isAbMode) capturedFile = null
+    }
+
+    Box(modifier = Modifier.fillMaxSize().background(GlucoachColors.Background)) {
+        when {
+            isAbMode -> {
+                Box(modifier = Modifier.fillMaxSize().background(GlucoachColors.Background).padding(bottom = 72.dp)) {
+                    FoodComparisonContent(onMealSaved = onMealSaved)
+                }
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopStart)
+                            .padding(top = 52.dp, start = 16.dp)
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(GlucoachColors.Border)
+                            .clickable(onClick = onClose),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "닫기",
+                        tint = GlucoachColors.TextSecondary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+            capturedFile != null -> {
+                key(sessionId) {
+                    FoodScanContent(
+                        photoFile = capturedFile!!,
+                        onBack = { capturedFile = null },
+                        onRetakePhoto = {
+                            sessionId++
+                            capturedFile = null
+                        },
+                        onMealSaved = onMealSaved,
+                    )
+                }
+            }
+            else -> {
+                CameraScreen(
+                    onClose = onClose,
+                    onPhotoTaken = { file -> capturedFile = file },
                 )
             }
         }
 
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { onABComparison() }
-                    .padding(vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.CompareArrows,
-                contentDescription = null,
-                tint = GlucoachColors.TextPrimary,
-                modifier = Modifier.size(24.dp),
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = "A/B 비교 시뮬레이션",
-                color = GlucoachColors.TextPrimary,
-                fontSize = 16.sp,
+        if (capturedFile == null) {
+            CameraModeToggle(
+                isAbMode = isAbMode,
+                onModeChange = onModeChange,
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = if (isAbMode) 16.dp else 180.dp),
             )
         }
+    }
+}
 
-        HorizontalDivider(color = GlucoachColors.Border)
+@Composable
+private fun CameraModeToggle(
+    isAbMode: Boolean,
+    onModeChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(50))
+                .background(Color.Black.copy(alpha = 0.55f))
+                .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        CameraModeChip(text = "음식 인식", selected = !isAbMode, onClick = { onModeChange(false) })
+        CameraModeChip(text = "A/B 비교", selected = isAbMode, onClick = { onModeChange(true) })
+    }
+}
 
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { onFoodScan() }
-                    .padding(vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.CameraAlt,
-                contentDescription = null,
-                tint = GlucoachColors.TextPrimary,
-                modifier = Modifier.size(24.dp),
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = "음식 리포트",
-                color = GlucoachColors.TextPrimary,
-                fontSize = 16.sp,
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
+@Composable
+private fun CameraModeChip(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(50))
+                .background(if (selected) Color.White else Color.Transparent)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 18.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            color = if (selected) Color.Black else Color.White,
+            fontSize = 14.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        )
     }
 }
