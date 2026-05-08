@@ -4,7 +4,6 @@ import android.content.res.Configuration
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,7 +32,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,7 +51,6 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -87,19 +84,19 @@ private fun glucoseColor(value: Float) =
         else -> colorNormal
     }
 
-private fun getKrTimeLabels(
-    count: Int = 8,
-    intervalMinutes: Int = 5,
-    windowOffsetMinutes: Int = 0,
-): List<String> {
+private fun getKrTimeLabels(totalMinutes: Int = 35): List<String> {
     val sdf = SimpleDateFormat("HH:mm", Locale.KOREA)
     sdf.timeZone = TimeZone.getTimeZone("Asia/Seoul")
     val cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Seoul"))
-    cal.add(Calendar.MINUTE, -windowOffsetMinutes)
-    return (count - 1 downTo 0).map { i ->
-        val c = cal.clone() as Calendar
-        c.add(Calendar.MINUTE, -(i * intervalMinutes))
-        sdf.format(c.time)
+    val intervalMinutes = totalMinutes / 3
+    return (3 downTo 0).map { i ->
+        if (i == 0) {
+            "현재"
+        } else {
+            val c = cal.clone() as Calendar
+            c.add(Calendar.MINUTE, -(i * intervalMinutes))
+            sdf.format(c.time)
+        }
     }
 }
 
@@ -155,27 +152,9 @@ fun GraphScreen(
             simHistory
         }
 
-    var windowOffset by remember { mutableIntStateOf(0) }
-    var dragPxAccumulator by remember { mutableFloatStateOf(0f) }
-    val maxWindowOffset = (allData.size - 8).coerceAtLeast(0)
-
-    val displayData: List<Float> =
-        if (allData.size <= 8) {
-            allData
-        } else {
-            val endIdx = (allData.size - windowOffset).coerceAtLeast(8)
-            val startIdx = (endIdx - 8).coerceAtLeast(0)
-            allData.subList(startIdx, endIdx)
-        }
-
-    val onDragDelta: (Float) -> Unit = { deltaPx ->
-        dragPxAccumulator -= deltaPx // 왼쪽 드래그(음수) → 과거로
-        val steps = (dragPxAccumulator / 40f).toInt()
-        if (steps != 0) {
-            windowOffset = (windowOffset + steps).coerceIn(0, maxWindowOffset)
-            dragPxAccumulator -= steps * 40f
-        }
-    }
+    var selectedRangeMinutes by remember { mutableIntStateOf(120) }
+    val pointsToShow = (selectedRangeMinutes / 5).coerceAtLeast(2)
+    val displayData: List<Float> = allData.takeLast(pointsToShow)
 
     val (weekDates, todayIndex) = remember { getCurrentWeekDates() }
     var selectedDay by remember { mutableIntStateOf(todayIndex) }
@@ -201,8 +180,8 @@ fun GraphScreen(
             onNavigateToBle = onNavigateToBle,
             isDeviceConnected = showGraph,
             chartData = displayData,
-            windowOffset = windowOffset,
-            onDragDelta = onDragDelta,
+            selectedRangeMinutes = selectedRangeMinutes,
+            onRangeChange = { selectedRangeMinutes = it },
         )
     } else {
         GraphScreenPortrait(
@@ -216,8 +195,8 @@ fun GraphScreen(
             onNavigateToBle = onNavigateToBle,
             isDeviceConnected = showGraph,
             chartData = displayData,
-            windowOffset = windowOffset,
-            onDragDelta = onDragDelta,
+            selectedRangeMinutes = selectedRangeMinutes,
+            onRangeChange = { selectedRangeMinutes = it },
         )
     }
 }
@@ -236,8 +215,8 @@ private fun GraphScreenPortrait(
     onNavigateToBle: () -> Unit = {},
     isDeviceConnected: Boolean = false,
     chartData: List<Float> = dummyGlucoseData,
-    windowOffset: Int = 0,
-    onDragDelta: (Float) -> Unit = {},
+    selectedRangeMinutes: Int = 120,
+    onRangeChange: (Int) -> Unit = {},
 ) {
     Column(
         modifier =
@@ -325,37 +304,18 @@ private fun GraphScreenPortrait(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .height(300.dp)
-                                .pointerInput(Unit) {
-                                    detectHorizontalDragGestures { _, dragAmount ->
-                                        onDragDelta(dragAmount)
-                                    }
-                                },
-                    ) {
-                        GlucoseCanvas(
-                            modifier = Modifier.fillMaxSize(),
-                            data = chartData,
-                            windowOffsetMinutes = windowOffset * 5,
-                        )
-                        if (windowOffset > 0) {
-                            val minutesBack = windowOffset * 5
-                            val timeLabel =
-                                if (minutesBack < 60) "${minutesBack}분 전" else "${minutesBack / 60}시간 ${minutesBack % 60}분 전"
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .align(Alignment.TopEnd)
-                                        .background(Color(0xCC333333), RoundedCornerShape(8.dp))
-                                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                            ) {
-                                Text(text = "◀ $timeLabel", color = Color.White, fontSize = 11.sp)
-                            }
-                        }
-                    }
+                    TimeRangeChips(
+                        selectedRangeMinutes = selectedRangeMinutes,
+                        onRangeChange = onRangeChange,
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    GlucoseCanvas(
+                        modifier = Modifier.fillMaxWidth().height(300.dp),
+                        data = chartData,
+                        totalMinutes = selectedRangeMinutes,
+                    )
                 }
             }
         }
@@ -376,8 +336,8 @@ private fun GraphScreenLandscape(
     onNavigateToBle: () -> Unit = {},
     isDeviceConnected: Boolean = false,
     chartData: List<Float> = dummyGlucoseData,
-    windowOffset: Int = 0,
-    onDragDelta: (Float) -> Unit = {},
+    selectedRangeMinutes: Int = 120,
+    onRangeChange: (Int) -> Unit = {},
 ) {
     Box(
         modifier =
@@ -491,40 +451,23 @@ private fun GraphScreenLandscape(
                                 .background(Color(0xFFEEEEEE)),
                     )
 
-                    Box(
+                    Column(
                         modifier =
                             Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .pointerInput(Unit) {
-                                    detectHorizontalDragGestures { _, dragAmount ->
-                                        onDragDelta(dragAmount)
-                                    }
-                                },
+                                .padding(horizontal = 12.dp, vertical = 12.dp),
                     ) {
-                        GlucoseCanvas(
-                            modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 12.dp, vertical = 12.dp),
-                            data = chartData,
-                            windowOffsetMinutes = windowOffset * 5,
+                        TimeRangeChips(
+                            selectedRangeMinutes = selectedRangeMinutes,
+                            onRangeChange = onRangeChange,
                         )
-                        if (windowOffset > 0) {
-                            val minutesBack = windowOffset * 5
-                            val timeLabel =
-                                if (minutesBack < 60) "${minutesBack}분 전" else "${minutesBack / 60}시간 ${minutesBack % 60}분 전"
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(end = 12.dp, top = 4.dp)
-                                        .background(Color(0xCC333333), RoundedCornerShape(8.dp))
-                                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                            ) {
-                                Text(text = "◀ $timeLabel", color = Color.White, fontSize = 11.sp)
-                            }
-                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        GlucoseCanvas(
+                            modifier = Modifier.fillMaxWidth().weight(1f),
+                            data = chartData,
+                            totalMinutes = selectedRangeMinutes,
+                        )
                     }
                 }
             }
@@ -545,6 +488,40 @@ private fun GraphScreenLandscape(
 }
 
 // ── 공용 컴포넌트 ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun TimeRangeChips(
+    selectedRangeMinutes: Int,
+    onRangeChange: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        listOf(30 to "30분", 60 to "1시간", 120 to "2시간", 360 to "6시간").forEach { (minutes, label) ->
+            val selected = selectedRangeMinutes == minutes
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier =
+                    Modifier
+                        .background(
+                            if (selected) Primary else Color(0xFFE8F7FA),
+                            RoundedCornerShape(20.dp),
+                        )
+                        .clickable { onRangeChange(minutes) }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+            ) {
+                Text(
+                    text = label,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (selected) Color.White else Primary,
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun DeviceNotConnectedPlaceholder(onNavigateToBle: () -> Unit = {}) {
@@ -743,9 +720,9 @@ private fun HighLowRow(chartData: List<Float> = dummyGlucoseData) {
 private fun GlucoseCanvas(
     modifier: Modifier = Modifier,
     data: List<Float> = dummyGlucoseData,
-    windowOffsetMinutes: Int = 0,
+    totalMinutes: Int = 35,
 ) {
-    val timeLabels = remember(windowOffsetMinutes) { getKrTimeLabels(windowOffsetMinutes = windowOffsetMinutes) }
+    val timeLabels = remember(totalMinutes) { getKrTimeLabels(totalMinutes = totalMinutes) }
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
