@@ -76,5 +76,5 @@ class WeeklyReportResponse(BaseModel):
     status: str  # "success" | "error"
     ai_summary: Optional[str] = None
     ai_suggest: Optional[str] = None
-    pdf_key: Optional[str] = None
+    pdf_bytes: Optional[str] = None  # base64 인코딩된 PDF 바이너리
     error: Optional[str] = None

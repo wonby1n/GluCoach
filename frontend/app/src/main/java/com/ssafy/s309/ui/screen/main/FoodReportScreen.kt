@@ -6,7 +6,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,9 +20,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material3.Icon
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,9 +37,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ssafy.s309.R
 import com.ssafy.s309.data.model.FoodGradeInfo
-import com.ssafy.s309.data.repository.FoodReportMockData
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
@@ -73,34 +72,65 @@ internal fun gradeBgColor(grade: String): Color =
 // ── 진입점 ──────────────────────────────────────────────
 
 @Composable
-fun FoodReportContent(modifier: Modifier = Modifier) {
+fun FoodReportContent(
+    modifier: Modifier = Modifier,
+    viewModel: FoodReportViewModel = hiltViewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedGrade by remember { mutableStateOf<String?>(null) }
 
     if (selectedGrade != null) {
         BackHandler { selectedGrade = null }
     }
 
-    Crossfade(
-        targetState = selectedGrade,
-        animationSpec = tween(300),
-        label = "food-report-crossfade",
-    ) { grade ->
-        if (grade == null) {
-            FoodReportMainContent(
-                onGradeClick = { selectedGrade = it },
-                modifier = modifier,
-            )
-        } else {
-            val gradeInfo =
-                FoodReportMockData.gradeInfoList.firstOrNull { it.grade == grade }
-                    ?: return@Crossfade
-            val foods = FoodReportMockData.gradeFoodItems[grade] ?: emptyList()
-            FoodReportDetailContent(
-                gradeInfo = gradeInfo,
-                foods = foods,
-                onBack = { selectedGrade = null },
-                modifier = modifier,
-            )
+    when (val state = uiState) {
+        is FoodReportUiState.Loading -> {
+            Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = GlucoachColors.Primary)
+            }
+        }
+
+        is FoodReportUiState.Error -> {
+            Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = state.message,
+                        color = GlucoachColors.TextSecondary,
+                        fontSize = 14.sp,
+                    )
+                    Spacer(Modifier.height(GlucoachSpacing.md))
+                    Button(onClick = { viewModel.loadFoodGrades() }) {
+                        Text("다시 시도")
+                    }
+                }
+            }
+        }
+
+        is FoodReportUiState.Success -> {
+            Crossfade(
+                targetState = selectedGrade,
+                animationSpec = tween(300),
+                label = "food-report-crossfade",
+            ) { grade ->
+                if (grade == null) {
+                    FoodReportMainContent(
+                        gradeInfoList = state.gradeInfoList,
+                        onGradeClick = { selectedGrade = it },
+                        modifier = modifier,
+                    )
+                } else {
+                    val gradeInfo =
+                        state.gradeInfoList.firstOrNull { it.grade == grade }
+                            ?: return@Crossfade
+                    val foods = state.gradeFoodItems[grade] ?: emptyList()
+                    FoodReportDetailContent(
+                        gradeInfo = gradeInfo,
+                        foods = foods,
+                        onBack = { selectedGrade = null },
+                        modifier = modifier,
+                    )
+                }
+            }
         }
     }
 }
@@ -109,6 +139,7 @@ fun FoodReportContent(modifier: Modifier = Modifier) {
 
 @Composable
 private fun FoodReportMainContent(
+    gradeInfoList: List<FoodGradeInfo>,
     onGradeClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -121,24 +152,12 @@ private fun FoodReportMainContent(
     ) {
         Spacer(Modifier.height(GlucoachSpacing.xxl))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = "내 음식 성적표",
-                color = GlucoachColors.TextPrimary,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Icon(
-                imageVector = Icons.Outlined.Notifications,
-                contentDescription = "알림",
-                tint = GlucoachColors.PrimaryDark,
-                modifier = Modifier.size(28.dp),
-            )
-        }
+        Text(
+            text = "내 음식 성적표",
+            color = GlucoachColors.TextPrimary,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+        )
 
         Spacer(Modifier.height(GlucoachSpacing.xl))
 
@@ -155,7 +174,7 @@ private fun FoodReportMainContent(
 
         Spacer(Modifier.height(GlucoachSpacing.md))
 
-        FoodReportMockData.gradeInfoList.forEach { gradeInfo ->
+        gradeInfoList.forEach { gradeInfo ->
             GradeListItem(
                 gradeInfo = gradeInfo,
                 onClick = { onGradeClick(gradeInfo.grade) },

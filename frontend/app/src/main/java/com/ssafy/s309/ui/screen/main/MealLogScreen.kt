@@ -907,10 +907,10 @@ private fun MealCard(
         }
     val bgColor =
         when (meal.mealType) {
-            MealType.BREAKFAST -> Color(0xFFFFF8E1)
-            MealType.LUNCH -> Color(0xFFF1F8E9)
-            MealType.DINNER -> Color(0xFFE8EAF6)
-            MealType.SNACK -> Color(0xFFFCE4EC)
+            MealType.BREAKFAST -> Color(0xFFF0FAFB)
+            MealType.LUNCH -> GlucoachColors.PrimaryLight
+            MealType.DINNER -> Color(0xFFD4EEF5)
+            MealType.SNACK -> Color(0xFFE8F7FA)
         }
 
     Row(
