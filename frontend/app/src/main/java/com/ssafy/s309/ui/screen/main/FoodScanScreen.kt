@@ -101,6 +101,7 @@ fun FoodScanContent(
     var showSimulation by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
+        viewModel.reset()
         viewModel.analyze(photoFile)
     }
 

@@ -223,19 +223,4 @@ class MainViewModel
             super.onCleared()
             GlucoseSimulator.stop()
         }
-
-        // [DEBUG_KIKI_TEST] 배포 전 삭제
-        fun debugSetGlucose(
-            mgDl: Int,
-            rateMgDlPerMin: Float,
-        ) {
-            _uiState.update {
-                it.copy(
-                    currentGlucoseMgDl = mgDl,
-                    trendRateMgDlPerMin = rateMgDlPerMin,
-                    diffFromPrevious = (rateMgDlPerMin * 5).toInt(),
-                )
-            }
-        }
-        // [/DEBUG_KIKI_TEST]
     }
