@@ -72,7 +72,7 @@ class FcmService : FirebaseMessagingService() {
     ) {
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_MEAL, "식후 활동 알림", NotificationManager.IMPORTANCE_HIGH)
+            NotificationChannel(CHANNEL_COACHING, "키키 코칭 알림", NotificationManager.IMPORTANCE_HIGH)
                 .apply { description = "식후 활동 유도 및 선택 응답 알림" },
         )
 
@@ -106,7 +106,7 @@ class FcmService : FirebaseMessagingService() {
 
         manager.notify(
             notifId,
-            NotificationCompat.Builder(this, CHANNEL_MEAL)
+            NotificationCompat.Builder(this, CHANNEL_COACHING)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
@@ -126,7 +126,8 @@ class FcmService : FirebaseMessagingService() {
     ) {
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_DEFAULT, "기본 알림", NotificationManager.IMPORTANCE_DEFAULT),
+            NotificationChannel(CHANNEL_COACHING, "키키 코칭 알림", NotificationManager.IMPORTANCE_HIGH)
+                .apply { description = "혈당 코칭 및 아침 브리핑 알림" },
         )
 
         val pendingIntent =
@@ -139,13 +140,14 @@ class FcmService : FirebaseMessagingService() {
 
         manager.notify(
             System.currentTimeMillis().toInt(),
-            NotificationCompat.Builder(this, CHANNEL_DEFAULT)
+            NotificationCompat.Builder(this, CHANNEL_COACHING)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                 .setSmallIcon(R.drawable.ic_notification)
                 .setAutoCancel(true)
                 .setContentIntent(pendingIntent)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .build(),
         )
     }
@@ -163,8 +165,7 @@ class FcmService : FirebaseMessagingService() {
 
     companion object {
         private const val TAG = "FcmService"
-        private const val CHANNEL_DEFAULT = "glucoach_default"
-        private const val CHANNEL_MEAL = "glucose_coaching"
+        private const val CHANNEL_COACHING = "glucose_coaching"
         private const val ALERT_TYPE_MEAL_FOLLOWUP = "AGENT_MEAL_FOLLOWUP"
         private const val MEAL_FOLLOWUP_TITLE = "식후 컨디션"
     }

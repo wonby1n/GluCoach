@@ -36,6 +36,7 @@ fun NotificationPanel(
     notifications: List<NotificationItem>,
     onBack: () -> Unit,
     onClearAll: () -> Unit,
+    onMarkAllRead: () -> Unit = {},
     onNotificationClick: (NotificationItem) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -49,7 +50,7 @@ fun NotificationPanel(
         Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
         NotificationPanelTopBar(onBack = onBack)
         Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
-        NotificationPanelTitleRow(onClearAll = onClearAll)
+        NotificationPanelTitleRow(onMarkAllRead = onMarkAllRead, onClearAll = onClearAll)
         Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(GlucoachSpacing.md),
@@ -98,7 +99,10 @@ private fun NotificationPanelTopBar(onBack: () -> Unit) {
 }
 
 @Composable
-private fun NotificationPanelTitleRow(onClearAll: () -> Unit) {
+private fun NotificationPanelTitleRow(
+    onMarkAllRead: () -> Unit,
+    onClearAll: () -> Unit,
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -110,12 +114,28 @@ private fun NotificationPanelTitleRow(onClearAll: () -> Unit) {
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
         )
-        Text(
-            text = "모두 지우기",
-            color = Color.Black,
-            fontSize = 10.sp,
-            modifier = Modifier.clickable(onClick = onClearAll),
-        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "전체 읽음",
+                color = GlucoachColors.TextSecondary,
+                fontSize = 10.sp,
+                modifier = Modifier.clickable(onClick = onMarkAllRead),
+            )
+            Text(
+                text = "|",
+                color = GlucoachColors.TextSecondary,
+                fontSize = 10.sp,
+            )
+            Text(
+                text = "모두 지우기",
+                color = Color.Black,
+                fontSize = 10.sp,
+                modifier = Modifier.clickable(onClick = onClearAll),
+            )
+        }
     }
 }
 

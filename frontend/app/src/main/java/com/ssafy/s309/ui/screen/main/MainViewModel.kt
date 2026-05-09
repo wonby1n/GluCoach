@@ -212,6 +212,13 @@ class MainViewModel
             _uiState.update { it.copy(notifications = emptyList()) }
         }
 
+        fun markAllNotificationsRead() {
+            _uiState.update { it.copy(notifications = it.notifications.map { n -> n.copy(isUnread = false) }) }
+            viewModelScope.launch {
+                healthRepository.markAllAlertsRead()
+            }
+        }
+
         fun sendMealReply(userReply: String) {
             val userId = tokenManager.getUserId() ?: return
             viewModelScope.launch {
