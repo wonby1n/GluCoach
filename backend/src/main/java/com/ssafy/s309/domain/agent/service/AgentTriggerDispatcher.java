@@ -22,7 +22,7 @@ public class AgentTriggerDispatcher {
             trigger.getReferenceId(),
             trigger.getReason());
 
-    aiRestClient.post().uri("/trigger").body(payload).retrieve().toBodilessEntity();
+    aiRestClient.post().uri("/agent/trigger").body(payload).retrieve().toBodilessEntity();
 
     log.info(
         "trigger dispatched: id={} type={} userId={}",
