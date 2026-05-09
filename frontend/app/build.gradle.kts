@@ -23,12 +23,17 @@ android {
     }
 
     buildTypes {
+        debug {
+            // 로컬 도커 BE: USB 실기기에서 adb reverse tcp:8080 tcp:8080 이후 localhost:8080 접근.
+            buildConfigField("String", "BASE_URL", "\"http://localhost:8080/\"")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            buildConfigField("String", "BASE_URL", "\"https://k14s309.p.ssafy.io/\"")
         }
     }
 
@@ -39,6 +44,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

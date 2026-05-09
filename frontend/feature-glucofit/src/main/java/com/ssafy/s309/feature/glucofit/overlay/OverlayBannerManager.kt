@@ -27,13 +27,25 @@ class OverlayBannerManager(private val context: Context) {
         food: FoodInfo,
         glucose: Double?,
     ) {
+        showWithMessage(buildMessage(food, glucose))
+    }
+
+    /** B-2 정책 — KeyboardMessageBuilder 결과를 그대로 출력. */
+    fun showWithMessage(
+        text: String,
+        color: Int,
+    ) {
+        showWithMessage(text to color)
+    }
+
+    private fun showWithMessage(textColor: Pair<String, Int>) {
         if (!Settings.canDrawOverlays(context)) {
             Log.w("OverlayBannerManager", "오버레이 권한 없음 — SYSTEM_ALERT_WINDOW 권한을 허용해야 배너가 표시됩니다")
             return
         }
         dismiss()
 
-        val banner = buildBanner(food, glucose)
+        val banner = buildBannerView(textColor.first, textColor.second)
 
         val screenWidth = context.resources.displayMetrics.widthPixels
         val params =
@@ -55,12 +67,10 @@ class OverlayBannerManager(private val context: Context) {
         handler.postDelayed({ dismiss() }, 2000)
     }
 
-    private fun buildBanner(
-        food: FoodInfo,
-        glucose: Double?,
+    private fun buildBannerView(
+        message: String,
+        textColor: Int,
     ): LinearLayout {
-        val (message, textColor) = buildMessage(food, glucose)
-
         val container =
             LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL

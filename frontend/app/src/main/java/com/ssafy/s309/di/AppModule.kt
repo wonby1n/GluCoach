@@ -1,6 +1,7 @@
 package com.ssafy.s309.di
 
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+import com.ssafy.s309.BuildConfig
 import com.ssafy.s309.data.api.AgentApi
 import com.ssafy.s309.data.api.AuthApi
 import com.ssafy.s309.data.api.FoodApi
@@ -23,7 +24,7 @@ import retrofit2.Retrofit
 import javax.inject.Named
 import javax.inject.Singleton
 
-private const val BASE_URL = "https://k14s309.p.ssafy.io/"
+private val BASE_URL = BuildConfig.BASE_URL
 
 @Module
 @InstallIn(SingletonComponent::class)

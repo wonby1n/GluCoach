@@ -48,8 +48,8 @@ class TokenAuthenticator
                 .build()
         }
 
-        private fun refreshSync(refreshToken: String): String? =
-            try {
+        private fun refreshSync(refreshToken: String): String? {
+            return try {
                 val client = OkHttpClient()
                 val body =
                     """{"refreshToken":"$refreshToken"}"""
@@ -71,6 +71,7 @@ class TokenAuthenticator
                 Log.w(TAG, "토큰 갱신 실패", e)
                 null
             }
+        }
 
         companion object {
             private const val TAG = "TokenAuthenticator"

@@ -20,6 +20,7 @@ class AuthRepository
         private val authApi: AuthApi,
         private val tokenManager: TokenManager,
         private val userApi: UserApi,
+        private val keyboardFoodSync: KeyboardFoodSyncManager,
     ) {
         suspend fun signup(
             email: String,
@@ -33,6 +34,7 @@ class AuthRepository
                 tokenManager.saveEmail(email)
                 tokenManager.parseUserIdFromJwt(response.accessToken)?.let { tokenManager.saveUserId(it) }
                 sendStoredFcmToken()
+                keyboardFoodSync.syncIfNeeded(force = true)
                 response
             }
 
@@ -46,6 +48,7 @@ class AuthRepository
                 tokenManager.saveEmail(email)
                 tokenManager.parseUserIdFromJwt(response.accessToken)?.let { tokenManager.saveUserId(it) }
                 sendStoredFcmToken()
+                keyboardFoodSync.syncIfNeeded(force = true)
                 response
             }
 
