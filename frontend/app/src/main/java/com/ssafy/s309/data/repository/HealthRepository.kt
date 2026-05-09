@@ -172,7 +172,7 @@ class HealthRepository
                 val response = healthApi.getChatMessages()
                 val items =
                     response.content
-                        .filter { it.sender != "user" && !it.isRead }
+                        .filter { it.sender != "user" }
                         .sortedByDescending { it.id }
                 if (items.isNotEmpty()) {
                     return items.map { m ->
@@ -244,6 +244,12 @@ class HealthRepository
         suspend fun markAlertRead(alertId: Long) {
             runCatching { healthApi.markChatMessageRead(alertId) }
                 .onFailure { Log.w(TAG, "채팅 메시지 읽음 처리 실패 id=$alertId", it) }
+        }
+
+        /** 전체 읽음 처리. 실패해도 UI 상태는 유지. */
+        suspend fun markAllAlertsRead() {
+            runCatching { healthApi.markAllChatMessagesRead() }
+                .onFailure { Log.w(TAG, "전체 읽음 처리 실패", it) }
         }
 
         /**

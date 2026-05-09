@@ -110,6 +110,7 @@ fun MainScreen(
         onBellClick = viewModel::openNotificationPanel,
         onNotificationBack = viewModel::closeNotificationPanel,
         onClearAllNotifications = viewModel::clearAllNotifications,
+        onMarkAllNotificationsRead = viewModel::markAllNotificationsRead,
         onNotificationClick = viewModel::selectNotification,
         onDismissNotificationDetail = viewModel::dismissNotificationDetail,
         mascotSlot = mascotSlot,
@@ -138,6 +139,7 @@ fun MainScreenContent(
     onBellClick: () -> Unit,
     onNotificationBack: () -> Unit,
     onClearAllNotifications: () -> Unit,
+    onMarkAllNotificationsRead: () -> Unit = {},
     onNotificationClick: (com.ssafy.s309.data.model.NotificationItem) -> Unit = {},
     onDismissNotificationDetail: () -> Unit = {},
     mascotSlot: (@Composable () -> Unit)? = null,
@@ -427,6 +429,7 @@ fun MainScreenContent(
                 notifications = state.notifications,
                 onBack = onNotificationBack,
                 onClearAll = onClearAllNotifications,
+                onMarkAllRead = onMarkAllNotificationsRead,
                 onNotificationClick = onNotificationClick,
             )
         }
