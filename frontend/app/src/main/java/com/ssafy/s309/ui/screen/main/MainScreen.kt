@@ -129,7 +129,6 @@ fun MainScreen(
         requestedTab = requestedTab,
         onTabHandled = onTabHandled,
         // [DEBUG_KIKI_TEST]
-        onDebugSetGlucose = viewModel::debugSetGlucose,
     )
 }
 
@@ -157,8 +156,6 @@ fun MainScreenContent(
     userEmail: String = "",
     requestedTab: String? = null,
     onTabHandled: () -> Unit = {},
-    // [DEBUG_KIKI_TEST]
-    onDebugSetGlucose: (Int, Float) -> Unit = { _, _ -> },
 ) {
     var selectedTab by rememberSaveable { mutableStateOf("home") }
     var showReportSheet by remember { mutableStateOf(false) }
@@ -280,9 +277,6 @@ fun MainScreenContent(
                                     onChatClick = onKikiChatClick,
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
-
-                                DebugKikiTestPanel(onDebugSetGlucose) // [DEBUG_KIKI_TEST]
-                                Spacer(modifier = Modifier.height(GlucoachSpacing.xl)) // [DEBUG_KIKI_TEST]
 
                                 val twoHoursAgoMs = remember { System.currentTimeMillis() - 2 * 60 * 60 * 1000L }
                                 val chartTimeLabels =
