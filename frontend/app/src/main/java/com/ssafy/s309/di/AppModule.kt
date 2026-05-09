@@ -10,6 +10,7 @@ import com.ssafy.s309.data.api.SleepSessionApi
 import com.ssafy.s309.data.api.UserApi
 import com.ssafy.s309.data.api.WeeklyReportApi
 import com.ssafy.s309.data.network.AuthInterceptor
+import com.ssafy.s309.data.network.TokenAuthenticator
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -65,9 +66,13 @@ object AppModule {
     @Provides
     @Singleton
     @Named("authenticated")
-    fun provideAuthenticatedOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient =
+    fun provideAuthenticatedOkHttpClient(
+        authInterceptor: AuthInterceptor,
+        tokenAuthenticator: TokenAuthenticator,
+    ): OkHttpClient =
         OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
+            .authenticator(tokenAuthenticator)
             .addInterceptor(
                 HttpLoggingInterceptor().apply {
                     level = HttpLoggingInterceptor.Level.BODY
@@ -121,9 +126,13 @@ object AppModule {
     @Provides
     @Singleton
     @Named("no-redirect")
-    fun provideNoRedirectOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient =
+    fun provideNoRedirectOkHttpClient(
+        authInterceptor: AuthInterceptor,
+        tokenAuthenticator: TokenAuthenticator,
+    ): OkHttpClient =
         OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
+            .authenticator(tokenAuthenticator)
             .addInterceptor(
                 HttpLoggingInterceptor().apply {
                     level = HttpLoggingInterceptor.Level.BODY
