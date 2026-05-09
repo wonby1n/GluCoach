@@ -78,6 +78,23 @@ def get_sleep(date: str) -> dict:
 
 def get_meals(date: str) -> dict:
     """지정한 날짜의 식사 기록을 반환한다."""
+    user_id = _agent_context.get("user_id")
+    backend_url = os.getenv("BACKEND_API_URL", "")
+    agent_api_key = os.getenv("AGENT_API_KEY", "dev-agent-key-change-in-prod")
+
+    if backend_url and user_id is not None:
+        try:
+            resp = _requests.get(
+                f"{backend_url}/api/agent/meals",
+                headers={"X-Agent-Api-Key": agent_api_key},
+                params={"user_id": user_id, "date": date},
+                timeout=5,
+            )
+            resp.raise_for_status()
+            return {"date": date, "meals": resp.json()}
+        except Exception as e:
+            print(f"[get_meals] backend error, fallback to mock: {e}")
+
     return {
         "date": date,
         "meals": MEAL_DATA.get(date, []),
