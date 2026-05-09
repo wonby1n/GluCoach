@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AgentNotificationService {
 
   private static final String AGENT_PREFIX = "AGENT_";
-  private static final Duration DEDUP_WINDOW = Duration.ofMinutes(30);
+  private static final Duration DEDUP_WINDOW = Duration.ofMinutes(1); // 시연용: 원래 30분
 
   private final ChatMessageService chatMessageService;
   private final ChatMessageRepository chatMessageRepository;

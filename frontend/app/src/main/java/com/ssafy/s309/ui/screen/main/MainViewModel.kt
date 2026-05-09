@@ -75,13 +75,17 @@ class MainViewModel
         private fun observeGlucoseAlerts() {
             viewModelScope.launch {
                 healthRepository.glucoseAlertStream.collect { alert ->
-                    // 즉시 반영 (배너 텍스트 빠르게 변경)
+                    // 즉시 반영 + selectedNotification 업데이트 → KikiAlarmDetailScreen 자동 갱신
                     _uiState.update { state ->
-                        state.copy(notifications = listOf(alert) + state.notifications)
+                        state.copy(
+                            notifications = listOf(alert) + state.notifications,
+                            selectedNotification = alert,
+                        )
                     }
                     // BE에서 재조회 → displayTrace + 정확한 alertType(messageType) 획득
                     val refreshed = healthRepository.getNotifications()
-                    _uiState.update { it.copy(notifications = refreshed) }
+                    val latest = refreshed.firstOrNull()
+                    _uiState.update { it.copy(notifications = refreshed, selectedNotification = latest) }
                 }
             }
         }
@@ -208,23 +212,22 @@ class MainViewModel
             _uiState.update { it.copy(notifications = emptyList()) }
         }
 
+        fun markAllNotificationsRead() {
+            _uiState.update { it.copy(notifications = it.notifications.map { n -> n.copy(isUnread = false) }) }
+            viewModelScope.launch {
+                healthRepository.markAllAlertsRead()
+            }
+        }
+
+        fun sendMealReply(userReply: String) {
+            val userId = tokenManager.getUserId() ?: return
+            viewModelScope.launch {
+                healthRepository.sendPostMealReply(userId, userReply)
+            }
+        }
+
         override fun onCleared() {
             super.onCleared()
             GlucoseSimulator.stop()
         }
-
-        // [DEBUG_KIKI_TEST] 배포 전 삭제
-        fun debugSetGlucose(
-            mgDl: Int,
-            rateMgDlPerMin: Float,
-        ) {
-            _uiState.update {
-                it.copy(
-                    currentGlucoseMgDl = mgDl,
-                    trendRateMgDlPerMin = rateMgDlPerMin,
-                    diffFromPrevious = (rateMgDlPerMin * 5).toInt(),
-                )
-            }
-        }
-        // [/DEBUG_KIKI_TEST]
     }

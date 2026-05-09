@@ -34,7 +34,6 @@ import com.ssafy.s309.ui.screen.auth.SignInScreen
 import com.ssafy.s309.ui.screen.auth.SignUpScreen
 import com.ssafy.s309.ui.screen.ble.BleScreen
 import com.ssafy.s309.ui.screen.health.HealthSourceScreen
-import com.ssafy.s309.ui.screen.main.AddMenuSheet
 import com.ssafy.s309.ui.screen.main.GuardianScreen
 import com.ssafy.s309.ui.screen.main.KikiAlarmDetailScreen
 import com.ssafy.s309.ui.screen.main.KikiChatScreen
@@ -98,7 +97,6 @@ private fun SubScreenWithBottomNav(
     content: @Composable () -> Unit,
 ) {
     var showReportSheet by remember { mutableStateOf(false) }
-    var showAddSheet by remember { mutableStateOf(false) }
 
     Column(
         modifier =
@@ -110,7 +108,7 @@ private fun SubScreenWithBottomNav(
             content()
 
             androidx.compose.animation.AnimatedVisibility(
-                visible = showReportSheet || showAddSheet,
+                visible = showReportSheet,
                 enter = fadeIn(animationSpec = tween(durationMillis = 280)),
                 exit = fadeOut(animationSpec = tween(durationMillis = 240)),
             ) {
@@ -119,10 +117,7 @@ private fun SubScreenWithBottomNav(
                         Modifier
                             .fillMaxSize()
                             .background(Color.Black.copy(alpha = 0.3f))
-                            .clickable {
-                                showReportSheet = false
-                                showAddSheet = false
-                            },
+                            .clickable { showReportSheet = false },
                 )
             }
 
@@ -156,37 +151,6 @@ private fun SubScreenWithBottomNav(
                     onClose = { showReportSheet = false },
                 )
             }
-
-            androidx.compose.animation.AnimatedVisibility(
-                visible = showAddSheet,
-                enter =
-                    expandVertically(
-                        expandFrom = Alignment.Bottom,
-                        animationSpec = tween(durationMillis = 280),
-                    ),
-                exit =
-                    shrinkVertically(
-                        shrinkTowards = Alignment.Bottom,
-                        animationSpec = tween(durationMillis = 240),
-                    ),
-                modifier = Modifier.align(Alignment.BottomCenter),
-            ) {
-                AddMenuSheet(
-                    onABComparison = {
-                        showAddSheet = false
-                        val mainEntry = navController.getBackStackEntry(Screen.Main.route)
-                        mainEntry.savedStateHandle["requestedTab"] = "food-comparison"
-                        navController.popBackStack(Screen.Main.route, inclusive = false)
-                    },
-                    onFoodScan = {
-                        showAddSheet = false
-                        val mainEntry = navController.getBackStackEntry(Screen.Main.route)
-                        mainEntry.savedStateHandle["requestedTab"] = "food-scan"
-                        navController.popBackStack(Screen.Main.route, inclusive = false)
-                    },
-                    onClose = { showAddSheet = false },
-                )
-            }
         }
 
         BottomNavBar(
@@ -194,17 +158,16 @@ private fun SubScreenWithBottomNav(
             selectedId = selectedId,
             onItemClick = { item ->
                 when (item.id) {
-                    "add" -> {
-                        showReportSheet = false
-                        showAddSheet = !showAddSheet
+                    "kiki" -> {
+                        navController.navigate(Screen.KikiChat.route) {
+                            launchSingleTop = true
+                        }
                     }
                     "report" -> {
-                        showAddSheet = false
                         showReportSheet = !showReportSheet
                     }
                     else -> {
                         showReportSheet = false
-                        showAddSheet = false
                         val mainEntry = navController.getBackStackEntry(Screen.Main.route)
                         mainEntry.savedStateHandle["requestedTab"] = item.id
                         navController.popBackStack(Screen.Main.route, inclusive = false)
@@ -471,6 +434,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     notification = notification,
                     onBack = { navController.popBackStack() },
                     onChatClick = { navController.navigate(Screen.KikiChat.route) },
+                    onMealReply = mainViewModel::sendMealReply,
                 )
             }
         }

@@ -57,7 +57,7 @@ class FcmService : FirebaseMessagingService() {
             message.data["alertType"]
                 ?: if (title == MEAL_FOLLOWUP_TITLE) ALERT_TYPE_MEAL_FOLLOWUP else null
 
-        if (alertType == ALERT_TYPE_MEAL_FOLLOWUP) {
+        if (alertType?.startsWith(ALERT_TYPE_MEAL_FOLLOWUP) == true) {
             showMealFollowupNotification(title, body)
         } else {
             showNotification(title, body)
@@ -72,7 +72,7 @@ class FcmService : FirebaseMessagingService() {
     ) {
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_MEAL, "식후 활동 알림", NotificationManager.IMPORTANCE_HIGH)
+            NotificationChannel(CHANNEL_COACHING, "키키 코칭 알림", NotificationManager.IMPORTANCE_HIGH)
                 .apply { description = "식후 활동 유도 및 선택 응답 알림" },
         )
 
@@ -106,7 +106,7 @@ class FcmService : FirebaseMessagingService() {
 
         manager.notify(
             notifId,
-            NotificationCompat.Builder(this, CHANNEL_MEAL)
+            NotificationCompat.Builder(this, CHANNEL_COACHING)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
@@ -126,7 +126,8 @@ class FcmService : FirebaseMessagingService() {
     ) {
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_DEFAULT, "기본 알림", NotificationManager.IMPORTANCE_DEFAULT),
+            NotificationChannel(CHANNEL_COACHING, "키키 코칭 알림", NotificationManager.IMPORTANCE_HIGH)
+                .apply { description = "혈당 코칭 및 아침 브리핑 알림" },
         )
 
         val pendingIntent =
@@ -139,31 +140,32 @@ class FcmService : FirebaseMessagingService() {
 
         manager.notify(
             System.currentTimeMillis().toInt(),
-            NotificationCompat.Builder(this, CHANNEL_DEFAULT)
+            NotificationCompat.Builder(this, CHANNEL_COACHING)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                 .setSmallIcon(R.drawable.ic_notification)
                 .setAutoCancel(true)
                 .setContentIntent(pendingIntent)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .build(),
         )
     }
 
     @androidx.annotation.RawRes
     private fun resIdForAlertType(alertType: String?): Int =
-        when (alertType) {
-            "AGENT_WAKE_UP" -> R.raw.kiki_morning // 좋은 아침이에요. 어젯밤 수면이 부족했어요. 저녁 혈당이 200까지 올라서 조심하셔야 돼요. 오늘 식사를 같이 확인해볼까요?
-            "AGENT_MEAL_FOLLOWUP" -> R.raw.kiki_walk // 지금 10분만 걸으면 좋아요.
-            "AGENT_MEAL_RETRY" -> R.raw.kiki_stretch // 회의 끝났나요? 잠깐 스트레칭 어때요?
-            "AGENT_SLEEP_INSIGHT" -> R.raw.kiki_daily_done // 오늘 하루 수고했어요. 어제보다 혈당 변동 폭이 안정적이에요.
+        when {
+            alertType == null -> R.raw.kiki_morning
+            alertType.startsWith("AGENT_WAKE_UP") -> R.raw.kiki_morning
+            alertType.startsWith("AGENT_MEAL_FOLLOWUP") -> R.raw.kiki_walk
+            alertType.startsWith("AGENT_MEAL_RETRY") -> R.raw.kiki_stretch
+            alertType.startsWith("AGENT_SLEEP_INSIGHT") -> R.raw.kiki_daily_done
             else -> R.raw.kiki_morning
         }
 
     companion object {
         private const val TAG = "FcmService"
-        private const val CHANNEL_DEFAULT = "glucoach_default"
-        private const val CHANNEL_MEAL = "glucose_coaching"
+        private const val CHANNEL_COACHING = "glucose_coaching"
         private const val ALERT_TYPE_MEAL_FOLLOWUP = "AGENT_MEAL_FOLLOWUP"
         private const val MEAL_FOLLOWUP_TITLE = "식후 컨디션"
     }

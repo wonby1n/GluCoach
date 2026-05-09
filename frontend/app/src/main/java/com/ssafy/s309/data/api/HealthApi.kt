@@ -70,6 +70,10 @@ interface HealthApi {
         @Path("id") id: Long,
     )
 
+    /** 전체 읽음 처리 */
+    @POST("api/chat/messages/mark-all-read")
+    suspend fun markAllChatMessagesRead()
+
     /** 1분 폴 시계열 5분 배치 INSERT */
     @POST("api/health/snapshots")
     suspend fun saveSnapshotBatch(

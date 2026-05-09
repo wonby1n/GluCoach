@@ -1,12 +1,14 @@
 package com.ssafy.s309.di
 
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+import com.ssafy.s309.data.api.AgentApi
 import com.ssafy.s309.data.api.AuthApi
 import com.ssafy.s309.data.api.FoodApi
 import com.ssafy.s309.data.api.HealthApi
 import com.ssafy.s309.data.api.PredictApi
 import com.ssafy.s309.data.api.SleepSessionApi
 import com.ssafy.s309.data.api.UserApi
+import com.ssafy.s309.data.api.WeeklyReportApi
 import com.ssafy.s309.data.network.AuthInterceptor
 import dagger.Module
 import dagger.Provides
@@ -115,4 +117,43 @@ object AppModule {
     fun provideSleepSessionApi(
         @Named("authenticated") retrofit: Retrofit,
     ): SleepSessionApi = retrofit.create(SleepSessionApi::class.java)
+
+    @Provides
+    @Singleton
+    @Named("no-redirect")
+    fun provideNoRedirectOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient =
+        OkHttpClient.Builder()
+            .addInterceptor(authInterceptor)
+            .addInterceptor(
+                HttpLoggingInterceptor().apply {
+                    level = HttpLoggingInterceptor.Level.BODY
+                },
+            )
+            .followRedirects(false)
+            .build()
+
+    @Provides
+    @Singleton
+    @Named("no-redirect")
+    fun provideNoRedirectRetrofit(
+        @Named("no-redirect") okHttpClient: OkHttpClient,
+        json: Json,
+    ): Retrofit =
+        Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .build()
+
+    @Provides
+    @Singleton
+    fun provideWeeklyReportApi(
+        @Named("no-redirect") retrofit: Retrofit,
+    ): WeeklyReportApi = retrofit.create(WeeklyReportApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideAgentApi(
+        @Named("authenticated") retrofit: Retrofit,
+    ): AgentApi = retrofit.create(AgentApi::class.java)
 }

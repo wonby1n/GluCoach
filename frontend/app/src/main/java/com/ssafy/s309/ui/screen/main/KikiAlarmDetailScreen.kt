@@ -34,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,7 +64,26 @@ fun KikiAlarmDetailScreen(
     notification: com.ssafy.s309.data.model.NotificationItem? = null,
     onBack: () -> Unit = {},
     onChatClick: () -> Unit = {},
+    onMealReply: (String) -> Unit = {},
 ) {
+    var selectedOption by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(notification?.id) {
+        android.util.Log.d("KikiAlarm", "notification changed: id=${notification?.id} alertType=${notification?.alertType}")
+        selectedOption = null
+    }
+    val isPostMeal =
+        notification?.alertType?.let {
+            it.startsWith("AGENT_MEAL_FOLLOWUP") || it.startsWith("AGENT_MEAL_RETRY")
+        } == true
+    android.util.Log.d("KikiAlarm", "recompose: selectedOption=$selectedOption isPostMeal=$isPostMeal")
+    val speechLines =
+        when (selectedOption) {
+            "OKAY" -> listOf("좋아요! 지금 바로 움직여봐요.", "조금만 움직여도 혈당 조절에 도움이 돼요.")
+            "BUSY" -> listOf("알겠어요!", "회의 끝나고 30분 뒤에 다시 알려드릴게요.")
+            "DECLINE" -> notification?.message?.split("\n") ?: listOf("키키가 오늘 컨디션을 보고 있어요.")
+            else -> notification?.message?.split("\n") ?: listOf("키키가 오늘 컨디션을 보고 있어요.")
+        }
+
     Column(
         modifier =
             Modifier
@@ -139,13 +159,29 @@ fun KikiAlarmDetailScreen(
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.md))
 
-            SpeechBubble(
-                lines =
-                    notification?.message?.split("\n")
-                        ?: listOf("키키가 오늘 컨디션을 보고 있어요."),
-            )
+            SpeechBubble(lines = speechLines)
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+
+            if (isPostMeal && selectedOption == null) {
+                PostMealOptionButtons(
+                    onOkay = {
+                        android.util.Log.d("KikiAlarm", "onOkay clicked")
+                        selectedOption = "OKAY"
+                        onMealReply("알겠어요.")
+                    },
+                    onBusy = {
+                        android.util.Log.d("KikiAlarm", "onBusy clicked")
+                        selectedOption = "BUSY"
+                        onMealReply("지금 회의 중이에요.")
+                    },
+                    onDecline = {
+                        android.util.Log.d("KikiAlarm", "onDecline clicked")
+                        selectedOption = "DECLINE"
+                    },
+                )
+                Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+            }
 
             if (notification?.displayTrace != null) {
                 ExpandableInfoCard(
@@ -310,6 +346,47 @@ private fun ExpandableInfoCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PostMealOptionButtons(
+    onOkay: () -> Unit,
+    onBusy: () -> Unit,
+    onDecline: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.sm),
+    ) {
+        PostMealButton(text = "알겠어요", onClick = onOkay, modifier = Modifier.weight(1f))
+        PostMealButton(text = "회의 중", onClick = onBusy, modifier = Modifier.weight(1f))
+        PostMealButton(text = "괜찮아요", onClick = onDecline, modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun PostMealButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
+                .clip(RoundedCornerShape(GlucoachCorner.card))
+                .background(GlucoachColors.PrimaryDark)
+                .clickable(onClick = onClick)
+                .padding(vertical = 14.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            color = Color.White,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 

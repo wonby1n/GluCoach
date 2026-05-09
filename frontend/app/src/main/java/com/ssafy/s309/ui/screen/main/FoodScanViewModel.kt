@@ -183,4 +183,8 @@ class FoodScanViewModel
         fun resetError() {
             _state.value = FoodScanState.Idle
         }
+
+        fun reset() {
+            _state.value = FoodScanState.Idle
+        }
     }
