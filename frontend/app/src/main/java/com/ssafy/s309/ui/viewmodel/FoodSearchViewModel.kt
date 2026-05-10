@@ -34,6 +34,7 @@ class FoodSearchViewModel
         private var searchJob: Job? = null
 
         fun onQueryChanged(newQuery: String) {
+            if (_query.value == newQuery) return
             _query.value = newQuery
             _error.value = null
 
