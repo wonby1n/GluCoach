@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -73,6 +74,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -522,12 +524,18 @@ private fun SelectedFoodSlot(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f, fill = false),
+            ) {
                 Text(
                     text = food.name,
                     color = GlucoachColors.TextPrimary,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
                 Spacer(modifier = Modifier.width(GlucoachSpacing.xs))
                 Icon(
@@ -540,6 +548,7 @@ private fun SelectedFoodSlot(
                             .clickable(onClick = onInfoClick),
                 )
             }
+            Spacer(modifier = Modifier.width(GlucoachSpacing.xs))
             Icon(
                 imageVector = Icons.Filled.Close,
                 contentDescription = "음식 삭제",
@@ -585,6 +594,7 @@ private fun SelectedFoodSlot(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .height(IntrinsicSize.Min)
                     .clip(RoundedCornerShape(8.dp))
                     .border(1.dp, GlucoachColors.Border, RoundedCornerShape(8.dp)),
         ) {
@@ -1309,12 +1319,18 @@ private fun FoodCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f, fill = false),
+            ) {
                 Text(
                     text = food.name,
                     color = GlucoachColors.TextPrimary,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
                 Spacer(modifier = Modifier.width(GlucoachSpacing.xs))
                 Icon(
@@ -1327,6 +1343,7 @@ private fun FoodCard(
                             .clickable(onClick = onInfoClick),
                 )
             }
+            Spacer(modifier = Modifier.width(GlucoachSpacing.xs))
             Icon(
                 imageVector = Icons.Filled.Close,
                 contentDescription = "음식 삭제",
@@ -1357,6 +1374,7 @@ private fun FoodCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .height(IntrinsicSize.Min)
                     .clip(RoundedCornerShape(8.dp))
                     .border(1.dp, GlucoachColors.Border, RoundedCornerShape(8.dp)),
         ) {
@@ -1776,7 +1794,6 @@ private fun FoodNutritionDetailDialog(
             Spacer(modifier = Modifier.height(GlucoachSpacing.md))
             HorizontalDivider(color = GlucoachColors.Border)
 
-            NutritionRow("혈당지수(GI)", "${food.gi}g")
             NutritionRow("탄수화물", "${food.carbs}g")
             NutritionRow("단백질", "${food.protein}g")
             NutritionRow("지방", "${food.fat}g")
