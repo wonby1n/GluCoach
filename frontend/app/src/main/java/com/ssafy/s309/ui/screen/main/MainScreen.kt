@@ -24,12 +24,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Description
@@ -59,6 +61,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -67,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ssafy.s309.R
 import com.ssafy.s309.ui.component.BottomNavBar
 import com.ssafy.s309.ui.component.BottomNavItem
 import com.ssafy.s309.ui.component.CurrentGlucoseCard
@@ -249,6 +254,10 @@ fun MainScreenContent(
                             ) {
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
                                 TodayConditionHeader(
+                                    onAddClick = {
+                                        showCameraPanel = true
+                                        isAbMode = false
+                                    },
                                     onBellClick = onBellClick,
                                     hasUnread = state.notifications.any { it.isUnread },
                                     bellIcon = bellIcon,
@@ -445,23 +454,44 @@ fun MainScreenContent(
 
 @Composable
 private fun TodayConditionHeader(
+    onAddClick: () -> Unit,
     onBellClick: () -> Unit,
     hasUnread: Boolean,
     bellIcon: (@Composable () -> Unit)? = null,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(
-            text = "오늘의 컨디션",
-            color = GlucoachColors.TextPrimary,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-        )
+    Box(modifier = Modifier.fillMaxWidth()) {
         Box(
-            modifier = Modifier.size(32.dp).clickable(onClick = onBellClick),
+            modifier =
+                Modifier
+                    .size(32.dp)
+                    .align(Alignment.CenterStart)
+                    .clickable(onClick = onAddClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Add,
+                contentDescription = "음식 촬영",
+                tint = GlucoachColors.TextPrimary,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+
+        androidx.compose.foundation.Image(
+            painter = painterResource(id = R.drawable.glucoach_logo),
+            contentDescription = "Glucoach",
+            modifier =
+                Modifier
+                    .height(24.dp)
+                    .align(Alignment.Center),
+            contentScale = ContentScale.Fit,
+        )
+
+        Box(
+            modifier =
+                Modifier
+                    .size(32.dp)
+                    .align(Alignment.CenterEnd)
+                    .clickable(onClick = onBellClick),
             contentAlignment = Alignment.Center,
         ) {
             if (bellIcon != null) {
@@ -712,17 +742,35 @@ private fun InstagramCameraPanel(
         if (!isAbMode) capturedFile = null
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(GlucoachColors.Background)) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(GlucoachColors.Background)
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                    onClick = {},
+                ),
+    ) {
         when {
             isAbMode -> {
-                Box(modifier = Modifier.fillMaxSize().background(GlucoachColors.Background).padding(bottom = 72.dp)) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(GlucoachColors.Background)
+                            .statusBarsPadding()
+                            .padding(bottom = 72.dp),
+                ) {
                     FoodComparisonContent(onMealSaved = onMealSaved)
                 }
                 Box(
                     modifier =
                         Modifier
                             .align(Alignment.TopStart)
-                            .padding(top = 52.dp, start = 16.dp)
+                            .statusBarsPadding()
+                            .padding(start = 16.dp, top = 8.dp)
                             .size(36.dp)
                             .clip(CircleShape)
                             .background(GlucoachColors.Border)
