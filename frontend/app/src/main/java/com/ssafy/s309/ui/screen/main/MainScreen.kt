@@ -165,6 +165,7 @@ fun MainScreenContent(
     onTabHandled: () -> Unit = {},
 ) {
     var selectedTab by rememberSaveable { mutableStateOf("home") }
+    var mealLogTargetDate by remember { mutableStateOf<String?>(null) }
     var showReportSheet by remember { mutableStateOf(false) }
     var showCameraPanel by remember { mutableStateOf(false) }
     var isAbMode by remember { mutableStateOf(false) }
@@ -240,9 +241,16 @@ fun MainScreenContent(
                             MealLogContent(
                                 onBackToHome = { selectedTab = "home" },
                                 onNavigateToFoodReport = { selectedTab = "food-report" },
+                                initialDate = mealLogTargetDate.also { mealLogTargetDate = null },
                             )
                         "report" -> AIReportContent()
-                        "food-report" -> FoodReportContent()
+                        "food-report" ->
+                            FoodReportContent(
+                                onNavigateToMealLog = { date, _ ->
+                                    mealLogTargetDate = date
+                                    selectedTab = "meallog"
+                                },
+                            )
 
                         else ->
                             Column(

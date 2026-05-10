@@ -303,6 +303,7 @@ class MealLogViewModel
 fun MealLogContent(
     onBackToHome: () -> Unit = {},
     onNavigateToFoodReport: () -> Unit = {},
+    initialDate: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val mealLogViewModel: MealLogViewModel = hiltViewModel()
@@ -321,6 +322,7 @@ fun MealLogContent(
             foodSearchViewModel = foodSearchViewModel,
             onMealClick = { selectedMeal = it },
             onBack = onBackToHome,
+            initialDate = initialDate,
         )
 
         AnimatedVisibility(
@@ -364,8 +366,16 @@ private fun MealLogCalendarContent(
     foodSearchViewModel: FoodSearchViewModel,
     onMealClick: (MealRecord) -> Unit,
     onBack: () -> Unit,
+    initialDate: String? = null,
     modifier: Modifier = Modifier,
 ) {
+    val parsedInit =
+        remember(initialDate) {
+            initialDate?.let {
+                runCatching { java.time.LocalDate.parse(it) }.getOrNull()
+            }
+        }
+
     val today =
         remember {
             val cal = Calendar.getInstance()
@@ -376,11 +386,11 @@ private fun MealLogCalendarContent(
             )
         }
 
-    var displayYear by remember { mutableIntStateOf(today.first) }
-    var displayMonth by remember { mutableIntStateOf(today.second) }
-    var selectedYear by remember { mutableIntStateOf(today.first) }
-    var selectedMonth by remember { mutableIntStateOf(today.second) }
-    var selectedDay by remember { mutableIntStateOf(today.third) }
+    var displayYear by remember { mutableIntStateOf(parsedInit?.year ?: today.first) }
+    var displayMonth by remember { mutableIntStateOf(parsedInit?.monthValue ?: today.second) }
+    var selectedYear by remember { mutableIntStateOf(parsedInit?.year ?: today.first) }
+    var selectedMonth by remember { mutableIntStateOf(parsedInit?.monthValue ?: today.second) }
+    var selectedDay by remember { mutableIntStateOf(parsedInit?.dayOfMonth ?: today.third) }
     var showSearchDialog by remember { mutableStateOf(false) }
     var showMemoDialog by remember { mutableStateOf(false) }
     var pendingFood by remember { mutableStateOf<FoodSearchItem?>(null) }
