@@ -167,6 +167,58 @@ class KikiChatViewModel
             }
         }
 
+        /** FCM data.chatMessageId 수신 시 호출 — 인디케이터 OFF + page=0 재조회 */
+        fun onFcmReceived() {
+            timeoutJob?.cancel()
+            _isWaitingForAgent.value = false
+            viewModelScope.launch {
+                runCatching { healthRepository.getChatMessagesPage(page = 0) }
+                    .onSuccess { response ->
+                        val existingCreatedAts =
+                            _messages.value
+                                .filterNot { it is ChatMessage.DateSeparator }
+                                .map { msg ->
+                                    when (msg) {
+                                        is ChatMessage.KikiMessage -> msg.item.createdAt
+                                        is ChatMessage.UserMessage -> msg.createdAt
+                                        else -> ""
+                                    }
+                                }.toSet()
+                        val newMessages =
+                            response.content
+                                .sortedByDescending { it.id }
+                                .filter { it.createdAt !in existingCreatedAts }
+                                .map { m ->
+                                    if (m.sender == "user") {
+                                        ChatMessage.UserMessage(
+                                            text = m.message ?: "",
+                                            timestamp = parseIsoTimestamp(m.createdAt),
+                                            createdAt = m.createdAt,
+                                        )
+                                    } else {
+                                        ChatMessage.KikiMessage(
+                                            NotificationItem(
+                                                id = m.id,
+                                                title = "키키",
+                                                message = m.message ?: "",
+                                                timeAgoText = healthRepository.formatTimeAgo(m.createdAt),
+                                                isUnread = !m.isRead,
+                                                alertType = m.messageType ?: "",
+                                                createdAt = m.createdAt,
+                                                displayTrace = m.displayTrace,
+                                            ),
+                                        )
+                                    }
+                                }
+                        if (newMessages.isNotEmpty()) {
+                            val raw = _messages.value.filterNot { it is ChatMessage.DateSeparator }
+                            _messages.value = withDateSeparators(newMessages + raw)
+                        }
+                    }
+                    .onFailure { Log.w(TAG, "FCM 후 메시지 재조회 실패", it) }
+            }
+        }
+
         fun sendFoodRecommendCommand() {
             if (_isWaitingForAgent.value) return
             viewModelScope.launch {
