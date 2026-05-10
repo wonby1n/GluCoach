@@ -49,7 +49,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -315,7 +314,6 @@ private fun FoodSelectionContent(
     var showSearchDialog by remember { mutableStateOf(false) }
     var showNutritionDialog by remember { mutableStateOf(false) }
     var nutritionFood by remember { mutableStateOf<FoodItem?>(null) }
-    val recentKeywords = remember { mutableStateListOf("연어(조리전)", "연어구이", "연어회", "훈제연어") }
     val bothSelected = foodA != null && foodB != null
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -455,7 +453,6 @@ private fun FoodSelectionContent(
         if (showSearchDialog) {
             FoodSearchDialog(
                 foodSearchViewModel = foodSearchViewModel,
-                recentKeywords = recentKeywords,
                 onFoodSelected = { food ->
                     onFoodSelected(food.toFoodItem())
                     showSearchDialog = false
@@ -719,7 +716,6 @@ private fun EmptyChartPlaceholder() {
 @Composable
 internal fun FoodSearchDialog(
     foodSearchViewModel: FoodSearchViewModel,
-    recentKeywords: MutableList<String>,
     onFoodSelected: (FoodSearchItem) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -731,6 +727,7 @@ internal fun FoodSearchDialog(
     val searchResults by foodSearchViewModel.results.collectAsState()
     val isSearchLoading by foodSearchViewModel.isLoading.collectAsState()
     val searchError by foodSearchViewModel.error.collectAsState()
+    val recentKeywords by foodSearchViewModel.recentKeywords.collectAsState()
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -920,9 +917,7 @@ internal fun FoodSearchDialog(
                                             .fillMaxWidth()
                                             .padding(vertical = GlucoachSpacing.md)
                                             .clickable {
-                                                if (!recentKeywords.contains(item.name)) {
-                                                    recentKeywords.add(0, item.name)
-                                                }
+                                                foodSearchViewModel.addRecentKeyword(item.name)
                                                 onFoodSelected(item)
                                             },
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -996,7 +991,7 @@ internal fun FoodSearchDialog(
                                         fontSize = 15.sp,
                                     )
                                     IconButton(
-                                        onClick = { recentKeywords.remove(keyword) },
+                                        onClick = { foodSearchViewModel.removeRecentKeyword(keyword) },
                                         modifier = Modifier.size(24.dp),
                                     ) {
                                         Icon(

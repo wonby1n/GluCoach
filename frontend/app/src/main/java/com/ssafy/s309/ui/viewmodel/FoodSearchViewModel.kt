@@ -2,6 +2,8 @@ package com.ssafy.s309.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ssafy.s309.data.local.RecentSearchManager
+import com.ssafy.s309.data.local.TokenManager
 import com.ssafy.s309.data.model.FoodSearchItem
 import com.ssafy.s309.data.repository.FoodRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,6 +20,8 @@ class FoodSearchViewModel
     @Inject
     constructor(
         private val foodRepository: FoodRepository,
+        private val recentSearchManager: RecentSearchManager,
+        private val tokenManager: TokenManager,
     ) : ViewModel() {
         private val _query = MutableStateFlow("")
         val query: StateFlow<String> = _query.asStateFlow()
@@ -31,7 +35,31 @@ class FoodSearchViewModel
         private val _error = MutableStateFlow<String?>(null)
         val error: StateFlow<String?> = _error.asStateFlow()
 
+        private val _recentKeywords = MutableStateFlow<List<String>>(emptyList())
+        val recentKeywords: StateFlow<List<String>> = _recentKeywords.asStateFlow()
+
         private var searchJob: Job? = null
+
+        init {
+            loadRecentKeywords()
+        }
+
+        private fun loadRecentKeywords() {
+            val userId = tokenManager.getUserId() ?: return
+            _recentKeywords.value = recentSearchManager.getKeywords(userId)
+        }
+
+        fun addRecentKeyword(keyword: String) {
+            val userId = tokenManager.getUserId() ?: return
+            recentSearchManager.addKeyword(userId, keyword)
+            _recentKeywords.value = recentSearchManager.getKeywords(userId)
+        }
+
+        fun removeRecentKeyword(keyword: String) {
+            val userId = tokenManager.getUserId() ?: return
+            recentSearchManager.removeKeyword(userId, keyword)
+            _recentKeywords.value = recentSearchManager.getKeywords(userId)
+        }
 
         fun onQueryChanged(newQuery: String) {
             if (_query.value == newQuery) return
