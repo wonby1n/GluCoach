@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
@@ -71,6 +72,11 @@ public class ChatMessageController {
       @Valid @RequestBody ChatReplyRequest req) {
     ChatMessage saved =
         chatMessageService.replyByOption(principal.userId(), req.parentId(), req.optionId());
+    aiAgentCommandClient.dispatchAsync(
+        principal.userId(),
+        saved.getId(),
+        "user_response",
+        Map.of("user_reply", saved.getMessage(), "parent_id", req.parentId()));
     return ResponseEntity.status(HttpStatus.CREATED).body(ChatMessageItem.from(saved));
   }
 

@@ -11,6 +11,7 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 from app.agent.food_recommend_agent_run import run_food_recommend_agent
+from app.agent.postmeal_agent_run import run_postmeal_agent
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +50,38 @@ async def dispatch_command(req: AgentCommandRequest) -> AgentCommandResponse:
             )
         except Exception as e:
             log.exception("food recommend agent failed")
+            return AgentCommandResponse(
+                status="error",
+                command_type=req.command_type,
+                error=f"agent_execution_failed: {type(e).__name__}",
+            )
+
+        status = "fallback" if result.get("error") == "llm_call_failed" else (
+            "error" if result.get("error") else "success"
+        )
+        return AgentCommandResponse(
+            status=status,
+            command_type=req.command_type,
+            message=result.get("message"),
+            turns=result.get("turns"),
+            error=result.get("error"),
+        )
+
+    if req.command_type == "user_response":
+        trigger = {
+            "reason": "user_response",
+            "meal_time": "",
+            "user_reply": req.payload.get("user_reply", ""),
+        }
+        try:
+            result = await run_in_threadpool(
+                run_postmeal_agent,
+                trigger,
+                user_id=req.user_id,
+                alert_type="AGENT_MEAL_REPLY",
+            )
+        except Exception as e:
+            log.exception("postmeal user_response agent failed")
             return AgentCommandResponse(
                 status="error",
                 command_type=req.command_type,
