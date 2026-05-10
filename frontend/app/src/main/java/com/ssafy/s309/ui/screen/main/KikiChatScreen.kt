@@ -24,13 +24,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBackIosNew
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,22 +54,22 @@ import com.ssafy.s309.data.repository.HealthRepository
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+
+// ── 모델 ─────────────────────────────────────────────────────────────
 
 sealed class ChatMessage {
     data class KikiMessage(val item: NotificationItem) : ChatMessage()
@@ -74,21 +77,13 @@ sealed class ChatMessage {
     data class UserMessage(
         val text: String,
         val timestamp: Long = System.currentTimeMillis(),
+        val createdAt: String = "",
     ) : ChatMessage()
+
+    data class DateSeparator(val label: String) : ChatMessage()
 }
 
-private data class StatusOption(val label: String, val replyText: String)
-
-private val STATUS_OPTIONS =
-    listOf(
-        StatusOption("알겠어요", "알겠어요."),
-        StatusOption("회의 중이에요", "지금 회의 중이에요."),
-        StatusOption("괜찮아요", "괜찮아요."),
-    )
-
-private const val FONT_SIZE_DEFAULT = 14f
-private const val FONT_SIZE_MIN = 11f
-private const val FONT_SIZE_MAX = 20f
+// ── ViewModel ────────────────────────────────────────────────────────
 
 @HiltViewModel
 class KikiChatViewModel
@@ -100,21 +95,68 @@ class KikiChatViewModel
         private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
         val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
 
+        private val _isLoadingMore = MutableStateFlow(false)
+        val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+
+        private val _hasMore = MutableStateFlow(true)
+        val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
+
         private val _fontSize = MutableStateFlow(FONT_SIZE_DEFAULT)
         val fontSize: StateFlow<Float> = _fontSize.asStateFlow()
 
-        private val httpClient =
-            OkHttpClient.Builder()
-                .callTimeout(8, TimeUnit.SECONDS)
-                .build()
+        private var currentPage = -1
 
         init {
-            viewModelScope.launch {
-                _messages.value = healthRepository.getNotifications().map { ChatMessage.KikiMessage(it) }
-            }
+            loadNextPage()
+            // 실시간 혈당 알림 스트림
             viewModelScope.launch {
                 healthRepository.glucoseAlertStream.collect { alert ->
-                    _messages.update { listOf(ChatMessage.KikiMessage(alert)) + it }
+                    val raw = _messages.value.filterNot { it is ChatMessage.DateSeparator }
+                    _messages.value = withDateSeparators(listOf(ChatMessage.KikiMessage(alert)) + raw)
+                }
+            }
+        }
+
+        fun loadNextPage() {
+            if (_isLoadingMore.value || !_hasMore.value) return
+            val nextPage = currentPage + 1
+            viewModelScope.launch {
+                _isLoadingMore.value = true
+                try {
+                    val response = healthRepository.getChatMessagesPage(nextPage)
+                    val newMessages: List<ChatMessage> =
+                        response.content
+                            .sortedByDescending { it.id }
+                            .map { m ->
+                                if (m.sender == "user") {
+                                    ChatMessage.UserMessage(
+                                        text = m.message ?: "",
+                                        timestamp = parseIsoTimestamp(m.createdAt),
+                                        createdAt = m.createdAt,
+                                    )
+                                } else {
+                                    ChatMessage.KikiMessage(
+                                        NotificationItem(
+                                            id = m.id,
+                                            title = "키키",
+                                            message = m.message ?: "",
+                                            timeAgoText = healthRepository.formatTimeAgo(m.createdAt),
+                                            isUnread = !m.isRead,
+                                            alertType = m.messageType ?: "",
+                                            createdAt = m.createdAt,
+                                            displayTrace = m.displayTrace,
+                                        ),
+                                    )
+                                }
+                            }
+                    _hasMore.value = (nextPage.toLong() + 1) * PAGE_SIZE < response.total
+                    val existing = _messages.value.filterNot { it is ChatMessage.DateSeparator }
+                    _messages.value = withDateSeparators(existing + newMessages)
+                    currentPage = nextPage
+                } catch (e: Exception) {
+                    Log.w(TAG, "page=$nextPage 로드 실패", e)
+                } finally {
+                    _isLoadingMore.value = false
                 }
             }
         }
@@ -123,57 +165,179 @@ class KikiChatViewModel
 
         fun decreaseFontSize() = _fontSize.update { (it - 1f).coerceAtLeast(FONT_SIZE_MIN) }
 
+        /**
+         * replyText: AI 서버에 보낼 텍스트 (null 이면 서버 호출 생략 — "괜찮아요" 케이스)
+         * displayLabel: 말풍선에 표시할 텍스트
+         */
         fun sendUserReply(
-            label: String,
-            replyText: String,
+            replyText: String?,
+            displayLabel: String,
         ) {
-            _messages.update { listOf(ChatMessage.UserMessage(label)) + it }
-            val userId = tokenManager.getUserId() ?: return
-            viewModelScope.launch(Dispatchers.IO) {
-                try {
-                    val json =
-                        JSONObject().apply {
-                            put("user_id", userId)
-                            put(
-                                "trigger",
-                                JSONObject().apply {
-                                    put("reason", "user_response")
-                                    put("meal_time", "")
-                                    put("user_reply", replyText)
-                                },
-                            )
-                        }.toString()
-                    val request =
-                        Request.Builder()
-                            .url("$AI_BASE_URL/agent/post-meal")
-                            .post(json.toRequestBody("application/json".toMediaType()))
-                            .build()
-                    httpClient.newCall(request).execute().close()
-                } catch (e: Exception) {
-                    Log.w(TAG, "reply send failed", e)
+            val now = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+            val userMsg =
+                ChatMessage.UserMessage(
+                    text = displayLabel,
+                    timestamp = System.currentTimeMillis(),
+                    createdAt = now,
+                )
+            val raw = _messages.value.filterNot { it is ChatMessage.DateSeparator }
+            _messages.value = withDateSeparators(listOf(userMsg) + raw)
+
+            if (replyText != null) {
+                val userId = tokenManager.getUserId() ?: return
+                viewModelScope.launch {
+                    healthRepository.sendPostMealReply(userId, replyText)
                 }
             }
         }
 
         companion object {
-            private const val AI_BASE_URL = "https://k14s309.p.ssafy.io/ai"
             private const val TAG = "KikiChatVM"
+            const val PAGE_SIZE = 20L
+            private const val FONT_SIZE_DEFAULT = 14f
+            private const val FONT_SIZE_MIN = 11f
+            private const val FONT_SIZE_MAX = 20f
         }
     }
+
+// ── 날짜 헬퍼 ────────────────────────────────────────────────────────
+
+private fun parseIsoTimestamp(iso: String): Long =
+    try {
+        try {
+            OffsetDateTime.parse(iso).toInstant().toEpochMilli()
+        } catch (e: Exception) {
+            LocalDateTime.parse(iso).atZone(ZoneId.of("UTC")).toInstant().toEpochMilli()
+        }
+    } catch (e: Exception) {
+        System.currentTimeMillis()
+    }
+
+private fun getMessageDate(msg: ChatMessage): LocalDate? =
+    when (msg) {
+        is ChatMessage.KikiMessage -> {
+            val iso = msg.item.createdAt
+            if (iso.isBlank()) {
+                null
+            } else {
+                try {
+                    try {
+                        OffsetDateTime.parse(iso).toLocalDate()
+                    } catch (e: Exception) {
+                        LocalDateTime.parse(iso).toLocalDate()
+                    }
+                } catch (e: Exception) {
+                    null
+                }
+            }
+        }
+        is ChatMessage.UserMessage -> {
+            if (msg.createdAt.isNotBlank()) {
+                try {
+                    try {
+                        OffsetDateTime.parse(msg.createdAt).toLocalDate()
+                    } catch (
+                        e: Exception,
+                    ) {
+                        LocalDateTime.parse(msg.createdAt).toLocalDate()
+                    }
+                } catch (e: Exception) {
+                    LocalDate.ofEpochDay(msg.timestamp / 86_400_000L)
+                }
+            } else {
+                LocalDate.ofEpochDay(msg.timestamp / 86_400_000L)
+            }
+        }
+        is ChatMessage.DateSeparator -> null
+    }
+
+private fun formatDateLabel(date: LocalDate): String {
+    val today = LocalDate.now()
+    return when (date) {
+        today -> "오늘"
+        today.minusDays(1) -> "어제"
+        else -> "${date.monthValue}월 ${date.dayOfMonth}일"
+    }
+}
+
+/**
+ * 순수 메시지 목록(DateSeparator 미포함, 최신순)을 받아
+ * 날짜가 바뀌는 경계마다 DateSeparator 를 삽입해 반환.
+ */
+private fun withDateSeparators(messages: List<ChatMessage>): List<ChatMessage> {
+    if (messages.isEmpty()) return messages
+    val result = mutableListOf<ChatMessage>()
+    for (i in messages.indices) {
+        result.add(messages[i])
+        val cur = getMessageDate(messages[i])
+        val next = if (i + 1 < messages.size) getMessageDate(messages[i + 1]) else null
+        if (cur != null && next != null && cur != next) {
+            result.add(ChatMessage.DateSeparator(formatDateLabel(next)))
+        }
+    }
+    return result
+}
+
+private fun formatTimestamp(timestamp: Long): String = SimpleDateFormat("HH:mm", Locale.KOREA).format(Date(timestamp))
+
+// ── Screen ───────────────────────────────────────────────────────────
 
 @Composable
 fun KikiChatScreen(
     onBack: () -> Unit,
-    onItemClick: (com.ssafy.s309.data.model.NotificationItem) -> Unit = {},
+    onItemClick: (NotificationItem) -> Unit = {},
+    onReplySent: () -> Unit = {},
     viewModel: KikiChatViewModel = hiltViewModel(),
 ) {
     val messages by viewModel.messages.collectAsStateWithLifecycle()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
+    val hasMore by viewModel.hasMore.collectAsStateWithLifecycle()
     val fontSize by viewModel.fontSize.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
+    // 새 메시지 도착 시 맨 아래로 스크롤 (reverseLayout=true 기준 index 0)
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(0)
     }
+
+    // 스크롤 끝(시각적 상단 = 오래된 메시지) 감지 → 다음 페이지 로드
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val total = info.totalItemsCount
+            if (total == 0) return@derivedStateOf false
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: return@derivedStateOf false
+            lastVisible >= total - 3
+        }
+    }
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore) viewModel.loadNextPage()
+    }
+
+    // 응답 버튼을 표시할 AGENT_MEAL_FOLLOWUP 메시지 ID 계산
+    val (targetMealId, showReplyButtons) =
+        remember(messages) {
+            val pure = messages.filterNot { it is ChatMessage.DateSeparator }
+            val idx =
+                pure.indexOfFirst {
+                    it is ChatMessage.KikiMessage && it.item.alertType.startsWith("AGENT_MEAL_FOLLOWUP")
+                }
+            if (idx < 0) return@remember Pair(-1L, false)
+            // 더 최신 메시지(인덱스 < idx) 중 UserMessage 또는 에이전트 후속 메시지가 있으면 이미 처리됨
+            val alreadyReplied =
+                pure.take(idx).any { msg ->
+                    msg is ChatMessage.UserMessage ||
+                        (
+                            msg is ChatMessage.KikiMessage &&
+                                (
+                                    msg.item.alertType.startsWith("AGENT_MEAL_REPLY") ||
+                                        msg.item.alertType.startsWith("AGENT_MEAL_RETRY")
+                                )
+                        )
+                }
+            val id = (pure[idx] as ChatMessage.KikiMessage).item.id
+            Pair(id, !alreadyReplied)
+        }
 
     Column(
         modifier =
@@ -189,7 +353,7 @@ fun KikiChatScreen(
         )
         HorizontalDivider(color = GlucoachColors.Border)
 
-        if (messages.isEmpty()) {
+        if (messages.isEmpty() && !isLoadingMore) {
             Box(
                 modifier =
                     Modifier
@@ -224,25 +388,62 @@ fun KikiChatScreen(
                 reverseLayout = true,
             ) {
                 item { Spacer(modifier = Modifier.height(GlucoachSpacing.sm)) }
-                items(messages) { message ->
+
+                items(
+                    items = messages,
+                    key = { msg ->
+                        when (msg) {
+                            is ChatMessage.KikiMessage -> "kiki_${msg.item.id}"
+                            is ChatMessage.UserMessage -> "user_${msg.timestamp}"
+                            is ChatMessage.DateSeparator -> "sep_${msg.label}"
+                        }
+                    },
+                ) { message ->
                     when (message) {
                         is ChatMessage.KikiMessage ->
                             KikiChatBubble(
                                 item = message.item,
                                 fontSize = fontSize,
+                                showReplyButtons = showReplyButtons && message.item.id == targetMealId,
+                                onReply = { replyText, displayLabel ->
+                                    viewModel.sendUserReply(replyText, displayLabel)
+                                    if (replyText != null) onReplySent()
+                                },
                                 onClick = { onItemClick(message.item) },
                             )
-                        is ChatMessage.UserMessage -> UserChatBubble(message = message, fontSize = fontSize)
+                        is ChatMessage.UserMessage ->
+                            UserChatBubble(message = message, fontSize = fontSize)
+                        is ChatMessage.DateSeparator ->
+                            DateSeparatorItem(label = message.label)
                     }
                 }
-                item { Spacer(modifier = Modifier.height(GlucoachSpacing.sm)) }
+
+                // 로딩 인디케이터 / 추가 패딩
+                item {
+                    if (isLoadingMore) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = GlucoachSpacing.md),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = GlucoachColors.Primary,
+                                strokeWidth = 2.dp,
+                            )
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+                    }
+                }
             }
         }
-
-        HorizontalDivider(color = GlucoachColors.Border)
-        StatusChipsBar(onChipClick = { label, reply -> viewModel.sendUserReply(label, reply) })
     }
 }
+
+// ── TopBar ───────────────────────────────────────────────────────────
 
 @Composable
 private fun KikiChatTopBar(
@@ -294,6 +495,8 @@ private fun FontSizeControl(
     onIncrease: () -> Unit,
     onDecrease: () -> Unit,
 ) {
+    val minSize = 11f
+    val maxSize = 20f
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier =
@@ -302,22 +505,18 @@ private fun FontSizeControl(
                     .clip(CircleShape)
                     .background(GlucoachColors.PrimaryLight)
                     .border(1.dp, GlucoachColors.Primary.copy(alpha = 0.4f), CircleShape)
-                    .clickable(enabled = fontSize > FONT_SIZE_MIN) { onDecrease() },
+                    .clickable(enabled = fontSize > minSize) { onDecrease() },
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = "−",
-                color = if (fontSize > FONT_SIZE_MIN) GlucoachColors.PrimaryDark else GlucoachColors.TextSecondary,
+                color = if (fontSize > minSize) GlucoachColors.PrimaryDark else GlucoachColors.TextSecondary,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
             )
         }
         Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = "가",
-            color = GlucoachColors.TextSecondary,
-            fontSize = fontSize.sp,
-        )
+        Text(text = "가", color = GlucoachColors.TextSecondary, fontSize = fontSize.sp)
         Spacer(modifier = Modifier.width(6.dp))
         Box(
             modifier =
@@ -326,12 +525,12 @@ private fun FontSizeControl(
                     .clip(CircleShape)
                     .background(GlucoachColors.PrimaryLight)
                     .border(1.dp, GlucoachColors.Primary.copy(alpha = 0.4f), CircleShape)
-                    .clickable(enabled = fontSize < FONT_SIZE_MAX) { onIncrease() },
+                    .clickable(enabled = fontSize < maxSize) { onIncrease() },
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = "+",
-                color = if (fontSize < FONT_SIZE_MAX) GlucoachColors.PrimaryDark else GlucoachColors.TextSecondary,
+                color = if (fontSize < maxSize) GlucoachColors.PrimaryDark else GlucoachColors.TextSecondary,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
             )
@@ -339,41 +538,14 @@ private fun FontSizeControl(
     }
 }
 
-@Composable
-private fun StatusChipsBar(onChipClick: (label: String, replyText: String) -> Unit) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(GlucoachColors.Surface)
-                .padding(horizontal = GlucoachSpacing.lg, vertical = GlucoachSpacing.sm),
-        horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.sm, Alignment.CenterHorizontally),
-    ) {
-        STATUS_OPTIONS.forEach { option ->
-            Box(
-                modifier =
-                    Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(GlucoachColors.PrimaryLight)
-                        .border(1.dp, GlucoachColors.Primary.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
-                        .clickable { onChipClick(option.label, option.replyText) }
-                        .padding(horizontal = GlucoachSpacing.md, vertical = 6.dp),
-            ) {
-                Text(
-                    text = option.label,
-                    color = GlucoachColors.PrimaryDark,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
-        }
-    }
-}
+// ── 말풍선 ────────────────────────────────────────────────────────────
 
 @Composable
 private fun KikiChatBubble(
     item: NotificationItem,
     fontSize: Float,
+    showReplyButtons: Boolean = false,
+    onReply: (replyText: String?, displayLabel: String) -> Unit = { _, _ -> },
     onClick: () -> Unit = {},
 ) {
     Row(
@@ -414,7 +586,57 @@ private fun KikiChatBubble(
                     modifier = Modifier.padding(bottom = 2.dp),
                 )
             }
+            // AGENT_MEAL_FOLLOWUP 응답 버튼 (최신 미응답 메시지에만 표시)
+            if (showReplyButtons) {
+                Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+                ChatReplyButtons(onReply = onReply)
+            }
         }
+    }
+}
+
+@Composable
+private fun ChatReplyButtons(onReply: (replyText: String?, displayLabel: String) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.sm)) {
+        ChatReplyButton(
+            text = "알겠어요",
+            modifier = Modifier.weight(1f),
+            onClick = { onReply("알겠어요.", "알겠어요") },
+        )
+        ChatReplyButton(
+            text = "회의 중",
+            modifier = Modifier.weight(1f),
+            onClick = { onReply("지금 회의 중이에요.", "회의 중") },
+        )
+        ChatReplyButton(
+            text = "괜찮아요",
+            modifier = Modifier.weight(1f),
+            onClick = { onReply(null, "괜찮아요") },
+        )
+    }
+}
+
+@Composable
+private fun ChatReplyButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(GlucoachColors.PrimaryDark)
+                .clickable(onClick = onClick)
+                .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            color = Color.White,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
@@ -455,7 +677,33 @@ private fun UserChatBubble(
     }
 }
 
-private fun formatTimestamp(timestamp: Long): String = SimpleDateFormat("HH:mm", Locale.KOREA).format(Date(timestamp))
+@Composable
+private fun DateSeparatorItem(label: String) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = GlucoachSpacing.sm),
+        contentAlignment = Alignment.Center,
+    ) {
+        HorizontalDivider(color = GlucoachColors.Border)
+        Box(
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(GlucoachColors.Background)
+                    .padding(horizontal = GlucoachSpacing.md, vertical = 4.dp),
+        ) {
+            Text(
+                text = label,
+                color = GlucoachColors.TextSecondary,
+                fontSize = 12.sp,
+            )
+        }
+    }
+}
+
+// ── Avatar ───────────────────────────────────────────────────────────
 
 @Composable
 private fun KikiAvatar(size: Int) {

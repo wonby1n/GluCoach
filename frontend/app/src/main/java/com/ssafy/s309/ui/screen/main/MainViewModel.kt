@@ -1,6 +1,7 @@
 package com.ssafy.s309.ui.screen.main
 
 import android.content.Context
+import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ssafy.s309.data.ble.BleConnectionState
@@ -75,17 +76,26 @@ class MainViewModel
         private fun observeGlucoseAlerts() {
             viewModelScope.launch {
                 healthRepository.glucoseAlertStream.collect { alert ->
-                    // 즉시 반영 + selectedNotification 업데이트 → KikiAlarmDetailScreen 자동 갱신
+                    // 즉시 반영 (팝업 없이 배너에만 쌓이도록 selectedNotification 세팅 안 함)
                     _uiState.update { state ->
                         state.copy(
                             notifications = listOf(alert) + state.notifications,
-                            selectedNotification = alert,
                         )
                     }
                     // BE에서 재조회 → displayTrace + 정확한 alertType(messageType) 획득
                     val refreshed = healthRepository.getNotifications()
-                    val latest = refreshed.firstOrNull()
-                    _uiState.update { it.copy(notifications = refreshed, selectedNotification = latest) }
+                    // 로컬에서 이미 읽음 처리한 알림은 서버 응답으로 덮어쓰지 않음 (race condition 방지)
+                    val locallyReadIds =
+                        _uiState.value.notifications
+                            .filter { !it.isUnread }.map { it.id }.toSet()
+                    _uiState.update {
+                        it.copy(
+                            notifications =
+                                refreshed.map { n ->
+                                    if (n.id in locallyReadIds) n.copy(isUnread = false) else n
+                                },
+                        )
+                    }
                 }
             }
         }
@@ -214,6 +224,7 @@ class MainViewModel
 
         fun markAllNotificationsRead() {
             _uiState.update { it.copy(notifications = it.notifications.map { n -> n.copy(isUnread = false) }) }
+            NotificationManagerCompat.from(context).cancelAll()
             viewModelScope.launch {
                 healthRepository.markAllAlertsRead()
             }

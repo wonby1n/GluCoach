@@ -141,6 +141,25 @@ async def dispatch_trigger(req: TriggerRequest):
                 error=f"agent_execution_failed: {type(e).__name__}",
             )
 
+    elif req.triggerType == "post_meal_followup":
+        followup_trigger = {
+            "reason": "schedule_followup",
+            "meal_time": "",
+            "original_reply": "",
+            "followup_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        }
+        try:
+            result = await run_in_threadpool(
+                run_postmeal_agent, followup_trigger,
+                user_id=str(req.userId), alert_type="AGENT_MEAL_RETRY",
+            )
+        except Exception as e:
+            return AgentResponse(
+                status="error",
+                reasoning_trace=[],
+                error=f"agent_execution_failed: {type(e).__name__}",
+            )
+
     elif req.triggerType == "morning":
         try:
             result = await run_in_threadpool(run_agent, user_id=str(req.userId))
