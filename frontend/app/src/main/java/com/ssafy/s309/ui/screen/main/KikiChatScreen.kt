@@ -54,6 +54,8 @@ import com.ssafy.s309.data.repository.HealthRepository
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -104,6 +106,10 @@ class KikiChatViewModel
         private val _fontSize = MutableStateFlow(FONT_SIZE_DEFAULT)
         val fontSize: StateFlow<Float> = _fontSize.asStateFlow()
 
+        private val _isWaitingForAgent = MutableStateFlow(false)
+        val isWaitingForAgent: StateFlow<Boolean> = _isWaitingForAgent.asStateFlow()
+
+        private var timeoutJob: Job? = null
         private var currentPage = -1
 
         init {
@@ -161,6 +167,23 @@ class KikiChatViewModel
             }
         }
 
+        fun sendFoodRecommendCommand() {
+            if (_isWaitingForAgent.value) return
+            viewModelScope.launch {
+                runCatching { healthRepository.sendFoodRecommendCommand() }
+                    .onSuccess {
+                        _isWaitingForAgent.value = true
+                        timeoutJob?.cancel()
+                        timeoutJob =
+                            viewModelScope.launch {
+                                delay(AGENT_TIMEOUT_MS)
+                                _isWaitingForAgent.value = false
+                            }
+                    }
+                    .onFailure { Log.w(TAG, "음식 추천 명령 발화 실패", it) }
+            }
+        }
+
         fun increaseFontSize() = _fontSize.update { (it + 1f).coerceAtMost(FONT_SIZE_MAX) }
 
         fun decreaseFontSize() = _fontSize.update { (it - 1f).coerceAtLeast(FONT_SIZE_MIN) }
@@ -197,6 +220,7 @@ class KikiChatViewModel
             private const val FONT_SIZE_DEFAULT = 14f
             private const val FONT_SIZE_MIN = 11f
             private const val FONT_SIZE_MAX = 20f
+            private const val AGENT_TIMEOUT_MS = 30_000L
         }
     }
 
