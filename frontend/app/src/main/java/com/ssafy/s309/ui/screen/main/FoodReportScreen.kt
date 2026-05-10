@@ -3,13 +3,16 @@ package com.ssafy.s309.ui.screen.main
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -166,7 +169,20 @@ private fun FoodReportMainContent(
         Spacer(Modifier.height(GlucoachSpacing.xl))
 
         Text(
-            text = "등급별 음식",
+            text = "요약",
+            color = GlucoachColors.TextPrimary,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+        )
+
+        Spacer(Modifier.height(GlucoachSpacing.md))
+
+        GradePieChart(gradeInfoList = gradeInfoList)
+
+        Spacer(Modifier.height(GlucoachSpacing.xl))
+
+        Text(
+            text = "등급 상세",
             color = GlucoachColors.TextPrimary,
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
@@ -292,5 +308,105 @@ private fun GradeListItem(
             color = GlucoachColors.TextSecondary,
             fontSize = 16.sp,
         )
+    }
+}
+
+// ── 파이 차트 (요약) ──────────────────────────────────────────
+
+private val GRADE_ORDER = listOf("S", "A", "B", "C", "D")
+
+@Composable
+private fun GradePieChart(gradeInfoList: List<FoodGradeInfo>) {
+    val entries =
+        GRADE_ORDER.map { grade ->
+            val count = gradeInfoList.firstOrNull { it.grade == grade }?.count ?: 0
+            grade to count
+        }
+    val total = entries.sumOf { it.second }.coerceAtLeast(1)
+
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(GlucoachCorner.card))
+                .background(Color(0xFFF7F9FB))
+                .padding(GlucoachSpacing.lg),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .aspectRatio(1f)
+                    .padding(8.dp),
+        ) {
+            val hasData = entries.any { it.second > 0 }
+
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                if (!hasData) {
+                    drawArc(
+                        color = Color(0xFFE0E0E0),
+                        startAngle = 0f,
+                        sweepAngle = 360f,
+                        useCenter = true,
+                        size = size,
+                    )
+                } else {
+                    var startAngle = -90f
+                    entries.forEach { (grade, count) ->
+                        if (count > 0) {
+                            val sweep = (count.toFloat() / total) * 360f
+                            drawArc(
+                                color = gradeColor(grade),
+                                startAngle = startAngle,
+                                sweepAngle = sweep,
+                                useCenter = true,
+                                size = size,
+                            )
+                            startAngle += sweep
+                        }
+                    }
+                }
+            }
+
+            if (!hasData) {
+                Text(
+                    text = "데이터가 없어요",
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 12.sp,
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            }
+        }
+
+        Spacer(Modifier.width(GlucoachSpacing.lg))
+
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            entries.forEach { (grade, count) ->
+                val pct = if (total > 0) (count * 100) / total else 0
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(gradeColor(grade)),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "${grade}등급",
+                        color = GlucoachColors.TextSecondary,
+                        fontSize = 13.sp,
+                        modifier = Modifier.width(44.dp),
+                    )
+                    Text(
+                        text = "$pct%",
+                        color = if (grade == "D") gradeColor("D") else GlucoachColors.TextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = if (grade == "D") FontWeight.Bold else FontWeight.Normal,
+                    )
+                }
+            }
+        }
     }
 }
