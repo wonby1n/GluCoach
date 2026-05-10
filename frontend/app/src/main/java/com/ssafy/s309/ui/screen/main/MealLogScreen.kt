@@ -49,7 +49,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -401,8 +400,6 @@ private fun MealLogCalendarContent(
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.PickVisualMedia(),
         ) { uri -> if (uri != null) selectedPhotoUri = uri }
-    val recentKeywords = remember { mutableStateListOf<String>() }
-
     val beMeals by mealLogViewModel.beMeals.collectAsState()
     val beDaysWithMeals by mealLogViewModel.beDaysWithMeals.collectAsState()
     val nutritionMap by mealLogViewModel.foodNutritionMap.collectAsState()
@@ -502,7 +499,6 @@ private fun MealLogCalendarContent(
         if (showSearchDialog) {
             FoodSearchDialog(
                 foodSearchViewModel = foodSearchViewModel,
-                recentKeywords = recentKeywords,
                 onFoodSelected = { food ->
                     showSearchDialog = false
                     pendingFood = food
