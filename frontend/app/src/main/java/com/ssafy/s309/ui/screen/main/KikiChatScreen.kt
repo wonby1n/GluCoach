@@ -121,6 +121,12 @@ class KikiChatViewModel
                     _messages.value = withDateSeparators(listOf(ChatMessage.KikiMessage(alert)) + raw)
                 }
             }
+            // FCM 채팅 이벤트 — 인디케이터 OFF + page=0 재조회
+            viewModelScope.launch {
+                healthRepository.chatFcmEvent.collect {
+                    onFcmReceived()
+                }
+            }
         }
 
         fun loadNextPage() {

@@ -11,6 +11,7 @@ import com.google.firebase.messaging.RemoteMessage
 import com.ssafy.s309.MainActivity
 import com.ssafy.s309.R
 import com.ssafy.s309.data.local.TokenManager
+import com.ssafy.s309.data.repository.HealthRepository
 import com.ssafy.s309.data.repository.UserRepository
 import com.ssafy.s309.notification.GlucoseAlertManager
 import com.ssafy.s309.notification.TtsManager
@@ -30,6 +31,8 @@ class FcmService : FirebaseMessagingService() {
     @Inject lateinit var ttsManager: TtsManager
 
     @Inject lateinit var glucoseAlertManager: GlucoseAlertManager
+
+    @Inject lateinit var healthRepository: HealthRepository
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -64,6 +67,11 @@ class FcmService : FirebaseMessagingService() {
         }
         ttsManager.playSound(resIdForAlertType(alertType))
         glucoseAlertManager.emitFcmAlert(title, body, alertType ?: "")
+
+        // 채팅 메시지 FCM — KikiChatViewModel에 재조회 신호 전달
+        if (message.data["chatMessageId"] != null) {
+            healthRepository.emitChatFcmEvent()
+        }
     }
 
     private fun showMealFollowupNotification(
