@@ -183,6 +183,7 @@ class HealthRepository
                             timeAgoText = formatTimeAgo(m.createdAt),
                             isUnread = !m.isRead,
                             alertType = m.messageType ?: "",
+                            createdAt = m.createdAt,
                             displayTrace = m.displayTrace,
                         )
                     }
@@ -239,6 +240,12 @@ class HealthRepository
                 )
             }.onFailure { Log.w(TAG, "식후 응답 전송 실패", it) }
         }
+
+        /** 채팅 메시지 페이지 조회 (사용자 메시지 포함). KikiChatScreen 페이징 전용. */
+        suspend fun getChatMessagesPage(
+            page: Int,
+            size: Int = 20,
+        ) = healthApi.getChatMessages(page = page, size = size)
 
         /** 채팅 메시지 읽음 처리 (백엔드 반영). 실패해도 UI 상태는 유지. */
         suspend fun markAlertRead(alertId: Long) {
@@ -379,7 +386,7 @@ class HealthRepository
                 else -> "키키가 오늘 컨디션을 보고 있어요"
             }
 
-        private fun formatTimeAgo(isoDateTime: String): String =
+        internal fun formatTimeAgo(isoDateTime: String): String =
             try {
                 // OffsetDateTime으로 먼저 시도 ("Z", "+09:00" 등 offset 포함 형식 처리)
                 // 실패 시 timezone 없는 LocalDateTime으로 fallback

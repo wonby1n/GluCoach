@@ -1,17 +1,11 @@
 {
   "agent": "postmeal_reply",
-  "triggered_at": "2026-05-09 03:06:59",
-  "message": "하원님, 움직여주셔서 좋아요! 😊",
+  "triggered_at": "2026-05-10 15:18:49",
+  "message": "하원님, 회의 중이시군요! 30분 뒤에 다시 확인할게요 😊",
   "display_trace": {
     "title": "키키가 확인한 내용",
     "summary": "식사 기록, 식후 혈당 흐름, 활동량을 함께 확인해 활동을 제안했어요.",
     "cards": [
-      {
-        "type": "meal",
-        "title": "식사 기록",
-        "description": "12:00에 김치찌개 + 공기밥을(를) 드셨어요. 탄수화물 75g.",
-        "severity": "info"
-      },
       {
         "type": "glucose",
         "title": "식후 혈당 흐름",
@@ -21,7 +15,7 @@
       {
         "type": "activity",
         "title": "식후 활동량",
-        "description": "식후 걸음수 421보",
+        "description": "식후 걸음수 444보",
         "severity": "good"
       }
     ],
@@ -30,36 +24,25 @@
       "reason": "식후 혈당이 많이 올라서 활동을 제안했어요.",
       "message_rule": "부담 없는 톤으로 활동 1가지를 제안했어요."
     },
-    "notification_message": "하원님, 움직여주셔서 좋아요! 😊"
+    "notification_message": "하원님, 회의 중이시군요! 30분 뒤에 다시 확인할게요 😊"
   },
   "turns": 3,
   "tool_calls": [
     {
-      "name": "get_meals",
+      "name": "get_notification_history",
       "input": {
-        "date": "2026-05-04"
+        "hours": 2
       },
       "result": {
-        "date": "2026-05-04",
-        "meals": [
-          {
-            "meal_id": "meal_002",
-            "type": "lunch",
-            "time": "2026-05-04 12:00",
-            "foods": [
-              "김치찌개",
-              "공기밥"
-            ],
-            "carbs_g": 75,
-            "calories": 580
-          }
-        ]
+        "hours": 2,
+        "today": "2026-05-04",
+        "notifications": []
       }
     },
     {
       "name": "get_glucose",
       "input": {
-        "start_time": "2026-05-04T11:30:00",
+        "start_time": "2026-05-04T12:00:00",
         "end_time": "2026-05-04T14:00:00"
       },
       "result": {
@@ -95,14 +78,20 @@
     {
       "name": "get_steps",
       "input": {
-        "start_time": "2026-05-04T13:00:00",
+        "start_time": "2026-05-04T12:30:00",
         "end_time": "2026-05-04T14:00:00"
       },
       "result": {
-        "start_time": "2026-05-04 13:00",
+        "start_time": "2026-05-04 12:30",
         "end_time": "2026-05-04 14:00",
-        "total_steps": 421,
+        "total_steps": 444,
         "periods": [
+          {
+            "start": "2026-05-04 12:30",
+            "end": "2026-05-04 13:00",
+            "steps": 23,
+            "period_minutes": 30
+          },
           {
             "start": "2026-05-04 13:00",
             "end": "2026-05-04 13:30",
@@ -119,59 +108,82 @@
       }
     },
     {
+      "name": "schedule_followup",
+      "input": {
+        "delay_minutes": 30,
+        "reason": "사용자 회의 중, 회의 종료 후 식후 활동 재확인"
+      },
+      "result": {
+        "status": "scheduled",
+        "delay_minutes": 1,
+        "reason": "사용자 회의 중, 회의 종료 후 식후 활동 재확인"
+      }
+    },
+    {
       "name": "send_notification",
       "input": {
-        "message": "하원님, 움직여주셔서 좋아요! 😊",
+        "message": "하원님, 회의 중이시군요! 30분 뒤에 다시 확인할게요 😊",
         "options": [
           {
-            "id": "thanks",
-            "label": "감사해요"
-          },
-          {
-            "id": "check_later",
-            "label": "나중에 확인"
-          },
-          {
-            "id": "ok",
+            "id": "ack",
             "label": "알겠어요"
+          },
+          {
+            "id": "later_60",
+            "label": "1시간 뒤"
+          },
+          {
+            "id": "skip",
+            "label": "괜찮아요"
           }
         ],
         "display_trace": {
-          "summary": "식후 활동 실천, 혈당 하락 추세 확인",
+          "summary": "식후 90분, 회의 중 응답",
           "cards": [
-            {
-              "type": "steps",
-              "title": "활동량",
-              "description": "최근 30분간 380보 걸으셨어요."
-            },
             {
               "type": "glucose",
               "title": "혈당",
-              "description": "180에서 175로 조금씩 내려오고 있어요."
+              "description": "식후 90분에 180mg/dL에 도달했으나, 현재는 175mg/dL로 하강 추세예요."
+            },
+            {
+              "type": "steps",
+              "title": "활동량",
+              "description": "식후 첫 60분간은 활동량이 적었지만, 최근 30분간 380보 움직이셨어요."
             }
           ],
           "decision": {
-            "reason": "사용자가 수락 후 실제로 활동했고 혈당도 개선 추세이므로 짧은 격려로 마무리합니다."
+            "reason": "회의 중이라고 응답하셨으므로, 상황을 존중하며 30분 후 다시 확인하기로 예약했어요."
           }
         }
       },
       "result": {
         "status": "sent",
-        "message": "하원님, 움직여주셔서 좋아요! 😊",
+        "message": "하원님, 회의 중이시군요! 30분 뒤에 다시 확인할게요 😊",
         "options": [
           {
-            "id": "thanks",
-            "label": "감사해요"
-          },
-          {
-            "id": "check_later",
-            "label": "나중에 확인"
-          },
-          {
-            "id": "ok",
+            "id": "ack",
             "label": "알겠어요"
+          },
+          {
+            "id": "later_60",
+            "label": "1시간 뒤"
+          },
+          {
+            "id": "skip",
+            "label": "괜찮아요"
           }
         ]
+      }
+    },
+    {
+      "name": "trigger_projection",
+      "input": {
+        "command": "SHOW"
+      },
+      "result": {
+        "status": "error",
+        "message": "timed out",
+        "command": "SHOW"
       }
     }
   ]

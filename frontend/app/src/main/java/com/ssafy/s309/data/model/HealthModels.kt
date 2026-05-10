@@ -63,6 +63,7 @@ data class NotificationItem(
     val timeAgoText: String,
     val isUnread: Boolean,
     val alertType: String = "",
+    val createdAt: String = "",
     val displayTrace: DisplayTrace? = null,
 )
 
