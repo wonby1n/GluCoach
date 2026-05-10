@@ -23,12 +23,16 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "BASE_URL", "\"https://k14s309.p.ssafy.io/\"")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            buildConfigField("String", "BASE_URL", "\"https://k14s309.p.ssafy.io/\"")
         }
     }
 
@@ -39,6 +43,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

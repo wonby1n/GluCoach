@@ -59,7 +59,14 @@ class TokenManager
         fun getFcmToken(): String? = prefs.getString(KEY_FCM_TOKEN, null)
 
         fun clearTokens() {
+            // FCM 토큰은 디바이스에 묶인 값이라 로그아웃과 무관하게 보존한다.
+            // 같이 지우면 재로그인 시 서버 PUT 할 토큰이 없고, FcmService.onNewToken 은
+            // 토큰이 바뀔 때만 발화하므로 영영 등록되지 않는 케이스가 발생한다.
+            val fcmToken = prefs.getString(KEY_FCM_TOKEN, null)
             prefs.edit().clear().apply()
+            if (fcmToken != null) {
+                prefs.edit().putString(KEY_FCM_TOKEN, fcmToken).apply()
+            }
         }
 
         private companion object {

@@ -4,6 +4,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.inputmethodservice.InputMethodService
+import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -12,12 +13,17 @@ import android.widget.LinearLayout
 import android.widget.LinearLayout.LayoutParams.MATCH_PARENT
 import android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
 import android.widget.TextView
-import com.ssafy.s309.feature.glucofit.data.FoodDatabase
+import com.ssafy.s309.feature.glucofit.data.KeyboardFoodCache
+import com.ssafy.s309.feature.glucofit.data.KeyboardStateLoader
 import com.ssafy.s309.feature.glucofit.glucose.GlucoseSimulator
+import com.ssafy.s309.feature.glucofit.overlay.KeyboardMessageBuilder
 import com.ssafy.s309.feature.glucofit.overlay.OverlayBannerManager
 
 class GlucoseKeyboard : InputMethodService() {
     private val currentText = StringBuilder()
+
+    /** EditText 실제 내용 스냅샷. send 직전 마지막 비어있지 않은 값으로 갱신. */
+    private var lastEditorText: String = ""
     private lateinit var tvDisplay: TextView
     private lateinit var keyContainer: LinearLayout
     private lateinit var btnLang: TextView
@@ -25,11 +31,26 @@ class GlucoseKeyboard : InputMethodService() {
     private val hangul = HangulComposer()
     private var isKorean = true
 
-    private val foodChips =
+    /** BE 동기화 캐시가 비어 있을 때 폴백. 시연 안전망. */
+    private val fallbackChips =
         listOf(
             "마라탕", "치킨", "라면", "피자", "떡볶이",
             "초밥", "삼겹살", "짜장면", "냉면", "삼계탕",
         )
+
+    /** 칩 표시 시점의 캐시 상태로 동적 결정. 등급 좋은 음식 → fallback. */
+    private fun resolveChips(): List<String> {
+        val graded = KeyboardFoodCache.topGraded(10).map { it.name }
+        return graded.ifEmpty { fallbackChips }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        KeyboardFoodCache.load(applicationContext)
+        // 메인 앱 미진입 상태에서도 IME 단독으로 혈당 시뮬레이터 가동.
+        // 이미 실행 중이면 start() 내부 가드로 no-op.
+        GlucoseSimulator.start(applicationContext)
+    }
 
     private val KO_ROW1 = listOf("ㅂ", "ㅈ", "ㄷ", "ㄱ", "ㅅ", "ㅛ", "ㅕ", "ㅑ", "ㅐ", "ㅔ")
     private val KO_ROW1S = listOf("ㅃ", "ㅉ", "ㄸ", "ㄲ", "ㅆ", "ㅛ", "ㅕ", "ㅑ", "ㅒ", "ㅖ")
@@ -59,7 +80,7 @@ class GlucoseKeyboard : InputMethodService() {
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(6), dp(5), dp(6), dp(5))
             }
-        foodChips.forEach { food ->
+        resolveChips().forEach { food ->
             inner.addView(
                 TextView(this).apply {
                     text = food
@@ -295,12 +316,15 @@ class GlucoseKeyboard : InputMethodService() {
     }
 
     private fun confirm() {
+        Log.d(TAG, "confirm() called — currentText='$currentText' hangul.isEmpty=${hangul.isEmpty()}")
         if (isKorean && !hangul.isEmpty()) {
             val last = hangul.flush()
+            Log.d(TAG, "confirm: flushing hangul='$last'")
             currentInputConnection?.commitText(last, 1)
             currentText.append(last)
         }
         val text = currentText.toString().trim()
+        Log.d(TAG, "confirm: final text='$text' (length=${text.length})")
         if (text.isNotEmpty()) triggerBanner(text)
         currentText.clear()
         hangul.reset()
@@ -343,9 +367,19 @@ class GlucoseKeyboard : InputMethodService() {
     }
 
     private fun triggerBanner(text: String) {
-        val food = FoodDatabase.findFood(text) ?: return
-        val glucose = GlucoseSimulator.glucoseState.value
-        bannerManager.show(food, glucose)
+        Log.d(TAG, "triggerBanner called: text='$text'")
+        val food = KeyboardFoodCache.findExact(text) ?: KeyboardFoodCache.findContained(text)
+        Log.d(TAG, "triggerBanner matched: ${food?.name ?: "NONE"} (grade=${food?.grade ?: "-"})")
+        if (food == null) return
+        val glucose = GlucoseSimulator.glucoseState.value?.toInt()
+        val state = KeyboardStateLoader.read(applicationContext)
+        Log.d(TAG, "triggerBanner glucose=$glucose lastMealAt=${state.lastMealAtMs}")
+        val msg = KeyboardMessageBuilder.build(food, glucose, state.lastMealAtMs)
+        bannerManager.showWithMessage(msg.text, msg.color)
+    }
+
+    companion object {
+        private const val TAG = "GlucoseKeyboard"
     }
 
     private fun refreshDisplay(composing: String = "") {
@@ -358,6 +392,43 @@ class GlucoseKeyboard : InputMethodService() {
         currentText.clear()
         hangul.reset()
         if (::tvDisplay.isInitialized) refreshDisplay()
+    }
+
+    override fun onUpdateSelection(
+        oldSelStart: Int,
+        oldSelEnd: Int,
+        newSelStart: Int,
+        newSelEnd: Int,
+        candidatesStart: Int,
+        candidatesEnd: Int,
+    ) {
+        super.onUpdateSelection(
+            oldSelStart,
+            oldSelEnd,
+            newSelStart,
+            newSelEnd,
+            candidatesStart,
+            candidatesEnd,
+        )
+        val ic = currentInputConnection ?: return
+        // 필드 클리어(=send) 감지: 새 selection이 (0,0)이고 직전엔 내용 있었음.
+        if (newSelStart == 0 && newSelEnd == 0 && oldSelEnd > 0) {
+            val pending = lastEditorText.trim()
+            Log.d(TAG, "onUpdateSelection: send detected, lastEditorText='$pending'")
+            if (pending.length >= 2) triggerBanner(pending)
+            lastEditorText = ""
+            currentText.clear()
+            hangul.reset()
+            if (::tvDisplay.isInitialized) refreshDisplay()
+            return
+        }
+        // 그 외엔 실제 EditText 스냅샷 갱신. send 시점에 사용.
+        val before = ic.getTextBeforeCursor(256, 0)?.toString().orEmpty()
+        val after = ic.getTextAfterCursor(256, 0)?.toString().orEmpty()
+        val snapshot = (before + after).trim()
+        if (snapshot.isNotEmpty()) {
+            lastEditorText = snapshot
+        }
     }
 
     override fun onDestroy() {

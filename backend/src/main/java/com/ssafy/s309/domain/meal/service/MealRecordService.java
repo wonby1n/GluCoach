@@ -21,7 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class MealRecordService {
 
-  private static final int TRIGGER_DELAY_MINUTES = 60;
+  private static final int TRIGGER_DELAY_MINUTES = 1;
 
   private final MealRecordRepository mealRecordRepository;
   private final AgentPendingTriggerRepository triggerRepository;

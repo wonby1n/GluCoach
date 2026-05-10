@@ -1,6 +1,7 @@
 package com.ssafy.s309.di
 
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+import com.ssafy.s309.BuildConfig
 import com.ssafy.s309.data.api.AgentApi
 import com.ssafy.s309.data.api.AuthApi
 import com.ssafy.s309.data.api.FoodApi
@@ -10,6 +11,7 @@ import com.ssafy.s309.data.api.SleepSessionApi
 import com.ssafy.s309.data.api.UserApi
 import com.ssafy.s309.data.api.WeeklyReportApi
 import com.ssafy.s309.data.network.AuthInterceptor
+import com.ssafy.s309.data.network.TokenAuthenticator
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -22,7 +24,7 @@ import retrofit2.Retrofit
 import javax.inject.Named
 import javax.inject.Singleton
 
-private const val BASE_URL = "https://k14s309.p.ssafy.io/"
+private val BASE_URL = BuildConfig.BASE_URL
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -65,9 +67,13 @@ object AppModule {
     @Provides
     @Singleton
     @Named("authenticated")
-    fun provideAuthenticatedOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient =
+    fun provideAuthenticatedOkHttpClient(
+        authInterceptor: AuthInterceptor,
+        tokenAuthenticator: TokenAuthenticator,
+    ): OkHttpClient =
         OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
+            .authenticator(tokenAuthenticator)
             .addInterceptor(
                 HttpLoggingInterceptor().apply {
                     level = HttpLoggingInterceptor.Level.BODY
@@ -121,9 +127,13 @@ object AppModule {
     @Provides
     @Singleton
     @Named("no-redirect")
-    fun provideNoRedirectOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient =
+    fun provideNoRedirectOkHttpClient(
+        authInterceptor: AuthInterceptor,
+        tokenAuthenticator: TokenAuthenticator,
+    ): OkHttpClient =
         OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
+            .authenticator(tokenAuthenticator)
             .addInterceptor(
                 HttpLoggingInterceptor().apply {
                     level = HttpLoggingInterceptor.Level.BODY

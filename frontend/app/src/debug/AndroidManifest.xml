@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- debug 빌드 전용: 로컬 도커 BE(localhost:8080) 평문 통신 허용 -->
+    <application
+        android:usesCleartextTraffic="true"
+        tools:replace="android:usesCleartextTraffic" />
+
+</manifest>

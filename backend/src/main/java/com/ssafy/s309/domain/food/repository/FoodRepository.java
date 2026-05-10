@@ -29,19 +29,20 @@ public interface FoodRepository extends JpaRepository<Food, Integer> {
    * Agent 음식 추천용 — 사용자가 등급(user_food_grades) 또는 최근 식사(meal_records 7일)에 없는 foods 후보. search_count
    * desc 정렬, Pageable로 limit 제어.
    */
-  /** IME 키보드용 — 사용자가 등급을 가진 음식 목록 (이름·카테고리·등급). */
+  /**
+   * IME 키보드용 — 모든 foods + 사용자 등급 LEFT JOIN. 한 번에 다 내려서 IME가 메모리에 보유. 등급 있는 음식 먼저, 그 다음 search_count
+   * desc.
+   *
+   * <p>현재 DB 규모 ~19,600개 → 단일 SELECT 약 50~150ms. 1일 1회 동기화라 부담 없음.
+   */
   @Query(
       """
       SELECT new com.ssafy.s309.domain.food.dto.KeyboardFoodItem(f.name, f.category, ufg.grade)
       FROM Food f
-      JOIN UserFoodGrade ufg ON f.id = ufg.foodId
-      WHERE ufg.userId = :userId
-      ORDER BY ufg.updatedAt DESC
+      LEFT JOIN UserFoodGrade ufg ON ufg.foodId = f.id AND ufg.userId = :userId
+      ORDER BY (CASE WHEN ufg.grade IS NOT NULL THEN 0 ELSE 1 END), f.searchCount DESC, f.id ASC
       """)
-  List<KeyboardFoodItem> findKeyboardGradesByUserId(@Param("userId") Integer userId);
-
-  /** IME 키보드용 — search_count 상위 음식 (등급 없음 fallback). */
-  List<Food> findTop200ByOrderBySearchCountDesc();
+  List<KeyboardFoodItem> findAllKeyboardFoods(@Param("userId") Integer userId);
 
   @Query(
       """

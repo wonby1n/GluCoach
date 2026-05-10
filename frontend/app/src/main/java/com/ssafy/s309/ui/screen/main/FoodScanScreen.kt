@@ -77,6 +77,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.ssafy.s309.R
+import com.ssafy.s309.data.model.GlucosePrediction
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
@@ -133,6 +134,7 @@ fun FoodScanContent(
                     onBack = { showSimulation = false },
                     onRetakePhoto = onRetakePhoto,
                     onRecordMeal = { viewModel.saveMeal(candidate, photoFile, memo, selectedDateTime) },
+                    prediction = s.prediction,
                 )
             } else {
                 BackHandler { onBack() }
@@ -692,6 +694,7 @@ private fun SimulationScreen(
     onBack: () -> Unit,
     onRetakePhoto: () -> Unit,
     onRecordMeal: () -> Unit,
+    prediction: GlucosePrediction? = null,
 ) {
     Column(
         modifier =
@@ -785,6 +788,11 @@ private fun SimulationScreen(
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
             NutritionCard(food = food)
+
+            if (prediction != null) {
+                Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+                GlucosePredictionChart(prediction = prediction)
+            }
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
@@ -1005,15 +1013,13 @@ private fun ErrorScreen(
     }
 }
 
-// ── 글루코스 예측 차트 (레거시, 현재 미사용) ────────────────────
+// ── 글루코스 예측 차트 ────────────────────────────────────────
 
-@Suppress("unused")
 @Composable
-private fun GlucosePredictionChart(
-    baseGlucose: Int,
-    peakGlucose: Int,
-    afterTwoHours: Int,
-) {
+private fun GlucosePredictionChart(prediction: GlucosePrediction) {
+    val curve = prediction.curve
+    if (curve.isEmpty()) return
+
     Column(
         modifier =
             Modifier
@@ -1038,69 +1044,83 @@ private fun GlucosePredictionChart(
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
-                val minVal = 80f
-                val maxVal = 170f
-                val range = maxVal - minVal
+                val minTime = curve.first().minuteOffset.toFloat()
+                val maxTime = curve.last().minuteOffset.toFloat()
+                val timeRange = (maxTime - minTime).coerceAtLeast(1f)
+                val minVal = (curve.minOf { it.glucoseMgdl } - 10f).coerceAtLeast(60f)
+                val maxVal = curve.maxOf { it.glucoseMgdl } + 10f
+                val valRange = (maxVal - minVal).coerceAtLeast(1f)
 
-                fun yFor(v: Float) = h - ((v - minVal) / range) * h
+                fun xFor(minute: Float) = (minute - minTime) / timeRange * w
 
-                val points =
-                    listOf(
-                        0f to baseGlucose.toFloat(),
-                        w * 0.45f to peakGlucose.toFloat(),
-                        w to afterTwoHours.toFloat(),
-                    )
+                fun yFor(v: Float) = h - ((v - minVal) / valRange) * h
 
-                val path =
+                val pts = curve.map { Offset(xFor(it.minuteOffset.toFloat()), yFor(it.glucoseMgdl)) }
+
+                val linePath =
                     Path().apply {
-                        moveTo(points[0].first, yFor(points[0].second))
-                        val cp1x = (points[0].first + points[1].first) / 2f
-                        cubicTo(
-                            cp1x,
-                            yFor(points[0].second),
-                            cp1x,
-                            yFor(points[1].second),
-                            points[1].first,
-                            yFor(points[1].second),
-                        )
-                        val cp2x = (points[1].first + points[2].first) / 2f
-                        cubicTo(
-                            cp2x,
-                            yFor(points[1].second),
-                            cp2x,
-                            yFor(points[2].second),
-                            points[2].first,
-                            yFor(points[2].second),
-                        )
+                        moveTo(pts[0].x, pts[0].y)
+                        for (i in 1 until pts.size) {
+                            val prev = pts[i - 1]
+                            val curr = pts[i]
+                            val cpx = (prev.x + curr.x) / 2f
+                            cubicTo(cpx, prev.y, cpx, curr.y, curr.x, curr.y)
+                        }
+                    }
+
+                val fillPath =
+                    Path().apply {
+                        addPath(linePath)
+                        lineTo(pts.last().x, h)
+                        lineTo(pts.first().x, h)
+                        close()
                     }
                 drawPath(
-                    path = path,
-                    color = GlucoachColors.ChartLineInactive,
+                    path = fillPath,
+                    brush =
+                        Brush.verticalGradient(
+                            colors =
+                                listOf(
+                                    GlucoachColors.Primary.copy(alpha = 0.18f),
+                                    GlucoachColors.Primary.copy(alpha = 0f),
+                                ),
+                            startY = 0f,
+                            endY = h,
+                        ),
+                )
+                drawPath(
+                    path = linePath,
+                    color = GlucoachColors.Primary,
                     style = Stroke(width = 2.5f, cap = StrokeCap.Round),
                 )
 
-                drawCircle(
-                    color = GlucoachColors.Primary,
-                    radius = 6f,
-                    center = Offset(points[0].first, yFor(points[0].second)),
-                )
+                val peakX = xFor(prediction.peakMinute.toFloat())
+                val peakY = yFor(prediction.peakMgdl)
+                drawCircle(color = GlucoachColors.Primary, radius = 6f, center = Offset(peakX, peakY))
             }
         }
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.md))
 
+        val firstGlucose = curve.first().glucoseMgdl.toInt()
+        val twoHourGlucose =
+            curve
+                .minByOrNull { kotlin.math.abs(it.minuteOffset - 120) }
+                ?.glucoseMgdl
+                ?.toInt()
+                ?: curve.last().glucoseMgdl.toInt()
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            ChartLabel(title = "식전", value = "${baseGlucose}mg/dL")
-            ChartLabel(title = "식후 최고점", value = "${peakGlucose}mg/dL")
-            ChartLabel(title = "2시간 후", value = "${afterTwoHours}mg/dL")
+            ChartLabel(title = "식전", value = "${firstGlucose}mg/dL")
+            ChartLabel(title = "식후 최고점", value = "${prediction.peakMgdl.toInt()}mg/dL")
+            ChartLabel(title = "2시간 후", value = "${twoHourGlucose}mg/dL")
         }
     }
 }
 
-@Suppress("unused")
 @Composable
 private fun ChartLabel(
     title: String,

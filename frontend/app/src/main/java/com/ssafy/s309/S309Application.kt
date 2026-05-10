@@ -1,6 +1,7 @@
 package com.ssafy.s309
 
 import android.app.Application
+import com.ssafy.s309.data.repository.KeyboardFoodSyncManager
 import com.ssafy.s309.notification.GlucoseAlertManager
 import com.ssafy.s309.notification.TtsManager
 import dagger.hilt.android.HiltAndroidApp
@@ -13,4 +14,12 @@ class S309Application : Application() {
 
     // TTS 엔진을 앱 시작 시 미리 초기화 (첫 알림에서 지연 없음)
     @Inject lateinit var ttsManager: TtsManager
+
+    // IME 키보드용 음식 목록 동기화 (TTL 24h, 로그인 시에만)
+    @Inject lateinit var keyboardFoodSync: KeyboardFoodSyncManager
+
+    override fun onCreate() {
+        super.onCreate()
+        keyboardFoodSync.syncIfNeeded()
+    }
 }
