@@ -712,7 +712,17 @@ private fun InstagramCameraPanel(
         if (!isAbMode) capturedFile = null
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(GlucoachColors.Background)) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(GlucoachColors.Background)
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                    onClick = {},
+                ),
+    ) {
         when {
             isAbMode -> {
                 Box(modifier = Modifier.fillMaxSize().background(GlucoachColors.Background).padding(bottom = 72.dp)) {
