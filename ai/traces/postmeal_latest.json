@@ -1,7 +1,7 @@
 {
   "agent": "postmeal",
-  "triggered_at": "2026-05-10 15:23:57",
-  "message": "하원님, 가벼운 스트레칭 한번 해볼까요? 몸이 한결 편해질 거예요 😊",
+  "triggered_at": "2026-05-10 23:50:03",
+  "message": "하원님, 식사 후 가볍게 움직여볼까요? 잠깐 산책이나 스트레칭 어떠세요?",
   "display_trace": {
     "title": "키키가 확인한 내용",
     "summary": "식사 기록, 식후 혈당 흐름, 활동량을 함께 확인해 활동을 제안했어요.",
@@ -24,7 +24,7 @@
       "reason": "혈당 상승과 활동 부족이 함께 감지되어 가벼운 활동을 제안했어요.",
       "message_rule": "부담 없는 톤으로 활동 1가지를 제안했어요."
     },
-    "notification_message": "하원님, 가벼운 스트레칭 한번 해볼까요? 몸이 한결 편해질 거예요 😊"
+    "notification_message": "하원님, 식사 후 가볍게 움직여볼까요? 잠깐 산책이나 스트레칭 어떠세요?"
   },
   "turns": 3,
   "tool_calls": [
@@ -89,30 +89,22 @@
     {
       "name": "get_notification_history",
       "input": {
-        "hours": 24
+        "hours": 6
       },
       "result": {
-        "hours": 24,
+        "hours": 6,
         "today": "2026-05-04",
-        "notifications": [
-          {
-            "id": "notif_002",
-            "sent_at": "2026-05-03 14:00",
-            "type": "식후 활동 유도",
-            "message": "10분만 걸어볼까요?",
-            "user_action": "ignored"
-          }
-        ]
+        "notifications": []
       }
     },
     {
       "name": "send_notification",
       "input": {
-        "message": "하원님, 가벼운 스트레칭 한번 해볼까요? 몸이 한결 편해질 거예요 😊",
+        "message": "하원님, 식사 후 가볍게 움직여볼까요? 잠깐 산책이나 스트레칭 어떠세요?",
         "options": [
           {
-            "id": "stretch_now",
-            "label": "할게요"
+            "id": "walk_now",
+            "label": "움직일게요"
           },
           {
             "id": "later_30",
@@ -129,7 +121,7 @@
             {
               "type": "glucose",
               "title": "혈당",
-              "description": "점심 후 60분간 혈당이 125에서 165로 상승했어요."
+              "description": "식사 전 125mg/dL에서 현재 165mg/dL로 상승 추세예요."
             },
             {
               "type": "steps",
@@ -138,17 +130,17 @@
             }
           ],
           "decision": {
-            "reason": "식후 혈당이 상승 추세이고 최근 활동량이 적어서, 가벼운 움직임을 권유했어요."
+            "reason": "식후 혈당이 상승 추세이고 최근 활동량이 적어, 가벼운 움직임을 권유하기 좋은 타이밍입니다."
           }
         }
       },
       "result": {
         "status": "sent",
-        "message": "하원님, 가벼운 스트레칭 한번 해볼까요? 몸이 한결 편해질 거예요 😊",
+        "message": "하원님, 식사 후 가볍게 움직여볼까요? 잠깐 산책이나 스트레칭 어떠세요?",
         "options": [
           {
-            "id": "stretch_now",
-            "label": "할게요"
+            "id": "walk_now",
+            "label": "움직일게요"
           },
           {
             "id": "later_30",
