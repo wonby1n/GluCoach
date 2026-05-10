@@ -193,6 +193,30 @@ data class DailyHealthSummaryUpsertRequest(
     val avgHeartRate: Double? = null,
 )
 
+/** POST /api/chat/messages/command 요청 */
+@Serializable
+data class ChatCommandRequest(
+    val commandType: String,
+    val message: String,
+    val payload: Map<String, String> = emptyMap(),
+)
+
+/** POST /api/chat/messages/command 응답 */
+@Serializable
+data class ChatCommandResponse(
+    val id: Long,
+    val sender: String,
+    val commandType: String,
+    val message: String,
+    val createdAt: String,
+)
+
+/** GET /api/chat/messages/unread-count 응답 */
+@Serializable
+data class UnreadCountResponse(
+    val unreadCount: Long,
+)
+
 /** POST /ai/agent/post-meal trigger 페이로드 */
 @Serializable
 data class PostMealTriggerRequest(
