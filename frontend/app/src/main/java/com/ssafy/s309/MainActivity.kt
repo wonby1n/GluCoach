@@ -19,7 +19,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.google.firebase.messaging.FirebaseMessaging
+import com.ssafy.s309.data.local.TokenManager
 import com.ssafy.s309.data.repository.HealthRepository
+import com.ssafy.s309.data.repository.UserRepository
 import com.ssafy.s309.data.repository.source.SamsungHealthHolder
 import com.ssafy.s309.navigation.AppNavigation
 import com.ssafy.s309.ui.theme.S309Theme
@@ -49,6 +51,10 @@ class MainActivity : ComponentActivity() {
         fun samsungHealthHolder(): SamsungHealthHolder
 
         fun healthRepository(): HealthRepository
+
+        fun tokenManager(): TokenManager
+
+        fun userRepository(): UserRepository
     }
 
     private val samsungHealthHolder: SamsungHealthHolder by lazy {
@@ -61,6 +67,18 @@ class MainActivity : ComponentActivity() {
         EntryPointAccessors
             .fromApplication(applicationContext, MainActivityEntryPoint::class.java)
             .healthRepository()
+    }
+
+    private val tokenManager: TokenManager by lazy {
+        EntryPointAccessors
+            .fromApplication(applicationContext, MainActivityEntryPoint::class.java)
+            .tokenManager()
+    }
+
+    private val userRepository: UserRepository by lazy {
+        EntryPointAccessors
+            .fromApplication(applicationContext, MainActivityEntryPoint::class.java)
+            .userRepository()
     }
 
     // Samsung Health 권한 자동 요청은 Activity 라이프타임당 1회만. onResume 마다 다시 띄우면
@@ -81,7 +99,22 @@ class MainActivity : ComponentActivity() {
         startSamsungHealthPolling()
         requestNotificationPermission()
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-            if (task.isSuccessful) Log.d("FCM", "토큰: ${task.result}")
+            if (!task.isSuccessful) {
+                Log.w("FCM", "토큰 발급 실패", task.exception)
+                return@addOnCompleteListener
+            }
+            val token = task.result ?: return@addOnCompleteListener
+            Log.d("FCM", "토큰: $token")
+            // FcmService.onNewToken 은 토큰이 바뀔 때만 발화한다. 첫 부팅 콜백을 놓치거나
+            // 등록 흐름이 깨졌던 시점에 발화했던 케이스를 복구하기 위해, 매 실행마다
+            // 현재 토큰을 로컬에 저장하고 로그인 상태면 즉시 서버에 PUT 한다.
+            tokenManager.saveFcmToken(token)
+            if (tokenManager.getUserId() != null) {
+                lifecycleScope.launch {
+                    userRepository.registerFcmToken(token)
+                        .onFailure { Log.w("FCM", "FCM 토큰 서버 등록 실패", it) }
+                }
+            }
         }
         // enableEdgeToEdge()
         setContent {
