@@ -29,8 +29,10 @@ import com.ssafy.s309.data.repository.source.HealthDataSource
 import com.ssafy.s309.data.repository.source.MockHealthDataSource
 import com.ssafy.s309.data.repository.source.SamsungHealthDataSource
 import com.ssafy.s309.notification.GlucoseAlertManager
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.time.LocalDate
@@ -72,6 +74,15 @@ class HealthRepository
         val glucoseHistory: StateFlow<List<GlucoseReading>> = bleManager.glucoseHistory
         val glucoseAlertStream: SharedFlow<NotificationItem> = glucoseAlertManager.alertStream
         val bleProcessingSettings: StateFlow<BleProcessingSettings> = bleManager.processingSettings
+
+        // ── FCM 채팅 이벤트 브릿지 ────────────────────────────────────
+        private val _chatFcmEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        val chatFcmEvent: SharedFlow<Unit> = _chatFcmEvent.asSharedFlow()
+
+        /** FcmService에서 data.chatMessageId 수신 시 호출. ViewModel이 collect하여 재조회. */
+        fun emitChatFcmEvent() {
+            _chatFcmEvent.tryEmit(Unit)
+        }
 
         fun updateAlertThresholds(
             alertLow: Int,

@@ -54,6 +54,8 @@ import com.ssafy.s309.data.repository.HealthRepository
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -104,6 +106,10 @@ class KikiChatViewModel
         private val _fontSize = MutableStateFlow(FONT_SIZE_DEFAULT)
         val fontSize: StateFlow<Float> = _fontSize.asStateFlow()
 
+        private val _isWaitingForAgent = MutableStateFlow(false)
+        val isWaitingForAgent: StateFlow<Boolean> = _isWaitingForAgent.asStateFlow()
+
+        private var timeoutJob: Job? = null
         private var currentPage = -1
 
         init {
@@ -113,6 +119,12 @@ class KikiChatViewModel
                 healthRepository.glucoseAlertStream.collect { alert ->
                     val raw = _messages.value.filterNot { it is ChatMessage.DateSeparator }
                     _messages.value = withDateSeparators(listOf(ChatMessage.KikiMessage(alert)) + raw)
+                }
+            }
+            // FCM 채팅 이벤트 — 인디케이터 OFF + page=0 재조회
+            viewModelScope.launch {
+                healthRepository.chatFcmEvent.collect {
+                    onFcmReceived()
                 }
             }
         }
@@ -161,6 +173,75 @@ class KikiChatViewModel
             }
         }
 
+        /** FCM data.chatMessageId 수신 시 호출 — 인디케이터 OFF + page=0 재조회 */
+        fun onFcmReceived() {
+            timeoutJob?.cancel()
+            _isWaitingForAgent.value = false
+            viewModelScope.launch {
+                runCatching { healthRepository.getChatMessagesPage(page = 0) }
+                    .onSuccess { response ->
+                        val existingCreatedAts =
+                            _messages.value
+                                .filterNot { it is ChatMessage.DateSeparator }
+                                .map { msg ->
+                                    when (msg) {
+                                        is ChatMessage.KikiMessage -> msg.item.createdAt
+                                        is ChatMessage.UserMessage -> msg.createdAt
+                                        else -> ""
+                                    }
+                                }.toSet()
+                        val newMessages =
+                            response.content
+                                .sortedByDescending { it.id }
+                                .filter { it.createdAt !in existingCreatedAts }
+                                .map { m ->
+                                    if (m.sender == "user") {
+                                        ChatMessage.UserMessage(
+                                            text = m.message ?: "",
+                                            timestamp = parseIsoTimestamp(m.createdAt),
+                                            createdAt = m.createdAt,
+                                        )
+                                    } else {
+                                        ChatMessage.KikiMessage(
+                                            NotificationItem(
+                                                id = m.id,
+                                                title = "키키",
+                                                message = m.message ?: "",
+                                                timeAgoText = healthRepository.formatTimeAgo(m.createdAt),
+                                                isUnread = !m.isRead,
+                                                alertType = m.messageType ?: "",
+                                                createdAt = m.createdAt,
+                                                displayTrace = m.displayTrace,
+                                            ),
+                                        )
+                                    }
+                                }
+                        if (newMessages.isNotEmpty()) {
+                            val raw = _messages.value.filterNot { it is ChatMessage.DateSeparator }
+                            _messages.value = withDateSeparators(newMessages + raw)
+                        }
+                    }
+                    .onFailure { Log.w(TAG, "FCM 후 메시지 재조회 실패", it) }
+            }
+        }
+
+        fun sendFoodRecommendCommand() {
+            if (_isWaitingForAgent.value) return
+            viewModelScope.launch {
+                runCatching { healthRepository.sendFoodRecommendCommand() }
+                    .onSuccess {
+                        _isWaitingForAgent.value = true
+                        timeoutJob?.cancel()
+                        timeoutJob =
+                            viewModelScope.launch {
+                                delay(AGENT_TIMEOUT_MS)
+                                _isWaitingForAgent.value = false
+                            }
+                    }
+                    .onFailure { Log.w(TAG, "음식 추천 명령 발화 실패", it) }
+            }
+        }
+
         fun increaseFontSize() = _fontSize.update { (it + 1f).coerceAtMost(FONT_SIZE_MAX) }
 
         fun decreaseFontSize() = _fontSize.update { (it - 1f).coerceAtLeast(FONT_SIZE_MIN) }
@@ -197,6 +278,7 @@ class KikiChatViewModel
             private const val FONT_SIZE_DEFAULT = 14f
             private const val FONT_SIZE_MIN = 11f
             private const val FONT_SIZE_MAX = 20f
+            private const val AGENT_TIMEOUT_MS = 30_000L
         }
     }
 
