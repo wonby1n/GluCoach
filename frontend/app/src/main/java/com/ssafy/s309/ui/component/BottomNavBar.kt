@@ -85,27 +85,29 @@ private fun BottomNavEntry(
     onClick: () -> Unit,
 ) {
     if (item.isCenter) {
-        Box(
-            modifier =
-                Modifier
-                    .size(CENTER_BUTTON_SIZE)
-                    .clip(CircleShape)
-                    .background(GlucoachColors.Primary)
-                    .clickable(onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.appicon),
-                contentDescription = item.label,
-                modifier = Modifier.size(38.dp),
-                contentScale = ContentScale.Fit,
-            )
+        Box(modifier = Modifier.size(CENTER_BUTTON_SIZE)) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(CENTER_BUTTON_SIZE)
+                        .clip(CircleShape)
+                        .background(GlucoachColors.Primary)
+                        .clickable(onClick = onClick),
+                contentAlignment = Alignment.Center,
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.appicon),
+                    contentDescription = item.label,
+                    modifier = Modifier.size(38.dp),
+                    contentScale = ContentScale.Fit,
+                )
+            }
             if (item.hasUnread) {
                 Box(
                     modifier =
                         Modifier
                             .align(Alignment.TopEnd)
-                            .size(10.dp)
+                            .size(14.dp)
                             .background(Color(0xFFE53935), shape = CircleShape)
                             .border(1.5.dp, Color.White, CircleShape),
                 )
