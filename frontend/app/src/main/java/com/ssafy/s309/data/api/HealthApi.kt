@@ -2,6 +2,8 @@ package com.ssafy.s309.data.api
 
 import com.ssafy.s309.data.model.AlertListResponse
 import com.ssafy.s309.data.model.CgmRecordResponse
+import com.ssafy.s309.data.model.ChatCommandRequest
+import com.ssafy.s309.data.model.ChatCommandResponse
 import com.ssafy.s309.data.model.ChatMessageListResponse
 import com.ssafy.s309.data.model.DailyHealthSummaryResponse
 import com.ssafy.s309.data.model.DailyHealthSummaryUpsertRequest
@@ -9,6 +11,7 @@ import com.ssafy.s309.data.model.HealthSnapshotBatchRequest
 import com.ssafy.s309.data.model.HealthSnapshotBatchResponse
 import com.ssafy.s309.data.model.MealCreateResponse
 import com.ssafy.s309.data.model.MealRecordResponse
+import com.ssafy.s309.data.model.UnreadCountResponse
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.http.Body
@@ -73,6 +76,16 @@ interface HealthApi {
     /** 전체 읽음 처리 */
     @POST("api/chat/messages/mark-all-read")
     suspend fun markAllChatMessagesRead()
+
+    /** 음식 추천 명령 발화 */
+    @POST("api/chat/messages/command")
+    suspend fun sendChatCommand(
+        @Body request: ChatCommandRequest,
+    ): ChatCommandResponse
+
+    /** 안 읽음 수 조회 */
+    @GET("api/chat/messages/unread-count")
+    suspend fun getUnreadCount(): UnreadCountResponse
 
     /** 1분 폴 시계열 5분 배치 INSERT */
     @POST("api/health/snapshots")

@@ -9,6 +9,7 @@ import com.ssafy.s309.data.ble.BleManager
 import com.ssafy.s309.data.ble.BleProcessingSettings
 import com.ssafy.s309.data.ble.ScannedDevice
 import com.ssafy.s309.data.model.CgmRecordResponse
+import com.ssafy.s309.data.model.ChatCommandRequest
 import com.ssafy.s309.data.model.DailyHealthSummary
 import com.ssafy.s309.data.model.DailyHealthSummaryUpsertRequest
 import com.ssafy.s309.data.model.GlucoseRange
@@ -258,6 +259,21 @@ class HealthRepository
             runCatching { healthApi.markAllChatMessagesRead() }
                 .onFailure { Log.w(TAG, "전체 읽음 처리 실패", it) }
         }
+
+        /** 음식 추천 명령 발화. commandType/message/payload 고정값. */
+        suspend fun sendFoodRecommendCommand() =
+            healthApi.sendChatCommand(
+                ChatCommandRequest(
+                    commandType = "recommend_food",
+                    message = "음식 추천해줘",
+                    payload = emptyMap(),
+                ),
+            )
+
+        /** 안 읽음 수 조회. 배지 갱신용. */
+        suspend fun getUnreadCount(): Long =
+            runCatching { healthApi.getUnreadCount().unreadCount }
+                .getOrDefault(0L)
 
         /**
          * 워치 최근 수면 세션을 BE에 송신. 동일 startedAt 재호출 시 BE가 idempotent하게 기존 row 반환.
