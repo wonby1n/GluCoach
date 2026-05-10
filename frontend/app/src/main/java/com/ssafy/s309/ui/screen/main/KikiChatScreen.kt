@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBackIosNew
+import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -37,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -375,6 +377,7 @@ fun KikiChatScreen(
     val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
     val hasMore by viewModel.hasMore.collectAsStateWithLifecycle()
     val fontSize by viewModel.fontSize.collectAsStateWithLifecycle()
+    val isWaitingForAgent by viewModel.isWaitingForAgent.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
     // 새 메시지 도착 시 맨 아래로 스크롤 (reverseLayout=true 기준 index 0)
@@ -435,89 +438,146 @@ fun KikiChatScreen(
         )
         HorizontalDivider(color = GlucoachColors.Border)
 
-        if (messages.isEmpty() && !isLoadingMore) {
-            Box(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    KikiAvatar(size = 72)
-                    Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
-                    Text(
-                        text = "키키가 보낸 알림이 없어요",
-                        color = GlucoachColors.TextSecondary,
-                        fontSize = 15.sp,
-                    )
-                    Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
-                    Text(
-                        text = "혈당 이상 감지 시 키키가 알려드려요",
-                        color = GlucoachColors.TextSecondary,
-                        fontSize = 13.sp,
-                    )
-                }
-            }
-        } else {
-            LazyColumn(
-                state = listState,
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .padding(horizontal = GlucoachSpacing.lg),
-                verticalArrangement = Arrangement.spacedBy(GlucoachSpacing.lg),
-                reverseLayout = true,
-            ) {
-                item { Spacer(modifier = Modifier.height(GlucoachSpacing.sm)) }
-
-                items(
-                    items = messages,
-                    key = { msg ->
-                        when (msg) {
-                            is ChatMessage.KikiMessage -> "kiki_${msg.item.id}"
-                            is ChatMessage.UserMessage -> "user_${msg.timestamp}"
-                            is ChatMessage.DateSeparator -> "sep_${msg.label}"
-                        }
-                    },
-                ) { message ->
-                    when (message) {
-                        is ChatMessage.KikiMessage ->
-                            KikiChatBubble(
-                                item = message.item,
-                                fontSize = fontSize,
-                                showReplyButtons = showReplyButtons && message.item.id == targetMealId,
-                                onReply = { replyText, displayLabel ->
-                                    viewModel.sendUserReply(replyText, displayLabel)
-                                    if (replyText != null) onReplySent()
-                                },
-                                onClick = { onItemClick(message.item) },
-                            )
-                        is ChatMessage.UserMessage ->
-                            UserChatBubble(message = message, fontSize = fontSize)
-                        is ChatMessage.DateSeparator ->
-                            DateSeparatorItem(label = message.label)
+        Box(modifier = Modifier.weight(1f)) {
+            if (messages.isEmpty() && !isLoadingMore) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        KikiAvatar(size = 72)
+                        Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+                        Text(
+                            text = "키키가 보낸 알림이 없어요",
+                            color = GlucoachColors.TextSecondary,
+                            fontSize = 15.sp,
+                        )
+                        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+                        Text(
+                            text = "혈당 이상 감지 시 키키가 알려드려요",
+                            color = GlucoachColors.TextSecondary,
+                            fontSize = 13.sp,
+                        )
                     }
                 }
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = GlucoachSpacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(GlucoachSpacing.lg),
+                    reverseLayout = true,
+                ) {
+                    // 플로팅 버튼에 가리지 않도록 하단 여백
+                    item { Spacer(modifier = Modifier.height(52.dp)) }
 
-                // 로딩 인디케이터 / 추가 패딩
-                item {
-                    if (isLoadingMore) {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = GlucoachSpacing.md),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = GlucoachColors.Primary,
-                                strokeWidth = 2.dp,
-                            )
+                    items(
+                        items = messages,
+                        key = { msg ->
+                            when (msg) {
+                                is ChatMessage.KikiMessage -> "kiki_${msg.item.id}"
+                                is ChatMessage.UserMessage -> "user_${msg.timestamp}"
+                                is ChatMessage.DateSeparator -> "sep_${msg.label}"
+                            }
+                        },
+                    ) { message ->
+                        when (message) {
+                            is ChatMessage.KikiMessage ->
+                                KikiChatBubble(
+                                    item = message.item,
+                                    fontSize = fontSize,
+                                    showReplyButtons = showReplyButtons && message.item.id == targetMealId,
+                                    onReply = { replyText, displayLabel ->
+                                        viewModel.sendUserReply(replyText, displayLabel)
+                                        if (replyText != null) onReplySent()
+                                    },
+                                    onClick = { onItemClick(message.item) },
+                                )
+                            is ChatMessage.UserMessage ->
+                                UserChatBubble(message = message, fontSize = fontSize)
+                            is ChatMessage.DateSeparator ->
+                                DateSeparatorItem(label = message.label)
                         }
-                    } else {
-                        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+                    }
+
+                    // 로딩 인디케이터 / 추가 패딩
+                    item {
+                        if (isLoadingMore) {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = GlucoachSpacing.md),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = GlucoachColors.Primary,
+                                    strokeWidth = 2.dp,
+                                )
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+                        }
+                    }
+                }
+            }
+
+            // ── 음식 추천 버튼 / 대기 인디케이터 (floating) ──────────
+            if (isWaitingForAgent) {
+                Row(
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = GlucoachSpacing.lg),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = GlucoachColors.PrimaryDark,
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(modifier = Modifier.width(GlucoachSpacing.sm))
+                    Text(
+                        text = "키키가 분석 중...",
+                        color = GlucoachColors.TextSecondary,
+                        fontSize = 14.sp,
+                    )
+                }
+            } else {
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = GlucoachSpacing.lg)
+                            .shadow(
+                                elevation = 6.dp,
+                                shape = RoundedCornerShape(20.dp),
+                            )
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(GlucoachColors.Surface)
+                            .border(1.5.dp, GlucoachColors.PrimaryDark, RoundedCornerShape(20.dp))
+                            .clickable { viewModel.sendFoodRecommendCommand() }
+                            .padding(horizontal = GlucoachSpacing.lg, vertical = GlucoachSpacing.sm),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Restaurant,
+                            contentDescription = null,
+                            tint = GlucoachColors.PrimaryDark,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Text(
+                            text = "음식 추천",
+                            color = GlucoachColors.PrimaryDark,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
                     }
                 }
             }
