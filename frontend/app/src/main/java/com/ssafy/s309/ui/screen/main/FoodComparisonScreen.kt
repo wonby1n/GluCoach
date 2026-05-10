@@ -326,7 +326,7 @@ private fun FoodSelectionContent(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 22.dp),
         ) {
-            Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+            Spacer(modifier = Modifier.height(56.dp))
 
             Text(
                 text = "음식 비교 시뮬레이션",
@@ -1064,7 +1064,7 @@ private fun FoodComparisonResultContent(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 22.dp),
         ) {
-            Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+            Spacer(modifier = Modifier.height(56.dp))
 
             Text(
                 text = "음식 비교 시뮬레이션",

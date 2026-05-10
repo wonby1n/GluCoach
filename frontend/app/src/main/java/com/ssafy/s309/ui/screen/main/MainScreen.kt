@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -725,14 +726,22 @@ private fun InstagramCameraPanel(
     ) {
         when {
             isAbMode -> {
-                Box(modifier = Modifier.fillMaxSize().background(GlucoachColors.Background).padding(bottom = 72.dp)) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(GlucoachColors.Background)
+                            .statusBarsPadding()
+                            .padding(bottom = 72.dp),
+                ) {
                     FoodComparisonContent(onMealSaved = onMealSaved)
                 }
                 Box(
                     modifier =
                         Modifier
                             .align(Alignment.TopStart)
-                            .padding(top = 52.dp, start = 16.dp)
+                            .statusBarsPadding()
+                            .padding(start = 16.dp, top = 8.dp)
                             .size(36.dp)
                             .clip(CircleShape)
                             .background(GlucoachColors.Border)
