@@ -287,7 +287,7 @@ private fun AIReportSuccessContent(
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
             Text(
-                text = "이번주 요약",
+                text = "이번 주 요약",
                 color = GlucoachColors.TextPrimary,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
@@ -481,7 +481,7 @@ private fun WeeklyGlucoseChart(
                 .background(GlucoachColors.Surface)
                 .padding(GlucoachSpacing.xl),
     ) {
-        Text(text = "7일 혈당 추이", color = GlucoachColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text(text = "이번 주 혈당 흐름", color = GlucoachColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
 
@@ -494,12 +494,13 @@ private fun WeeklyGlucoseChart(
         Text(
             text = "목표 범위 내 ${timeInRange.toInt()}%",
             color = tirColor,
-            fontSize = 20.sp,
+            fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
         )
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = tirMessage,
-            color = tirColor.copy(alpha = 0.85f),
+            color = GlucoachColors.TextSecondary,
             fontSize = 12.sp,
         )
 
