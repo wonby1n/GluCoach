@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -63,9 +64,11 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -74,6 +77,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ssafy.s309.data.model.WeeklyFoodItem
 import com.ssafy.s309.data.model.WeeklyReportResponse
+import com.ssafy.s309.ui.component.FoodCategoryImageMapper
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
@@ -118,7 +122,7 @@ private data class PatternItem(
 private fun WeeklyFoodItem.toReportFoodCard(gradeMap: Map<Int, String>) =
     ReportFoodCard(
         name = foodName,
-        imageResId = 0,
+        imageResId = FoodCategoryImageMapper.getImageRes(null, foodName),
         grade = gradeMap[foodId] ?: if (type == "GOOD") "A" else "D",
     )
 
@@ -678,22 +682,15 @@ private fun FoodGradeCard(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box {
-            // 이미지가 없으면 이니셜 원형으로 대체
-            Box(
+            Image(
+                painter = painterResource(id = food.imageResId),
+                contentDescription = food.name,
                 modifier =
                     Modifier
                         .size(80.dp)
-                        .clip(CircleShape)
-                        .background(GlucoachColors.Border),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = food.name.firstOrNull()?.toString() ?: "?",
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = GlucoachColors.TextSecondary,
-                )
-            }
+                        .clip(CircleShape),
+                contentScale = ContentScale.Crop,
+            )
             Box(
                 modifier =
                     Modifier
