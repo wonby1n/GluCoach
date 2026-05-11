@@ -307,10 +307,12 @@ private fun GlucoseChartBody(
                             val p1 = pts[i - 1]
                             val p2 = pts[i]
                             val p3 = pts[minOf(i + 1, pts.lastIndex)]
+                            val cp1x = (p1.x + (p2.x - p0.x) / 6f).coerceIn(p1.x, p2.x)
+                            val cp2x = (p2.x - (p3.x - p1.x) / 6f).coerceIn(p1.x, p2.x)
                             cubicTo(
-                                p1.x + (p2.x - p0.x) / 6f,
+                                cp1x,
                                 p1.y + (p2.y - p0.y) / 6f,
-                                p2.x - (p3.x - p1.x) / 6f,
+                                cp2x,
                                 p2.y - (p3.y - p1.y) / 6f,
                                 p2.x,
                                 p2.y,
