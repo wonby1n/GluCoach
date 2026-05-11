@@ -96,7 +96,7 @@ class FoodScanViewModel
                             FoodScanCandidate(
                                 rank = 1,
                                 foodId = foodItem.id,
-                                name = foodItem.name,
+                                name = foodItem.displayName ?: foodItem.name,
                                 kcal = foodItem.kcal,
                                 carbsG = foodItem.carbsG,
                                 proteinG = foodItem.proteinG,
@@ -131,7 +131,7 @@ class FoodScanViewModel
                             FoodScanCandidate(
                                 rank = candidates.size + 1,
                                 foodId = foodItem.id,
-                                name = foodItem.name,
+                                name = foodItem.displayName ?: foodItem.name,
                                 kcal = foodItem.kcal,
                                 carbsG = foodItem.carbsG,
                                 proteinG = foodItem.proteinG,

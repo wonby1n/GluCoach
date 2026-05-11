@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 public record FoodSearchResult(
     Integer id,
     String name,
+    String displayName,
     String category,
     BigDecimal kcal,
     BigDecimal carbsG,
@@ -24,6 +25,7 @@ public record FoodSearchResult(
     return new FoodSearchResult(
         food.getId(),
         food.getName(),
+        food.getDisplayName(),
         food.getCategory(),
         food.getKcal(),
         food.getCarbsG(),
