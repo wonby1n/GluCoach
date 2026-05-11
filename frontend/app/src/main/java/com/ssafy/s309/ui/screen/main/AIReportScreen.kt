@@ -129,7 +129,7 @@ private fun WeeklyReportResponse.toSummaryCards(prevAvgGlucose: Double?) =
             val (changeText, changeColor) =
                 when {
                     prevAvgGlucose == null -> "지난주 데이터 없음" to Color(0xFF9E9E9E)
-                    avgGlucose > prevAvgGlucose + 0.5 -> "지난주보다 ${(avgGlucose - prevAvgGlucose).toInt()}mg 높아요" to Color(0xFFE53935)
+                    avgGlucose > prevAvgGlucose + 0.5 -> "지난주보다 ${(avgGlucose - prevAvgGlucose).toInt()}mg 높아요" to Color(0xFFE96A6A)
                     avgGlucose < prevAvgGlucose - 0.5 -> "지난주보다 ${(prevAvgGlucose - avgGlucose).toInt()}mg 낮아요" to Color(0xFF2196F3)
                     else -> "지난주와 비슷해요" to Color(0xFF9E9E9E)
                 }
@@ -142,7 +142,7 @@ private fun WeeklyReportResponse.toSummaryCards(prevAvgGlucose: Double?) =
                 glucoseSd.toInt().toString(),
                 "mg/dL",
                 if (stable) "안정적" else "불안정적",
-                if (stable) Color(0xFF2196F3) else Color(0xFFE53935),
+                if (stable) Color(0xFF2196F3) else Color(0xFFE96A6A),
             )
         },
     )
@@ -258,6 +258,12 @@ private fun AIReportSuccessContent(
                 slots.toList()
             }
         }
+    val (tirColor, tirMessage) =
+        when {
+            report.timeInRange >= 70 -> Color(0xFF4CAF50) to "이번 주 혈당 관리 정말 대단해요! 키키도 함께 기뻐요 🎉"
+            report.timeInRange >= 50 -> Color(0xFFFF9800) to "이번 주도 함께 잘 해가고 있어요! 키키가 항상 응원할게요 💪"
+            else -> Color(0xFFE96A6A) to "키키가 함께할게요! 이번 주도 같이 건강하게 해봐요 🌟"
+        }
     val patternItems = remember(report.id) { report.toPatternItems() }
 
     Column(
@@ -293,6 +299,21 @@ private fun AIReportSuccessContent(
                 fontWeight = FontWeight.Bold,
             )
 
+            Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+
+            Text(
+                text = "목표 범위 내 ${report.timeInRange.toInt()}%",
+                color = tirColor,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = tirMessage,
+                color = GlucoachColors.TextSecondary,
+                fontSize = 12.sp,
+            )
+
             Spacer(modifier = Modifier.height(GlucoachSpacing.md))
         }
 
@@ -301,7 +322,7 @@ private fun AIReportSuccessContent(
         Column(modifier = Modifier.padding(horizontal = 22.dp)) {
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
-            WeeklyGlucoseChart(weeklyGlucose = weeklyGlucose, timeInRange = report.timeInRange)
+            WeeklyGlucoseChart(weeklyGlucose = weeklyGlucose)
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
@@ -457,15 +478,12 @@ private fun SummaryStatItem(
 // ── 7일 혈당 추이 차트 ──────────────────────────────────
 
 @Composable
-private fun WeeklyGlucoseChart(
-    weeklyGlucose: List<Float?>,
-    timeInRange: Double,
-) {
+private fun WeeklyGlucoseChart(weeklyGlucose: List<Float?>) {
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     val days = listOf("월", "화", "수", "목", "금", "토", "일")
     val highThreshold = 180f
     val lowThreshold = 60f
-    val dangerColor = Color(0xFFE53935)
+    val dangerColor = Color(0xFFE96A6A)
     val dataMax = weeklyGlucose.filterNotNull().maxOrNull() ?: 200f
     val dataMin = weeklyGlucose.filterNotNull().minOrNull() ?: 50f
     val maxVal = maxOf(200f, dataMax + 20f)
@@ -482,27 +500,6 @@ private fun WeeklyGlucoseChart(
                 .padding(GlucoachSpacing.xl),
     ) {
         Text(text = "이번 주 혈당 흐름", color = GlucoachColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-
-        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
-
-        val (tirColor, tirMessage) =
-            when {
-                timeInRange >= 70 -> Color(0xFF4CAF50) to "이번 주 혈당 관리 정말 대단해요! 키키도 함께 기뻐요 🎉"
-                timeInRange >= 50 -> Color(0xFFFF9800) to "이번 주도 함께 잘 해가고 있어요! 키키가 항상 응원할게요 💪"
-                else -> Color(0xFFE53935) to "키키가 함께할게요! 이번 주도 같이 건강하게 해봐요 🌟"
-            }
-        Text(
-            text = "목표 범위 내 ${timeInRange.toInt()}%",
-            color = tirColor,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = tirMessage,
-            color = GlucoachColors.TextSecondary,
-            fontSize = 12.sp,
-        )
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
 
@@ -624,7 +621,7 @@ private fun WeeklyGlucoseChart(
             // 점선 바로 위 라벨
             Text(
                 text = "180",
-                color = Color(0xFFE53935),
+                color = Color(0xFFE96A6A),
                 fontSize = 10.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.offset(y = y180),
@@ -648,7 +645,7 @@ private fun WeeklyGlucoseChart(
                 val tipY = maxOf(0.dp, cy - 28.dp)
                 Text(
                     text = text,
-                    color = if (v > 180f) Color(0xFFE53935) else GlucoachColors.Primary,
+                    color = if (v > 180f) Color(0xFFE96A6A) else GlucoachColors.Primary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.offset(x = tipX, y = tipY),
@@ -664,7 +661,7 @@ private fun WeeklyGlucoseChart(
                 val defaultTextColor =
                     when (idx) {
                         5 -> Color(0xFF2196F3)
-                        6 -> Color(0xFFE53935)
+                        6 -> Color(0xFFE96A6A)
                         else -> GlucoachColors.TextSecondary
                     }
                 Box(
