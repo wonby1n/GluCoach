@@ -18,6 +18,8 @@ data class WeeklyReportResponse(
     val createdAt: String = "",
     val foods: List<WeeklyFoodItem> = emptyList(),
     val dailyGlucose: List<DailyGlucoseItem> = emptyList(),
+    val avgSteps: Double? = null,
+    val avgSleepMinutes: Double? = null,
 )
 
 @Serializable
