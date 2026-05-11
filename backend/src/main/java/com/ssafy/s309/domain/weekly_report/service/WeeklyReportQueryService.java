@@ -10,6 +10,7 @@ import com.ssafy.s309.domain.weekly_report.dto.WeeklyReportAiRequest;
 import com.ssafy.s309.domain.weekly_report.dto.WeeklyReportAiRequest.DailyGlucoseItem;
 import com.ssafy.s309.domain.weekly_report.dto.WeeklyReportAiRequest.FoodItem;
 import com.ssafy.s309.domain.weekly_report.dto.WeeklyReportAiRequest.HourlyGlucoseItem;
+import com.ssafy.s309.domain.weekly_report.dto.WeeklyReportResponse;
 import com.ssafy.s309.domain.weekly_report.dto.projection.WeeklyFoodItemProjection;
 import com.ssafy.s309.domain.weekly_report.dto.projection.WeeklyGlucoseStatsProjection;
 import com.ssafy.s309.domain.weekly_report.dto.projection.WeeklyHealthStatsProjection;
@@ -137,6 +138,18 @@ public class WeeklyReportQueryService {
         .weeklyAvgSleepMinutes(health != null ? health.getAvgSleepMinutes() : null)
         .medicationCount(medicationCount)
         .build();
+  }
+
+  public List<WeeklyReportResponse.DailyGlucoseItem> getDailyGlucose(
+      Integer userId, LocalDate weekStart) {
+    LocalDateTime from = weekStart.atStartOfDay();
+    LocalDateTime to = weekStart.plusDays(7).atStartOfDay();
+    return glucoseRecordRepository.findDailyGlucoseTrend(userId, from, to).stream()
+        .map(
+            p ->
+                WeeklyReportResponse.DailyGlucoseItem.of(
+                    p.getDate().toString(), p.getAvg(), p.getMin(), p.getMax()))
+        .toList();
   }
 
   private List<FoodItem> toFoodItems(List<WeeklyFoodItemProjection> projections) {
