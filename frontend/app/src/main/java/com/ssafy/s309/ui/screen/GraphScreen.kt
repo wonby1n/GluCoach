@@ -726,33 +726,45 @@ private fun GlucoseCanvas(
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
-        val yMin = 0f
-        val yMax = 250f
         val leftPad = 48f
         val chartW = w - leftPad
 
         val n = data.size
         if (n < 2) return@Canvas
+
+        val dataMax = data.max()
+        val dataMin = data.min()
+        val pad = ((dataMax - dataMin) * 0.15f).coerceAtLeast(15f)
+        val yMax = dataMax + pad
+        val yMin = dataMin - pad
         val stepX = chartW / (n - 1)
 
         fun xOf(i: Int) = leftPad + i * stepX
 
         fun yOf(v: Float) = h - (v - yMin) / (yMax - yMin) * h
 
-        drawRect(
-            color = Primary.copy(alpha = 0.07f),
-            topLeft = Offset(leftPad, yOf(140f)),
-            size = Size(chartW, yOf(70f) - yOf(140f)),
-        )
+        val rangeTop = 140f.coerceIn(yMin, yMax)
+        val rangeBottom = 70f.coerceIn(yMin, yMax)
+        if (rangeTop > yMin && rangeBottom < yMax) {
+            drawRect(
+                color = Primary.copy(alpha = 0.07f),
+                topLeft = Offset(leftPad, yOf(rangeTop)),
+                size = Size(chartW, yOf(rangeBottom) - yOf(rangeTop)),
+            )
+        }
 
+        val tickCount = 4
+        val tickStep = (yMax - yMin) / tickCount
         val textPaint =
             Paint().asFrameworkPaint().apply {
                 isAntiAlias = true
                 textSize = 28f
                 color = android.graphics.Color.parseColor("#AAAAAA")
             }
-        yAxisValues.forEach { label ->
-            val y = yOf(label.toFloat())
+        for (i in 0..tickCount) {
+            val v = yMin + tickStep * i
+            val label = v.toInt()
+            val y = yOf(v)
             drawLine(
                 color = Color(0xFFEEEEEE),
                 start = Offset(leftPad, y),
@@ -763,11 +775,22 @@ private fun GlucoseCanvas(
             drawIntoCanvas { it.nativeCanvas.drawText("$label", 0f, y + 10f, textPaint) }
         }
 
+        val pts = data.mapIndexed { i, v -> Offset(xOf(i), yOf(v)) }
         val linePath = Path()
-        linePath.moveTo(xOf(0), yOf(data[0]))
+        linePath.moveTo(pts[0].x, pts[0].y)
         for (i in 1 until n) {
-            val cpX = (xOf(i - 1) + xOf(i)) / 2f
-            linePath.cubicTo(cpX, yOf(data[i - 1]), cpX, yOf(data[i]), xOf(i), yOf(data[i]))
+            val p0 = pts[maxOf(i - 2, 0)]
+            val p1 = pts[i - 1]
+            val p2 = pts[i]
+            val p3 = pts[minOf(i + 1, pts.lastIndex)]
+            linePath.cubicTo(
+                p1.x + (p2.x - p0.x) / 6f,
+                p1.y + (p2.y - p0.y) / 6f,
+                p2.x - (p3.x - p1.x) / 6f,
+                p2.y - (p3.y - p1.y) / 6f,
+                p2.x,
+                p2.y,
+            )
         }
 
         drawPath(

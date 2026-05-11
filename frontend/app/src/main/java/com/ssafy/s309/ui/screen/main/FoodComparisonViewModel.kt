@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.ssafy.s309.data.model.FoodCompareItem
 import com.ssafy.s309.data.model.GlucoseCompareRequest
 import com.ssafy.s309.data.model.GlucoseCompareResponse
+import com.ssafy.s309.data.model.GlucoseRange
 import com.ssafy.s309.data.model.MealCreateRequest
 import com.ssafy.s309.data.repository.HealthRepository
 import com.ssafy.s309.data.repository.PredictRepository
@@ -24,6 +25,7 @@ data class FoodComparisonUiState(
     val error: String? = null,
     val mealRecorded: Boolean = false,
     val mealError: String? = null,
+    val glucoseRange: GlucoseRange = GlucoseRange(minMgDl = 90, maxMgDl = 170),
 )
 
 @HiltViewModel
@@ -35,6 +37,13 @@ class FoodComparisonViewModel
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(FoodComparisonUiState())
         val uiState: StateFlow<FoodComparisonUiState> = _uiState.asStateFlow()
+
+        init {
+            viewModelScope.launch {
+                val range = healthRepository.getGlucoseTargetRange()
+                _uiState.update { it.copy(glucoseRange = range) }
+            }
+        }
 
         internal fun compareGlucose(
             foodA: FoodItem,
