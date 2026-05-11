@@ -763,11 +763,22 @@ private fun GlucoseCanvas(
             drawIntoCanvas { it.nativeCanvas.drawText("$label", 0f, y + 10f, textPaint) }
         }
 
+        val pts = data.mapIndexed { i, v -> Offset(xOf(i), yOf(v)) }
         val linePath = Path()
-        linePath.moveTo(xOf(0), yOf(data[0]))
+        linePath.moveTo(pts[0].x, pts[0].y)
         for (i in 1 until n) {
-            val cpX = (xOf(i - 1) + xOf(i)) / 2f
-            linePath.cubicTo(cpX, yOf(data[i - 1]), cpX, yOf(data[i]), xOf(i), yOf(data[i]))
+            val p0 = pts[maxOf(i - 2, 0)]
+            val p1 = pts[i - 1]
+            val p2 = pts[i]
+            val p3 = pts[minOf(i + 1, pts.lastIndex)]
+            linePath.cubicTo(
+                p1.x + (p2.x - p0.x) / 6f,
+                p1.y + (p2.y - p0.y) / 6f,
+                p2.x - (p3.x - p1.x) / 6f,
+                p2.y - (p3.y - p1.y) / 6f,
+                p2.x,
+                p2.y,
+            )
         }
 
         drawPath(

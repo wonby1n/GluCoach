@@ -300,14 +300,27 @@ private fun GlucoseChartBody(
                 pathEffect = dash,
             )
 
-            // 3) 혈당 라인 (부드러운 path)
+            // 3) 혈당 라인 (Catmull-Rom 곡선)
             if (readings.size >= 2) {
-                val path = Path()
-                readings.forEachIndexed { index, reading ->
-                    val x = xFor(reading.timestampMillis)
-                    val y = yFor(reading.valueMgDl)
-                    if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                }
+                val pts = readings.map { Offset(xFor(it.timestampMillis), yFor(it.valueMgDl)) }
+                val path =
+                    Path().apply {
+                        moveTo(pts[0].x, pts[0].y)
+                        for (i in 1 until pts.size) {
+                            val p0 = pts[maxOf(i - 2, 0)]
+                            val p1 = pts[i - 1]
+                            val p2 = pts[i]
+                            val p3 = pts[minOf(i + 1, pts.lastIndex)]
+                            cubicTo(
+                                p1.x + (p2.x - p0.x) / 6f,
+                                p1.y + (p2.y - p0.y) / 6f,
+                                p2.x - (p3.x - p1.x) / 6f,
+                                p2.y - (p3.y - p1.y) / 6f,
+                                p2.x,
+                                p2.y,
+                            )
+                        }
+                    }
                 drawPath(
                     path = path,
                     color = GlucoachColors.Primary,
