@@ -152,8 +152,10 @@ def send_notification(message: str, options: list, display_trace: dict) -> dict:
     agent_api_key = os.getenv("AGENT_API_KEY", "dev-agent-key-change-in-prod")
 
     # ── 입력 검증 ──────────────────────────────────────
-    if not isinstance(options, list) or len(options) != 3:
-        return {"status": "error", "error": "options must be exactly 3 items", "got": options}
+    if not isinstance(options, list):
+        options = []
+    if len(options) > 0 and len(options) != 3:
+        return {"status": "error", "error": "options must be exactly 3 items or empty", "got": options}
     for opt in options:
         if not isinstance(opt, dict) or "id" not in opt or "label" not in opt:
             return {"status": "error", "error": "each option must be {id, label}", "got": opt}
@@ -169,16 +171,18 @@ def send_notification(message: str, options: list, display_trace: dict) -> dict:
         }
 
     try:
+        body = {
+            "userId": user_id,
+            "alertType": alert_type,
+            "message": message,
+            "displayTrace": display_trace,
+        }
+        if options:
+            body["options"] = options
         resp = _requests.post(
             f"{backend_url}/api/agent/notifications",
             headers={"X-Agent-Api-Key": agent_api_key},
-            json={
-                "userId": user_id,
-                "alertType": alert_type,
-                "message": message,
-                "options": options,
-                "displayTrace": display_trace,
-            },
+            json=body,
             timeout=5,
         )
         print(f"[API 응답] status={resp.status_code}, body={resp.text}")
@@ -327,10 +331,11 @@ TOOL_SCHEMAS = [
                 },
                 "options": {
                     "type": "array",
-                    "minItems": 3,
+                    "minItems": 0,
                     "maxItems": 3,
                     "description": (
-                        "사용자 응답 선택지 정확히 3개. 컨텍스트에 맞게 동적으로 생성. "
+                        "사용자 응답 선택지. 첫 알림(meal_recorded)에서는 정확히 3개, "
+                        "user_response/schedule_followup에서는 빈 배열 []로 전달. "
                         "관례적 순서: 1) 긍정/수락 2) 미루기/나중에 3) 거절/패스. "
                         "label은 8자 이내 짧게."
                     ),

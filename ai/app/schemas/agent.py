@@ -30,7 +30,7 @@ class PostMealTrigger(BaseModel):
     reason: Literal["meal_recorded", "user_response", "schedule_followup"] = Field(
         ..., description="트리거 이유"
     )
-    meal_time: str = Field(..., description="식사 시각 (예: 2026-05-04 12:00)")
+    meal_time: str = Field("", description="식사 시각 (예: 2026-05-04 12:00)")
 
     # user_response일 때
     user_reply: Optional[str] = Field(None, description="사용자 응답 텍스트")
