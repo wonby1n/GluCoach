@@ -34,7 +34,8 @@ public interface MealRecordRepository extends JpaRepository<MealRecord, Integer>
   @Query(
       """
       SELECT new com.ssafy.s309.domain.agent.dto.AgentMealItem(
-        m.id, m.recordedAt, m.food.name, m.food.carbsG, m.food.proteinG, m.food.fatG, m.food.kcal,
+        m.id, m.recordedAt, m.food.name, m.food.displayName,
+        m.food.carbsG, m.food.proteinG, m.food.fatG, m.food.kcal,
         m.imageStorageKey
       )
       FROM MealRecord m

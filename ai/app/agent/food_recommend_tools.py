@@ -70,9 +70,10 @@ def get_user_food_grades(min_meal_count: int = 2) -> dict:
     filtered = [g for g in raw if (g.get("mealCount") or 0) >= min_meal_count]
     by_grade: dict = {"S": [], "A": [], "B": [], "C": [], "D": []}
     for g in filtered:
+        # LLM 노출용이라 foodDisplayName(정리된 표시명) 우선, 없으면 foodName(식약처 raw) fallback.
         item = {
             "food_id": g.get("foodId"),
-            "name": g.get("foodName"),
+            "name": g.get("foodDisplayName") or g.get("foodName"),
             "grade": g.get("grade"),
             "avg_slope": float(g.get("avgSlope")) if g.get("avgSlope") is not None else None,
             "meal_count": g.get("mealCount"),
@@ -98,7 +99,7 @@ def get_recent_meals(days: int = 2) -> dict:
         {
             "meal_id": m.get("mealId"),
             "recorded_at": m.get("timestamp"),
-            "name": m.get("foodName"),
+            "name": m.get("foodDisplayName") or m.get("foodName"),
             "carbs_g": m.get("carbs"),
             "kcal": m.get("calories"),
             "image_storage_key": m.get("imageStorageKey"),
@@ -138,7 +139,7 @@ def get_unseen_food_candidates(limit: int = 20) -> dict:
         "candidates": [
             {
                 "food_id": c.get("foodId"),
-                "name": c.get("name"),
+                "name": c.get("displayName") or c.get("name"),
                 "category": c.get("category"),
                 "kcal": c.get("kcal"),
                 "carbs_g": c.get("carbsG"),

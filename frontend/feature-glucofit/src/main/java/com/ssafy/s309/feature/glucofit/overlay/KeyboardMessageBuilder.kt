@@ -28,8 +28,9 @@ object KeyboardMessageBuilder {
         glucose: Int?,
         lastMealAtMs: Long?,
     ): Message {
+        val displayName = food.displayName ?: food.name
         if (glucose == null) {
-            return Message("${food.name}, 혈당 측정 중이 아니에요", Color.parseColor("#9E9E9E"))
+            return Message("$displayName, 혈당 측정 중이 아니에요", Color.parseColor("#9E9E9E"))
         }
         val gState = classifyGlucose(glucose)
         val recency = classifyRecency(lastMealAtMs)
@@ -38,7 +39,7 @@ object KeyboardMessageBuilder {
         val template = template(gState, grade, recency)
         val text =
             template
-                .replace("{food}", food.name)
+                .replace("{food}", displayName)
                 .replace("{glucose}", glucose.toString())
                 .replace("{grade}", grade ?: "?")
                 .replace("{minutes}", minutes.toString())

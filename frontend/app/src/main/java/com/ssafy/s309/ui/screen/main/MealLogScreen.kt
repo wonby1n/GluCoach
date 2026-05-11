@@ -432,7 +432,7 @@ private fun MealLogCalendarContent(
                     month = selectedMonth,
                     day = selectedDay,
                     mealType = guessMealType(m.recordedAt),
-                    name = m.foodName ?: "식사 기록",
+                    name = m.foodDisplayName ?: m.foodName ?: "식사 기록",
                     description = m.memo ?: "",
                     calories = food?.kcal?.toInt() ?: 0,
                     carbs = food?.carbsG?.toFloat() ?: 0f,

@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 public record FoodGradeResponse(
     Integer foodId,
     String foodName,
+    String foodDisplayName,
     String grade,
     BigDecimal avgSlope,
     Integer mealCount,
