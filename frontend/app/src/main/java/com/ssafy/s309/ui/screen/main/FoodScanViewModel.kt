@@ -86,9 +86,9 @@ class FoodScanViewModel
                 val topFoodId = response.foodId
 
                 if (topFoodId != null) {
-                    val topName = response.foodName ?: response.detected.firstOrNull()?.nameKo.orEmpty()
+                    val topDisplayName = response.detected.firstOrNull()?.nameKo ?: response.foodName.orEmpty()
                     // searchFoods 결과를 한 번만 받아 재사용 — 중복 호출 회피.
-                    val results = foodRepository.searchFoods(topName).getOrNull().orEmpty()
+                    val results = foodRepository.searchFoods(response.foodName ?: topDisplayName).getOrNull().orEmpty()
                     val foodItem: FoodSearchItem? =
                         results.firstOrNull { it.id == topFoodId } ?: results.firstOrNull()
                     if (foodItem != null) {
@@ -96,7 +96,7 @@ class FoodScanViewModel
                             FoodScanCandidate(
                                 rank = 1,
                                 foodId = foodItem.id,
-                                name = foodItem.name,
+                                name = foodItem.displayName ?: topDisplayName,
                                 kcal = foodItem.kcal,
                                 carbsG = foodItem.carbsG,
                                 proteinG = foodItem.proteinG,
@@ -110,7 +110,7 @@ class FoodScanViewModel
                             FoodScanCandidate(
                                 rank = 1,
                                 foodId = topFoodId,
-                                name = topName,
+                                name = topDisplayName,
                                 kcal = null,
                                 carbsG = null,
                                 proteinG = null,
@@ -131,7 +131,7 @@ class FoodScanViewModel
                             FoodScanCandidate(
                                 rank = candidates.size + 1,
                                 foodId = foodItem.id,
-                                name = foodItem.name,
+                                name = foodItem.displayName ?: detection.nameKo,
                                 kcal = foodItem.kcal,
                                 carbsG = foodItem.carbsG,
                                 proteinG = foodItem.proteinG,

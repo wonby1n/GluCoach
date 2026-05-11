@@ -15,7 +15,7 @@ public interface UserFoodGradeRepository extends JpaRepository<UserFoodGrade, In
   @Query(
       """
       SELECT new com.ssafy.s309.domain.meal.dto.FoodGradeResponse(
-          ufg.foodId, f.name, ufg.grade, ufg.avgSlope, ufg.mealCount, ufg.updatedAt)
+          ufg.foodId, f.name, f.displayName, ufg.grade, ufg.avgSlope, ufg.mealCount, ufg.updatedAt)
       FROM UserFoodGrade ufg
       JOIN Food f ON ufg.foodId = f.id
       WHERE ufg.userId = :userId
@@ -29,6 +29,7 @@ public interface UserFoodGradeRepository extends JpaRepository<UserFoodGrade, In
           """
           SELECT ufg.food_id        AS foodId,
                  f.name             AS foodName,
+                 f.display_name     AS foodDisplayName,
                  ufg.grade          AS grade,
                  ufg.avg_slope      AS avgSlope,
                  ufg.meal_count     AS mealCount,
@@ -52,6 +53,8 @@ public interface UserFoodGradeRepository extends JpaRepository<UserFoodGrade, In
     Integer getFoodId();
 
     String getFoodName();
+
+    String getFoodDisplayName();
 
     String getGrade();
 
