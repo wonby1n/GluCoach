@@ -12,9 +12,11 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -79,6 +81,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.ssafy.s309.data.model.DailyGlucoseItem
 import com.ssafy.s309.data.model.WeeklyFoodItem
 import com.ssafy.s309.data.model.WeeklyReportResponse
 import com.ssafy.s309.ui.component.FoodCategoryImageMapper
@@ -96,6 +99,7 @@ private data class SummaryCard(
     val unit: String,
     val changeText: String,
     val changeColor: Color,
+    val isClickable: Boolean = false,
 )
 
 private data class ReportFoodCard(
@@ -130,6 +134,18 @@ private fun WeeklyFoodItem.toReportFoodCard(gradeMap: Map<Int, String>) =
         grade = gradeMap[foodId] ?: if (type == "GOOD") "A" else "D",
     )
 
+private fun String.toPatternChips(): List<String> =
+    split(Regex("[.。\n]+"))
+        .map { it.trim().trimEnd('.', ' ') }
+        .filter { it.length > 2 }
+        .take(5)
+
+private fun weekDayLabel(dateStr: String): String =
+    runCatching {
+        val d = LocalDate.parse(dateStr)
+        listOf("월", "화", "수", "목", "금", "토", "일")[d.dayOfWeek.value - 1] + "요일"
+    }.getOrDefault("")
+
 private fun WeeklyReportResponse.toSummaryCards(prevAvgGlucose: Double?) =
     listOf(
         run {
@@ -151,6 +167,14 @@ private fun WeeklyReportResponse.toSummaryCards(prevAvgGlucose: Double?) =
                 if (stable) "안정적" else "불안정적",
                 if (stable) Color(0xFF2196F3) else Color(0xFFE96A6A),
             )
+        },
+        run {
+            val label = dailyGlucose.maxByOrNull { it.max }?.let { "${weekDayLabel(it.date)} 기록" } ?: "이번 주 최고"
+            SummaryCard("최고 혈당", maxGlucose.toInt().toString(), "mg/dL", label, Color(0xFFE96A6A), isClickable = true)
+        },
+        run {
+            val label = dailyGlucose.minByOrNull { it.min }?.let { "${weekDayLabel(it.date)} 기록" } ?: "이번 주 최저"
+            SummaryCard("최저 혈당", minGlucose.toInt().toString(), "mg/dL", label, Color(0xFF2196F3), isClickable = true)
         },
     )
 
@@ -244,6 +268,7 @@ private fun AIReportSuccessContent(
 ) {
     val report = state.current
     var selectedFood by remember(report.id) { mutableStateOf<ReportFoodCard?>(null) }
+    var showDailyDetail by remember(report.id) { mutableStateOf(false) }
 
     val prevAvgGlucose = remember(state.selectedIndex) { state.reports.getOrNull(state.selectedIndex + 1)?.avgGlucose }
     val summaryCards = remember(report.id) { report.toSummaryCards(prevAvgGlucose) }
@@ -251,18 +276,28 @@ private fun AIReportSuccessContent(
         remember(report.id, state.gradeMap) { report.foods.filter { it.type == "GOOD" }.map { it.toReportFoodCard(state.gradeMap) } }
     val cautionFoods =
         remember(report.id, state.gradeMap) { report.foods.filter { it.type == "BAD" }.map { it.toReportFoodCard(state.gradeMap) } }
-    val weeklyGlucose =
+    val (weeklyAvg, weeklyMax, weeklyMin) =
         remember(report.id) {
             if (report.dailyGlucose.isEmpty()) {
-                List<Float?>(7) { report.avgGlucose.toFloat() }
+                Triple(
+                    List<Float?>(7) { report.avgGlucose.toFloat() },
+                    List<Float?>(7) { report.maxGlucose.toFloat() },
+                    List<Float?>(7) { report.minGlucose.toFloat() },
+                )
             } else {
                 val weekStart = LocalDate.parse(report.weekStart)
-                val slots = arrayOfNulls<Float>(7)
+                val avgSlots = arrayOfNulls<Float>(7)
+                val maxSlots = arrayOfNulls<Float>(7)
+                val minSlots = arrayOfNulls<Float>(7)
                 report.dailyGlucose.forEach { item ->
                     val idx = (LocalDate.parse(item.date).toEpochDay() - weekStart.toEpochDay()).toInt()
-                    if (idx in 0..6) slots[idx] = item.avg.toFloat()
+                    if (idx in 0..6) {
+                        avgSlots[idx] = item.avg.toFloat()
+                        maxSlots[idx] = item.max.toFloat()
+                        minSlots[idx] = item.min.toFloat()
+                    }
                 }
-                slots.toList()
+                Triple(avgSlots.toList(), maxSlots.toList(), minSlots.toList())
             }
         }
     val (tirColor, tirMessage) =
@@ -341,12 +376,27 @@ private fun AIReportSuccessContent(
             Spacer(modifier = Modifier.height(GlucoachSpacing.md))
         }
 
-        WeeklySummaryRow(cards = summaryCards)
+        WeeklySummaryRow(
+            cards = summaryCards,
+            onDetailClick = { showDailyDetail = true },
+        )
+
+        if (showDailyDetail) {
+            GlucoseDailyDetailSheet(
+                dailyGlucose = report.dailyGlucose,
+                weekRange = formatWeekRange(report.weekStart),
+                onDismiss = { showDailyDetail = false },
+            )
+        }
 
         Column(modifier = Modifier.padding(horizontal = 22.dp)) {
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
-            WeeklyGlucoseChart(weeklyGlucose = weeklyGlucose)
+            WeeklyGlucoseChart(
+                weeklyAvg = weeklyAvg,
+                weeklyMax = weeklyMax,
+                weeklyMin = weeklyMin,
+            )
 
             val hasSamsungData =
                 (report.avgSleepMinutes != null && report.avgSleepMinutes > 0) ||
@@ -471,7 +521,10 @@ private fun AIReportSuccessContent(
 // ── 이번주 요약 카드 ─────────────────────────────────────
 
 @Composable
-private fun WeeklySummaryRow(cards: List<SummaryCard>) {
+private fun WeeklySummaryRow(
+    cards: List<SummaryCard>,
+    onDetailClick: () -> Unit = {},
+) {
     Row(
         modifier =
             Modifier
@@ -481,7 +534,11 @@ private fun WeeklySummaryRow(cards: List<SummaryCard>) {
         horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.md),
     ) {
         cards.forEach { card ->
-            SummaryStatItem(card = card, modifier = Modifier.width(130.dp))
+            SummaryStatItem(
+                card = card,
+                modifier = Modifier.width(130.dp),
+                onClick = if (card.isClickable) onDetailClick else null,
+            )
         }
     }
 }
@@ -490,6 +547,7 @@ private fun WeeklySummaryRow(cards: List<SummaryCard>) {
 private fun SummaryStatItem(
     card: SummaryCard,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
 ) {
     Column(
         modifier =
@@ -498,16 +556,32 @@ private fun SummaryStatItem(
                 .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
                 .clip(RoundedCornerShape(GlucoachCorner.card))
                 .background(GlucoachColors.Surface)
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
                 .padding(GlucoachSpacing.lg),
     ) {
         Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
-            Text(
-                text = card.title,
-                color = GlucoachColors.TextSecondary,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = card.title,
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (onClick != null) {
+                    Text(
+                        text = "상세",
+                        color = card.changeColor,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
         }
         Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
             Row(verticalAlignment = Alignment.Bottom) {
@@ -532,14 +606,33 @@ private fun SummaryStatItem(
 // ── 7일 혈당 추이 차트 ──────────────────────────────────
 
 @Composable
-private fun WeeklyGlucoseChart(weeklyGlucose: List<Float?>) {
+private fun WeeklyGlucoseChart(
+    weeklyAvg: List<Float?>,
+    weeklyMax: List<Float?>,
+    weeklyMin: List<Float?>,
+) {
+    var selectedMode by remember { mutableIntStateOf(0) }
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     val days = listOf("월", "화", "수", "목", "금", "토", "일")
     val highThreshold = 180f
     val lowThreshold = 60f
-    val dangerColor = Color(0xFFE96A6A)
-    val dataMax = weeklyGlucose.filterNotNull().maxOrNull() ?: 200f
-    val dataMin = weeklyGlucose.filterNotNull().minOrNull() ?: 50f
+
+    val points =
+        when (selectedMode) {
+            1 -> weeklyMax
+            2 -> weeklyMin
+            else -> weeklyAvg
+        }
+    val (lineColor, dangerColor) =
+        when (selectedMode) {
+            1 -> Color(0xFFE96A6A) to Color(0xFFE96A6A)
+            2 -> Color(0xFF2196F3) to Color(0xFF2196F3)
+            else -> GlucoachColors.Primary to Color(0xFFE96A6A)
+        }
+    val tabColors = listOf(GlucoachColors.Primary, Color(0xFFE96A6A), Color(0xFF2196F3))
+
+    val dataMax = points.filterNotNull().maxOrNull() ?: 200f
+    val dataMin = points.filterNotNull().minOrNull() ?: 50f
     val maxVal = maxOf(200f, dataMax + 20f)
     val minVal = minOf(50f, dataMin - 20f).coerceAtLeast(0f)
     val range = maxVal - minVal
@@ -553,25 +646,62 @@ private fun WeeklyGlucoseChart(weeklyGlucose: List<Float?>) {
                 .background(GlucoachColors.Surface)
                 .padding(GlucoachSpacing.xl),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Box(
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(lineColor.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.WaterDrop,
+                        contentDescription = null,
+                        tint = lineColor,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                Column {
+                    Text(text = "이번 주 혈당 흐름", color = GlucoachColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "mg/dL", color = GlucoachColors.TextSecondary, fontSize = 11.sp)
+                }
+            }
+
+            Row(
                 modifier =
                     Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(GlucoachColors.Primary.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center,
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(GlucoachColors.Border.copy(alpha = 0.5f))
+                        .padding(3.dp),
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.WaterDrop,
-                    contentDescription = null,
-                    tint = GlucoachColors.Primary,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            Column {
-                Text(text = "이번 주 혈당 흐름", color = GlucoachColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                Text(text = "mg/dL", color = GlucoachColors.TextSecondary, fontSize = 11.sp)
+                listOf("평균", "최고", "최저").forEachIndexed { idx, label ->
+                    val isSelected = selectedMode == idx
+                    Box(
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(17.dp))
+                                .background(if (isSelected) tabColors[idx] else Color.Transparent)
+                                .clickable {
+                                    selectedMode = idx
+                                    selectedIndex = null
+                                }
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = label,
+                            color = if (isSelected) Color.White else GlucoachColors.TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        )
+                    }
+                }
             }
         }
 
@@ -581,8 +711,7 @@ private fun WeeklyGlucoseChart(weeklyGlucose: List<Float?>) {
         var chartWidthPx by remember { mutableIntStateOf(0) }
         val density = LocalDensity.current
         val widthDp = with(density) { chartWidthPx.toDp() }
-        val stepDp = if (weeklyGlucose.size > 1 && chartWidthPx > 0) widthDp / (weeklyGlucose.size - 1) else 0.dp
-        // 점선 위 4dp 간격에 라벨 배치
+        val stepDp = if (points.size > 1 && chartWidthPx > 0) widthDp / (points.size - 1) else 0.dp
         val y180 = (chartHeight * (1f - (highThreshold - minVal) / range) - 17.dp).coerceIn(0.dp, chartHeight - 14.dp)
         val y60 = (chartHeight * (1f - (lowThreshold - minVal) / range) - 17.dp).coerceIn(0.dp, chartHeight - 14.dp)
 
@@ -600,7 +729,9 @@ private fun WeeklyGlucoseChart(weeklyGlucose: List<Float?>) {
 
                 fun yFor(v: Float) = h - ((v - minVal) / range) * h
 
-                drawRect(color = Color(0x1AE53935), topLeft = Offset(0f, 0f), size = Size(w, yFor(highThreshold)))
+                if (selectedMode == 0) {
+                    drawRect(color = Color(0x1AE53935), topLeft = Offset(0f, 0f), size = Size(w, yFor(highThreshold)))
+                }
 
                 val dashEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
                 val gridColor = GlucoachColors.ChartGrid
@@ -619,7 +750,6 @@ private fun WeeklyGlucoseChart(weeklyGlucose: List<Float?>) {
                     pathEffect = dashEffect,
                 )
 
-                val points = weeklyGlucose
                 if (points.size >= 2) {
                     val step = w / (points.size - 1)
                     for (i in 1 until points.size) {
@@ -628,41 +758,42 @@ private fun WeeklyGlucoseChart(weeklyGlucose: List<Float?>) {
                         val x0 = (i - 1) * step
                         val x1 = i * step
                         val cx = (x0 + x1) / 2f
-                        val p0High = v0 > highThreshold
-                        val p1High = v1 > highThreshold
-                        if (p0High == p1High) {
+                        if (selectedMode == 0) {
+                            val p0High = v0 > highThreshold
+                            val p1High = v1 > highThreshold
+                            if (p0High == p1High) {
+                                val path =
+                                    Path().apply {
+                                        moveTo(x0, yFor(v0))
+                                        cubicTo(cx, yFor(v0), cx, yFor(v1), x1, yFor(v1))
+                                    }
+                                drawPath(path, if (p0High) dangerColor else lineColor, style = Stroke(2.5f, cap = StrokeCap.Round))
+                            } else {
+                                val ratio = (highThreshold - v0) / (v1 - v0)
+                                val xMid = x0 + ratio * (x1 - x0)
+                                val yMid = yFor(highThreshold)
+                                val cx0 = (x0 + xMid) / 2f
+                                val cx1 = (xMid + x1) / 2f
+                                val path0 =
+                                    Path().apply {
+                                        moveTo(x0, yFor(v0))
+                                        cubicTo(cx0, yFor(v0), cx0, yMid, xMid, yMid)
+                                    }
+                                drawPath(path0, if (p0High) dangerColor else lineColor, style = Stroke(2.5f, cap = StrokeCap.Round))
+                                val path1 =
+                                    Path().apply {
+                                        moveTo(xMid, yMid)
+                                        cubicTo(cx1, yMid, cx1, yFor(v1), x1, yFor(v1))
+                                    }
+                                drawPath(path1, if (p1High) dangerColor else lineColor, style = Stroke(2.5f, cap = StrokeCap.Round))
+                            }
+                        } else {
                             val path =
                                 Path().apply {
                                     moveTo(x0, yFor(v0))
                                     cubicTo(cx, yFor(v0), cx, yFor(v1), x1, yFor(v1))
                                 }
-                            drawPath(path, if (p0High) dangerColor else GlucoachColors.Primary, style = Stroke(2.5f, cap = StrokeCap.Round))
-                        } else {
-                            val ratio = (highThreshold - v0) / (v1 - v0)
-                            val xMid = x0 + ratio * (x1 - x0)
-                            val yMid = yFor(highThreshold)
-                            val cx0 = (x0 + xMid) / 2f
-                            val cx1 = (xMid + x1) / 2f
-                            val path0 =
-                                Path().apply {
-                                    moveTo(x0, yFor(v0))
-                                    cubicTo(cx0, yFor(v0), cx0, yMid, xMid, yMid)
-                                }
-                            drawPath(
-                                path0,
-                                if (p0High) dangerColor else GlucoachColors.Primary,
-                                style = Stroke(2.5f, cap = StrokeCap.Round),
-                            )
-                            val path1 =
-                                Path().apply {
-                                    moveTo(xMid, yMid)
-                                    cubicTo(cx1, yMid, cx1, yFor(v1), x1, yFor(v1))
-                                }
-                            drawPath(
-                                path1,
-                                if (p1High) dangerColor else GlucoachColors.Primary,
-                                style = Stroke(2.5f, cap = StrokeCap.Round),
-                            )
+                            drawPath(path, lineColor, style = Stroke(2.5f, cap = StrokeCap.Round))
                         }
                     }
                     selectedIndex?.let { idx ->
@@ -680,7 +811,7 @@ private fun WeeklyGlucoseChart(weeklyGlucose: List<Float?>) {
                         if (v == null) return@forEachIndexed
                         val cx = i * step
                         val cy = yFor(v)
-                        val pointColor = if (v > highThreshold) dangerColor else GlucoachColors.Primary
+                        val pointColor = if (selectedMode == 0 && v > highThreshold) dangerColor else lineColor
                         if (selectedIndex == i) {
                             drawCircle(color = pointColor, radius = 8f, center = Offset(cx, cy))
                             drawCircle(color = GlucoachColors.Surface, radius = 4f, center = Offset(cx, cy))
@@ -692,7 +823,6 @@ private fun WeeklyGlucoseChart(weeklyGlucose: List<Float?>) {
                 }
             }
 
-            // 점선 바로 위 라벨
             Text(
                 text = "180",
                 color = Color(0xFFE96A6A),
@@ -709,7 +839,7 @@ private fun WeeklyGlucoseChart(weeklyGlucose: List<Float?>) {
             )
 
             selectedIndex?.let { idx ->
-                val v = weeklyGlucose.getOrNull(idx) ?: return@let
+                val v = points.getOrNull(idx) ?: return@let
                 val text = "${v.toInt()}"
                 val textHalfWidth = (text.length * 3.5f).dp
                 val cx = stepDp * idx
@@ -719,7 +849,7 @@ private fun WeeklyGlucoseChart(weeklyGlucose: List<Float?>) {
                 val tipY = maxOf(0.dp, cy - 28.dp)
                 Text(
                     text = text,
-                    color = if (v > 180f) Color(0xFFE96A6A) else GlucoachColors.Primary,
+                    color = lineColor,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.offset(x = tipX, y = tipY),
@@ -743,7 +873,7 @@ private fun WeeklyGlucoseChart(weeklyGlucose: List<Float?>) {
                         Modifier
                             .size(28.dp)
                             .clip(CircleShape)
-                            .background(if (isSelected) GlucoachColors.Primary else Color.Transparent)
+                            .background(if (isSelected) lineColor else Color.Transparent)
                             .clickable { selectedIndex = if (selectedIndex == idx) null else idx },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -908,45 +1038,252 @@ private fun FoodGradeCard(
 @Composable
 private fun WeeklyPatternAnalysis(patterns: List<PatternItem>) {
     Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
-                .clip(RoundedCornerShape(GlucoachCorner.card))
-                .background(GlucoachColors.Surface)
-                .padding(GlucoachSpacing.xl),
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(GlucoachSpacing.md),
     ) {
-        Text(text = "이번 주 패턴 분석", color = GlucoachColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text(text = "이번 주 패턴 분석", color = GlucoachColors.TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
 
-        Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
-
-        patterns.forEachIndexed { index, item ->
-            PatternRow(item)
-            if (index < patterns.lastIndex) Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+        patterns.forEach { item ->
+            PatternCard(item)
         }
     }
 }
 
 @Composable
-private fun PatternRow(item: PatternItem) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+private fun PatternCard(item: PatternItem) {
+    val accentColor = item.iconBgColor
+    val chips = remember(item.description) { item.description.toPatternChips() }
+
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+                .shadow(2.dp, RoundedCornerShape(GlucoachCorner.card))
+                .clip(RoundedCornerShape(GlucoachCorner.card))
+                .background(GlucoachColors.Surface),
+    ) {
         Box(
             modifier =
                 Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(item.iconBgColor.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center,
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(accentColor),
+        )
+
+        Column(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .padding(horizontal = GlucoachSpacing.lg, vertical = GlucoachSpacing.lg),
         ) {
-            Icon(imageVector = item.icon, contentDescription = null, tint = item.iconBgColor, modifier = Modifier.size(22.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(accentColor.copy(alpha = 0.12f))
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+            ) {
+                Icon(imageVector = item.icon, contentDescription = null, tint = accentColor, modifier = Modifier.size(14.dp))
+                Text(text = item.title, color = accentColor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                chips.forEach { chip ->
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(accentColor.copy(alpha = 0.07f))
+                                .padding(horizontal = 10.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .size(5.dp)
+                                    .clip(CircleShape)
+                                    .background(accentColor),
+                        )
+                        Text(
+                            text = chip,
+                            color = GlucoachColors.TextPrimary,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                        )
+                    }
+                }
+            }
         }
+    }
+}
 
-        Spacer(modifier = Modifier.width(GlucoachSpacing.md))
+// ── 일별 혈당 상세 BottomSheet ──────────────────────────
 
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = item.title, color = GlucoachColors.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(GlucoachSpacing.xs))
-            Text(text = item.description, color = GlucoachColors.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp)
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GlucoseDailyDetailSheet(
+    dailyGlucose: List<DailyGlucoseItem>,
+    weekRange: String,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = GlucoachColors.Surface,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = null,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 22.dp)
+                    .padding(top = 24.dp, bottom = 32.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column {
+                    Text(text = "일별 혈당 기록", color = GlucoachColors.TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(text = weekRange, color = GlucoachColors.TextSecondary, fontSize = 13.sp)
+                }
+                IconButton(onClick = onDismiss) {
+                    Icon(imageVector = Icons.Outlined.Close, contentDescription = "닫기", tint = GlucoachColors.TextSecondary)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(GlucoachColors.Primary.copy(alpha = 0.08f))
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+            ) {
+                Text(
+                    text = "날짜",
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1.2f),
+                )
+                Text(
+                    text = "평균",
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "최고",
+                    color = Color(0xFFE96A6A),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "최저",
+                    color = Color(0xFF2196F3),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                )
+            }
+
+            if (dailyGlucose.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(text = "일별 데이터가 없어요", color = GlucoachColors.TextSecondary, fontSize = 14.sp)
+                }
+            } else {
+                dailyGlucose.forEach { item ->
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = weekDayLabel(item.date),
+                            color = GlucoachColors.TextPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1.2f),
+                        )
+                        Text(
+                            text = "${item.avg.toInt()}",
+                            color = GlucoachColors.TextPrimary,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center,
+                        )
+                        Text(
+                            text = "${item.max.toInt()}",
+                            color = Color(0xFFE96A6A),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center,
+                        )
+                        Text(
+                            text = "${item.min.toInt()}",
+                            color = Color(0xFF2196F3),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(GlucoachColors.Border),
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFE96A6A)))
+                    Text(text = "최고", color = GlucoachColors.TextSecondary, fontSize = 12.sp)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF2196F3)))
+                    Text(text = "최저", color = GlucoachColors.TextSecondary, fontSize = 12.sp)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(GlucoachColors.TextSecondary))
+                    Text(text = "단위 mg/dL", color = GlucoachColors.TextSecondary, fontSize = 12.sp)
+                }
+            }
         }
     }
 }
