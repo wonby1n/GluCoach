@@ -55,8 +55,8 @@ class ToolCallDetail(BaseModel):
 
 
 class AgentResponse(BaseModel):
-    status: Literal["success", "fallback", "error"] = Field(
-        ..., description="실행 결과 상태"
+    status: Literal["success", "fallback", "error", "accepted"] = Field(
+        ..., description="실행 결과 상태 (accepted: 백그라운드 처리 중)"
     )
     notification_sent: Optional[str] = Field(
         None, description="발송된 알림 메시지"
