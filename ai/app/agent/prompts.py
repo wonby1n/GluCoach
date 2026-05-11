@@ -133,18 +133,21 @@ def build_postmeal_prompt(trigger: dict) -> str:
 
 1) 지금 불가 (예: "회의 중", "바빠요", "잠깐만", "이따가", "나중에")
    → schedule_followup(delay_minutes=30) 호출
-   → "30분 뒤에 다시 확인할게요" 식의 재확인 예약 메시지 발송
+   → send_notification으로 재확인 예약 메시지 발송 (options는 빈 배열 [] 로 전달할 것)
    → 톤: 사용자 상황을 존중하는 가벼운 표현
 
 2) 수락 (예: "알겠어요", "나갔다 올게요", "산책 갈게요", "ㅇㅋ")
-   → 짧은 격려 메시지만 발송 (1문장, 30자 이내)
-   → 사용자는 지금 막 활동을 시작하려는 것임. "움직여주셔서", "다녀오셨나요" 같이 이미 완료한 표현 절대 쓰지 말 것
-   → 예시: "좋아요! 가볍게 다녀오세요 😊", "파이팅! 금방이에요 💪"
+   → 출발 격려 메시지만 발송 (1문장, 20자 이내, options는 빈 배열 [] 로 전달할 것)
+   → 사용자는 지금 막 나가려는 상태. 아직 활동을 시작하지 않았음.
+   → [절대 금지] "움직여주셔서", "다녀오셨나요", "좋아요!", "~해주셔서" 등 완료형·감사형 표현
+   → [필수 톤] 출발을 응원하는 짧은 한마디. 예: "가볍게 다녀오세요 😊", "파이팅! 금방이에요 💪", "좋은 선택! 다녀오세요 🚶"
    → schedule_followup 호출하지 말 것
 
 3) 거절 (예: "괜찮아요", "됐어요", "안 할래요", "싫어요")
    → send_notification, schedule_followup 모두 호출하지 말 것
    → 조용히 종료 (아무 알림도 보내지 않음)
+
+[중요] user_response 트리거에서는 send_notification 호출 시 options를 반드시 빈 배열 []로 전달할 것. 버튼은 첫 알림에만 존재해야 합니다.
 """
     elif reason == "schedule_followup":
         original_reply = trigger.get("original_reply", "")
@@ -167,6 +170,7 @@ def build_postmeal_prompt(trigger: dict) -> str:
 - 이전 사용자 응답 맥락을 자연스럽게 이어갈 것 (예: "회의 끝나셨나요?")
 - schedule_followup을 다시 호출하지 말 것 (재예약 금지, 이번이 마지막 시도)
 - 이번에도 활동을 거부하면 조용히 종료
+- send_notification 호출 시 options는 반드시 빈 배열 []로 전달할 것 (버튼 없음)
 """
     else:
         trigger_section = f"""[트리거 정보]
