@@ -152,6 +152,12 @@ public class WeeklyReportQueryService {
         .toList();
   }
 
+  public WeeklyHealthStatsProjection getHealthStats(Integer userId, LocalDate weekStart) {
+    return dailyHealthSummaryRepository
+        .findWeeklyHealthStats(userId, weekStart, weekStart.plusDays(6))
+        .orElse(null);
+  }
+
   private List<FoodItem> toFoodItems(List<WeeklyFoodItemProjection> projections) {
     return projections.stream()
         .map(p -> FoodItem.builder().foodName(p.getFoodName()).avgSlope(p.getAvgSlope()).build())

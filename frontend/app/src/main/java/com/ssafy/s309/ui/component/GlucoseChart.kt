@@ -222,7 +222,7 @@ private fun GlucoseChartBody(
         val yRange = (yMax - yMin).toFloat().coerceAtLeast(1f)
         Text(
             text = "$dataMax",
-            color = GlucoachColors.TextPrimary,
+            color = glucoseZoneColor(dataMax, range),
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             modifier =
@@ -232,7 +232,7 @@ private fun GlucoseChartBody(
         )
         Text(
             text = "$dataMin",
-            color = GlucoachColors.TextPrimary,
+            color = glucoseZoneColor(dataMin, range),
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             modifier =
@@ -240,6 +240,10 @@ private fun GlucoseChartBody(
                     .offset(y = CHART_TOP_PADDING + canvasInnerHeight - yLabelHalfHeight)
                     .padding(start = 4.dp),
         )
+
+        val lastPointColor =
+            readings.lastOrNull()?.let { glucoseZoneColor(it.valueMgDl, range) }
+                ?: GlucoachColors.Primary
 
         Canvas(
             modifier =
@@ -303,10 +307,12 @@ private fun GlucoseChartBody(
                             val p1 = pts[i - 1]
                             val p2 = pts[i]
                             val p3 = pts[minOf(i + 1, pts.lastIndex)]
+                            val cp1x = (p1.x + (p2.x - p0.x) / 6f).coerceIn(p1.x, p2.x)
+                            val cp2x = (p2.x - (p3.x - p1.x) / 6f).coerceIn(p1.x, p2.x)
                             cubicTo(
-                                p1.x + (p2.x - p0.x) / 6f,
+                                cp1x,
                                 p1.y + (p2.y - p0.y) / 6f,
-                                p2.x - (p3.x - p1.x) / 6f,
+                                cp2x,
                                 p2.y - (p3.y - p1.y) / 6f,
                                 p2.x,
                                 p2.y,
@@ -325,7 +331,7 @@ private fun GlucoseChartBody(
                 val cx = xFor(last.timestampMillis)
                 val cy = yFor(last.valueMgDl)
                 drawCircle(
-                    color = GlucoachColors.Primary,
+                    color = lastPointColor,
                     radius = 6f,
                     center = Offset(cx, cy),
                     style = Stroke(width = 2f),

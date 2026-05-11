@@ -72,15 +72,22 @@ class FoodComparisonViewModel
 
         internal fun selectMeal(
             food: FoodItem,
-            mealHour: Int,
+            dateTime: LocalDateTime,
+            memo: String,
+            imageFile: java.io.File? = null,
         ) {
             viewModelScope.launch {
                 _uiState.update { it.copy(isLoading = true, mealError = null) }
-                val recordedAt =
-                    LocalDateTime.now()
-                        .withHour(mealHour).withMinute(0).withSecond(0).withNano(0)
-                        .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                healthRepository.createMealRecord(MealCreateRequest(foodId = food.id.toInt(), recordedAt = recordedAt))
+                val recordedAt = dateTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                healthRepository.createMealRecord(
+                    request =
+                        MealCreateRequest(
+                            foodId = food.id.toInt(),
+                            memo = memo.ifBlank { null },
+                            recordedAt = recordedAt,
+                        ),
+                    imageFile = imageFile,
+                )
                     .onSuccess {
                         _uiState.update { it.copy(isLoading = false, mealRecorded = true) }
                     }

@@ -1,5 +1,9 @@
 package com.ssafy.s309.ui.screen.main
 
+import android.net.Uri
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -27,6 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Clear
@@ -68,6 +73,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -81,17 +87,21 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil3.compose.AsyncImage
 import com.ssafy.s309.R
 import com.ssafy.s309.data.model.FoodSearchItem
 import com.ssafy.s309.data.model.GlucoseCompareResponse
 import com.ssafy.s309.data.model.GlucosePrediction
 import com.ssafy.s309.data.model.GlucoseRange
 import com.ssafy.s309.ui.component.FoodCategoryImageMapper
+import com.ssafy.s309.ui.component.MealDateTimePicker
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
 import com.ssafy.s309.ui.viewmodel.FoodSearchViewModel
 import kotlinx.coroutines.delay
+import java.io.File
+import java.time.LocalDateTime
 
 // ── 데이터 ──────────────────────────────────────────────
 
@@ -263,6 +273,7 @@ fun FoodComparisonContent(
             foodB = foodB!!,
             compareResult = uiState.result!!,
             glucoseRange = uiState.glucoseRange,
+            isSaving = uiState.isLoading,
             onResetSelection = {
                 foodA = null
                 foodB = null
@@ -276,7 +287,7 @@ fun FoodComparisonContent(
                 foodB = null
                 viewModel.resetResult()
             },
-            onSelectMeal = { food, hour -> viewModel.selectMeal(food, hour) },
+            onSelectMeal = { food, dateTime, memo, imageFile -> viewModel.selectMeal(food, dateTime, memo, imageFile) },
             modifier = modifier,
         )
     } else {
@@ -940,7 +951,7 @@ internal fun FoodSearchDialog(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = item.name,
+                                            text = item.displayName ?: item.name,
                                             color = GlucoachColors.TextPrimary,
                                             fontSize = 15.sp,
                                         )
@@ -1054,18 +1065,33 @@ private fun FoodComparisonResultContent(
     foodB: FoodItem,
     compareResult: GlucoseCompareResponse,
     glucoseRange: GlucoseRange,
+    isSaving: Boolean,
     onResetSelection: () -> Unit,
     onFoodARemoved: () -> Unit,
     onFoodBRemoved: () -> Unit,
-    onSelectMeal: (FoodItem, Int) -> Unit,
+    onSelectMeal: (FoodItem, LocalDateTime, String, File?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var selectedFoodIndex by remember { mutableIntStateOf(1) }
+    val stableIndex = if (compareResult.foodA.peakMgdl <= compareResult.foodB.peakMgdl) 0 else 1
+    var selectedFoodIndex by remember(stableIndex) { mutableIntStateOf(stableIndex) }
     var showNutritionDialog by remember { mutableStateOf(false) }
     var nutritionDialogFoodIndex by remember { mutableIntStateOf(0) }
     var showMealTimeDialog by remember { mutableStateOf(false) }
+    var showMealInput by remember { mutableStateOf(false) }
+    var initialMealHour by remember { mutableIntStateOf(12) }
     val foods = listOf(foodA, foodB)
     val predictions = listOf(compareResult.foodA, compareResult.foodB)
+
+    if (showMealInput) {
+        MealRecordInputContent(
+            food = foods[selectedFoodIndex],
+            initialHour = initialMealHour,
+            isSaving = isSaving,
+            onBack = { showMealInput = false },
+            onSubmit = { dateTime, memo, imageFile -> onSelectMeal(foods[selectedFoodIndex], dateTime, memo, imageFile) },
+        )
+        return
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -1182,11 +1208,259 @@ private fun FoodComparisonResultContent(
             MealTimePickerDialog(
                 onTimeSelected = { hour ->
                     showMealTimeDialog = false
-                    onSelectMeal(foods[selectedFoodIndex], hour)
+                    initialMealHour = hour
+                    showMealInput = true
                 },
                 onDismiss = { showMealTimeDialog = false },
             )
         }
+    }
+}
+
+// ── 식사 기록 입력 ────────────────────────────────────────
+
+@Composable
+private fun MealRecordInputContent(
+    food: FoodItem,
+    initialHour: Int,
+    isSaving: Boolean,
+    onBack: () -> Unit,
+    onSubmit: (LocalDateTime, String, File?) -> Unit,
+) {
+    BackHandler { onBack() }
+
+    val context = LocalContext.current
+    var memo by remember { mutableStateOf("") }
+    var selectedDateTime by remember {
+        mutableStateOf(
+            LocalDateTime.now()
+                .withHour(initialHour).withMinute(0).withSecond(0).withNano(0),
+        )
+    }
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedImageFile by remember { mutableStateOf<File?>(null) }
+
+    val photoPickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent(),
+        ) { uri ->
+            if (uri != null) {
+                selectedImageUri = uri
+                val file = File.createTempFile("meal_", ".jpg", context.cacheDir)
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    file.outputStream().use { output -> input.copyTo(output) }
+                }
+                selectedImageFile = file
+            }
+        }
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(GlucoachColors.Background)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 22.dp),
+    ) {
+        Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+
+        Box(modifier = Modifier.fillMaxWidth()) {
+            IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                    contentDescription = "뒤로",
+                    tint = GlucoachColors.TextPrimary,
+                )
+            }
+            Text(
+                text = "식사 기록",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
+                    .clip(RoundedCornerShape(GlucoachCorner.card))
+                    .background(GlucoachColors.Surface)
+                    .padding(GlucoachSpacing.xl),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Image(
+                painter = painterResource(id = food.imageResId),
+                contentDescription = food.name,
+                modifier = Modifier.size(80.dp),
+                contentScale = ContentScale.Fit,
+            )
+            Spacer(modifier = Modifier.width(GlucoachSpacing.lg))
+            Column {
+                Text(
+                    text = food.name,
+                    color = GlucoachColors.TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.height(GlucoachSpacing.xs))
+                Text(
+                    text = "${food.calories}kcal",
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 14.sp,
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+        Text(
+            text = "식사 시간",
+            color = GlucoachColors.TextSecondary,
+            fontSize = 13.sp,
+        )
+        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+        MealDateTimePicker(
+            initialDateTime = selectedDateTime,
+            onDateTimeChanged = { selectedDateTime = it },
+        )
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+        Text(
+            text = "사진",
+            color = GlucoachColors.TextSecondary,
+            fontSize = 13.sp,
+        )
+        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+
+        if (selectedImageUri != null) {
+            Box(modifier = Modifier.fillMaxWidth()) {
+                AsyncImage(
+                    model = selectedImageUri,
+                    contentDescription = "선택한 사진",
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .clip(RoundedCornerShape(GlucoachCorner.card))
+                            .background(GlucoachColors.Surface),
+                    contentScale = ContentScale.Crop,
+                )
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.5f))
+                            .clickable {
+                                selectedImageUri = null
+                                selectedImageFile = null
+                            },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "사진 삭제",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+        } else {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .clip(RoundedCornerShape(GlucoachCorner.card))
+                        .background(GlucoachColors.Surface)
+                        .border(1.dp, GlucoachColors.Border, RoundedCornerShape(GlucoachCorner.card))
+                        .clickable { photoPickerLauncher.launch("image/*") },
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Outlined.Add,
+                        contentDescription = "사진 추가",
+                        tint = GlucoachColors.Primary,
+                        modifier = Modifier.size(32.dp),
+                    )
+                    Spacer(modifier = Modifier.height(GlucoachSpacing.xs))
+                    Text(
+                        text = "사진 추가",
+                        color = GlucoachColors.TextSecondary,
+                        fontSize = 13.sp,
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+        OutlinedTextField(
+            value = memo,
+            onValueChange = { memo = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = {
+                Text(
+                    text = "메모를 입력하세요",
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 14.sp,
+                )
+            },
+            shape = RoundedCornerShape(GlucoachCorner.card),
+            colors =
+                OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = GlucoachColors.Primary,
+                    unfocusedBorderColor = GlucoachColors.Border,
+                    focusedContainerColor = GlucoachColors.Surface,
+                    unfocusedContainerColor = GlucoachColors.Surface,
+                ),
+            minLines = 2,
+            maxLines = 4,
+        )
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+        Button(
+            onClick = { onSubmit(selectedDateTime, memo, selectedImageFile) },
+            enabled = !isSaving,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = GlucoachColors.Primary,
+                    contentColor = Color.White,
+                    disabledContainerColor = GlucoachColors.Primary.copy(alpha = 0.6f),
+                    disabledContentColor = Color.White,
+                ),
+        ) {
+            if (isSaving) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Text(
+                    text = "식사 기록하기",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
     }
 }
 

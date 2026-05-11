@@ -4,6 +4,8 @@ import com.ssafy.s309.domain.food.client.FoodApiClient;
 import com.ssafy.s309.domain.food.client.dto.FoodApiItem;
 import com.ssafy.s309.domain.food.dto.FoodSearchResult;
 import com.ssafy.s309.domain.food.exception.FoodApiException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,32 +33,48 @@ public class FoodService {
 
     List<FoodSearchResult> cached = tx.tryFreshCache(normalized);
     if (!cached.isEmpty()) {
+      List<FoodSearchResult> deduped = dedupByNormalizedName(cached);
       log.info(
           "[FoodSearch] cache=HIT query={} count={} elapsedMs={}",
           normalized,
-          cached.size(),
+          deduped.size(),
           System.currentTimeMillis() - startMs);
-      return cached;
+      return deduped;
     }
 
     try {
       List<FoodApiItem> items = foodApiClient.search(normalized);
-      List<FoodSearchResult> saved = tx.upsertAndReturn(items);
+      List<FoodSearchResult> deduped = dedupByNormalizedName(tx.upsertAndReturn(items));
       log.info(
           "[FoodSearch] cache=MISS query={} count={} elapsedMs={}",
           normalized,
-          saved.size(),
+          deduped.size(),
           System.currentTimeMillis() - startMs);
-      return saved;
+      return deduped;
     } catch (FoodApiException e) {
-      List<FoodSearchResult> stale = tx.fallbackToStale(normalized);
+      List<FoodSearchResult> deduped = dedupByNormalizedName(tx.fallbackToStale(normalized));
       log.warn(
           "[FoodSearch] cache=FALLBACK query={} count={} elapsedMs={} reason={}",
           normalized,
-          stale.size(),
+          deduped.size(),
           System.currentTimeMillis() - startMs,
           e.getMessage());
-      return stale;
+      return deduped;
     }
+  }
+
+  /**
+   * name 의 공백/언더스코어/하이픈을 제거한 키 기준 중복 제거.
+   *
+   * <p>입력은 이미 search_count desc 정렬 상태이므로 LinkedHashMap putIfAbsent 로 첫 번째(가장 인기) row 만 유지된다. 동일 식약처
+   * 항목이 띄어쓰기/표기 차이로 여러 row 로 적재된 케이스(예: "소고기 샤브샤브" vs "소고기샤브샤브")를 단일 표시로 통합.
+   */
+  private static List<FoodSearchResult> dedupByNormalizedName(List<FoodSearchResult> results) {
+    LinkedHashMap<String, FoodSearchResult> seen = new LinkedHashMap<>();
+    for (FoodSearchResult r : results) {
+      String key = r.name().replaceAll("[\\s_-]", "");
+      seen.putIfAbsent(key, r);
+    }
+    return new ArrayList<>(seen.values());
   }
 }

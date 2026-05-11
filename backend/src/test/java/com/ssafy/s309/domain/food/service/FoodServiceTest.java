@@ -114,4 +114,37 @@ class FoodServiceTest {
 
     verify(foodApiClient).search("사과");
   }
+
+  @Test
+  void search_는_띄어쓰기만_다른_중복_row_를_제거하고_search_count_상위_row_만_유지한다() {
+    // tryFreshCache 결과는 이미 search_count desc 정렬되어 있다고 가정.
+    given(tx.tryFreshCache("샤브샤브"))
+        .willReturn(List.of(result(1, "소고기 샤브샤브"), result(2, "소고기샤브샤브"), result(3, "갈비탕")));
+
+    List<FoodSearchResult> out = foodService.search("샤브샤브");
+
+    // 정규화 키 같은 두 row 중 첫 번째(id=1)만 유지, 다른 키(id=3)는 그대로.
+    assertThat(out).extracting(FoodSearchResult::id).containsExactly(1, 3);
+  }
+
+  @Test
+  void search_는_언더스코어_하이픈_변형도_중복으로_간주한다() {
+    given(tx.tryFreshCache("김치찌개"))
+        .willReturn(List.of(result(10, "김치찌개"), result(11, "김치_찌개"), result(12, "김치-찌개")));
+
+    List<FoodSearchResult> out = foodService.search("김치찌개");
+
+    assertThat(out).extracting(FoodSearchResult::id).containsExactly(10);
+  }
+
+  @Test
+  void search_는_정규화_후_키가_다르면_모두_유지한다() {
+    // "김치찌개", "김치찌개_햄", "햄_김치찌개" 는 정규화 후 키가 모두 달라 dedup 안 됨.
+    given(tx.tryFreshCache("김치찌개"))
+        .willReturn(List.of(result(20, "김치찌개"), result(21, "김치찌개_햄"), result(22, "햄_김치찌개")));
+
+    List<FoodSearchResult> out = foodService.search("김치찌개");
+
+    assertThat(out).extracting(FoodSearchResult::id).containsExactly(20, 21, 22);
+  }
 }

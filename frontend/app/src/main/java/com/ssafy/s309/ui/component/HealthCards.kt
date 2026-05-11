@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ssafy.s309.data.model.GlucoseRange
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
@@ -37,6 +38,7 @@ import com.ssafy.s309.ui.theme.GlucoachSpacing
 fun CurrentGlucoseCard(
     currentMgDl: Int,
     diffFromPrevious: Int,
+    glucoseRange: GlucoseRange = GlucoseRange(minMgDl = 70, maxMgDl = 140),
     modifier: Modifier = Modifier,
     mascotSlot: (@Composable () -> Unit)? = null,
 ) {
@@ -54,6 +56,8 @@ fun CurrentGlucoseCard(
                     shape = RoundedCornerShape(GlucoachCorner.card),
                 ),
     ) {
+        val glucoseColor = glucoseZoneColor(currentMgDl, glucoseRange)
+
         // 좌측 텍스트 블록
         Column(
             modifier =
@@ -64,14 +68,14 @@ fun CurrentGlucoseCard(
         ) {
             Text(
                 text = "현재 혈당",
-                color = GlucoachColors.PrimaryDark,
+                color = glucoseColor,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
             )
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     text = "$currentMgDl",
-                    color = GlucoachColors.PrimaryDark,
+                    color = glucoseColor,
                     fontSize = 52.sp,
                     fontWeight = FontWeight.Bold,
                 )
@@ -86,7 +90,7 @@ fun CurrentGlucoseCard(
             }
             Text(
                 text = "30분 전 대비 ${formatDiff(diffFromPrevious)}",
-                color = GlucoachColors.Primary,
+                color = glucoseColor,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
             )
@@ -112,6 +116,15 @@ private fun formatDiff(diff: Int): String =
         diff > 0 -> "+$diff"
         else -> "$diff"
     }
+
+internal fun glucoseZoneColor(
+    mgDl: Int,
+    range: GlucoseRange,
+) = when {
+    mgDl < range.minMgDl || mgDl > range.maxMgDl + 40 -> GlucoachColors.GlucoseDanger
+    mgDl > range.maxMgDl -> GlucoachColors.GlucoseWarning
+    else -> GlucoachColors.GlucoseNormal
+}
 
 /**
  * 2x1 배치되는 하단 정보 카드 (칼로리 / 수면).
