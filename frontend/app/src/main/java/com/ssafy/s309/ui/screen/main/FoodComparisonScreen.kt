@@ -940,7 +940,7 @@ internal fun FoodSearchDialog(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = item.name,
+                                            text = item.displayName ?: item.name,
                                             color = GlucoachColors.TextPrimary,
                                             fontSize = 15.sp,
                                         )

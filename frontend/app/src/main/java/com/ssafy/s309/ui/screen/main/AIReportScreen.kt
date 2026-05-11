@@ -122,7 +122,7 @@ private data class PatternItem(
 
 private fun WeeklyFoodItem.toReportFoodCard(gradeMap: Map<Int, String>) =
     ReportFoodCard(
-        name = foodName,
+        name = foodDisplayName ?: foodName,
         imageResId = FoodCategoryImageMapper.getImageRes(null, foodName),
         grade = gradeMap[foodId] ?: if (type == "GOOD") "A" else "D",
     )
