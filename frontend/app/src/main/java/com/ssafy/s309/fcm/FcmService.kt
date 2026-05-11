@@ -172,6 +172,7 @@ class FcmService : FirebaseMessagingService() {
             alertType == null -> R.raw.kiki_morning
             alertType.startsWith("AGENT_WAKE_UP") -> R.raw.kiki_morning
             alertType.startsWith("AGENT_MEAL_FOLLOWUP") -> R.raw.kiki_walk
+            alertType.startsWith("AGENT_MEAL_REPLY") -> R.raw.kiki_wait
             alertType.startsWith("AGENT_MEAL_RETRY") -> R.raw.kiki_stretch
             alertType.startsWith("AGENT_SLEEP_INSIGHT") -> R.raw.kiki_daily_done
             else -> R.raw.kiki_morning
