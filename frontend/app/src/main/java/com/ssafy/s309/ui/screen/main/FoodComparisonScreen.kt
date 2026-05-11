@@ -1060,7 +1060,8 @@ private fun FoodComparisonResultContent(
     onSelectMeal: (FoodItem, Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var selectedFoodIndex by remember { mutableIntStateOf(1) }
+    val stableIndex = if (compareResult.foodA.peakMgdl <= compareResult.foodB.peakMgdl) 0 else 1
+    var selectedFoodIndex by remember(stableIndex) { mutableIntStateOf(stableIndex) }
     var showNutritionDialog by remember { mutableStateOf(false) }
     var nutritionDialogFoodIndex by remember { mutableIntStateOf(0) }
     var showMealTimeDialog by remember { mutableStateOf(false) }
