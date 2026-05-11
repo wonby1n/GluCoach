@@ -45,7 +45,6 @@ import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
 import kotlin.math.max
-import kotlin.math.min
 
 /**
  * "오늘 혈당 흐름" 카드 전체 컴포넌트.
@@ -189,9 +188,11 @@ private fun GlucoseChartBody(
     readings: List<GlucoseReading>,
     range: GlucoseRange,
 ) {
-    // 축 라벨 계산
-    val yMax = max(range.maxMgDl, readings.maxOfOrNull { it.valueMgDl } ?: range.maxMgDl) + 20
-    val yMin = min(range.minMgDl, readings.minOfOrNull { it.valueMgDl } ?: range.minMgDl) - 20
+    val dataMax = readings.maxOfOrNull { it.valueMgDl } ?: range.maxMgDl
+    val dataMin = readings.minOfOrNull { it.valueMgDl } ?: range.minMgDl
+    val padding = max(((dataMax - dataMin) * 0.15f).toInt(), 15)
+    val yMax = dataMax + padding
+    val yMin = dataMin - padding
 
     val minTime = readings.firstOrNull()?.timestampMillis ?: 0L
     val maxTime = readings.lastOrNull()?.timestampMillis ?: 1L
@@ -219,33 +220,24 @@ private fun GlucoseChartBody(
         // Canvas 와 동일한 수직 패딩을 사용해 Y라벨을 회색 박스 상/하단에 정렬한다.
         val canvasInnerHeight = maxHeight - CHART_TOP_PADDING - CHART_BOTTOM_PADDING
         val yRange = (yMax - yMin).toFloat().coerceAtLeast(1f)
-        val topLabelOffset =
-            CHART_TOP_PADDING +
-                canvasInnerHeight * ((yMax - range.maxMgDl).toFloat() / yRange) -
-                yLabelHalfHeight
-        val bottomLabelOffset =
-            CHART_TOP_PADDING +
-                canvasInnerHeight * ((yMax - range.minMgDl).toFloat() / yRange) -
-                yLabelHalfHeight
-
         Text(
-            text = "${range.maxMgDl}",
+            text = "$dataMax",
             color = GlucoachColors.TextPrimary,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             modifier =
                 Modifier
-                    .offset(y = topLabelOffset)
+                    .offset(y = CHART_TOP_PADDING - yLabelHalfHeight)
                     .padding(start = 4.dp),
         )
         Text(
-            text = "${range.minMgDl}",
+            text = "$dataMin",
             color = GlucoachColors.TextPrimary,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             modifier =
                 Modifier
-                    .offset(y = bottomLabelOffset)
+                    .offset(y = CHART_TOP_PADDING + canvasInnerHeight - yLabelHalfHeight)
                     .padding(start = 4.dp),
         )
 
@@ -300,14 +292,27 @@ private fun GlucoseChartBody(
                 pathEffect = dash,
             )
 
-            // 3) 혈당 라인 (부드러운 path)
+            // 3) 혈당 라인 (Catmull-Rom 곡선)
             if (readings.size >= 2) {
-                val path = Path()
-                readings.forEachIndexed { index, reading ->
-                    val x = xFor(reading.timestampMillis)
-                    val y = yFor(reading.valueMgDl)
-                    if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                }
+                val pts = readings.map { Offset(xFor(it.timestampMillis), yFor(it.valueMgDl)) }
+                val path =
+                    Path().apply {
+                        moveTo(pts[0].x, pts[0].y)
+                        for (i in 1 until pts.size) {
+                            val p0 = pts[maxOf(i - 2, 0)]
+                            val p1 = pts[i - 1]
+                            val p2 = pts[i]
+                            val p3 = pts[minOf(i + 1, pts.lastIndex)]
+                            cubicTo(
+                                p1.x + (p2.x - p0.x) / 6f,
+                                p1.y + (p2.y - p0.y) / 6f,
+                                p2.x - (p3.x - p1.x) / 6f,
+                                p2.y - (p3.y - p1.y) / 6f,
+                                p2.x,
+                                p2.y,
+                            )
+                        }
+                    }
                 drawPath(
                     path = path,
                     color = GlucoachColors.Primary,
