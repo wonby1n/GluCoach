@@ -1,7 +1,6 @@
 package com.ssafy.s309.data.repository
 
 import android.util.Log
-import com.ssafy.s309.data.api.AgentApi
 import com.ssafy.s309.data.api.HealthApi
 import com.ssafy.s309.data.api.SleepSessionApi
 import com.ssafy.s309.data.ble.BleConnectionState
@@ -21,8 +20,6 @@ import com.ssafy.s309.data.model.MealCreateResponse
 import com.ssafy.s309.data.model.MealEvent
 import com.ssafy.s309.data.model.MealRecordResponse
 import com.ssafy.s309.data.model.NotificationItem
-import com.ssafy.s309.data.model.PostMealReplyRequest
-import com.ssafy.s309.data.model.PostMealTriggerRequest
 import com.ssafy.s309.data.model.SleepSessionCreateRequest
 import com.ssafy.s309.data.repository.source.HealthConnectDataSource
 import com.ssafy.s309.data.repository.source.HealthDataSource
@@ -55,7 +52,6 @@ class HealthRepository
     @Inject
     constructor(
         private val healthApi: HealthApi,
-        private val agentApi: AgentApi,
         private val sleepSessionApi: SleepSessionApi,
         private val mockDataSource: MockHealthDataSource,
         samsungDataSource: SamsungHealthDataSource,
@@ -234,20 +230,17 @@ class HealthRepository
                 healthApi.createMeal(request = requestBody, image = imagePart)
             }
 
-        /** 식후 활동 유도 에이전트에 유저 응답 전달. 실패해도 UI 상태는 유지. */
+        /** 식후 활동 유도 에이전트에 유저 응답 전달. 백엔드 경유로 DB 저장 + AI 디스패치. */
         suspend fun sendPostMealReply(
-            userId: String,
             userReply: String,
+            displayLabel: String,
         ) {
             runCatching {
-                agentApi.postMealReply(
-                    PostMealReplyRequest(
-                        user_id = userId,
-                        trigger =
-                            PostMealTriggerRequest(
-                                reason = "user_response",
-                                user_reply = userReply,
-                            ),
+                healthApi.sendChatCommand(
+                    ChatCommandRequest(
+                        commandType = "user_response",
+                        message = displayLabel,
+                        payload = mapOf("user_reply" to userReply),
                     ),
                 )
             }.onFailure { Log.w(TAG, "식후 응답 전송 실패", it) }
