@@ -407,6 +407,11 @@ fun MainScreenContent(
                 onClose = { showCameraPanel = false },
                 onMealSaved = {
                     showCameraPanel = false
+                    if (isAbMode) {
+                        mealLogTargetDate =
+                            java.time.LocalDate.now()
+                                .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
+                    }
                     selectedTab = if (isAbMode) "meallog" else "home"
                 },
             )
