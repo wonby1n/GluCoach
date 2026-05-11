@@ -299,6 +299,65 @@ class AuthServiceTest {
   }
 
   @Test
+  void 재발급_성공_새_토큰_쌍_반환_및_Redis_갱신() {
+    given(jwtProvider.validate("valid-refresh")).willReturn(true);
+    given(jwtProvider.isAccessToken("valid-refresh")).willReturn(false);
+    given(jwtProvider.getUserId("valid-refresh")).willReturn(USER_ID);
+    given(refreshTokenService.matches(USER_ID, "valid-refresh")).willReturn(true);
+    given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
+    given(jwtProvider.generateAccessToken(USER_ID, "test@example.com")).willReturn("new-access");
+    given(jwtProvider.generateRefreshToken(USER_ID)).willReturn("new-refresh");
+
+    TokenResponse response = authService.reissue("valid-refresh");
+
+    assertThat(response.accessToken()).isEqualTo("new-access");
+    assertThat(response.refreshToken()).isEqualTo("new-refresh");
+    verify(refreshTokenService).save(USER_ID, "new-refresh");
+    verify(refreshTokenService, never()).delete(any());
+  }
+
+  @Test
+  void 재발급_변조_또는_만료_토큰_예외_및_세션_유지() {
+    given(jwtProvider.validate("invalid-refresh")).willReturn(false);
+
+    assertThatThrownBy(() -> authService.reissue("invalid-refresh"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("유효하지 않은 리프레시 토큰");
+
+    // 변조/만료 케이스는 재사용 감지가 아니므로 기존 세션은 유지(delete 호출 없음)
+    verify(refreshTokenService, never()).delete(any());
+  }
+
+  @Test
+  void 재발급_AccessToken_을_RefreshToken_자리로_보낸_경우_예외() {
+    // validate=true && isAccessToken=true 분기 — 토큰 자체는 유효하지만 종류가 잘못된 경우.
+    // 재사용 감지가 아니므로 delete 호출되지 않음.
+    given(jwtProvider.validate("access-token")).willReturn(true);
+    given(jwtProvider.isAccessToken("access-token")).willReturn(true);
+
+    assertThatThrownBy(() -> authService.reissue("access-token"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("유효하지 않은 리프레시 토큰");
+
+    verify(refreshTokenService, never()).delete(any());
+  }
+
+  @Test
+  void 재발급_이미_사용된_토큰_재사용_감지_세션_무효화() {
+    given(jwtProvider.validate("reused-refresh")).willReturn(true);
+    given(jwtProvider.isAccessToken("reused-refresh")).willReturn(false);
+    given(jwtProvider.getUserId("reused-refresh")).willReturn(USER_ID);
+    given(refreshTokenService.matches(USER_ID, "reused-refresh")).willReturn(false);
+
+    assertThatThrownBy(() -> authService.reissue("reused-refresh"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("비정상적인 토큰 사용");
+
+    // 재사용 감지 시 해당 사용자 전체 세션 무효화
+    verify(refreshTokenService).delete(USER_ID);
+  }
+
+  @Test
   void 이메일_중복_확인_사용가능() {
     given(userRepository.existsByEmail("new@example.com")).willReturn(false);
 
