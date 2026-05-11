@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -84,6 +85,7 @@ import com.ssafy.s309.R
 import com.ssafy.s309.data.model.FoodSearchItem
 import com.ssafy.s309.data.model.GlucoseCompareResponse
 import com.ssafy.s309.data.model.GlucosePrediction
+import com.ssafy.s309.data.model.GlucoseRange
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
@@ -258,6 +260,7 @@ fun FoodComparisonContent(
             foodA = foodA!!,
             foodB = foodB!!,
             compareResult = uiState.result!!,
+            glucoseRange = uiState.glucoseRange,
             onResetSelection = {
                 foodA = null
                 foodB = null
@@ -1048,6 +1051,7 @@ private fun FoodComparisonResultContent(
     foodA: FoodItem,
     foodB: FoodItem,
     compareResult: GlucoseCompareResponse,
+    glucoseRange: GlucoseRange,
     onResetSelection: () -> Unit,
     onFoodARemoved: () -> Unit,
     onFoodBRemoved: () -> Unit,
@@ -1108,6 +1112,7 @@ private fun FoodComparisonResultContent(
                 foodB = foodB,
                 predictionA = compareResult.foodA,
                 predictionB = compareResult.foodB,
+                glucoseRange = glucoseRange,
             )
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
@@ -1475,12 +1480,18 @@ private fun GlucoseComparisonChart(
     foodB: FoodItem,
     predictionA: GlucosePrediction,
     predictionB: GlucosePrediction,
+    glucoseRange: GlucoseRange,
 ) {
+    val rangeHigh = glucoseRange.maxMgDl.toFloat()
+    val rangeLow = glucoseRange.minMgDl.toFloat()
     val curveA = predictionA.curve.map { it.glucoseMgdl }
     val curveB = predictionB.curve.map { it.glucoseMgdl }
-    val allValues = curveA + curveB
-    val maxVal = (allValues.maxOrNull() ?: 200f).coerceAtLeast(170f) + 10f
-    val minVal = (allValues.minOrNull() ?: 70f).coerceAtMost(90f) - 10f
+    val allValues = curveA + curveB + listOf(rangeHigh, rangeLow)
+    val dataMax = allValues.maxOrNull() ?: 200f
+    val dataMin = allValues.minOrNull() ?: 70f
+    val padding = ((dataMax - dataMin) * 0.12f).coerceAtLeast(10f)
+    val maxVal = dataMax + padding
+    val minVal = dataMin - padding
 
     Column(
         modifier =
@@ -1531,15 +1542,15 @@ private fun GlucoseComparisonChart(
 
                 drawLine(
                     color = gridColor,
-                    start = Offset(0f, yFor(170f)),
-                    end = Offset(w, yFor(170f)),
+                    start = Offset(0f, yFor(rangeHigh)),
+                    end = Offset(w, yFor(rangeHigh)),
                     strokeWidth = 1f,
                     pathEffect = dashEffect,
                 )
                 drawLine(
                     color = gridColor,
-                    start = Offset(0f, yFor(90f)),
-                    end = Offset(w, yFor(90f)),
+                    start = Offset(0f, yFor(rangeLow)),
+                    end = Offset(w, yFor(rangeLow)),
                     strokeWidth = 1f,
                     pathEffect = dashEffect,
                 )
@@ -1551,15 +1562,15 @@ private fun GlucoseComparisonChart(
                                 GlucoachColors.Primary.copy(alpha = 0.08f),
                                 GlucoachColors.Primary.copy(alpha = 0.02f),
                             ),
-                        startY = yFor(170f),
-                        endY = yFor(90f),
+                        startY = yFor(rangeHigh),
+                        endY = yFor(rangeLow),
                     )
                 val shadePath =
                     Path().apply {
-                        moveTo(0f, yFor(170f))
-                        lineTo(w, yFor(170f))
-                        lineTo(w, yFor(90f))
-                        lineTo(0f, yFor(90f))
+                        moveTo(0f, yFor(rangeHigh))
+                        lineTo(w, yFor(rangeHigh))
+                        lineTo(w, yFor(rangeLow))
+                        lineTo(0f, yFor(rangeLow))
                         close()
                     }
                 drawPath(shadePath, shadeBrush)
@@ -1570,14 +1581,23 @@ private fun GlucoseComparisonChart(
                 ) {
                     if (points.size < 2) return
                     val step = w / (points.size - 1)
+                    val pts = points.mapIndexed { i, v -> Offset(i * step, yFor(v)) }
                     val path =
                         Path().apply {
-                            moveTo(0f, yFor(points[0]))
-                            for (i in 1 until points.size) {
-                                val x0 = (i - 1) * step
-                                val x1 = i * step
-                                val cx = (x0 + x1) / 2f
-                                cubicTo(cx, yFor(points[i - 1]), cx, yFor(points[i]), x1, yFor(points[i]))
+                            moveTo(pts[0].x, pts[0].y)
+                            for (i in 1 until pts.size) {
+                                val p0 = pts[maxOf(i - 2, 0)]
+                                val p1 = pts[i - 1]
+                                val p2 = pts[i]
+                                val p3 = pts[minOf(i + 1, pts.lastIndex)]
+                                cubicTo(
+                                    p1.x + (p2.x - p0.x) / 6f,
+                                    p1.y + (p2.y - p0.y) / 6f,
+                                    p2.x - (p3.x - p1.x) / 6f,
+                                    p2.y - (p3.y - p1.y) / 6f,
+                                    p2.x,
+                                    p2.y,
+                                )
                             }
                         }
                     drawPath(
@@ -1591,20 +1611,20 @@ private fun GlucoseComparisonChart(
                 drawCurve(curveB, GlucoachColors.Primary)
             }
 
+            val rangeTotal = maxVal - minVal
+            val highOffsetY = (chartHeight.value * (maxVal - rangeHigh) / rangeTotal - 6f).dp
+            val lowOffsetY = (chartHeight.value * (maxVal - rangeLow) / rangeTotal - 6f).dp
             Text(
-                text = "170",
+                text = "${glucoseRange.maxMgDl}",
                 color = GlucoachColors.TextSecondary,
                 fontSize = 10.sp,
-                modifier = Modifier.align(Alignment.TopStart),
+                modifier = Modifier.offset(y = highOffsetY),
             )
             Text(
-                text = "90",
+                text = "${glucoseRange.minMgDl}",
                 color = GlucoachColors.TextSecondary,
                 fontSize = 10.sp,
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(bottom = 20.dp),
+                modifier = Modifier.offset(y = lowOffsetY),
             )
         }
 

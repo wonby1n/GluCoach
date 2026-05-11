@@ -24,8 +24,10 @@ public class WeeklyReportResponse {
   private final String aiSuggest;
   private final LocalDateTime createdAt;
   private final List<WeeklyFoodItem> foods;
+  private final List<DailyGlucoseItem> dailyGlucose;
 
-  private WeeklyReportResponse(WeeklyReport r, List<WeeklyFood> foods) {
+  private WeeklyReportResponse(
+      WeeklyReport r, List<WeeklyFood> foods, List<DailyGlucoseItem> dailyGlucose) {
     this.id = r.getId();
     this.weekStart = r.getWeekStart();
     this.avgGlucose = r.getAvgGlucose();
@@ -39,10 +41,32 @@ public class WeeklyReportResponse {
     this.aiSuggest = r.getAiSuggest();
     this.createdAt = r.getCreatedAt();
     this.foods = foods.stream().map(WeeklyFoodItem::from).toList();
+    this.dailyGlucose = dailyGlucose;
   }
 
-  public static WeeklyReportResponse from(WeeklyReport r, List<WeeklyFood> foods) {
-    return new WeeklyReportResponse(r, foods);
+  public static WeeklyReportResponse from(
+      WeeklyReport r, List<WeeklyFood> foods, List<DailyGlucoseItem> dailyGlucose) {
+    return new WeeklyReportResponse(r, foods, dailyGlucose);
+  }
+
+  @Getter
+  public static class DailyGlucoseItem {
+
+    private final String date;
+    private final BigDecimal avg;
+    private final BigDecimal min;
+    private final BigDecimal max;
+
+    private DailyGlucoseItem(String date, BigDecimal avg, BigDecimal min, BigDecimal max) {
+      this.date = date;
+      this.avg = avg;
+      this.min = min;
+      this.max = max;
+    }
+
+    public static DailyGlucoseItem of(String date, BigDecimal avg, BigDecimal min, BigDecimal max) {
+      return new DailyGlucoseItem(date, avg, min, max);
+    }
   }
 
   @Getter
