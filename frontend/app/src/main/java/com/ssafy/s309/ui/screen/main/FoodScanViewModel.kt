@@ -54,6 +54,9 @@ class FoodScanViewModel
         private val _state = MutableStateFlow<FoodScanState>(FoodScanState.Idle)
         val state: StateFlow<FoodScanState> = _state.asStateFlow()
 
+        private val _manualSearchResults = MutableStateFlow<List<FoodSearchItem>>(emptyList())
+        val manualSearchResults: StateFlow<List<FoodSearchItem>> = _manualSearchResults.asStateFlow()
+
         fun analyze(photoFile: File) {
             if (_state.value !is FoodScanState.Idle) return
             viewModelScope.launch {
@@ -70,11 +73,6 @@ class FoodScanViewModel
                     return@launch
                 }
                 val response = predictResult.getOrNull()!!
-
-                if (response.status == "LOW_CONFIDENCE") {
-                    _state.value = FoodScanState.Error("음식을 인식하지 못했습니다.\n다시 촬영해 주세요.")
-                    return@launch
-                }
 
                 // Stage 2: 후보 영양정보 보강
                 // OK / PENDING_NUTRITION 시 BE 가 foodId/foodName 채움 → top-1 보강.
@@ -146,12 +144,7 @@ class FoodScanViewModel
                 _state.value = FoodScanState.Analyzing(3)
                 delay(400)
 
-                _state.value =
-                    if (candidates.isEmpty()) {
-                        FoodScanState.Error("영양 정보를 찾을 수 없습니다.\n다시 촬영해 주세요.")
-                    } else {
-                        FoodScanState.Result(candidates = candidates, prediction = response.prediction)
-                    }
+                _state.value = FoodScanState.Result(candidates = candidates, prediction = response.prediction)
             }
         }
 
@@ -178,6 +171,20 @@ class FoodScanViewModel
                         current.copy(isSaving = false)
                     }
             }
+        }
+
+        fun searchManualFood(query: String) {
+            if (query.isBlank()) {
+                _manualSearchResults.value = emptyList()
+                return
+            }
+            viewModelScope.launch {
+                _manualSearchResults.value = foodRepository.searchFoods(query).getOrNull().orEmpty()
+            }
+        }
+
+        fun clearManualSearch() {
+            _manualSearchResults.value = emptyList()
         }
 
         fun resetError() {

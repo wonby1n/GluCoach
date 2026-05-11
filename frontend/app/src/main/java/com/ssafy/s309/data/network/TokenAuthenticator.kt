@@ -40,6 +40,7 @@ class TokenAuthenticator
                     }
                 } ?: run {
                     tokenManager.clearTokens()
+                    tokenManager.notifySessionExpired()
                     return null
                 }
 

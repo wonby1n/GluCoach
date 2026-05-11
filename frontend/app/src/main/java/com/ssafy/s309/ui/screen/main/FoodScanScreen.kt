@@ -30,6 +30,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -80,10 +82,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.ssafy.s309.R
+import com.ssafy.s309.data.model.FoodSearchItem
 import com.ssafy.s309.data.model.GlucosePrediction
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
+import kotlinx.coroutines.delay
 import java.io.File
 
 // ── 상태 ──────────────────────────────────────────────
@@ -103,8 +107,11 @@ fun FoodScanContent(
     viewModel: FoodScanViewModel = hiltViewModel(),
 ) {
     val scanState by viewModel.state.collectAsStateWithLifecycle()
+    val manualSearchResults by viewModel.manualSearchResults.collectAsStateWithLifecycle()
     var selectedIndex by remember { mutableIntStateOf(-1) }
     var showSimulation by remember { mutableStateOf(false) }
+    var showManualSearch by remember { mutableStateOf(false) }
+    var selectedManualCandidate by remember { mutableStateOf<FoodScanCandidate?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.reset()
@@ -124,22 +131,60 @@ fun FoodScanContent(
         }
 
         is FoodScanState.Result -> {
-            if (showSimulation && selectedIndex >= 0 && selectedIndex < s.candidates.size) {
-                val candidate = s.candidates[selectedIndex]
+            val simulationCandidate =
+                selectedManualCandidate
+                    ?: if (selectedIndex >= 0 && selectedIndex < s.candidates.size) s.candidates[selectedIndex] else null
+
+            if (showSimulation && simulationCandidate != null) {
                 var memo by remember { mutableStateOf("") }
                 var selectedDateTime by remember { mutableStateOf(java.time.LocalDateTime.now()) }
-                BackHandler { showSimulation = false }
+                BackHandler {
+                    showSimulation = false
+                    selectedManualCandidate = null
+                }
                 SimulationScreen(
-                    food = candidate,
+                    food = simulationCandidate,
                     isSaving = s.isSaving,
                     memo = memo,
                     onMemoChange = { memo = it },
                     selectedDateTime = selectedDateTime,
                     onDateTimeChange = { selectedDateTime = it },
-                    onBack = { showSimulation = false },
+                    onBack = {
+                        showSimulation = false
+                        selectedManualCandidate = null
+                    },
                     onRetakePhoto = onRetakePhoto,
-                    onRecordMeal = { viewModel.saveMeal(candidate, photoFile, memo, selectedDateTime) },
+                    onRecordMeal = { viewModel.saveMeal(simulationCandidate, photoFile, memo, selectedDateTime) },
                     prediction = s.prediction,
+                )
+            } else if (showManualSearch) {
+                BackHandler {
+                    showManualSearch = false
+                    viewModel.clearManualSearch()
+                }
+                FoodManualSearchScreen(
+                    searchResults = manualSearchResults,
+                    onSearch = { viewModel.searchManualFood(it) },
+                    onSelectFood = { item ->
+                        selectedManualCandidate =
+                            FoodScanCandidate(
+                                rank = 1,
+                                foodId = item.id,
+                                name = item.displayName ?: item.name,
+                                kcal = item.kcal,
+                                carbsG = item.carbsG,
+                                proteinG = item.proteinG,
+                                fatG = item.fatG,
+                                confidence = 1.0f,
+                            )
+                        showManualSearch = false
+                        showSimulation = true
+                        viewModel.clearManualSearch()
+                    },
+                    onBack = {
+                        showManualSearch = false
+                        viewModel.clearManualSearch()
+                    },
                 )
             } else {
                 BackHandler { onBack() }
@@ -150,6 +195,10 @@ fun FoodScanContent(
                     onSelect = { selectedIndex = it },
                     onViewDetail = { showSimulation = true },
                     onBack = onBack,
+                    onManualSearch = {
+                        selectedManualCandidate = null
+                        showManualSearch = true
+                    },
                 )
             }
         }
@@ -659,6 +708,7 @@ private fun AnalyzingResultScreen(
     onSelect: (Int) -> Unit,
     onViewDetail: () -> Unit,
     onBack: () -> Unit,
+    onManualSearch: () -> Unit,
 ) {
     Column(
         modifier =
@@ -718,54 +768,82 @@ private fun AnalyzingResultScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 22.dp),
         ) {
-            Text(
-                text = "인식된 음식",
-                color = GlucoachColors.TextPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-            )
+            if (candidates.isEmpty()) {
+                Text(
+                    text = "인식된 음식",
+                    color = GlucoachColors.TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                )
 
-            Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+                Spacer(modifier = Modifier.height(GlucoachSpacing.md))
 
-            candidates.forEachIndexed { index, food ->
-                val isSelected = index == selectedIndex
-                Row(
+                Box(
                     modifier =
                         Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .border(
-                                width = if (isSelected) 2.dp else 1.dp,
-                                color = if (isSelected) GlucoachColors.Primary else GlucoachColors.Border,
-                                shape = RoundedCornerShape(12.dp),
-                            )
                             .background(GlucoachColors.Surface)
-                            .clickable { onSelect(index) }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                            .padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "${food.rank}",
-                        color = GlucoachColors.Primary,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(modifier = Modifier.width(GlucoachSpacing.md))
-                    Text(
-                        text = food.name,
-                        color = GlucoachColors.TextPrimary,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        text = food.kcal?.let { "${it.toInt()}kcal" } ?: "-",
+                        text = "음식을 인식하지 못했습니다\n직접 입력해 주세요",
                         color = GlucoachColors.TextSecondary,
                         fontSize = 14.sp,
+                        textAlign = TextAlign.Center,
                     )
                 }
-                if (index < candidates.lastIndex) {
-                    Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+            } else {
+                Text(
+                    text = "인식된 음식",
+                    color = GlucoachColors.TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+
+                Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+
+                candidates.forEachIndexed { index, food ->
+                    val isSelected = index == selectedIndex
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(
+                                    width = if (isSelected) 2.dp else 1.dp,
+                                    color = if (isSelected) GlucoachColors.Primary else GlucoachColors.Border,
+                                    shape = RoundedCornerShape(12.dp),
+                                )
+                                .background(GlucoachColors.Surface)
+                                .clickable { onSelect(index) }
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "${food.rank}",
+                            color = GlucoachColors.Primary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(modifier = Modifier.width(GlucoachSpacing.md))
+                        Text(
+                            text = food.name,
+                            color = GlucoachColors.TextPrimary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = food.kcal?.let { "${it.toInt()}kcal" } ?: "-",
+                            color = GlucoachColors.TextSecondary,
+                            fontSize = 14.sp,
+                        )
+                    }
+                    if (index < candidates.lastIndex) {
+                        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+                    }
                 }
             }
 
@@ -774,22 +852,42 @@ private fun AnalyzingResultScreen(
 
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp).padding(bottom = GlucoachSpacing.xxl),
+            verticalArrangement = Arrangement.spacedBy(GlucoachSpacing.sm),
         ) {
-            Button(
-                onClick = onViewDetail,
-                enabled = selectedIndex >= 0,
+            if (candidates.isNotEmpty()) {
+                Button(
+                    onClick = onViewDetail,
+                    enabled = selectedIndex >= 0,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = GlucoachColors.Primary,
+                            contentColor = Color.White,
+                            disabledContainerColor = GlucoachColors.Border,
+                            disabledContentColor = GlucoachColors.TextSecondary,
+                        ),
+                ) {
+                    Text(
+                        text = "분석 결과 자세히 보기",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+
+            OutlinedButton(
+                onClick = onManualSearch,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 shape = RoundedCornerShape(24.dp),
                 colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor = GlucoachColors.Primary,
-                        contentColor = Color.White,
-                        disabledContainerColor = GlucoachColors.Border,
-                        disabledContentColor = GlucoachColors.TextSecondary,
+                    ButtonDefaults.outlinedButtonColors(
+                        contentColor = GlucoachColors.TextPrimary,
                     ),
+                border = androidx.compose.foundation.BorderStroke(1.dp, GlucoachColors.Border),
             ) {
                 Text(
-                    text = "분석 결과 자세히 보기",
+                    text = "직접 입력할래요",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -842,74 +940,47 @@ private fun SimulationScreen(
         Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
         Column(modifier = Modifier.padding(horizontal = 22.dp)) {
-            Text(
-                text = "칼로리",
-                color = GlucoachColors.TextSecondary,
-                fontSize = 14.sp,
-            )
-            Spacer(modifier = Modifier.height(GlucoachSpacing.xs))
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = food.kcal?.toInt()?.toString() ?: "-",
-                    color = GlucoachColors.Primary,
-                    fontSize = 48.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "kcal",
-                    color = GlucoachColors.TextPrimary,
-                    fontSize = 18.sp,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-            }
-
-            Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
-
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
-                        .clip(RoundedCornerShape(GlucoachCorner.card))
-                        .background(GlucoachColors.Surface)
-                        .padding(GlucoachSpacing.xl),
-            ) {
+            if (prediction != null) {
+                GlucoseSpikeCard(food = food, prediction = prediction)
+                Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+                GlucosePredictionChart(prediction = prediction)
+            } else {
                 Box(
                     modifier =
                         Modifier
-                            .align(Alignment.TopStart)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(GlucoachColors.Primary)
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                            .fillMaxWidth()
+                            .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
+                            .clip(RoundedCornerShape(GlucoachCorner.card))
+                            .background(GlucoachColors.Surface)
+                            .padding(GlucoachSpacing.xl),
                 ) {
-                    Text(
-                        text = food.name,
-                        color = Color.White,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
+                    Box(
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopStart)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(GlucoachColors.Primary)
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                    ) {
+                        Text(
+                            text = food.name,
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                    androidx.compose.foundation.Image(
+                        painter = painterResource(id = R.drawable.kiki_main),
+                        contentDescription = null,
+                        modifier = Modifier.size(140.dp).align(Alignment.Center),
+                        contentScale = ContentScale.Fit,
                     )
                 }
-
-                androidx.compose.foundation.Image(
-                    painter = painterResource(id = R.drawable.kiki_main),
-                    contentDescription = null,
-                    modifier =
-                        Modifier
-                            .size(180.dp)
-                            .align(Alignment.Center),
-                    contentScale = ContentScale.Fit,
-                )
             }
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
             NutritionCard(food = food)
-
-            if (prediction != null) {
-                Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
-                GlucosePredictionChart(prediction = prediction)
-            }
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
@@ -1017,12 +1088,24 @@ private fun NutritionCard(food: FoodScanCandidate) {
                 .background(GlucoachColors.Surface)
                 .padding(GlucoachSpacing.xl),
     ) {
-        Text(
-            text = "영양 성분 (1인분 기준)",
-            color = GlucoachColors.TextPrimary,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "영양 성분 (1인분 기준)",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = food.kcal?.let { "${it.toInt()} kcal" } ?: "-",
+                color = GlucoachColors.Primary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
 
@@ -1130,12 +1213,150 @@ private fun ErrorScreen(
     }
 }
 
+// ── 혈당 스파이크 카드 ─────────────────────────────────────────
+
+private data class SpikeLevel(
+    val color: Color,
+    val kikiRes: Int,
+    val message: String,
+)
+
+@Composable
+private fun GlucoseSpikeCard(
+    food: FoodScanCandidate,
+    prediction: GlucosePrediction,
+) {
+    val curve = prediction.curve
+    if (curve.isEmpty()) return
+
+    val firstGlucose = curve.first().glucoseMgdl.toInt()
+    val peakMgdl = prediction.peakMgdl.toInt()
+    val delta = peakMgdl - firstGlucose
+
+    val level =
+        when {
+            peakMgdl >= 180 ->
+                SpikeLevel(
+                    color = GlucoachColors.GlucoseDanger,
+                    kikiRes = R.drawable.kiki_spike,
+                    message = "혈당 스파이크 위험! 이 음식은 안 먹으면 좋겠어요",
+                )
+            peakMgdl >= 140 ->
+                SpikeLevel(
+                    color = GlucoachColors.GlucoseWarning,
+                    kikiRes = R.drawable.kiki_mild_tired,
+                    message = "혈당이 제법 오를 수 있어요. 소식하는 게 좋겠어요",
+                )
+            else ->
+                SpikeLevel(
+                    color = GlucoachColors.GlucoseNormal,
+                    kikiRes = R.drawable.kiki_main,
+                    message = "혈당이 안정적으로 유지될 것 같아요. 좋은 선택이에요!",
+                )
+        }
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
+                .clip(RoundedCornerShape(GlucoachCorner.card))
+                .background(GlucoachColors.Surface)
+                .padding(GlucoachSpacing.xl),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(GlucoachColors.Primary)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+        ) {
+            Text(
+                text = food.name,
+                color = Color.White,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "식후 최고 혈당",
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 13.sp,
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = "$peakMgdl",
+                        color = level.color,
+                        fontSize = 48.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "mg/dL",
+                        color = GlucoachColors.TextPrimary,
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
+                Text(
+                    text = "${if (delta >= 0) "+" else ""}${delta}mg/dL  식전($firstGlucose) 대비",
+                    color = level.color,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+
+            androidx.compose.foundation.Image(
+                painter = painterResource(id = level.kikiRes),
+                contentDescription = null,
+                modifier = Modifier.size(100.dp),
+                contentScale = ContentScale.Fit,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(level.color.copy(alpha = 0.1f))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            Text(
+                text = level.message,
+                color = level.color,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
 // ── 글루코스 예측 차트 ────────────────────────────────────────
 
 @Composable
 private fun GlucosePredictionChart(prediction: GlucosePrediction) {
     val curve = prediction.curve
     if (curve.isEmpty()) return
+
+    val firstGlucose = curve.first().glucoseMgdl.toInt()
+    val twoHourGlucose =
+        curve
+            .minByOrNull { kotlin.math.abs(it.minuteOffset - 120) }
+            ?.glucoseMgdl
+            ?.toInt()
+            ?: curve.last().glucoseMgdl.toInt()
 
     Column(
         modifier =
@@ -1152,6 +1373,17 @@ private fun GlucosePredictionChart(prediction: GlucosePrediction) {
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
         )
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            ChartLabel(title = "식전", value = "${firstGlucose}mg/dL")
+            ChartLabel(title = "식후 최고점", value = "${prediction.peakMgdl.toInt()}mg/dL")
+            ChartLabel(title = "2시간 후", value = "${twoHourGlucose}mg/dL")
+        }
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
 
@@ -1216,25 +1448,6 @@ private fun GlucosePredictionChart(prediction: GlucosePrediction) {
                 drawCircle(color = GlucoachColors.Primary, radius = 6f, center = Offset(peakX, peakY))
             }
         }
-
-        Spacer(modifier = Modifier.height(GlucoachSpacing.md))
-
-        val firstGlucose = curve.first().glucoseMgdl.toInt()
-        val twoHourGlucose =
-            curve
-                .minByOrNull { kotlin.math.abs(it.minuteOffset - 120) }
-                ?.glucoseMgdl
-                ?.toInt()
-                ?: curve.last().glucoseMgdl.toInt()
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            ChartLabel(title = "식전", value = "${firstGlucose}mg/dL")
-            ChartLabel(title = "식후 최고점", value = "${prediction.peakMgdl.toInt()}mg/dL")
-            ChartLabel(title = "2시간 후", value = "${twoHourGlucose}mg/dL")
-        }
     }
 }
 
@@ -1245,15 +1458,149 @@ private fun ChartLabel(
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            text = title,
-            color = GlucoachColors.TextSecondary,
-            fontSize = 11.sp,
-        )
-        Text(
             text = value,
             color = GlucoachColors.Primary,
-            fontSize = 13.sp,
+            fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
         )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = title,
+            color = GlucoachColors.TextSecondary,
+            fontSize = 12.sp,
+        )
+    }
+}
+
+// ── 6. 직접 음식 검색 화면 ─────────────────────────────────────
+
+@Composable
+private fun FoodManualSearchScreen(
+    searchResults: List<FoodSearchItem>,
+    onSearch: (String) -> Unit,
+    onSelectFood: (FoodSearchItem) -> Unit,
+    onBack: () -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+
+    LaunchedEffect(query) {
+        delay(300L)
+        onSearch(query)
+    }
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(GlucoachColors.Background),
+    ) {
+        Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+
+        Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+            IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                    contentDescription = "뒤로",
+                    tint = GlucoachColors.TextPrimary,
+                )
+            }
+            Text(
+                text = "음식 직접 입력",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 22.dp),
+            placeholder = {
+                Text(
+                    text = "음식 이름을 검색하세요",
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 14.sp,
+                )
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(GlucoachCorner.card),
+            colors =
+                OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = GlucoachColors.Primary,
+                    unfocusedBorderColor = GlucoachColors.Border,
+                    focusedContainerColor = GlucoachColors.Surface,
+                    unfocusedContainerColor = GlucoachColors.Surface,
+                ),
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { query = "" }) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "지우기",
+                            tint = GlucoachColors.TextSecondary,
+                        )
+                    }
+                }
+            },
+        )
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+
+        if (query.isNotBlank() && searchResults.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(top = 40.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "검색 결과가 없습니다",
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 14.sp,
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 22.dp),
+                verticalArrangement = Arrangement.spacedBy(GlucoachSpacing.sm),
+            ) {
+                items(searchResults) { item ->
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, GlucoachColors.Border, RoundedCornerShape(12.dp))
+                                .background(GlucoachColors.Surface)
+                                .clickable { onSelectFood(item) }
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = item.displayName ?: item.name,
+                            color = GlucoachColors.TextPrimary,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = item.kcal?.let { "${it.toInt()}kcal" } ?: "-",
+                            color = GlucoachColors.TextSecondary,
+                            fontSize = 13.sp,
+                        )
+                    }
+                }
+                item { Spacer(modifier = Modifier.height(GlucoachSpacing.xxl)) }
+            }
+        }
     }
 }

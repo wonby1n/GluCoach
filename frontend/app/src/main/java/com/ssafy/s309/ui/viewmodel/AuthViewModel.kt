@@ -2,6 +2,7 @@ package com.ssafy.s309.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ssafy.s309.data.local.TokenManager
 import com.ssafy.s309.data.model.UserSettingsUpdateRequest
 import com.ssafy.s309.data.repository.AuthRepository
 import com.ssafy.s309.data.repository.UserRepository
@@ -34,9 +35,18 @@ class AuthViewModel
     constructor(
         private val authRepository: AuthRepository,
         private val userRepository: UserRepository,
+        private val tokenManager: TokenManager,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
         val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
+
+        init {
+            viewModelScope.launch {
+                tokenManager.sessionExpiredFlow.collect {
+                    _uiState.value = AuthUiState.LogoutSuccess
+                }
+            }
+        }
 
         private val _autoLoginResult = MutableStateFlow<Boolean?>(null)
         val autoLoginResult: StateFlow<Boolean?> = _autoLoginResult.asStateFlow()
