@@ -99,6 +99,8 @@ data class MealRecordResponse(
     // ISO-8601
     val recordedAt: String,
     val imageUrl: String? = null,
+    // BE 가 채워주면 사용자 노출용. 없으면 foodName fallback.
+    val foodDisplayName: String? = null,
 )
 
 /** POST /api/meals 요청 (multipart "request" 파트) */

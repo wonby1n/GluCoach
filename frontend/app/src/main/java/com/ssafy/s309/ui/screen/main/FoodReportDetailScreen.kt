@@ -467,7 +467,7 @@ private fun FoodHistorySheet(
                             val date = extractDate(meal.recordedAt)
                             HistoryMealCard(
                                 mealType = mealType,
-                                foodName = meal.foodName ?: food.name,
+                                foodName = meal.foodDisplayName ?: meal.foodName ?: food.name,
                                 onClick = { onDateClick(date, meal.mealId) },
                             )
                             Spacer(Modifier.height(GlucoachSpacing.sm))

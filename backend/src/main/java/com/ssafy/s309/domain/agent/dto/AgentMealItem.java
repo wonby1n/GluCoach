@@ -7,6 +7,7 @@ public record AgentMealItem(
     Integer mealId,
     LocalDateTime timestamp,
     String foodName,
+    String foodDisplayName,
     BigDecimal carbs,
     BigDecimal protein,
     BigDecimal fat,

@@ -25,7 +25,7 @@ class UserFoodGradeServiceTest {
   private static final Integer USER_ID = 1;
 
   private FoodGradeResponse sampleResponse(String grade, BigDecimal slope, int count) {
-    return new FoodGradeResponse(10, "테스트음식", grade, slope, count, LocalDateTime.now());
+    return new FoodGradeResponse(10, "테스트음식", null, grade, slope, count, LocalDateTime.now());
   }
 
   @Test
