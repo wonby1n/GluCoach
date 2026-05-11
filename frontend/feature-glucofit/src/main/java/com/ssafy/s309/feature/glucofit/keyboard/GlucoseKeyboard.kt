@@ -1,5 +1,6 @@
 package com.ssafy.s309.feature.glucofit.keyboard
 
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -8,15 +9,12 @@ import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
-import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.LinearLayout.LayoutParams.MATCH_PARENT
 import android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
 import android.widget.TextView
 import com.ssafy.s309.feature.glucofit.data.KeyboardFoodCache
-import com.ssafy.s309.feature.glucofit.data.KeyboardStateLoader
 import com.ssafy.s309.feature.glucofit.glucose.GlucoseSimulator
-import com.ssafy.s309.feature.glucofit.overlay.KeyboardMessageBuilder
 import com.ssafy.s309.feature.glucofit.overlay.OverlayBannerManager
 
 class GlucoseKeyboard : InputMethodService() {
@@ -24,25 +22,14 @@ class GlucoseKeyboard : InputMethodService() {
 
     /** EditText 실제 내용 스냅샷. send 직전 마지막 비어있지 않은 값으로 갱신. */
     private var lastEditorText: String = ""
-    private lateinit var tvDisplay: TextView
     private lateinit var keyContainer: LinearLayout
     private lateinit var btnLang: TextView
+    private lateinit var inlineBanner: View
+    private lateinit var inlineBannerDot: View
+    private lateinit var inlineBannerText: TextView
     private val bannerManager by lazy { OverlayBannerManager(applicationContext) }
     private val hangul = HangulComposer()
     private var isKorean = true
-
-    /** BE 동기화 캐시가 비어 있을 때 폴백. 시연 안전망. */
-    private val fallbackChips =
-        listOf(
-            "마라탕", "치킨", "라면", "피자", "떡볶이",
-            "초밥", "삼겹살", "짜장면", "냉면", "삼계탕",
-        )
-
-    /** 칩 표시 시점의 캐시 상태로 동적 결정. 등급 좋은 음식 → fallback. */
-    private fun resolveChips(): List<String> {
-        val graded = KeyboardFoodCache.topGraded(10).map { it.name }
-        return graded.ifEmpty { fallbackChips }
-    }
 
     override fun onCreate() {
         super.onCreate()
@@ -67,60 +54,95 @@ class GlucoseKeyboard : InputMethodService() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#D1D3D8"))
-            addView(buildSuggestionStrip())
-            addView(buildDisplayBar())
+            addView(buildInlineBanner().also { inlineBanner = it })
             addView(buildKeyboard().also { keyContainer = it })
         }
     }
 
-    private fun buildSuggestionStrip(): View {
-        val inner =
+    private fun buildInlineBanner(): View {
+        val outer =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundColor(Color.parseColor("#DDF3F8"))
+                setPadding(dp(10), dp(6), dp(10), dp(6))
+                layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)
+                visibility = View.GONE
+            }
+        val container =
             LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(6), dp(5), dp(6), dp(5))
+                setPadding(dp(14), dp(10), dp(14), dp(10))
+                background =
+                    GradientDrawable().apply {
+                        setColor(Color.WHITE)
+                        cornerRadius = dp(12).toFloat()
+                        setStroke(dp(1), Color.parseColor("#4EA8BC"))
+                    }
+                layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)
             }
-        resolveChips().forEach { food ->
-            inner.addView(
-                TextView(this).apply {
-                    text = food
-                    textSize = 14f
-                    setTextColor(Color.parseColor("#222222"))
-                    gravity = Gravity.CENTER
-                    setPadding(dp(14), dp(6), dp(14), dp(6))
-                    background =
-                        GradientDrawable().apply {
-                            setColor(Color.WHITE)
-                            cornerRadius = dp(4).toFloat()
-                            setStroke(dp(1), Color.parseColor("#D0D0D0"))
-                        }
-                    layoutParams =
-                        LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
-                            setMargins(dp(3), 0, dp(3), 0)
-                        }
-                    setOnClickListener { tapChip(food) }
-                },
-            )
+
+        val colorDot =
+            View(this).apply {
+                background =
+                    GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(Color.parseColor("#9E9E9E"))
+                    }
+                layoutParams =
+                    LinearLayout.LayoutParams(dp(10), dp(10)).apply {
+                        setMargins(0, 0, dp(10), 0)
+                    }
+            }.also { inlineBannerDot = it }
+
+        val message =
+            TextView(this).apply {
+                textSize = 14f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(Color.parseColor("#1A1A1A"))
+                layoutParams =
+                    LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f)
+            }.also { inlineBannerText = it }
+
+        val chevron =
+            TextView(this).apply {
+                text = "›"
+                textSize = 22f
+                setTextColor(Color.parseColor("#888888"))
+                gravity = Gravity.CENTER
+                setPadding(dp(8), 0, dp(4), 0)
+            }
+
+        container.addView(colorDot)
+        container.addView(message)
+        container.addView(chevron)
+        container.setOnClickListener {
+            val intent =
+                Intent().apply {
+                    setClassName("com.ssafy.s309", "com.ssafy.s309.MainActivity")
+                    putExtra("navigate_to", "food_report")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+            startActivity(intent)
         }
-        return HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            setBackgroundColor(Color.parseColor("#E4E5E8"))
-            layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, dp(48))
-            addView(inner)
-        }
+        outer.addView(container)
+        return outer
     }
 
-    private fun buildDisplayBar(): TextView {
-        return TextView(this).apply {
-            setBackgroundColor(Color.parseColor("#F8F8F8"))
-            setPadding(dp(16), 0, dp(16), 0)
-            gravity = Gravity.CENTER_VERTICAL
-            hint = "음식 이름 입력 또는 위 칩 선택"
-            textSize = 15f
-            setTextColor(Color.parseColor("#1A1A1A"))
-            setHintTextColor(Color.parseColor("#BBBBBB"))
-            layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, dp(40))
-        }.also { tvDisplay = it }
+    private fun updateInlineBanner(
+        text: String,
+        color: Int,
+    ) {
+        inlineBannerText.text = text
+        inlineBannerText.setTextColor(Color.BLACK)
+        (inlineBannerDot.background as? GradientDrawable)?.setColor(color)
+        inlineBanner.visibility = View.VISIBLE
+    }
+
+    private fun hideInlineBanner() {
+        if (::inlineBanner.isInitialized) {
+            inlineBanner.visibility = View.GONE
+        }
     }
 
     private fun buildKeyboard(): LinearLayout {
@@ -348,18 +370,6 @@ class GlucoseKeyboard : InputMethodService() {
         rebuildKeys()
     }
 
-    private fun tapChip(food: String) {
-        if (isKorean && !hangul.isEmpty()) {
-            currentInputConnection?.commitText(hangul.flush(), 1)
-            hangul.reset()
-        }
-        currentInputConnection?.commitText(food, 1)
-        currentText.clear()
-        currentText.append(food)
-        refreshDisplay()
-        triggerBanner(food)
-    }
-
     private fun rebuildKeys() {
         keyContainer.removeAllViews()
         keyContainer.addView(buildLetterRows())
@@ -370,13 +380,36 @@ class GlucoseKeyboard : InputMethodService() {
         Log.d(TAG, "triggerBanner called: text='$text'")
         val food = KeyboardFoodCache.findExact(text) ?: KeyboardFoodCache.findContained(text)
         Log.d(TAG, "triggerBanner matched: ${food?.name ?: "NONE"} (grade=${food?.grade ?: "-"})")
-        if (food == null) return
-        val glucose = GlucoseSimulator.glucoseState.value?.toInt()
-        val state = KeyboardStateLoader.read(applicationContext)
-        Log.d(TAG, "triggerBanner glucose=$glucose lastMealAt=${state.lastMealAtMs}")
-        val msg = KeyboardMessageBuilder.build(food, glucose, state.lastMealAtMs)
-        bannerManager.showWithMessage(msg.text, msg.color)
+        if (food == null) {
+            hideInlineBanner()
+            return
+        }
+        val shortText = gradeToShortMessage(food.displayName ?: food.name, food.grade)
+        updateInlineBanner(shortText, gradeColor(food.grade))
     }
+
+    private fun gradeToShortMessage(
+        food: String,
+        grade: String?,
+    ): String =
+        when (grade) {
+            "S" -> "$food(S) 잘 맞아요!"
+            "A" -> "$food(A) 좋은 선택!"
+            "B" -> "$food(B) 무난해요!"
+            "C" -> "$food(C) 양 조심!"
+            "D" -> "$food(D) 혈당 주의!"
+            else -> "$food 기록이 없어요!"
+        }
+
+    private fun gradeColor(grade: String?): Int =
+        when (grade) {
+            "S" -> Color.parseColor("#4DBA87")
+            "A" -> Color.parseColor("#7BCAA0")
+            "B" -> Color.parseColor("#F9CD7E")
+            "C" -> Color.parseColor("#F6B44C")
+            "D" -> Color.parseColor("#E96A6A")
+            else -> Color.parseColor("#999999")
+        }
 
     companion object {
         private const val TAG = "GlucoseKeyboard"
@@ -384,14 +417,14 @@ class GlucoseKeyboard : InputMethodService() {
 
     private fun refreshDisplay(composing: String = "") {
         val display = currentText.toString() + composing
-        tvDisplay.text = display
+        triggerBanner(display)
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
         currentText.clear()
         hangul.reset()
-        if (::tvDisplay.isInitialized) refreshDisplay()
+        refreshDisplay()
     }
 
     override fun onUpdateSelection(
@@ -419,7 +452,7 @@ class GlucoseKeyboard : InputMethodService() {
             lastEditorText = ""
             currentText.clear()
             hangul.reset()
-            if (::tvDisplay.isInitialized) refreshDisplay()
+            refreshDisplay()
             return
         }
         // 그 외엔 실제 EditText 스냅샷 갱신. send 시점에 사용.

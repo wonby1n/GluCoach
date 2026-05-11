@@ -265,6 +265,7 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_NAVIGATE_TO = "navigate_to"
         const val NAV_KIKI_ALARM_DETAIL = "kiki_alarm_detail"
+        const val NAV_FOOD_REPORT = "food_report"
         private const val POLL_TAG = "SHPoller"
     }
 }
