@@ -2,7 +2,6 @@ package com.ssafy.s309.di
 
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.ssafy.s309.BuildConfig
-import com.ssafy.s309.data.api.AgentApi
 import com.ssafy.s309.data.api.AuthApi
 import com.ssafy.s309.data.api.FoodApi
 import com.ssafy.s309.data.api.HealthApi
@@ -160,10 +159,4 @@ object AppModule {
     fun provideWeeklyReportApi(
         @Named("no-redirect") retrofit: Retrofit,
     ): WeeklyReportApi = retrofit.create(WeeklyReportApi::class.java)
-
-    @Provides
-    @Singleton
-    fun provideAgentApi(
-        @Named("authenticated") retrofit: Retrofit,
-    ): AgentApi = retrofit.create(AgentApi::class.java)
 }

@@ -34,7 +34,10 @@ import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.DateRange
+import androidx.compose.material.icons.outlined.DirectionsWalk
 import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -286,13 +289,30 @@ private fun AIReportSuccessContent(
                 fontWeight = FontWeight.Bold,
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            Text(
-                text = formatWeekRange(report.weekStart),
-                color = GlucoachColors.TextSecondary,
-                fontSize = 13.sp,
-            )
+            Row(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(GlucoachColors.Primary.copy(alpha = 0.10f))
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.DateRange,
+                    contentDescription = null,
+                    tint = GlucoachColors.Primary,
+                    modifier = Modifier.size(14.dp),
+                )
+                Text(
+                    text = formatWeekRange(report.weekStart),
+                    color = GlucoachColors.Primary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
@@ -327,6 +347,29 @@ private fun AIReportSuccessContent(
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
             WeeklyGlucoseChart(weeklyGlucose = weeklyGlucose)
+
+            val hasSamsungData =
+                (report.avgSleepMinutes != null && report.avgSleepMinutes > 0) ||
+                    (report.avgSteps != null && report.avgSteps > 0)
+            if (hasSamsungData) {
+                Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+                Text(
+                    text = "건강 활동 데이터",
+                    color = GlucoachColors.TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+
+            report.avgSleepMinutes?.takeIf { it > 0 }?.let {
+                Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+                SleepWeeklySection(avgSleepMinutes = it)
+            }
+
+            report.avgSteps?.takeIf { it > 0 }?.let {
+                Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+                StepsWeeklySection(avgSteps = it)
+            }
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
@@ -411,6 +454,13 @@ private fun AIReportSuccessContent(
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
+            }
+
+            if ((report.avgSleepMinutes != null && report.avgSleepMinutes > 0) ||
+                (report.avgSteps != null && report.avgSteps > 0)
+            ) {
+                Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+                SamsungHealthDisclaimer()
             }
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
@@ -503,7 +553,27 @@ private fun WeeklyGlucoseChart(weeklyGlucose: List<Float?>) {
                 .background(GlucoachColors.Surface)
                 .padding(GlucoachSpacing.xl),
     ) {
-        Text(text = "이번 주 혈당 흐름", color = GlucoachColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(GlucoachColors.Primary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.WaterDrop,
+                    contentDescription = null,
+                    tint = GlucoachColors.Primary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Column {
+                Text(text = "이번 주 혈당 흐름", color = GlucoachColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(text = "mg/dL", color = GlucoachColors.TextSecondary, fontSize = 11.sp)
+            }
+        }
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
 
@@ -942,6 +1012,278 @@ private fun FoodMealHistorySheet(
         }
     }
 }
+
+// ── 일별 mock 데이터 생성 ─────────────────────────────────
+
+private fun generateMockDailyData(
+    average: Double,
+    multipliers: List<Float>,
+): List<Float> {
+    val raw = multipliers.map { (average * it).toFloat() }
+    val rawAvg = raw.sum() / raw.size
+    val scale = average.toFloat() / rawAvg
+    return raw.map { it * scale }
+}
+
+// ── 공용 주간 막대 차트 ──────────────────────────────────
+
+@Composable
+private fun WeeklyBarChart(
+    dailyValues: List<Float>,
+    barColor: Color,
+    maxValue: Float,
+    labelFor: (Float) -> String,
+    goalValue: Float? = null,
+    modifier: Modifier = Modifier,
+) {
+    val days = listOf("월", "화", "수", "목", "금", "토", "일")
+
+    Column(modifier = modifier) {
+        Row(modifier = Modifier.fillMaxWidth()) {
+            dailyValues.forEach { value ->
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    Text(text = labelFor(value), color = barColor, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(2.dp))
+
+        Canvas(modifier = Modifier.fillMaxWidth().height(110.dp)) {
+            val slotW = size.width / days.size
+            val barW = slotW * 0.55f
+            val r = 8f
+
+            goalValue?.let { goal ->
+                val goalY = size.height * (1f - (goal / maxValue).coerceIn(0f, 1f))
+                drawLine(
+                    color = barColor.copy(alpha = 0.30f),
+                    start = Offset(0f, goalY),
+                    end = Offset(size.width, goalY),
+                    strokeWidth = 1.5f,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)),
+                )
+            }
+
+            dailyValues.forEachIndexed { i, value ->
+                val barH = (value / maxValue).coerceIn(0f, 1f) * size.height
+                val x = i * slotW + (slotW - barW) / 2f
+                val topY = size.height - barH
+                val meetsGoal = goalValue == null || value >= goalValue
+
+                val path =
+                    Path().apply {
+                        moveTo(x, topY + r)
+                        quadraticBezierTo(x, topY, x + r, topY)
+                        lineTo(x + barW - r, topY)
+                        quadraticBezierTo(x + barW, topY, x + barW, topY + r)
+                        lineTo(x + barW, size.height)
+                        lineTo(x, size.height)
+                        close()
+                    }
+                drawPath(path, if (meetsGoal) barColor else barColor.copy(alpha = 0.45f))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Row(modifier = Modifier.fillMaxWidth()) {
+            days.forEachIndexed { idx, day ->
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = day,
+                        color =
+                            when (idx) {
+                                5 -> Color(0xFF2196F3)
+                                6 -> Color(0xFFE96A6A)
+                                else -> GlucoachColors.TextSecondary
+                            },
+                        fontSize = 11.sp,
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ── 삼성 헬스: 수면 섹션 ────────────────────────────────
+
+@Composable
+private fun SleepWeeklySection(avgSleepMinutes: Double) {
+    val sleepColor = Color(0xFF3F51B5)
+    val totalHours = (avgSleepMinutes / 60).toInt()
+    val remainMins = (avgSleepMinutes % 60).toInt()
+    val (statusColor, statusText) =
+        when {
+            avgSleepMinutes >= 420 -> sleepColor to "권장 수면 시간을 달성했어요"
+            avgSleepMinutes >= 360 -> Color(0xFFFF9800) to "수면이 조금 부족해요"
+            else -> Color(0xFFE96A6A) to "수면이 많이 부족해요"
+        }
+    val dailyMinutes =
+        remember(avgSleepMinutes) {
+            generateMockDailyData(avgSleepMinutes, listOf(0.68f, 1.12f, 0.82f, 1.30f, 0.92f, 0.75f, 1.08f))
+        }
+    val chartMax = maxOf(480f, dailyMinutes.maxOrNull() ?: 480f) * 1.15f
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
+                .clip(RoundedCornerShape(GlucoachCorner.card))
+                .background(GlucoachColors.Surface)
+                .padding(GlucoachSpacing.xl),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier.size(44.dp).clip(CircleShape).background(sleepColor.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(imageVector = Icons.Outlined.Bedtime, contentDescription = null, tint = sleepColor, modifier = Modifier.size(24.dp))
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(text = "수면", color = GlucoachColors.TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text(text = "이번 주 일별 수면 시간", color = GlucoachColors.TextSecondary, fontSize = 12.sp)
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            Column(horizontalAlignment = Alignment.End) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(text = "${totalHours}시간", color = GlucoachColors.TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    if (remainMins > 0) {
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = "${remainMins}분",
+                            color = GlucoachColors.TextSecondary,
+                            fontSize = 14.sp,
+                            modifier = Modifier.padding(bottom = 2.dp),
+                        )
+                    }
+                }
+                Text(text = "평균", color = GlucoachColors.TextSecondary, fontSize = 11.sp)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+
+        WeeklyBarChart(
+            dailyValues = dailyMinutes,
+            barColor = sleepColor,
+            maxValue = chartMax,
+            labelFor = { v -> "${(v / 60).toInt()}h" },
+            goalValue = 480f,
+        )
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(text = statusText, color = statusColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(text = "목표 8시간", color = GlucoachColors.TextSecondary, fontSize = 12.sp)
+        }
+    }
+}
+
+// ── 삼성 헬스: 걸음 수 섹션 ──────────────────────────────
+
+@Composable
+private fun StepsWeeklySection(avgSteps: Double) {
+    val stepsColor = Color(0xFF4CAF50)
+    val weeklyTotal = (avgSteps * 7).toLong()
+    val (statusColor, statusText) =
+        when {
+            avgSteps >= 10000 -> stepsColor to "목표 달성! 활발하게 움직이고 있어요"
+            avgSteps >= 7000 -> Color(0xFF2196F3) to "목표까지 조금만 더 걸어봐요"
+            else -> Color(0xFFFF9800) to "조금 더 활동적으로 움직여봐요"
+        }
+    val dailySteps =
+        remember(avgSteps) {
+            generateMockDailyData(avgSteps, listOf(0.87f, 1.18f, 0.92f, 1.28f, 0.97f, 0.83f, 1.14f))
+        }
+    val chartMax = maxOf(10000f, dailySteps.maxOrNull() ?: 10000f) * 1.15f
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
+                .clip(RoundedCornerShape(GlucoachCorner.card))
+                .background(GlucoachColors.Surface)
+                .padding(GlucoachSpacing.xl),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier.size(44.dp).clip(CircleShape).background(stepsColor.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.DirectionsWalk,
+                    contentDescription = null,
+                    tint = stepsColor,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(text = "걸음 수", color = GlucoachColors.TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text(text = "이번 주 일별 걸음 수", color = GlucoachColors.TextSecondary, fontSize = 12.sp)
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            Column(horizontalAlignment = Alignment.End) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = "%,d".format(avgSteps.toInt()),
+                        color = GlucoachColors.TextPrimary,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(text = "보", color = GlucoachColors.TextSecondary, fontSize = 14.sp, modifier = Modifier.padding(bottom = 2.dp))
+                }
+                Text(text = "일평균 · 주간 %,d보".format(weeklyTotal), color = GlucoachColors.TextSecondary, fontSize = 11.sp)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+
+        WeeklyBarChart(
+            dailyValues = dailySteps,
+            barColor = stepsColor,
+            maxValue = chartMax,
+            labelFor = { v -> "%.1fk".format(v / 1000f) },
+            goalValue = 10000f,
+        )
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(text = statusText, color = statusColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(text = "목표 10,000보", color = GlucoachColors.TextSecondary, fontSize = 12.sp)
+        }
+    }
+}
+
+// ── 삼성 헬스 데이터 출처 안내 ────────────────────────────
+
+@Composable
+private fun SamsungHealthDisclaimer() {
+    Text(
+        text = "※ 수면 및 걸음 수 데이터는 삼성 헬스(Samsung Health)에서 수집된 데이터를 기반으로 분석되었습니다. 해당 데이터는 건강 참고 목적으로 제공되며, 의료적 진단이나 치료에 활용되지 않습니다.",
+        color = GlucoachColors.TextSecondary.copy(alpha = 0.6f),
+        fontSize = 10.sp,
+        lineHeight = 15.sp,
+        textAlign = TextAlign.Start,
+    )
+}
+
+// ── 음식 식사 기록 MealRecordCard ────────────────────────
 
 @Composable
 private fun MealRecordCard(record: FoodMealRecord) {

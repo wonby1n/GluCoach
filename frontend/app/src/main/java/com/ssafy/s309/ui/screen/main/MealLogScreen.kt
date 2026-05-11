@@ -164,6 +164,11 @@ class MealLogViewModel
         val maxGlucoseMap: StateFlow<Map<Int, GlucoseDetail>> = _maxGlucoseMap.asStateFlow()
 
         private var loadedMonth: Pair<Int, Int>? = null
+
+        fun invalidateMonthCache() {
+            loadedMonth = null
+        }
+
         private var loadMealsJob: Job? = null
         private var monthScanJob: Job? = null
 
@@ -417,6 +422,15 @@ private fun MealLogCalendarContent(
                 LocalDate.of(selectedYear, selectedMonth, selectedDay)
                     .format(DateTimeFormatter.ISO_LOCAL_DATE)
             mealLogViewModel.loadMeals(date)
+        }
+    }
+
+    LaunchedEffect(initialDate) {
+        if (initialDate != null) {
+            val parsed = runCatching { LocalDate.parse(initialDate) }.getOrNull() ?: return@LaunchedEffect
+            mealLogViewModel.invalidateMonthCache()
+            mealLogViewModel.onMonthChanged(parsed.year, parsed.monthValue)
+            mealLogViewModel.loadMeals(initialDate)
         }
     }
 

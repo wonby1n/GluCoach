@@ -66,11 +66,13 @@ class FcmService : FirebaseMessagingService() {
             showNotification(title, body)
         }
         ttsManager.playSound(resIdForAlertType(alertType))
-        glucoseAlertManager.emitFcmAlert(title, body, alertType ?: "")
 
-        // 채팅 메시지 FCM — KikiChatViewModel에 재조회 신호 전달
+        // chatMessageId가 있는 FCM(agent 알림)은 chatFcmEvent로만 처리.
+        // alertStream에도 emit하면 chatFcmEvent 재조회와 중복되어 채팅 화면에 같은 메시지가 2번 표시됨.
         if (message.data["chatMessageId"] != null) {
             healthRepository.emitChatFcmEvent()
+        } else {
+            glucoseAlertManager.emitFcmAlert(title, body, alertType ?: "")
         }
     }
 

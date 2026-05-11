@@ -457,7 +457,7 @@ fun AppNavigation(
                     onBack = { navController.popBackStack() },
                     onChatClick = { navController.navigate(Screen.KikiChat.route) },
                     onMealReply = { replyText, displayLabel ->
-                        mainViewModel.sendMealReply(replyText)
+                        mainViewModel.sendMealReply(replyText, displayLabel)
                         chatViewModel.sendUserReply(null, displayLabel)
                     },
                     onViewed = mainViewModel::markAllNotificationsRead,
