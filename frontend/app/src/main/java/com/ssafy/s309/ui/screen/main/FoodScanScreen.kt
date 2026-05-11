@@ -66,6 +66,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -88,6 +89,8 @@ import java.io.File
 // ── 상태 ──────────────────────────────────────────────
 
 private enum class AnalysisStatus { PENDING, IN_PROGRESS, COMPLETED }
+
+private const val GUIDE_BOX_RATIO = 0.80f
 
 // ── 진입점 ─────────────────────────────────────────────────
 
@@ -196,9 +199,15 @@ fun CameraScreen(
 
     val imageCapture = remember { ImageCapture.Builder().build() }
     var isTaking by remember { mutableStateOf(false) }
+    var viewWidth by remember { mutableIntStateOf(0) }
+    var viewHeight by remember { mutableIntStateOf(0) }
 
     Box(
-        modifier = Modifier.fillMaxSize().background(Color.Black),
+        modifier =
+            Modifier.fillMaxSize().background(Color.Black).onSizeChanged {
+                viewWidth = it.width
+                viewHeight = it.height
+            },
     ) {
         // 전체화면 카메라 프리뷰
         if (hasCameraPermission) {
@@ -211,7 +220,7 @@ fun CameraScreen(
 
         // 가이드 박스 오버레이
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val boxSize = size.width * 0.80f
+            val boxSize = size.width * GUIDE_BOX_RATIO
             val left = (size.width - boxSize) / 2f
             val top = (size.height - boxSize) / 2f
             val right = left + boxSize
@@ -329,7 +338,7 @@ fun CameraScreen(
                         .clickable {
                             if (!isTaking) {
                                 isTaking = true
-                                takePhoto(imageCapture, context) { file -> onPhotoTaken(file) }
+                                takePhoto(imageCapture, context, viewWidth, viewHeight) { file -> onPhotoTaken(file) }
                             }
                         },
                 contentAlignment = Alignment.Center,
@@ -384,6 +393,8 @@ private fun CameraPreviewView(imageCapture: ImageCapture) {
 private fun takePhoto(
     imageCapture: ImageCapture,
     context: android.content.Context,
+    screenWidth: Int,
+    screenHeight: Int,
     onResult: (File) -> Unit,
 ) {
     val photoFile = File.createTempFile("food_", ".jpg", context.cacheDir)
@@ -394,7 +405,7 @@ private fun takePhoto(
         ContextCompat.getMainExecutor(context),
         object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                onResult(cropCenterSquare(photoFile))
+                onResult(cropToGuideBox(photoFile, screenWidth, screenHeight))
             }
 
             override fun onError(exc: ImageCaptureException) {
@@ -404,12 +415,75 @@ private fun takePhoto(
     )
 }
 
-private fun cropCenterSquare(file: File): File {
-    val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return file
-    val size = minOf(bitmap.width, bitmap.height)
-    val x = (bitmap.width - size) / 2
-    val y = (bitmap.height - size) / 2
-    val cropped = android.graphics.Bitmap.createBitmap(bitmap, x, y, size, size)
+private fun cropToGuideBox(
+    file: File,
+    screenWidth: Int,
+    screenHeight: Int,
+): File {
+    val original = BitmapFactory.decodeFile(file.absolutePath) ?: return file
+
+    val exif = android.media.ExifInterface(file.absolutePath)
+    val orientation =
+        exif.getAttributeInt(
+            android.media.ExifInterface.TAG_ORIENTATION,
+            android.media.ExifInterface.ORIENTATION_NORMAL,
+        )
+    val rotation =
+        when (orientation) {
+            android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+            android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+            android.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+            else -> 0f
+        }
+    val bitmap =
+        if (rotation != 0f) {
+            val matrix = android.graphics.Matrix().apply { postRotate(rotation) }
+            val rotated =
+                android.graphics.Bitmap.createBitmap(
+                    original,
+                    0,
+                    0,
+                    original.width,
+                    original.height,
+                    matrix,
+                    true,
+                )
+            if (rotated !== original) original.recycle()
+            rotated
+        } else {
+            original
+        }
+
+    val imgW = bitmap.width
+    val imgH = bitmap.height
+
+    if (screenWidth <= 0 || screenHeight <= 0) {
+        val size = minOf(imgW, imgH)
+        val x = (imgW - size) / 2
+        val y = (imgH - size) / 2
+        val cropped = android.graphics.Bitmap.createBitmap(bitmap, x, y, size, size)
+        val out = File(file.parent, "crop_${file.name}")
+        out.outputStream().use { cropped.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }
+        bitmap.recycle()
+        cropped.recycle()
+        return out
+    }
+
+    val scale = maxOf(screenWidth.toFloat() / imgW, screenHeight.toFloat() / imgH)
+    val visibleW = screenWidth / scale
+    val visibleH = screenHeight / scale
+    val visibleX = (imgW - visibleW) / 2f
+    val visibleY = (imgH - visibleH) / 2f
+
+    val boxScreenSize = screenWidth * GUIDE_BOX_RATIO
+    val boxScreenLeft = (screenWidth - boxScreenSize) / 2f
+    val boxScreenTop = (screenHeight - boxScreenSize) / 2f
+
+    val cropSize = (boxScreenSize / scale).toInt().coerceAtMost(minOf(imgW, imgH))
+    val cropX = (visibleX + boxScreenLeft / scale).toInt().coerceIn(0, (imgW - cropSize).coerceAtLeast(0))
+    val cropY = (visibleY + boxScreenTop / scale).toInt().coerceIn(0, (imgH - cropSize).coerceAtLeast(0))
+
+    val cropped = android.graphics.Bitmap.createBitmap(bitmap, cropX, cropY, cropSize, cropSize)
     val out = File(file.parent, "crop_${file.name}")
     out.outputStream().use { cropped.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }
     bitmap.recycle()
