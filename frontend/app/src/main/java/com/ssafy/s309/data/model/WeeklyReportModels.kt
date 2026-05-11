@@ -17,6 +17,15 @@ data class WeeklyReportResponse(
     val aiSuggest: String = "",
     val createdAt: String = "",
     val foods: List<WeeklyFoodItem> = emptyList(),
+    val dailyGlucose: List<DailyGlucoseItem> = emptyList(),
+)
+
+@Serializable
+data class DailyGlucoseItem(
+    val date: String,
+    val avg: Double,
+    val min: Double,
+    val max: Double,
 )
 
 @Serializable
