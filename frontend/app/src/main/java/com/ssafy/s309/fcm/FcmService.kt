@@ -66,9 +66,11 @@ class FcmService : FirebaseMessagingService() {
             showNotification(title, body)
         }
         ttsManager.playSound(resIdForAlertType(alertType))
+
+        // 홈 대시보드(KikiSuggestionCard + 뱃지)용 — 모든 알림을 alertStream에 emit
         glucoseAlertManager.emitFcmAlert(title, body, alertType ?: "")
 
-        // 채팅 메시지 FCM — KikiChatViewModel에 재조회 신호 전달
+        // 채팅 메시지 FCM — KikiChatViewModel에 page=0 재조회 신호 전달
         if (message.data["chatMessageId"] != null) {
             healthRepository.emitChatFcmEvent()
         }

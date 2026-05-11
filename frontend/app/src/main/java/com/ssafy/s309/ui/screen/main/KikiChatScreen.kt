@@ -1,3 +1,4 @@
+
 package com.ssafy.s309.ui.screen.main
 
 import android.util.Log
@@ -50,7 +51,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.ssafy.s309.R
-import com.ssafy.s309.data.local.TokenManager
 import com.ssafy.s309.data.model.NotificationItem
 import com.ssafy.s309.data.repository.HealthRepository
 import com.ssafy.s309.ui.theme.GlucoachColors
@@ -94,7 +94,6 @@ class KikiChatViewModel
     @Inject
     constructor(
         private val healthRepository: HealthRepository,
-        private val tokenManager: TokenManager,
     ) : ViewModel() {
         private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
         val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
@@ -119,6 +118,8 @@ class KikiChatViewModel
             // 실시간 혈당 알림 스트림
             viewModelScope.launch {
                 healthRepository.glucoseAlertStream.collect { alert ->
+                    // AGENT_ 알림은 chatFcmEvent가 백엔드 재조회로 처리 → 여기서 skip해야 중복 방지
+                    if (alert.alertType.startsWith("AGENT_")) return@collect
                     val raw = _messages.value.filterNot { it is ChatMessage.DateSeparator }
                     _messages.value = withDateSeparators(listOf(ChatMessage.KikiMessage(alert)) + raw)
                 }
@@ -267,9 +268,8 @@ class KikiChatViewModel
             _messages.value = withDateSeparators(listOf(userMsg) + raw)
 
             if (replyText != null) {
-                val userId = tokenManager.getUserId() ?: return
                 viewModelScope.launch {
-                    healthRepository.sendPostMealReply(userId, replyText)
+                    healthRepository.sendPostMealReply(replyText, displayLabel)
                 }
             }
         }
