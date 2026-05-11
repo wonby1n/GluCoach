@@ -29,6 +29,10 @@ object GlucoachColors {
     val GradeB = Color(0xFFFFA726)
     val GradeD = Color(0xFFD32F2F)
 
+    val GlucoseNormal = Color(0xFF71C1D2)
+    val GlucoseWarning = Color(0xFFF6B44C)
+    val GlucoseDanger = Color(0xFFE96A6A)
+
     val GradeS = Color(0xFF4CAF50)
     val GradeSBg = Color(0xFFE8F5E9)
     val GradeA = Color(0xFF71C1D2)
