@@ -200,20 +200,32 @@ fun MainScreenContent(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .pointerInput(showCameraPanel) {
+                        .pointerInput(showCameraPanel, selectedTab) {
                             if (!showCameraPanel) {
+                                val swipeTabs = listOf("home", "meallog", "profile")
                                 detectHorizontalDragGestures(
                                     onDragStart = { cumulativeDrag = 0f },
                                     onDragEnd = {
-                                        if (cumulativeDrag > 80.dp.toPx()) {
-                                            showCameraPanel = true
-                                            isAbMode = false
+                                        val threshold = 80.dp.toPx()
+                                        if (cumulativeDrag > threshold) {
+                                            val idx = swipeTabs.indexOf(selectedTab)
+                                            if (selectedTab == "home") {
+                                                showCameraPanel = true
+                                                isAbMode = false
+                                            } else if (idx > 0) {
+                                                selectedTab = swipeTabs[idx - 1]
+                                            }
+                                        } else if (cumulativeDrag < -threshold) {
+                                            val idx = swipeTabs.indexOf(selectedTab)
+                                            if (idx in 0 until swipeTabs.lastIndex) {
+                                                selectedTab = swipeTabs[idx + 1]
+                                            }
                                         }
                                         cumulativeDrag = 0f
                                     },
                                     onDragCancel = { cumulativeDrag = 0f },
                                     onHorizontalDrag = { _, dragAmount ->
-                                        if (dragAmount > 0) cumulativeDrag += dragAmount
+                                        cumulativeDrag += dragAmount
                                     },
                                 )
                             }
