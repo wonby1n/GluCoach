@@ -116,7 +116,7 @@ internal data class FoodItem(
 private fun FoodSearchItem.toFoodItem() =
     FoodItem(
         id = id.toLong(),
-        name = name,
+        name = displayName ?: name,
         category = category.orEmpty(),
         calories = kcal?.toInt() ?: 0,
         carbs = carbsG?.toInt() ?: 0,

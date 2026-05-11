@@ -137,7 +137,7 @@ class FoodReportViewModel
         private fun FoodGradeResponse.toGradeFoodItem(): GradeFoodItem =
             GradeFoodItem(
                 foodId = foodId,
-                name = foodName,
+                name = foodDisplayName ?: foodName,
                 frequency = mealCount,
                 lastEaten = formatLastEaten(lastEatenAt),
                 glucoseRise = avgSlope.toInt(),

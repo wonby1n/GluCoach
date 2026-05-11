@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 data class FoodSearchItem(
     val id: Int,
     val name: String,
+    val displayName: String? = null,
     val category: String? = null,
     val kcal: Double? = null,
     val carbsG: Double? = null,

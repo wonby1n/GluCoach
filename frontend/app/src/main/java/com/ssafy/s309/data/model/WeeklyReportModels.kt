@@ -34,4 +34,5 @@ data class WeeklyFoodItem(
     val foodName: String,
     val type: String,
     val avgSlope: Double,
+    val foodDisplayName: String? = null,
 )

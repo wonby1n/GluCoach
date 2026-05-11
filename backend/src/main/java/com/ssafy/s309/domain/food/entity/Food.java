@@ -33,6 +33,11 @@ public class Food extends BaseEntity {
   @Column(name = "name", nullable = false, length = 128)
   private String name;
 
+  // 사용자 노출용 표시명. NULL 이면 FE 가 name 으로 fallback.
+  // 식약처 API 매칭은 name 기준이므로 raw 보존, 표시만 분리.
+  @Column(name = "display_name", length = 100)
+  private String displayName;
+
   @Column(name = "category", length = 50)
   private String category;
 

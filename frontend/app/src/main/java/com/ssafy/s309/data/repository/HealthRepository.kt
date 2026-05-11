@@ -152,7 +152,7 @@ class HealthRepository
                             timestampMillis =
                                 LocalDateTime.parse(m.recordedAt)
                                     .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
-                            label = m.foodName?.ifBlank { null } ?: "식사",
+                            label = (m.foodDisplayName ?: m.foodName)?.ifBlank { null } ?: "식사",
                         )
                     }
                 }

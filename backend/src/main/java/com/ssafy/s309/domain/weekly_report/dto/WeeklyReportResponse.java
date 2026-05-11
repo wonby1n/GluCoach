@@ -74,12 +74,14 @@ public class WeeklyReportResponse {
 
     private final Integer foodId;
     private final String foodName;
+    private final String foodDisplayName;
     private final String type;
     private final BigDecimal avgSlope;
 
     private WeeklyFoodItem(WeeklyFood wf) {
       this.foodId = wf.getFoodId();
       this.foodName = wf.getFood() != null ? wf.getFood().getName() : null;
+      this.foodDisplayName = wf.getFood() != null ? wf.getFood().getDisplayName() : null;
       this.type = wf.getType();
       this.avgSlope = wf.getAvgSlope();
     }

@@ -7,6 +7,7 @@ package com.ssafy.s309.feature.glucofit.data
  */
 data class KeyboardFoodItem(
     val name: String,
+    val displayName: String? = null,
     val category: String? = null,
     val grade: String? = null,
 )
