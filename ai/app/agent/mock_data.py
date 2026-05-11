@@ -1,12 +1,16 @@
+from datetime import datetime, timedelta
+
+_now = datetime.now()
+_TODAY = _now.strftime("%Y-%m-%d")
+_YESTERDAY = (_now - timedelta(days=1)).strftime("%Y-%m-%d")
+
 # =============================================
-# 시연 기준 날짜
-# 어제: 2026-05-03 (일요일)
-# 오늘: 2026-05-04 (월요일)
+# 시연 기준 날짜 (매일 자동 갱신)
 # =============================================
 
 DEMO_DATE = {
-    "yesterday": "2026-05-03",
-    "today":     "2026-05-04",
+    "yesterday": _YESTERDAY,
+    "today":     _TODAY,
 }
 
 # =============================================
@@ -402,3 +406,31 @@ REASONING_TRACE_POSTMEAL_2 = {
     "decision": "알림 발송 (첫 알림과 다른 표현)",
     "message":  "회의 끝나셨나요? 잠깐 일어나서 스트레칭 어때요? 🌿",
 }
+
+
+# =============================================
+# 날짜 자동 치환: 하드코딩된 2026-05-04/03 → 오늘/어제
+# =============================================
+
+def _replace_dates(obj):
+    """재귀적으로 문자열 내 날짜를 치환한다."""
+    if isinstance(obj, str):
+        return obj.replace("2026-05-04", _TODAY).replace("2026-05-03", _YESTERDAY)
+    if isinstance(obj, dict):
+        return {_replace_dates(k): _replace_dates(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_replace_dates(i) for i in obj]
+    return obj
+
+
+DEMO_DATE = _replace_dates(DEMO_DATE)
+SLEEP_DATA = _replace_dates(SLEEP_DATA)
+GLUCOSE_DATA = _replace_dates(GLUCOSE_DATA)
+MEAL_DATA = _replace_dates(MEAL_DATA)
+STEPS_DATA = _replace_dates(STEPS_DATA)
+NOTIFICATION_HISTORY = _replace_dates(NOTIFICATION_HISTORY)
+EXPECTED_NOTIFICATIONS = _replace_dates(EXPECTED_NOTIFICATIONS)
+REASONING_TRACE_MORNING = _replace_dates(REASONING_TRACE_MORNING)
+REASONING_TRACE_POSTMEAL_1 = _replace_dates(REASONING_TRACE_POSTMEAL_1)
+REASONING_TRACE_POSTMEAL_REPLY = _replace_dates(REASONING_TRACE_POSTMEAL_REPLY)
+REASONING_TRACE_POSTMEAL_2 = _replace_dates(REASONING_TRACE_POSTMEAL_2)
