@@ -317,9 +317,10 @@ TOOL_SCHEMAS = [
     {
         "name": "send_notification",
         "description": (
-            "사용자에게 알림 메시지 + 응답 선택지 3개 + AI 추론 카드를 발송한다. "
-            "agent의 최종 행동으로 사용한다. options는 정확히 3개여야 하며 "
-            "사용자가 채팅 화면에서 클릭할 수 있는 응답 버튼이다. "
+            "사용자에게 알림 메시지 + AI 추론 카드를 발송한다. "
+            "agent의 최종 행동으로 사용한다. "
+            "meal_recorded 트리거에서는 options에 정확히 3개의 선택지를 포함해야 한다. "
+            "user_response/schedule_followup 트리거에서는 options를 빈 배열 []로 전달한다. "
             "display_trace는 사용자에게 노출 가능한 추론 과정 카드다."
         ),
         "input_schema": {
