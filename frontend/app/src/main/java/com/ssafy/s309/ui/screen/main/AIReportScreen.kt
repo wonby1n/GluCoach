@@ -57,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -225,7 +226,20 @@ private fun AIReportSuccessContent(
         remember(report.id, state.gradeMap) { report.foods.filter { it.type == "GOOD" }.map { it.toReportFoodCard(state.gradeMap) } }
     val cautionFoods =
         remember(report.id, state.gradeMap) { report.foods.filter { it.type == "BAD" }.map { it.toReportFoodCard(state.gradeMap) } }
-    val weeklyGlucose = remember(report.id) { List(7) { report.avgGlucose.toFloat() } }
+    val weeklyGlucose =
+        remember(report.id) {
+            if (report.dailyGlucose.isEmpty()) {
+                List<Float?>(7) { report.avgGlucose.toFloat() }
+            } else {
+                val weekStart = LocalDate.parse(report.weekStart)
+                val slots = arrayOfNulls<Float>(7)
+                report.dailyGlucose.forEach { item ->
+                    val idx = (LocalDate.parse(item.date).toEpochDay() - weekStart.toEpochDay()).toInt()
+                    if (idx in 0..6) slots[idx] = item.avg.toFloat()
+                }
+                slots.toList()
+            }
+        }
     val patternItems = remember(report.id) { report.toPatternItems() }
 
     Column(
@@ -425,11 +439,16 @@ private fun SummaryStatItem(
 // ── 7일 혈당 추이 차트 ──────────────────────────────────
 
 @Composable
-private fun WeeklyGlucoseChart(weeklyGlucose: List<Float>) {
+private fun WeeklyGlucoseChart(weeklyGlucose: List<Float?>) {
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     val days = listOf("월", "화", "수", "목", "금", "토", "일")
-    val minVal = 50f
-    val maxVal = 200f
+    val highThreshold = 180f
+    val lowThreshold = 60f
+    val dangerColor = Color(0xFFE53935)
+    val dataMax = weeklyGlucose.filterNotNull().maxOrNull() ?: 200f
+    val dataMin = weeklyGlucose.filterNotNull().minOrNull() ?: 50f
+    val maxVal = maxOf(200f, dataMax + 20f)
+    val minVal = minOf(50f, dataMin - 20f).coerceAtLeast(0f)
     val range = maxVal - minVal
 
     Column(
@@ -450,6 +469,9 @@ private fun WeeklyGlucoseChart(weeklyGlucose: List<Float>) {
         val density = LocalDensity.current
         val widthDp = with(density) { chartWidthPx.toDp() }
         val stepDp = if (weeklyGlucose.size > 1 && chartWidthPx > 0) widthDp / (weeklyGlucose.size - 1) else 0.dp
+        // 점선 위 4dp 간격에 라벨 배치
+        val y180 = (chartHeight * (1f - (highThreshold - minVal) / range) - 17.dp).coerceIn(0.dp, chartHeight - 14.dp)
+        val y60 = (chartHeight * (1f - (lowThreshold - minVal) / range) - 17.dp).coerceIn(0.dp, chartHeight - 14.dp)
 
         Box(
             modifier =
@@ -465,20 +487,21 @@ private fun WeeklyGlucoseChart(weeklyGlucose: List<Float>) {
 
                 fun yFor(v: Float) = h - ((v - minVal) / range) * h
 
+                drawRect(color = Color(0x1AE53935), topLeft = Offset(0f, 0f), size = Size(w, yFor(highThreshold)))
+
                 val dashEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
                 val gridColor = GlucoachColors.ChartGrid
-
                 drawLine(
                     color = gridColor,
-                    start = Offset(0f, yFor(180f)),
-                    end = Offset(w, yFor(180f)),
+                    start = Offset(0f, yFor(highThreshold)),
+                    end = Offset(w, yFor(highThreshold)),
                     strokeWidth = 1f,
                     pathEffect = dashEffect,
                 )
                 drawLine(
                     color = gridColor,
-                    start = Offset(0f, yFor(60f)),
-                    end = Offset(w, yFor(60f)),
+                    start = Offset(0f, yFor(lowThreshold)),
+                    end = Offset(w, yFor(lowThreshold)),
                     strokeWidth = 1f,
                     pathEffect = dashEffect,
                 )
@@ -486,45 +509,94 @@ private fun WeeklyGlucoseChart(weeklyGlucose: List<Float>) {
                 val points = weeklyGlucose
                 if (points.size >= 2) {
                     val step = w / (points.size - 1)
-                    val path =
-                        Path().apply {
-                            moveTo(0f, yFor(points[0]))
-                            for (i in 1 until points.size) {
-                                val x0 = (i - 1) * step
-                                val x1 = i * step
-                                val cx = (x0 + x1) / 2f
-                                cubicTo(cx, yFor(points[i - 1]), cx, yFor(points[i]), x1, yFor(points[i]))
-                            }
+                    for (i in 1 until points.size) {
+                        val v0 = points[i - 1] ?: continue
+                        val v1 = points[i] ?: continue
+                        val x0 = (i - 1) * step
+                        val x1 = i * step
+                        val cx = (x0 + x1) / 2f
+                        val p0High = v0 > highThreshold
+                        val p1High = v1 > highThreshold
+                        if (p0High == p1High) {
+                            val path =
+                                Path().apply {
+                                    moveTo(x0, yFor(v0))
+                                    cubicTo(cx, yFor(v0), cx, yFor(v1), x1, yFor(v1))
+                                }
+                            drawPath(path, if (p0High) dangerColor else GlucoachColors.Primary, style = Stroke(2.5f, cap = StrokeCap.Round))
+                        } else {
+                            val ratio = (highThreshold - v0) / (v1 - v0)
+                            val xMid = x0 + ratio * (x1 - x0)
+                            val yMid = yFor(highThreshold)
+                            val cx0 = (x0 + xMid) / 2f
+                            val cx1 = (xMid + x1) / 2f
+                            val path0 =
+                                Path().apply {
+                                    moveTo(x0, yFor(v0))
+                                    cubicTo(cx0, yFor(v0), cx0, yMid, xMid, yMid)
+                                }
+                            drawPath(
+                                path0,
+                                if (p0High) dangerColor else GlucoachColors.Primary,
+                                style = Stroke(2.5f, cap = StrokeCap.Round),
+                            )
+                            val path1 =
+                                Path().apply {
+                                    moveTo(xMid, yMid)
+                                    cubicTo(cx1, yMid, cx1, yFor(v1), x1, yFor(v1))
+                                }
+                            drawPath(
+                                path1,
+                                if (p1High) dangerColor else GlucoachColors.Primary,
+                                style = Stroke(2.5f, cap = StrokeCap.Round),
+                            )
                         }
-                    drawPath(path = path, color = GlucoachColors.Primary, style = Stroke(width = 2.5f, cap = StrokeCap.Round))
-
+                    }
                     selectedIndex?.let { idx ->
+                        val v = points[idx] ?: return@let
                         val cx = idx * step
                         drawLine(
                             color = GlucoachColors.TextSecondary,
-                            start = Offset(cx, yFor(points[idx]) + 12f),
+                            start = Offset(cx, yFor(v) + 12f),
                             end = Offset(cx, h),
                             strokeWidth = 1.5f,
                             pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)),
                         )
                     }
-
                     points.forEachIndexed { i, v ->
+                        if (v == null) return@forEachIndexed
                         val cx = i * step
                         val cy = yFor(v)
+                        val pointColor = if (v > highThreshold) dangerColor else GlucoachColors.Primary
                         if (selectedIndex == i) {
-                            drawCircle(color = GlucoachColors.Primary, radius = 8f, center = Offset(cx, cy))
+                            drawCircle(color = pointColor, radius = 8f, center = Offset(cx, cy))
                             drawCircle(color = GlucoachColors.Surface, radius = 4f, center = Offset(cx, cy))
                         } else {
                             drawCircle(color = GlucoachColors.Surface, radius = 6f, center = Offset(cx, cy))
-                            drawCircle(color = GlucoachColors.Primary, radius = 5f, center = Offset(cx, cy), style = Stroke(width = 2.5f))
+                            drawCircle(color = pointColor, radius = 5f, center = Offset(cx, cy), style = Stroke(width = 2.5f))
                         }
                     }
                 }
             }
 
+            // 점선 바로 위 라벨
+            Text(
+                text = "180",
+                color = Color(0xFFE53935),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.offset(y = y180),
+            )
+            Text(
+                text = "60",
+                color = Color(0xFF2196F3),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.offset(y = y60),
+            )
+
             selectedIndex?.let { idx ->
-                val v = weeklyGlucose[idx]
+                val v = weeklyGlucose.getOrNull(idx) ?: return@let
                 val text = "${v.toInt()}"
                 val textHalfWidth = (text.length * 3.5f).dp
                 val cx = stepDp * idx
@@ -534,20 +606,12 @@ private fun WeeklyGlucoseChart(weeklyGlucose: List<Float>) {
                 val tipY = maxOf(0.dp, cy - 28.dp)
                 Text(
                     text = text,
-                    color = GlucoachColors.Primary,
+                    color = if (v > 180f) Color(0xFFE53935) else GlucoachColors.Primary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.offset(x = tipX, y = tipY),
                 )
             }
-
-            Text(text = "180", color = GlucoachColors.TextSecondary, fontSize = 10.sp, modifier = Modifier.align(Alignment.TopStart))
-            Text(
-                text = "60",
-                color = GlucoachColors.TextSecondary,
-                fontSize = 10.sp,
-                modifier = Modifier.align(Alignment.BottomStart).padding(bottom = 4.dp),
-            )
         }
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
@@ -555,16 +619,29 @@ private fun WeeklyGlucoseChart(weeklyGlucose: List<Float>) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             days.forEachIndexed { idx, day ->
                 val isSelected = selectedIndex == idx
+                val isDanger = (weeklyGlucose.getOrNull(idx) ?: 0f) > 180f
+                val bgColor =
+                    when {
+                        isSelected && isDanger -> dangerColor
+                        isSelected -> GlucoachColors.Primary
+                        else -> Color.Transparent
+                    }
+                val textColor =
+                    when {
+                        isSelected -> Color.White
+                        isDanger -> dangerColor
+                        else -> GlucoachColors.TextSecondary
+                    }
                 Box(
                     modifier =
                         Modifier
                             .size(28.dp)
                             .clip(CircleShape)
-                            .background(if (isSelected) GlucoachColors.Primary else Color.Transparent)
+                            .background(bgColor)
                             .clickable { selectedIndex = if (selectedIndex == idx) null else idx },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(text = day, color = if (isSelected) Color.White else GlucoachColors.TextSecondary, fontSize = 12.sp)
+                    Text(text = day, color = textColor, fontSize = 12.sp)
                 }
             }
         }
