@@ -282,6 +282,7 @@ fun MainScreenContent(
                                 CurrentGlucoseCard(
                                     currentMgDl = state.currentGlucoseMgDl ?: 0,
                                     diffFromPrevious = state.diffFromPrevious,
+                                    glucoseRange = state.glucoseRange,
                                     mascotSlot = {
                                         KikiImage(
                                             drawableRes = kikiDrawable,
