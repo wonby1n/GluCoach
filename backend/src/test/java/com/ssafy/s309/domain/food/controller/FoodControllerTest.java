@@ -42,6 +42,7 @@ class FoodControllerTest {
             1,
             "밥, 흰쌀",
             null,
+            null,
             new BigDecimal("143.00"),
             new BigDecimal("31.50"),
             new BigDecimal("0.10"),

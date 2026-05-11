@@ -36,6 +36,7 @@ class FoodServiceTest {
         id,
         name,
         null,
+        null,
         new BigDecimal("143.00"),
         new BigDecimal("31.50"),
         new BigDecimal("0.10"),

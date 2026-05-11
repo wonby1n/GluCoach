@@ -137,7 +137,12 @@ public class WeeklyReportService {
         weeklyFoodRepository.findByReportIdInWithFood(reportIds).stream()
             .collect(Collectors.groupingBy(WeeklyFood::getReportId));
     return reports.stream()
-        .map(r -> WeeklyReportResponse.from(r, foodsByReportId.getOrDefault(r.getId(), List.of())))
+        .map(
+            r ->
+                WeeklyReportResponse.from(
+                    r,
+                    foodsByReportId.getOrDefault(r.getId(), List.of()),
+                    queryService.getDailyGlucose(userId, r.getWeekStart())))
         .toList();
   }
 

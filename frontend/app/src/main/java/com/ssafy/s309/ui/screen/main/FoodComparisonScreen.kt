@@ -86,6 +86,7 @@ import com.ssafy.s309.data.model.FoodSearchItem
 import com.ssafy.s309.data.model.GlucoseCompareResponse
 import com.ssafy.s309.data.model.GlucosePrediction
 import com.ssafy.s309.data.model.GlucoseRange
+import com.ssafy.s309.ui.component.FoodCategoryImageMapper
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
@@ -116,8 +117,9 @@ internal data class FoodItem(
 private fun FoodSearchItem.toFoodItem() =
     FoodItem(
         id = id.toLong(),
-        name = name,
+        name = displayName ?: name,
         category = category.orEmpty(),
+        imageResId = FoodCategoryImageMapper.getImageRes(category, name),
         calories = kcal?.toInt() ?: 0,
         carbs = carbsG?.toInt() ?: 0,
         sugar = sugarG?.toInt() ?: 0,

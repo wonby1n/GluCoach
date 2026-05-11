@@ -53,6 +53,7 @@ public class AgentUserDataService {
                 new AgentFoodGradeItem(
                     g.getFoodId(),
                     g.getFoodName(),
+                    g.getFoodDisplayName(),
                     g.getGrade(),
                     g.getAvgSlope(),
                     g.getMealCount(),

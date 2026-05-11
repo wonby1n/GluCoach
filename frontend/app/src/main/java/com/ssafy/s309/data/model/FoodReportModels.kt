@@ -31,4 +31,5 @@ data class FoodGradeResponse(
     @SerialName("avgSlope") val avgSlope: Double,
     @SerialName("mealCount") val mealCount: Int,
     @SerialName("lastEatenAt") val lastEatenAt: String,
+    @SerialName("foodDisplayName") val foodDisplayName: String? = null,
 )

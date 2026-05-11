@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -47,6 +48,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,6 +57,7 @@ import com.ssafy.s309.data.model.FoodGradeInfo
 import com.ssafy.s309.data.model.FoodTrend
 import com.ssafy.s309.data.model.GradeFoodItem
 import com.ssafy.s309.data.model.MealRecordResponse
+import com.ssafy.s309.ui.component.FoodCategoryImageMapper
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
@@ -240,21 +244,15 @@ private fun FoodDetailItem(
                 .padding(GlucoachSpacing.lg),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
+        Image(
+            painter = painterResource(id = FoodCategoryImageMapper.getImageRes(null, food.name)),
+            contentDescription = food.name,
             modifier =
                 Modifier
                     .size(48.dp)
-                    .clip(CircleShape)
-                    .background(gradeColor.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = food.name.take(1),
-                color = gradeColor,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-            )
-        }
+                    .clip(CircleShape),
+            contentScale = ContentScale.Crop,
+        )
 
         Spacer(Modifier.width(GlucoachSpacing.md))
 
@@ -467,7 +465,7 @@ private fun FoodHistorySheet(
                             val date = extractDate(meal.recordedAt)
                             HistoryMealCard(
                                 mealType = mealType,
-                                foodName = meal.foodName ?: food.name,
+                                foodName = meal.foodDisplayName ?: meal.foodName ?: food.name,
                                 onClick = { onDateClick(date, meal.mealId) },
                             )
                             Spacer(Modifier.height(GlucoachSpacing.sm))

@@ -37,7 +37,7 @@ public interface FoodRepository extends JpaRepository<Food, Integer> {
    */
   @Query(
       """
-      SELECT new com.ssafy.s309.domain.food.dto.KeyboardFoodItem(f.name, f.category, ufg.grade)
+      SELECT new com.ssafy.s309.domain.food.dto.KeyboardFoodItem(f.name, f.displayName, f.category, ufg.grade)
       FROM Food f
       LEFT JOIN UserFoodGrade ufg ON ufg.foodId = f.id AND ufg.userId = :userId
       ORDER BY (CASE WHEN ufg.grade IS NOT NULL THEN 0 ELSE 1 END), f.searchCount DESC, f.id ASC
@@ -47,7 +47,7 @@ public interface FoodRepository extends JpaRepository<Food, Integer> {
   @Query(
       """
       SELECT new com.ssafy.s309.domain.agent.dto.AgentUnseenFoodItem(
-          f.id, f.name, f.category, f.kcal, f.carbsG)
+          f.id, f.name, f.displayName, f.category, f.kcal, f.carbsG)
       FROM Food f
       WHERE f.id NOT IN (
           SELECT ufg.foodId FROM UserFoodGrade ufg WHERE ufg.userId = :userId
