@@ -68,13 +68,24 @@ class FoodPredictor:
             vec = self.extractor(tensor).squeeze(0)
 
         sims = (self.prototypes @ vec).cpu()
-        k = min(top_k, len(self.class_names))
-        top_vals, top_idx = sims.topk(k)
+        return self._merge_and_rank(sims, top_k)
 
+    def _merge_and_rank(self, sims: torch.Tensor, top_k: int) -> list[dict]:
+        """class_names 와 1:1 대응되는 cosine sims → 표시명 기준 머지 + top-k 정렬.
+
+        같은 표시명으로 매핑되는 DB 키(예: AI Hub 코드 '01015017' 와 커스텀 키
+        '국밥_돼지머리' 가 모두 '돼지국밥' 으로 매핑)는 더 높은 cosine 만 살린다.
+        합산이 아닌 max — cosine 은 확률이 아니라 같은 음식의 다른 prototype 일 뿐이라,
+        합산하면 단일 prototype 음식 대비 부당한 부스트가 발생.
+        """
+        merged: dict[str, float] = {}
+        for cname, sim in zip(self.class_names, sims.tolist()):
+            display = self.code_to_name.get(cname, cname)
+            if display not in merged or sim > merged[display]:
+                merged[display] = sim
+
+        ranked = sorted(merged.items(), key=lambda x: x[1], reverse=True)[:top_k]
         return [
-            {
-                "name_ko": self.code_to_name.get(self.class_names[idx], self.class_names[idx]),
-                "confidence": round(val, 4),
-            }
-            for val, idx in zip(top_vals.tolist(), top_idx.tolist())
+            {"name_ko": name, "confidence": round(sim, 4)}
+            for name, sim in ranked
         ]
