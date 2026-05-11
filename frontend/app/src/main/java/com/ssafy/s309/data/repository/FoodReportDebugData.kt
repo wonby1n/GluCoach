@@ -6,7 +6,7 @@ import com.ssafy.s309.data.model.MealRecordResponse
 // ──────────────────────────────────────────────────────────
 //  디버그 전용 mock 데이터. 배포 전 USE_FOOD_REPORT_MOCK = false 로 변경할 것.
 // ──────────────────────────────────────────────────────────
-internal const val USE_FOOD_REPORT_MOCK = true
+internal const val USE_FOOD_REPORT_MOCK = false
 
 internal val MOCK_FOOD_GRADES: List<FoodGradeResponse> =
     listOf(
