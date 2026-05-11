@@ -196,7 +196,8 @@ class KikiChatViewModel
                         val newMessages =
                             response.content
                                 .sortedByDescending { it.id }
-                                .filter { it.createdAt !in existingCreatedAts }
+                                // 유저 메시지는 sendUserReply 낙관적 추가로 이미 로컬에 존재 → skip하여 중복 방지
+                                .filter { it.createdAt !in existingCreatedAts && it.sender != "user" }
                                 .map { m ->
                                     if (m.sender == "user") {
                                         ChatMessage.UserMessage(
