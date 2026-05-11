@@ -37,6 +37,7 @@ import com.ssafy.s309.ui.screen.health.HealthSourceScreen
 import com.ssafy.s309.ui.screen.main.GuardianScreen
 import com.ssafy.s309.ui.screen.main.KikiAlarmDetailScreen
 import com.ssafy.s309.ui.screen.main.KikiChatScreen
+import com.ssafy.s309.ui.screen.main.KikiChatViewModel
 import com.ssafy.s309.ui.screen.main.MainScreen
 import com.ssafy.s309.ui.screen.main.MainViewModel
 import com.ssafy.s309.ui.screen.main.MyAccountScreen
@@ -179,7 +180,11 @@ private fun SubScreenWithBottomNav(
 }
 
 @Composable
-fun AppNavigation(navController: NavHostController = rememberNavController()) {
+fun AppNavigation(
+    navController: NavHostController = rememberNavController(),
+    pendingNavTarget: String? = null,
+    onNavTargetConsumed: () -> Unit = {},
+) {
     val authViewModel: AuthViewModel = hiltViewModel()
     val authState by authViewModel.uiState.collectAsState()
 
@@ -315,6 +320,14 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         composable(Screen.Main.route) { backStackEntry ->
             val requestedTab = backStackEntry.savedStateHandle.get<String>("requestedTab")
 
+            // FCM 알림 탭 → KikiAlarmDetail 딥링크 처리
+            LaunchedEffect(pendingNavTarget) {
+                if (pendingNavTarget == com.ssafy.s309.MainActivity.NAV_KIKI_ALARM_DETAIL) {
+                    navController.navigate(Screen.KikiAlarmDetail.route) { launchSingleTop = true }
+                    onNavTargetConsumed()
+                }
+            }
+
             LaunchedEffect(authState) {
                 if (authState is AuthUiState.LogoutSuccess ||
                     authState is AuthUiState.WithdrawSuccess
@@ -409,13 +422,21 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     navController.getBackStackEntry(Screen.Main.route)
                 }
             val mainViewModel: MainViewModel = hiltViewModel(mainEntry)
+            val chatViewModel: KikiChatViewModel = hiltViewModel(mainEntry)
+            LaunchedEffect(Unit) { mainViewModel.markAllNotificationsRead() }
             SubScreenWithBottomNav(navController = navController, selectedId = "home") {
                 KikiChatScreen(
-                    onBack = { navController.popBackStack() },
+                    onBack = {
+                        mainViewModel.markAllNotificationsRead()
+                        navController.popBackStack()
+                    },
                     onItemClick = { item ->
-                        mainViewModel.selectNotification(item)
+                        // 채팅 목록에서 열리는 알림은 이미 읽은 것으로 처리
+                        mainViewModel.selectNotification(item.copy(isUnread = false))
                         navController.navigate(Screen.KikiAlarmDetail.route)
                     },
+                    onReplySent = mainViewModel::markAllNotificationsRead,
+                    viewModel = chatViewModel,
                 )
             }
         }
@@ -425,6 +446,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     navController.getBackStackEntry(Screen.Main.route)
                 }
             val mainViewModel: MainViewModel = hiltViewModel(mainEntry)
+            val chatViewModel: KikiChatViewModel = hiltViewModel(mainEntry)
             val mainUiState by mainViewModel.uiState.collectAsState()
             val notification =
                 mainUiState.selectedNotification
@@ -434,7 +456,11 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     notification = notification,
                     onBack = { navController.popBackStack() },
                     onChatClick = { navController.navigate(Screen.KikiChat.route) },
-                    onMealReply = mainViewModel::sendMealReply,
+                    onMealReply = { replyText, displayLabel ->
+                        mainViewModel.sendMealReply(replyText)
+                        chatViewModel.sendUserReply(null, displayLabel)
+                    },
+                    onViewed = mainViewModel::markAllNotificationsRead,
                 )
             }
         }

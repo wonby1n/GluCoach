@@ -49,7 +49,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -68,7 +67,9 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
 import com.ssafy.s309.data.model.FoodSearchItem
 import com.ssafy.s309.data.model.MealRecordResponse
 import com.ssafy.s309.data.repository.FoodRepository
@@ -303,6 +304,7 @@ class MealLogViewModel
 fun MealLogContent(
     onBackToHome: () -> Unit = {},
     onNavigateToFoodReport: () -> Unit = {},
+    initialDate: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val mealLogViewModel: MealLogViewModel = hiltViewModel()
@@ -321,6 +323,7 @@ fun MealLogContent(
             foodSearchViewModel = foodSearchViewModel,
             onMealClick = { selectedMeal = it },
             onBack = onBackToHome,
+            initialDate = initialDate,
         )
 
         AnimatedVisibility(
@@ -364,8 +367,16 @@ private fun MealLogCalendarContent(
     foodSearchViewModel: FoodSearchViewModel,
     onMealClick: (MealRecord) -> Unit,
     onBack: () -> Unit,
+    initialDate: String? = null,
     modifier: Modifier = Modifier,
 ) {
+    val parsedInit =
+        remember(initialDate) {
+            initialDate?.let {
+                runCatching { java.time.LocalDate.parse(it) }.getOrNull()
+            }
+        }
+
     val today =
         remember {
             val cal = Calendar.getInstance()
@@ -376,11 +387,11 @@ private fun MealLogCalendarContent(
             )
         }
 
-    var displayYear by remember { mutableIntStateOf(today.first) }
-    var displayMonth by remember { mutableIntStateOf(today.second) }
-    var selectedYear by remember { mutableIntStateOf(today.first) }
-    var selectedMonth by remember { mutableIntStateOf(today.second) }
-    var selectedDay by remember { mutableIntStateOf(today.third) }
+    var displayYear by remember { mutableIntStateOf(parsedInit?.year ?: today.first) }
+    var displayMonth by remember { mutableIntStateOf(parsedInit?.monthValue ?: today.second) }
+    var selectedYear by remember { mutableIntStateOf(parsedInit?.year ?: today.first) }
+    var selectedMonth by remember { mutableIntStateOf(parsedInit?.monthValue ?: today.second) }
+    var selectedDay by remember { mutableIntStateOf(parsedInit?.dayOfMonth ?: today.third) }
     var showSearchDialog by remember { mutableStateOf(false) }
     var showMemoDialog by remember { mutableStateOf(false) }
     var pendingFood by remember { mutableStateOf<FoodSearchItem?>(null) }
@@ -391,8 +402,6 @@ private fun MealLogCalendarContent(
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.PickVisualMedia(),
         ) { uri -> if (uri != null) selectedPhotoUri = uri }
-    val recentKeywords = remember { mutableStateListOf<String>() }
-
     val beMeals by mealLogViewModel.beMeals.collectAsState()
     val beDaysWithMeals by mealLogViewModel.beDaysWithMeals.collectAsState()
     val nutritionMap by mealLogViewModel.foodNutritionMap.collectAsState()
@@ -492,7 +501,6 @@ private fun MealLogCalendarContent(
         if (showSearchDialog) {
             FoodSearchDialog(
                 foodSearchViewModel = foodSearchViewModel,
-                recentKeywords = recentKeywords,
                 onFoodSelected = { food ->
                     showSearchDialog = false
                     pendingFood = food
@@ -907,6 +915,15 @@ private fun MealCard(
     meal: MealRecord,
     onClick: () -> Unit,
 ) {
+    val context = LocalContext.current
+    LaunchedEffect(meal.imageUrl) {
+        meal.imageUrl?.let { url ->
+            SingletonImageLoader.get(context).enqueue(
+                ImageRequest.Builder(context).data(url).build(),
+            )
+        }
+    }
+
     val icon =
         when (meal.mealType) {
             MealType.BREAKFAST -> Icons.Outlined.WbSunny
@@ -1136,7 +1153,7 @@ private fun MealDetailContent(
                     Modifier
                         .fillMaxSize()
                         .background(Color.Black)
-                        .clickable(enabled = false) {},
+                        .clickable { showPhotoViewer = false },
             ) {
                 if (meal.imageUrl != null) {
                     AsyncImage(

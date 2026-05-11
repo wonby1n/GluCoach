@@ -9,6 +9,7 @@ import com.ssafy.s309.data.ble.BleManager
 import com.ssafy.s309.data.ble.BleProcessingSettings
 import com.ssafy.s309.data.ble.ScannedDevice
 import com.ssafy.s309.data.model.CgmRecordResponse
+import com.ssafy.s309.data.model.ChatCommandRequest
 import com.ssafy.s309.data.model.DailyHealthSummary
 import com.ssafy.s309.data.model.DailyHealthSummaryUpsertRequest
 import com.ssafy.s309.data.model.GlucoseRange
@@ -28,8 +29,10 @@ import com.ssafy.s309.data.repository.source.HealthDataSource
 import com.ssafy.s309.data.repository.source.MockHealthDataSource
 import com.ssafy.s309.data.repository.source.SamsungHealthDataSource
 import com.ssafy.s309.notification.GlucoseAlertManager
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.time.LocalDate
@@ -71,6 +74,15 @@ class HealthRepository
         val glucoseHistory: StateFlow<List<GlucoseReading>> = bleManager.glucoseHistory
         val glucoseAlertStream: SharedFlow<NotificationItem> = glucoseAlertManager.alertStream
         val bleProcessingSettings: StateFlow<BleProcessingSettings> = bleManager.processingSettings
+
+        // ── FCM 채팅 이벤트 브릿지 ────────────────────────────────────
+        private val _chatFcmEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        val chatFcmEvent: SharedFlow<Unit> = _chatFcmEvent.asSharedFlow()
+
+        /** FcmService에서 data.chatMessageId 수신 시 호출. ViewModel이 collect하여 재조회. */
+        fun emitChatFcmEvent() {
+            _chatFcmEvent.tryEmit(Unit)
+        }
 
         fun updateAlertThresholds(
             alertLow: Int,
@@ -183,6 +195,7 @@ class HealthRepository
                             timeAgoText = formatTimeAgo(m.createdAt),
                             isUnread = !m.isRead,
                             alertType = m.messageType ?: "",
+                            createdAt = m.createdAt,
                             displayTrace = m.displayTrace,
                         )
                     }
@@ -240,6 +253,12 @@ class HealthRepository
             }.onFailure { Log.w(TAG, "식후 응답 전송 실패", it) }
         }
 
+        /** 채팅 메시지 페이지 조회 (사용자 메시지 포함). KikiChatScreen 페이징 전용. */
+        suspend fun getChatMessagesPage(
+            page: Int,
+            size: Int = 20,
+        ) = healthApi.getChatMessages(page = page, size = size)
+
         /** 채팅 메시지 읽음 처리 (백엔드 반영). 실패해도 UI 상태는 유지. */
         suspend fun markAlertRead(alertId: Long) {
             runCatching { healthApi.markChatMessageRead(alertId) }
@@ -251,6 +270,21 @@ class HealthRepository
             runCatching { healthApi.markAllChatMessagesRead() }
                 .onFailure { Log.w(TAG, "전체 읽음 처리 실패", it) }
         }
+
+        /** 음식 추천 명령 발화. commandType/message/payload 고정값. */
+        suspend fun sendFoodRecommendCommand() =
+            healthApi.sendChatCommand(
+                ChatCommandRequest(
+                    commandType = "recommend_food",
+                    message = "음식 추천해줘",
+                    payload = emptyMap(),
+                ),
+            )
+
+        /** 안 읽음 수 조회. 배지 갱신용. */
+        suspend fun getUnreadCount(): Long =
+            runCatching { healthApi.getUnreadCount().unreadCount }
+                .getOrDefault(0L)
 
         /**
          * 워치 최근 수면 세션을 BE에 송신. 동일 startedAt 재호출 시 BE가 idempotent하게 기존 row 반환.
@@ -379,7 +413,7 @@ class HealthRepository
                 else -> "키키가 오늘 컨디션을 보고 있어요"
             }
 
-        private fun formatTimeAgo(isoDateTime: String): String =
+        internal fun formatTimeAgo(isoDateTime: String): String =
             try {
                 // OffsetDateTime으로 먼저 시도 ("Z", "+09:00" 등 offset 포함 형식 처리)
                 // 실패 시 timezone 없는 LocalDateTime으로 fallback

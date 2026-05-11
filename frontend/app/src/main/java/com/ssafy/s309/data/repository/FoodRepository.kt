@@ -5,6 +5,7 @@ import com.ssafy.s309.data.api.PredictApi
 import com.ssafy.s309.data.model.FoodGradeResponse
 import com.ssafy.s309.data.model.FoodSearchItem
 import com.ssafy.s309.data.model.FromImagePredictResponse
+import com.ssafy.s309.data.model.MealRecordResponse
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
@@ -22,6 +23,8 @@ class FoodRepository
         suspend fun searchFoods(query: String): Result<List<FoodSearchItem>> = runCatching { foodApi.searchFoods(query) }
 
         suspend fun getFoodGrades(): Result<List<FoodGradeResponse>> = runCatching { foodApi.getFoodGrades() }
+
+        suspend fun getFoodMealHistory(foodId: Int): Result<List<MealRecordResponse>> = runCatching { foodApi.getFoodMealHistory(foodId) }
 
         /**
          * 사진 통합 식전 예측 — BE 가 CV 인식 + foods 매칭 + 예측까지 한 번에 처리.

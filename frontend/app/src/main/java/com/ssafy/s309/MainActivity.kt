@@ -1,6 +1,7 @@
 package com.ssafy.s309
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -13,6 +14,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -86,6 +90,9 @@ class MainActivity : ComponentActivity() {
     // 자체가 안 뜨므로 추가 체크 불필요.
     private var samsungAutoRequested = false
 
+    /** FCM 알림 탭 시 이동할 화면 경로 (null = 기본 동작) */
+    private var pendingNavTarget by mutableStateOf<String?>(null)
+
     private val notificationPermissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestPermission(),
@@ -116,6 +123,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        pendingNavTarget = intent?.getStringExtra(EXTRA_NAVIGATE_TO)
         // enableEdgeToEdge()
         setContent {
             S309Theme {
@@ -128,10 +136,19 @@ class MainActivity : ComponentActivity() {
                             .background(MaterialTheme.colorScheme.background)
                             .statusBarsPadding(),
                 ) {
-                    AppNavigation()
+                    AppNavigation(
+                        pendingNavTarget = pendingNavTarget,
+                        onNavTargetConsumed = { pendingNavTarget = null },
+                    )
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingNavTarget = intent.getStringExtra(EXTRA_NAVIGATE_TO)
     }
 
     override fun onResume() {
@@ -245,7 +262,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private companion object {
-        const val POLL_TAG = "SHPoller"
+    companion object {
+        const val EXTRA_NAVIGATE_TO = "navigate_to"
+        const val NAV_KIKI_ALARM_DETAIL = "kiki_alarm_detail"
+        private const val POLL_TAG = "SHPoller"
     }
 }

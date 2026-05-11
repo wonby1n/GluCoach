@@ -11,6 +11,7 @@ import com.google.firebase.messaging.RemoteMessage
 import com.ssafy.s309.MainActivity
 import com.ssafy.s309.R
 import com.ssafy.s309.data.local.TokenManager
+import com.ssafy.s309.data.repository.HealthRepository
 import com.ssafy.s309.data.repository.UserRepository
 import com.ssafy.s309.notification.GlucoseAlertManager
 import com.ssafy.s309.notification.TtsManager
@@ -30,6 +31,8 @@ class FcmService : FirebaseMessagingService() {
     @Inject lateinit var ttsManager: TtsManager
 
     @Inject lateinit var glucoseAlertManager: GlucoseAlertManager
+
+    @Inject lateinit var healthRepository: HealthRepository
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -64,6 +67,11 @@ class FcmService : FirebaseMessagingService() {
         }
         ttsManager.playSound(resIdForAlertType(alertType))
         glucoseAlertManager.emitFcmAlert(title, body, alertType ?: "")
+
+        // 채팅 메시지 FCM — KikiChatViewModel에 재조회 신호 전달
+        if (message.data["chatMessageId"] != null) {
+            healthRepository.emitChatFcmEvent()
+        }
     }
 
     private fun showMealFollowupNotification(
@@ -100,8 +108,11 @@ class FcmService : FirebaseMessagingService() {
             PendingIntent.getActivity(
                 this,
                 notifId,
-                Intent(this, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_CLEAR_TOP },
-                PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE,
+                Intent(this, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    putExtra(MainActivity.EXTRA_NAVIGATE_TO, MainActivity.NAV_KIKI_ALARM_DETAIL)
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
 
         manager.notify(
@@ -133,9 +144,12 @@ class FcmService : FirebaseMessagingService() {
         val pendingIntent =
             PendingIntent.getActivity(
                 this,
-                0,
-                Intent(this, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_CLEAR_TOP },
-                PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE,
+                System.currentTimeMillis().toInt(),
+                Intent(this, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    putExtra(MainActivity.EXTRA_NAVIGATE_TO, MainActivity.NAV_KIKI_ALARM_DETAIL)
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
 
         manager.notify(

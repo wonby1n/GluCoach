@@ -34,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,16 +65,20 @@ fun KikiAlarmDetailScreen(
     notification: com.ssafy.s309.data.model.NotificationItem? = null,
     onBack: () -> Unit = {},
     onChatClick: () -> Unit = {},
-    onMealReply: (String) -> Unit = {},
+    onMealReply: (replyText: String, displayLabel: String) -> Unit = { _, _ -> },
+    onViewed: () -> Unit = {},
 ) {
     var selectedOption by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(notification?.id) {
         android.util.Log.d("KikiAlarm", "notification changed: id=${notification?.id} alertType=${notification?.alertType}")
         selectedOption = null
     }
+    DisposableEffect(Unit) {
+        onDispose { onViewed() }
+    }
     val isPostMeal =
         notification?.alertType?.let {
-            it.startsWith("AGENT_MEAL_FOLLOWUP") || it.startsWith("AGENT_MEAL_RETRY")
+            it.startsWith("AGENT_MEAL_FOLLOWUP")
         } == true
     android.util.Log.d("KikiAlarm", "recompose: selectedOption=$selectedOption isPostMeal=$isPostMeal")
     val speechLines =
@@ -163,17 +168,17 @@ fun KikiAlarmDetailScreen(
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
 
-            if (isPostMeal && selectedOption == null) {
+            if (isPostMeal && selectedOption == null && notification?.isUnread == true) {
                 PostMealOptionButtons(
                     onOkay = {
                         android.util.Log.d("KikiAlarm", "onOkay clicked")
                         selectedOption = "OKAY"
-                        onMealReply("알겠어요.")
+                        onMealReply("알겠어요.", "알겠어요")
                     },
                     onBusy = {
                         android.util.Log.d("KikiAlarm", "onBusy clicked")
                         selectedOption = "BUSY"
-                        onMealReply("지금 회의 중이에요.")
+                        onMealReply("지금 회의 중이에요.", "회의 중")
                     },
                     onDecline = {
                         android.util.Log.d("KikiAlarm", "onDecline clicked")

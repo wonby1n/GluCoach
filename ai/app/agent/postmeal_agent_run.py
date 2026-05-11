@@ -30,7 +30,7 @@ load_dotenv()
 sys.stdout.reconfigure(encoding="utf-8")
 
 # GMS 프록시 주소
-BASE_URL = "https://gms.ssafy.io/gmsapi/api.anthropic.com"
+BASE_URL = "https://api.anthropic.com"
 MODEL = "claude-sonnet-4-5-20250929"
 MAX_TOKENS = 4096
 MAX_TURNS = 10

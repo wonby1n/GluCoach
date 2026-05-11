@@ -12,6 +12,7 @@ data class FoodGradeInfo(
 )
 
 data class GradeFoodItem(
+    val foodId: Int,
     val name: String,
     val frequency: Int,
     val lastEaten: String,

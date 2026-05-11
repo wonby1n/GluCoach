@@ -2,6 +2,7 @@ package com.ssafy.s309.ui.screen.main
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -58,6 +59,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -207,6 +209,34 @@ fun CameraScreen(
             }
         }
 
+        // 가이드 박스 오버레이
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val boxSize = size.width * 0.80f
+            val left = (size.width - boxSize) / 2f
+            val top = (size.height - boxSize) / 2f
+            val right = left + boxSize
+            val bottom = top + boxSize
+            val overlay = Color.Black.copy(alpha = 0.55f)
+
+            drawRect(overlay, Offset.Zero, Size(size.width, top))
+            drawRect(overlay, Offset(0f, bottom), Size(size.width, size.height - bottom))
+            drawRect(overlay, Offset(0f, top), Size(left, boxSize))
+            drawRect(overlay, Offset(right, top), Size(size.width - right, boxSize))
+
+            val cLen = 36.dp.toPx()
+            val sw = 3.dp.toPx()
+            val white = Color.White
+
+            drawLine(white, Offset(left, top + cLen), Offset(left, top), sw)
+            drawLine(white, Offset(left, top), Offset(left + cLen, top), sw)
+            drawLine(white, Offset(right - cLen, top), Offset(right, top), sw)
+            drawLine(white, Offset(right, top), Offset(right, top + cLen), sw)
+            drawLine(white, Offset(left, bottom - cLen), Offset(left, bottom), sw)
+            drawLine(white, Offset(left, bottom), Offset(left + cLen, bottom), sw)
+            drawLine(white, Offset(right - cLen, bottom), Offset(right, bottom), sw)
+            drawLine(white, Offset(right, bottom), Offset(right, bottom - cLen), sw)
+        }
+
         // 상단 그라디언트 오버레이
         Box(
             modifier =
@@ -257,7 +287,7 @@ fun CameraScreen(
                         .background(GlucoachColors.PrimaryDark.copy(alpha = 0.6f))
                         .padding(horizontal = 20.dp, vertical = 8.dp),
             ) {
-                Text(text = "음식을 화면에 맞춰주세요", color = Color.White, fontSize = 14.sp)
+                Text(text = "박스 안에 음식을 맞춰주세요", color = Color.White, fontSize = 14.sp)
             }
         }
 
@@ -364,7 +394,7 @@ private fun takePhoto(
         ContextCompat.getMainExecutor(context),
         object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                onResult(photoFile)
+                onResult(cropCenterSquare(photoFile))
             }
 
             override fun onError(exc: ImageCaptureException) {
@@ -372,6 +402,19 @@ private fun takePhoto(
             }
         },
     )
+}
+
+private fun cropCenterSquare(file: File): File {
+    val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return file
+    val size = minOf(bitmap.width, bitmap.height)
+    val x = (bitmap.width - size) / 2
+    val y = (bitmap.height - size) / 2
+    val cropped = android.graphics.Bitmap.createBitmap(bitmap, x, y, size, size)
+    val out = File(file.parent, "crop_${file.name}")
+    out.outputStream().use { cropped.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }
+    bitmap.recycle()
+    cropped.recycle()
+    return out
 }
 
 // ── 2. 분석 중 화면 ──────────────────────────────────────
