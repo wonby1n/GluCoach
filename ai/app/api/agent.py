@@ -74,11 +74,47 @@ async def morning_agent(req: MorningRequest):
     )
 
 
+async def _run_postmeal_background(trigger: dict, user_id: str):
+    """백그라운드에서 postmeal agent를 실행하고, followup 예약까지 처리한다."""
+    try:
+        result = await run_in_threadpool(
+            run_postmeal_agent, trigger, user_id=user_id,
+        )
+    except Exception as e:
+        log.error("background postmeal agent failed: %s", e)
+        return
+
+    if result.get("scheduled_followup"):
+        delay_min = result["scheduled_followup"].get("delay_minutes", 30)
+        log.info(
+            "schedule_followup 예약: %d분 후 실행 (시연 모드: %d초 후)",
+            delay_min, DEMO_FOLLOWUP_DELAY_SECONDS,
+        )
+        await _run_followup_after_delay(
+            delay_seconds=DEMO_FOLLOWUP_DELAY_SECONDS,
+            trigger_base=trigger,
+            user_id=user_id,
+        )
+
+
 @router.post("/post-meal", response_model=AgentResponse)
 async def postmeal_agent(req: PostMealRequest, background_tasks: BackgroundTasks):
     """식후 활동 유도 agent를 실행한다."""
     trigger = req.trigger.model_dump(exclude_none=True)
+    reason = trigger.get("reason", "meal_recorded")
 
+    # user_response / schedule_followup → 즉시 응답, 백그라운드 처리
+    if reason in ("user_response", "schedule_followup"):
+        log.info("async dispatch: reason=%s user_id=%s", reason, req.user_id)
+        background_tasks.add_task(
+            _run_postmeal_background, trigger, str(req.user_id),
+        )
+        return AgentResponse(
+            status="accepted",
+            reasoning_trace=[],
+        )
+
+    # meal_recorded → 동기 처리 (알림 + 버튼 응답이 필요하므로)
     try:
         result = await run_in_threadpool(
             run_postmeal_agent, trigger, user_id=req.user_id,
@@ -119,11 +155,28 @@ async def postmeal_agent(req: PostMealRequest, background_tasks: BackgroundTasks
 
 
 @router.post("/trigger", response_model=AgentResponse)
-async def dispatch_trigger(req: TriggerRequest):
+async def dispatch_trigger(req: TriggerRequest, background_tasks: BackgroundTasks):
     """백엔드 AgentTriggerScheduler가 호출하는 트리거 디스패처.
     triggerType에 따라 적절한 agent를 실행한다.
     """
     log.info("trigger received: type=%s userId=%s ref=%s", req.triggerType, req.userId, req.referenceId)
+
+    # post_meal_followup → 즉시 응답, 백그라운드 처리
+    if req.triggerType == "post_meal_followup":
+        followup_trigger = {
+            "reason": "schedule_followup",
+            "meal_time": "",
+            "original_reply": "",
+            "followup_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        }
+        log.info("async dispatch trigger: post_meal_followup user_id=%s", req.userId)
+        background_tasks.add_task(
+            _run_postmeal_background, followup_trigger, str(req.userId),
+        )
+        return AgentResponse(
+            status="accepted",
+            reasoning_trace=[],
+        )
 
     if req.triggerType == "post_meal":
         trigger = {
@@ -133,25 +186,6 @@ async def dispatch_trigger(req: TriggerRequest):
         try:
             result = await run_in_threadpool(
                 run_postmeal_agent, trigger, user_id=str(req.userId),
-            )
-        except Exception as e:
-            return AgentResponse(
-                status="error",
-                reasoning_trace=[],
-                error=f"agent_execution_failed: {type(e).__name__}",
-            )
-
-    elif req.triggerType == "post_meal_followup":
-        followup_trigger = {
-            "reason": "schedule_followup",
-            "meal_time": "",
-            "original_reply": "",
-            "followup_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        }
-        try:
-            result = await run_in_threadpool(
-                run_postmeal_agent, followup_trigger,
-                user_id=str(req.userId), alert_type="AGENT_MEAL_RETRY",
             )
         except Exception as e:
             return AgentResponse(
