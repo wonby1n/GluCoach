@@ -34,6 +34,8 @@ import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.DateRange
+import androidx.compose.material.icons.outlined.DirectionsWalk
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.Button
@@ -286,13 +288,30 @@ private fun AIReportSuccessContent(
                 fontWeight = FontWeight.Bold,
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            Text(
-                text = formatWeekRange(report.weekStart),
-                color = GlucoachColors.TextSecondary,
-                fontSize = 13.sp,
-            )
+            Row(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(GlucoachColors.Primary.copy(alpha = 0.10f))
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.DateRange,
+                    contentDescription = null,
+                    tint = GlucoachColors.Primary,
+                    modifier = Modifier.size(14.dp),
+                )
+                Text(
+                    text = formatWeekRange(report.weekStart),
+                    color = GlucoachColors.Primary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
@@ -327,6 +346,27 @@ private fun AIReportSuccessContent(
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
             WeeklyGlucoseChart(weeklyGlucose = weeklyGlucose)
+
+            val hasSamsungHealthData = report.avgSleepMinutes != null || report.avgSteps != null
+            if (hasSamsungHealthData) {
+                Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+                Text(
+                    text = "건강 활동 데이터",
+                    color = GlucoachColors.TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+
+            report.avgSleepMinutes?.takeIf { it > 0 }?.let {
+                Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+                SleepWeeklySection(avgSleepMinutes = it)
+            }
+
+            report.avgSteps?.takeIf { it > 0 }?.let {
+                Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+                StepsWeeklySection(avgSteps = it)
+            }
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
@@ -411,6 +451,11 @@ private fun AIReportSuccessContent(
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
+            }
+
+            if (report.avgSleepMinutes != null || report.avgSteps != null) {
+                Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+                SamsungHealthDisclaimer()
             }
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
@@ -942,6 +987,226 @@ private fun FoodMealHistorySheet(
         }
     }
 }
+
+// ── 삼성 헬스: 수면 섹션 ────────────────────────────────
+
+@Composable
+private fun SleepWeeklySection(avgSleepMinutes: Double) {
+    val totalHours = (avgSleepMinutes / 60).toInt()
+    val remainMins = (avgSleepMinutes % 60).toInt()
+    val goalMinutes = 480f
+    val progress = (avgSleepMinutes.toFloat() / goalMinutes).coerceIn(0f, 1f)
+    val (statusColor, statusText) =
+        when {
+            avgSleepMinutes >= 420 -> Color(0xFF3F51B5) to "권장 수면 시간을 달성했어요"
+            avgSleepMinutes >= 360 -> Color(0xFFFF9800) to "수면이 조금 부족해요"
+            else -> Color(0xFFE96A6A) to "수면이 많이 부족해요"
+        }
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
+                .clip(RoundedCornerShape(GlucoachCorner.card))
+                .background(GlucoachColors.Surface)
+                .padding(GlucoachSpacing.xl),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF3F51B5).copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Bedtime,
+                    contentDescription = null,
+                    tint = Color(0xFF3F51B5),
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(text = "수면", color = GlucoachColors.TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text(text = "이번 주 평균", color = GlucoachColors.TextSecondary, fontSize = 12.sp)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = "${totalHours}시간",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 40.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            if (remainMins > 0) {
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "${remainMins}분",
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 20.sp,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(GlucoachColors.Border),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth(progress)
+                        .height(10.dp)
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(statusColor),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(text = statusText, color = statusColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(text = "목표 8시간", color = GlucoachColors.TextSecondary, fontSize = 12.sp)
+        }
+    }
+}
+
+// ── 삼성 헬스: 걸음 수 섹션 ──────────────────────────────
+
+@Composable
+private fun StepsWeeklySection(avgSteps: Double) {
+    val goalSteps = 10000
+    val progress = (avgSteps.toFloat() / goalSteps).coerceIn(0f, 1f)
+    val weeklyTotal = (avgSteps * 7).toLong()
+    val (statusColor, statusText) =
+        when {
+            avgSteps >= 10000 -> Color(0xFF4CAF50) to "목표 달성! 활발하게 움직이고 있어요"
+            avgSteps >= 7000 -> Color(0xFF2196F3) to "목표까지 조금만 더 걸어봐요"
+            else -> Color(0xFFFF9800) to "조금 더 활동적으로 움직여봐요"
+        }
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
+                .clip(RoundedCornerShape(GlucoachCorner.card))
+                .background(GlucoachColors.Surface)
+                .padding(GlucoachSpacing.xl),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF4CAF50).copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.DirectionsWalk,
+                    contentDescription = null,
+                    tint = Color(0xFF4CAF50),
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(text = "걸음 수", color = GlucoachColors.TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text(text = "이번 주 일평균", color = GlucoachColors.TextSecondary, fontSize = 12.sp)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = "%,d".format(avgSteps.toInt()),
+                color = GlucoachColors.TextPrimary,
+                fontSize = 40.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "걸음",
+                color = GlucoachColors.TextSecondary,
+                fontSize = 20.sp,
+                modifier = Modifier.padding(bottom = 6.dp),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = "주간 총 약 %,d걸음".format(weeklyTotal),
+            color = GlucoachColors.TextSecondary,
+            fontSize = 13.sp,
+        )
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(GlucoachColors.Border),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth(progress)
+                        .height(10.dp)
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(statusColor),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(text = statusText, color = statusColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(text = "목표 10,000보", color = GlucoachColors.TextSecondary, fontSize = 12.sp)
+        }
+    }
+}
+
+// ── 삼성 헬스 데이터 출처 안내 ────────────────────────────
+
+@Composable
+private fun SamsungHealthDisclaimer() {
+    Text(
+        text = "※ 수면 및 걸음 수 데이터는 삼성 헬스(Samsung Health)에서 수집된 데이터를 기반으로 분석되었습니다. 해당 데이터는 건강 참고 목적으로 제공되며, 의료적 진단이나 치료에 활용되지 않습니다.",
+        color = GlucoachColors.TextSecondary.copy(alpha = 0.6f),
+        fontSize = 10.sp,
+        lineHeight = 15.sp,
+        textAlign = TextAlign.Start,
+    )
+}
+
+// ── 음식 식사 기록 MealRecordCard ────────────────────────
 
 @Composable
 private fun MealRecordCard(record: FoodMealRecord) {
