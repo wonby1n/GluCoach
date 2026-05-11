@@ -726,33 +726,45 @@ private fun GlucoseCanvas(
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
-        val yMin = 0f
-        val yMax = 250f
         val leftPad = 48f
         val chartW = w - leftPad
 
         val n = data.size
         if (n < 2) return@Canvas
+
+        val dataMax = data.max()
+        val dataMin = data.min()
+        val pad = ((dataMax - dataMin) * 0.15f).coerceAtLeast(15f)
+        val yMax = dataMax + pad
+        val yMin = dataMin - pad
         val stepX = chartW / (n - 1)
 
         fun xOf(i: Int) = leftPad + i * stepX
 
         fun yOf(v: Float) = h - (v - yMin) / (yMax - yMin) * h
 
-        drawRect(
-            color = Primary.copy(alpha = 0.07f),
-            topLeft = Offset(leftPad, yOf(140f)),
-            size = Size(chartW, yOf(70f) - yOf(140f)),
-        )
+        val rangeTop = 140f.coerceIn(yMin, yMax)
+        val rangeBottom = 70f.coerceIn(yMin, yMax)
+        if (rangeTop > yMin && rangeBottom < yMax) {
+            drawRect(
+                color = Primary.copy(alpha = 0.07f),
+                topLeft = Offset(leftPad, yOf(rangeTop)),
+                size = Size(chartW, yOf(rangeBottom) - yOf(rangeTop)),
+            )
+        }
 
+        val tickCount = 4
+        val tickStep = (yMax - yMin) / tickCount
         val textPaint =
             Paint().asFrameworkPaint().apply {
                 isAntiAlias = true
                 textSize = 28f
                 color = android.graphics.Color.parseColor("#AAAAAA")
             }
-        yAxisValues.forEach { label ->
-            val y = yOf(label.toFloat())
+        for (i in 0..tickCount) {
+            val v = yMin + tickStep * i
+            val label = v.toInt()
+            val y = yOf(v)
             drawLine(
                 color = Color(0xFFEEEEEE),
                 start = Offset(leftPad, y),
