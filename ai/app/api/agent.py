@@ -57,6 +57,20 @@ async def _run_postmeal_background(trigger: dict, user_id: str):
     )
 
 
+async def _run_morning_background(user_id: str):
+    """백그라운드에서 morning agent를 실행한다."""
+    try:
+        result = await run_in_threadpool(run_agent, user_id=user_id)
+    except Exception as e:
+        log.error("background morning agent failed: %s", e)
+        return
+
+    log.info(
+        "background morning agent done: message=%s",
+        result.get("message"),
+    )
+
+
 @router.post("/morning", response_model=AgentResponse)
 async def morning_agent(req: MorningRequest):
     """아침 혈당 전략 agent를 실행한다."""
@@ -152,51 +166,35 @@ async def dispatch_trigger(req: TriggerRequest, background_tasks: BackgroundTask
             reasoning_trace=[],
         )
 
+    # post_meal → 즉시 응답, 백그라운드 처리 (동기 시 타임아웃 → 무한 재시도 방지)
     if req.triggerType == "post_meal":
         trigger = {
             "reason": "meal_recorded",
-            "meal_time": "",  # referenceId로 조회 가능하나 현재 mock에서는 빈값 허용
+            "meal_time": "",
         }
-        alert_type = "AGENT_MEAL_FOLLOWUP"
-        try:
-            result = await run_in_threadpool(
-                run_postmeal_agent, trigger,
-                user_id=str(req.userId), alert_type=alert_type,
-            )
-        except Exception as e:
-            return AgentResponse(
-                status="error",
-                reasoning_trace=[],
-                error=f"agent_execution_failed: {type(e).__name__}",
-            )
-
-    elif req.triggerType == "morning":
-        try:
-            result = await run_in_threadpool(run_agent, user_id=str(req.userId))
-        except Exception as e:
-            return AgentResponse(
-                status="error",
-                reasoning_trace=[],
-                error=f"agent_execution_failed: {type(e).__name__}",
-            )
-
-    else:
-        log.warning("unknown triggerType: %s", req.triggerType)
+        log.info("async dispatch trigger: post_meal user_id=%s", req.userId)
+        background_tasks.add_task(
+            _run_postmeal_background, trigger, str(req.userId),
+        )
         return AgentResponse(
-            status="error",
+            status="accepted",
             reasoning_trace=[],
-            error=f"unknown_trigger_type: {req.triggerType}",
         )
 
-    if result.get("error"):
-        status = "fallback" if result["error"] == "llm_call_failed" else "error"
-    else:
-        status = "success"
+    # morning → 즉시 응답, 백그라운드 처리
+    if req.triggerType == "morning":
+        log.info("async dispatch trigger: morning user_id=%s", req.userId)
+        background_tasks.add_task(
+            _run_morning_background, str(req.userId),
+        )
+        return AgentResponse(
+            status="accepted",
+            reasoning_trace=[],
+        )
 
+    log.warning("unknown triggerType: %s", req.triggerType)
     return AgentResponse(
-        status=status,
-        notification_sent=result.get("message"),
-        reasoning_trace=result.get("tool_call_details", []),
-        scheduled_followup=result.get("scheduled_followup"),
-        error=result.get("error"),
+        status="error",
+        reasoning_trace=[],
+        error=f"unknown_trigger_type: {req.triggerType}",
     )
