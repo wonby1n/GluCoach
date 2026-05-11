@@ -11,6 +11,8 @@ dependencies = [
     "torch>=2.2.0",
     "torchvision>=0.17.0",
     "Pillow>=10.0.0",
+    "requests>=2.33.1",
+    "python-multipart>=0.0.28",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +28,10 @@ train = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
 
 [build-system]
 requires = ["hatchling"]
