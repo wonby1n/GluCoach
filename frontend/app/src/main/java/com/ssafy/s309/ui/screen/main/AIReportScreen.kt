@@ -123,11 +123,28 @@ private fun WeeklyFoodItem.toReportFoodCard(gradeMap: Map<Int, String>) =
         grade = gradeMap[foodId] ?: if (type == "GOOD") "A" else "D",
     )
 
-private fun WeeklyReportResponse.toSummaryCards() =
+private fun WeeklyReportResponse.toSummaryCards(prevAvgGlucose: Double?) =
     listOf(
-        SummaryCard("평균 혈당", avgGlucose.toInt().toString(), "mg/dL", "SD ${glucoseSd.toInt()}", GlucoachColors.Primary),
-        SummaryCard("혈당 변동폭", glucoseSd.toInt().toString(), "mg/dL", "안정적", GlucoachColors.Primary),
-        SummaryCard("목표 범위 내", timeInRange.toInt().toString(), "%", "▲ ${timeAboveRange.toInt()}% 고혈당", GlucoachColors.Primary),
+        run {
+            val (changeText, changeColor) =
+                when {
+                    prevAvgGlucose == null -> "지난주 데이터 없음" to Color(0xFF9E9E9E)
+                    avgGlucose > prevAvgGlucose + 0.5 -> "지난주보다 ${(avgGlucose - prevAvgGlucose).toInt()}mg 높아요" to Color(0xFFE53935)
+                    avgGlucose < prevAvgGlucose - 0.5 -> "지난주보다 ${(prevAvgGlucose - avgGlucose).toInt()}mg 낮아요" to Color(0xFF2196F3)
+                    else -> "지난주와 비슷해요" to Color(0xFF9E9E9E)
+                }
+            SummaryCard("평균 혈당", avgGlucose.toInt().toString(), "mg/dL", changeText, changeColor)
+        },
+        run {
+            val stable = glucoseSd < 36
+            SummaryCard(
+                "혈당 변동폭",
+                glucoseSd.toInt().toString(),
+                "mg/dL",
+                if (stable) "안정적" else "불안정적",
+                if (stable) Color(0xFF2196F3) else Color(0xFFE53935),
+            )
+        },
     )
 
 private fun WeeklyReportResponse.toPatternItems(): List<PatternItem> =
@@ -221,7 +238,8 @@ private fun AIReportSuccessContent(
     val report = state.current
     var selectedFood by remember(report.id) { mutableStateOf<ReportFoodCard?>(null) }
 
-    val summaryCards = remember(report.id) { report.toSummaryCards() }
+    val prevAvgGlucose = remember(state.selectedIndex) { state.reports.getOrNull(state.selectedIndex + 1)?.avgGlucose }
+    val summaryCards = remember(report.id) { report.toSummaryCards(prevAvgGlucose) }
     val stableFoods =
         remember(report.id, state.gradeMap) { report.foods.filter { it.type == "GOOD" }.map { it.toReportFoodCard(state.gradeMap) } }
     val cautionFoods =
@@ -283,7 +301,7 @@ private fun AIReportSuccessContent(
         Column(modifier = Modifier.padding(horizontal = 22.dp)) {
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
-            WeeklyGlucoseChart(weeklyGlucose = weeklyGlucose)
+            WeeklyGlucoseChart(weeklyGlucose = weeklyGlucose, timeInRange = report.timeInRange)
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
@@ -439,7 +457,10 @@ private fun SummaryStatItem(
 // ── 7일 혈당 추이 차트 ──────────────────────────────────
 
 @Composable
-private fun WeeklyGlucoseChart(weeklyGlucose: List<Float?>) {
+private fun WeeklyGlucoseChart(
+    weeklyGlucose: List<Float?>,
+    timeInRange: Double,
+) {
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     val days = listOf("월", "화", "수", "목", "금", "토", "일")
     val highThreshold = 180f
@@ -461,6 +482,26 @@ private fun WeeklyGlucoseChart(weeklyGlucose: List<Float?>) {
                 .padding(GlucoachSpacing.xl),
     ) {
         Text(text = "7일 혈당 추이", color = GlucoachColors.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+
+        val (tirColor, tirMessage) =
+            when {
+                timeInRange >= 70 -> Color(0xFF4CAF50) to "이번 주 혈당 관리 정말 대단해요! 키키도 함께 기뻐요 🎉"
+                timeInRange >= 50 -> Color(0xFFFF9800) to "이번 주도 함께 잘 해가고 있어요! 키키가 항상 응원할게요 💪"
+                else -> Color(0xFFE53935) to "키키가 함께할게요! 이번 주도 같이 건강하게 해봐요 🌟"
+            }
+        Text(
+            text = "목표 범위 내 ${timeInRange.toInt()}%",
+            color = tirColor,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = tirMessage,
+            color = tirColor.copy(alpha = 0.85f),
+            fontSize = 12.sp,
+        )
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
 
@@ -619,17 +660,10 @@ private fun WeeklyGlucoseChart(weeklyGlucose: List<Float?>) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             days.forEachIndexed { idx, day ->
                 val isSelected = selectedIndex == idx
-                val isDanger = (weeklyGlucose.getOrNull(idx) ?: 0f) > 180f
-                val bgColor =
-                    when {
-                        isSelected && isDanger -> dangerColor
-                        isSelected -> GlucoachColors.Primary
-                        else -> Color.Transparent
-                    }
-                val textColor =
-                    when {
-                        isSelected -> Color.White
-                        isDanger -> dangerColor
+                val defaultTextColor =
+                    when (idx) {
+                        5 -> Color(0xFF2196F3)
+                        6 -> Color(0xFFE53935)
                         else -> GlucoachColors.TextSecondary
                     }
                 Box(
@@ -637,11 +671,11 @@ private fun WeeklyGlucoseChart(weeklyGlucose: List<Float?>) {
                         Modifier
                             .size(28.dp)
                             .clip(CircleShape)
-                            .background(bgColor)
+                            .background(if (isSelected) GlucoachColors.Primary else Color.Transparent)
                             .clickable { selectedIndex = if (selectedIndex == idx) null else idx },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(text = day, color = textColor, fontSize = 12.sp)
+                    Text(text = day, color = if (isSelected) Color.White else defaultTextColor, fontSize = 12.sp)
                 }
             }
         }
