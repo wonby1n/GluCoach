@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
@@ -47,7 +48,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.s309.data.model.FoodGradeInfo
@@ -96,14 +96,28 @@ internal fun FoodReportDetailContent(
         ) {
             Spacer(Modifier.height(GlucoachSpacing.xxl))
 
-            Text(
-                text = "음식 성적표",
-                color = GlucoachColors.TextPrimary,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center,
-            )
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 22.dp)
+                        .clickable(onClick = onBack),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                    contentDescription = "뒤로가기",
+                    tint = GlucoachColors.TextPrimary,
+                    modifier = Modifier.size(24.dp),
+                )
+                Spacer(Modifier.width(GlucoachSpacing.sm))
+                Text(
+                    text = "등급별 기록",
+                    color = GlucoachColors.TextPrimary,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
 
             Spacer(Modifier.height(GlucoachSpacing.lg))
 
