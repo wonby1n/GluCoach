@@ -24,8 +24,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -77,6 +80,7 @@ internal fun gradeBgColor(grade: String): Color =
 
 @Composable
 fun FoodReportContent(
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: FoodReportViewModel = hiltViewModel(),
     onNavigateToMealLog: (date: String, mealId: Int) -> Unit = { _, _ -> },
@@ -122,6 +126,7 @@ fun FoodReportContent(
                     FoodReportMainContent(
                         gradeInfoList = state.gradeInfoList,
                         onGradeClick = { selectedGrade = it },
+                        onBack = onBack,
                         modifier = modifier,
                     )
                 } else {
@@ -148,6 +153,7 @@ fun FoodReportContent(
 private fun FoodReportMainContent(
     gradeInfoList: List<FoodGradeInfo>,
     onGradeClick: (String) -> Unit,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -159,12 +165,27 @@ private fun FoodReportMainContent(
     ) {
         Spacer(Modifier.height(GlucoachSpacing.xxl))
 
-        Text(
-            text = "내 음식 성적표",
-            color = GlucoachColors.TextPrimary,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-        )
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onBack),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                contentDescription = "뒤로가기",
+                tint = GlucoachColors.TextPrimary,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(Modifier.width(GlucoachSpacing.sm))
+            Text(
+                text = "내 음식 성적표",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
 
         Spacer(Modifier.height(GlucoachSpacing.xl))
 

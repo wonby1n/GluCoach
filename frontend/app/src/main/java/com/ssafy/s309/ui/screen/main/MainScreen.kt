@@ -246,6 +246,7 @@ fun MainScreenContent(
                         "report" -> AIReportContent()
                         "food-report" ->
                             FoodReportContent(
+                                onBack = { selectedTab = "meallog" },
                                 onNavigateToMealLog = { date, _ ->
                                     mealLogTargetDate = date
                                     selectedTab = "meallog"
