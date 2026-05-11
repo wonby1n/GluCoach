@@ -230,10 +230,12 @@ class MainViewModel
             }
         }
 
-        fun sendMealReply(userReply: String) {
-            val userId = tokenManager.getUserId() ?: return
+        fun sendMealReply(
+            userReply: String,
+            displayLabel: String,
+        ) {
             viewModelScope.launch {
-                healthRepository.sendPostMealReply(userId, userReply)
+                healthRepository.sendPostMealReply(userReply, displayLabel)
             }
         }
 
