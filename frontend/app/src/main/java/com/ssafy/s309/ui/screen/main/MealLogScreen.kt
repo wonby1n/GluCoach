@@ -67,7 +67,9 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
 import com.ssafy.s309.data.model.FoodSearchItem
 import com.ssafy.s309.data.model.MealRecordResponse
 import com.ssafy.s309.data.repository.FoodRepository
@@ -913,6 +915,15 @@ private fun MealCard(
     meal: MealRecord,
     onClick: () -> Unit,
 ) {
+    val context = LocalContext.current
+    LaunchedEffect(meal.imageUrl) {
+        meal.imageUrl?.let { url ->
+            SingletonImageLoader.get(context).enqueue(
+                ImageRequest.Builder(context).data(url).build(),
+            )
+        }
+    }
+
     val icon =
         when (meal.mealType) {
             MealType.BREAKFAST -> Icons.Outlined.WbSunny
@@ -1142,7 +1153,7 @@ private fun MealDetailContent(
                     Modifier
                         .fillMaxSize()
                         .background(Color.Black)
-                        .clickable(enabled = false) {},
+                        .clickable { showPhotoViewer = false },
             ) {
                 if (meal.imageUrl != null) {
                     AsyncImage(
