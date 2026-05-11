@@ -25,9 +25,15 @@ public class WeeklyReportResponse {
   private final LocalDateTime createdAt;
   private final List<WeeklyFoodItem> foods;
   private final List<DailyGlucoseItem> dailyGlucose;
+  private final BigDecimal avgSteps;
+  private final BigDecimal avgSleepMinutes;
 
   private WeeklyReportResponse(
-      WeeklyReport r, List<WeeklyFood> foods, List<DailyGlucoseItem> dailyGlucose) {
+      WeeklyReport r,
+      List<WeeklyFood> foods,
+      List<DailyGlucoseItem> dailyGlucose,
+      BigDecimal avgSteps,
+      BigDecimal avgSleepMinutes) {
     this.id = r.getId();
     this.weekStart = r.getWeekStart();
     this.avgGlucose = r.getAvgGlucose();
@@ -42,11 +48,17 @@ public class WeeklyReportResponse {
     this.createdAt = r.getCreatedAt();
     this.foods = foods.stream().map(WeeklyFoodItem::from).toList();
     this.dailyGlucose = dailyGlucose;
+    this.avgSteps = avgSteps;
+    this.avgSleepMinutes = avgSleepMinutes;
   }
 
   public static WeeklyReportResponse from(
-      WeeklyReport r, List<WeeklyFood> foods, List<DailyGlucoseItem> dailyGlucose) {
-    return new WeeklyReportResponse(r, foods, dailyGlucose);
+      WeeklyReport r,
+      List<WeeklyFood> foods,
+      List<DailyGlucoseItem> dailyGlucose,
+      BigDecimal avgSteps,
+      BigDecimal avgSleepMinutes) {
+    return new WeeklyReportResponse(r, foods, dailyGlucose, avgSteps, avgSleepMinutes);
   }
 
   @Getter

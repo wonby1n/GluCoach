@@ -9,6 +9,7 @@ import com.ssafy.s309.domain.weekly_report.dto.WeeklyReportAiRequest;
 import com.ssafy.s309.domain.weekly_report.dto.WeeklyReportAiResponse;
 import com.ssafy.s309.domain.weekly_report.dto.WeeklyReportResponse;
 import com.ssafy.s309.domain.weekly_report.dto.projection.WeeklyFoodItemProjection;
+import com.ssafy.s309.domain.weekly_report.dto.projection.WeeklyHealthStatsProjection;
 import com.ssafy.s309.domain.weekly_report.entity.WeeklyFood;
 import com.ssafy.s309.domain.weekly_report.entity.WeeklyReport;
 import com.ssafy.s309.domain.weekly_report.repository.WeeklyFoodRepository;
@@ -138,11 +139,16 @@ public class WeeklyReportService {
             .collect(Collectors.groupingBy(WeeklyFood::getReportId));
     return reports.stream()
         .map(
-            r ->
-                WeeklyReportResponse.from(
-                    r,
-                    foodsByReportId.getOrDefault(r.getId(), List.of()),
-                    queryService.getDailyGlucose(userId, r.getWeekStart())))
+            r -> {
+              WeeklyHealthStatsProjection health =
+                  queryService.getHealthStats(userId, r.getWeekStart());
+              return WeeklyReportResponse.from(
+                  r,
+                  foodsByReportId.getOrDefault(r.getId(), List.of()),
+                  queryService.getDailyGlucose(userId, r.getWeekStart()),
+                  health != null ? health.getAvgSteps() : null,
+                  health != null ? health.getAvgSleepMinutes() : null);
+            })
         .toList();
   }
 
