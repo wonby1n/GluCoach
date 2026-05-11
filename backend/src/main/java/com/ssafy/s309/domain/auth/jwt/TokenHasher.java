@@ -3,6 +3,7 @@ package com.ssafy.s309.domain.auth.jwt;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 
 /**
  * Refresh Token 같은 민감 토큰의 저장소 보관용 해시 유틸.
@@ -18,11 +19,7 @@ public final class TokenHasher {
     try {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");
       byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
-      StringBuilder hex = new StringBuilder(hash.length * 2);
-      for (byte b : hash) {
-        hex.append(String.format("%02x", b));
-      }
-      return hex.toString();
+      return HexFormat.of().formatHex(hash);
     } catch (NoSuchAlgorithmException e) {
       throw new IllegalStateException("SHA-256 알고리즘을 사용할 수 없습니다", e);
     }
