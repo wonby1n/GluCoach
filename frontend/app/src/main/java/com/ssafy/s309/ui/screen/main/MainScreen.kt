@@ -100,7 +100,6 @@ fun MainScreen(
     onWithdrawClick: (String) -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onGuardianClick: () -> Unit = {},
-    onProjectorClick: () -> Unit = {},
     onAccountClick: () -> Unit = {},
     onKikiChatClick: () -> Unit = {},
     onKikiAlarmClick: () -> Unit = {},
@@ -127,7 +126,6 @@ fun MainScreen(
         onWithdrawClick = onWithdrawClick,
         onSettingsClick = onSettingsClick,
         onGuardianClick = onGuardianClick,
-        onProjectorClick = onProjectorClick,
         onAccountClick = onAccountClick,
         onKikiChatClick = onKikiChatClick,
         onKikiAlarmClick = onKikiAlarmClick,
@@ -156,7 +154,6 @@ fun MainScreenContent(
     onWithdrawClick: (String) -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onGuardianClick: () -> Unit = {},
-    onProjectorClick: () -> Unit = {},
     onAccountClick: () -> Unit = {},
     onKikiChatClick: () -> Unit = {},
     onKikiAlarmClick: () -> Unit = {},
@@ -246,7 +243,7 @@ fun MainScreenContent(
                                 onDeviceClick = onConnectedDeviceClick,
                                 onHealthDetailClick = onSettingsClick,
                                 onGuardianClick = onGuardianClick,
-                                onProjectorClick = onProjectorClick,
+                                isDeviceConnected = state.isDeviceConnected,
                                 userEmail = userEmail,
                             )
                         "meallog" ->
@@ -335,7 +332,7 @@ fun MainScreenContent(
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
                                 SummaryRow(
-                                    caloriesKcal = state.summary.caloriesBurnedKcal,
+                                    steps = state.summary.steps,
                                     sleepMinutes = state.summary.sleepMinutes,
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
@@ -635,7 +632,7 @@ private fun resolveBannerText(unread: List<com.ssafy.s309.data.model.Notificatio
 
 @Composable
 private fun SummaryRow(
-    caloriesKcal: Int,
+    steps: Int,
     sleepMinutes: Int,
 ) {
     Row(
@@ -643,10 +640,10 @@ private fun SummaryRow(
         horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.lg),
     ) {
         SummaryStatCard(
-            title = "칼로리 소모",
+            title = "걸음 수",
             periodLabel = "오늘",
-            primaryValue = "$caloriesKcal",
-            unitOrSuffix = "kcal",
+            primaryValue = "%,d".format(steps),
+            unitOrSuffix = "걸음",
             modifier = Modifier.weight(1f),
         )
         SummaryStatCard(
