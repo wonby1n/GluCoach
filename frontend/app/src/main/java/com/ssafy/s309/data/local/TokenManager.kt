@@ -2,6 +2,9 @@ package com.ssafy.s309.data.local
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -12,6 +15,13 @@ class TokenManager
         @ApplicationContext private val context: Context,
     ) {
         private val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+
+        private val _sessionExpiredFlow = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        val sessionExpiredFlow: SharedFlow<Unit> = _sessionExpiredFlow.asSharedFlow()
+
+        fun notifySessionExpired() {
+            _sessionExpiredFlow.tryEmit(Unit)
+        }
 
         fun saveTokens(
             accessToken: String,
