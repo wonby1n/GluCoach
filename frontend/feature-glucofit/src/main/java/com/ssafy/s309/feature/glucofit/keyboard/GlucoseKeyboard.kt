@@ -141,7 +141,13 @@ class GlucoseKeyboard : InputMethodService() {
                     currentMatchedFood?.let {
                         putExtra("food_name", it.displayName ?: it.name)
                     }
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    // NEW_TASK: Service에서 Activity 시작에 필수.
+                    // CLEAR_TOP + SINGLE_TOP: 기존 MainActivity 인스턴스를 재사용하면서 onNewIntent로 새 extras 전달,
+                    // 백그라운드에 있던 앱을 foreground로 끌어올림. (Samsung One UI 등 OEM에서 누락되는 케이스 방지)
+                    flags =
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP
                 }
             startActivity(intent)
         }
