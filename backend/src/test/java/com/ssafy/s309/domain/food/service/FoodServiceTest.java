@@ -32,10 +32,14 @@ class FoodServiceTest {
   @InjectMocks private FoodService foodService;
 
   private static FoodSearchResult result(Integer id, String name) {
+    return resultWithDisplay(id, name, null);
+  }
+
+  private static FoodSearchResult resultWithDisplay(Integer id, String name, String displayName) {
     return new FoodSearchResult(
         id,
         name,
-        null,
+        displayName,
         null,
         new BigDecimal("143.00"),
         new BigDecimal("31.50"),
@@ -146,5 +150,32 @@ class FoodServiceTest {
     List<FoodSearchResult> out = foodService.search("김치찌개");
 
     assertThat(out).extracting(FoodSearchResult::id).containsExactly(20, 21, 22);
+  }
+
+  @Test
+  void search_는_display_name이_같으면_raw_가_달라도_dedup된다() {
+    // V16 수기 보정으로 raw "국밥_돼지머리" → display "돼지머리국밥" 인데, raw "돼지머리국밥" 단독 row 도 별도 존재.
+    // raw 정규화 키만 보면 다른 키지만 사용자에겐 동일 표시 → display_name 기준으로 dedup 되어야 함.
+    given(tx.tryFreshCache("국밥"))
+        .willReturn(
+            List.of(
+                resultWithDisplay(30, "국밥_돼지머리", "돼지머리국밥"),
+                resultWithDisplay(31, "돼지머리국밥", "돼지머리국밥"),
+                resultWithDisplay(32, "국밥_콩나물", "콩나물국밥")));
+
+    List<FoodSearchResult> out = foodService.search("국밥");
+
+    assertThat(out).extracting(FoodSearchResult::id).containsExactly(30, 32);
+  }
+
+  @Test
+  void search_는_같은_raw_에서_한쪽_display_null_한쪽_채워진_경우도_dedup된다() {
+    // raw "국밥" 두 row 중 한쪽만 display 채워진 케이스. 사용자에게 동일 표시 → dedup.
+    given(tx.tryFreshCache("국밥"))
+        .willReturn(List.of(resultWithDisplay(40, "국밥", null), resultWithDisplay(41, "국밥", "국밥")));
+
+    List<FoodSearchResult> out = foodService.search("국밥");
+
+    assertThat(out).extracting(FoodSearchResult::id).containsExactly(40);
   }
 }
