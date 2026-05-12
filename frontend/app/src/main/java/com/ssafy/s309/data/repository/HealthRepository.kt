@@ -165,7 +165,7 @@ class HealthRepository
                 val summary = list.firstOrNull()
                 if (summary != null) {
                     return DailyHealthSummary(
-                        caloriesBurnedKcal = summary.caloriesBurned?.toInt() ?: 0,
+                        steps = summary.steps ?: 0,
                         sleepMinutes = summary.sleepMinutes ?: 0,
                     )
                 }

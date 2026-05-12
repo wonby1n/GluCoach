@@ -31,6 +31,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -285,14 +287,14 @@ private fun GlucoseChartBody(
                 color = GlucoachColors.ChartGrid,
                 start = Offset(0f, rangeTop),
                 end = Offset(chartWidth, rangeTop),
-                strokeWidth = 1f,
+                strokeWidth = 1.5f,
                 pathEffect = dash,
             )
             drawLine(
                 color = GlucoachColors.ChartGrid,
                 start = Offset(0f, rangeBottom),
                 end = Offset(chartWidth, rangeBottom),
-                strokeWidth = 1f,
+                strokeWidth = 1.5f,
                 pathEffect = dash,
             )
 
@@ -322,7 +324,7 @@ private fun GlucoseChartBody(
                 drawPath(
                     path = path,
                     color = GlucoachColors.Primary,
-                    style = Stroke(width = 3f),
+                    style = Stroke(width = 6f, cap = StrokeCap.Round, join = StrokeJoin.Round),
                 )
             }
 
@@ -332,9 +334,14 @@ private fun GlucoseChartBody(
                 val cy = yFor(last.valueMgDl)
                 drawCircle(
                     color = lastPointColor,
-                    radius = 6f,
+                    radius = 9f,
                     center = Offset(cx, cy),
-                    style = Stroke(width = 2f),
+                    style = Stroke(width = 3f),
+                )
+                drawCircle(
+                    color = lastPointColor.copy(alpha = 0.2f),
+                    radius = 9f,
+                    center = Offset(cx, cy),
                 )
             }
         }
@@ -369,7 +376,7 @@ fun GlucoseChartTimeAxis(
     }
 }
 
-private val CHART_BODY_HEIGHT = 110.dp
+private val CHART_BODY_HEIGHT = 130.dp
 private val CHART_TOP_PADDING = 4.dp
 private val CHART_BOTTOM_PADDING = 8.dp
 private val CHART_X_START_PADDING = 28.dp
