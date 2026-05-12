@@ -39,10 +39,10 @@ class SamsungHealthDataSource
                 val steps = mgr.getTodaySteps().toInt()
                 val sleep = mgr.getLastSleepDurationMinutes()
                 // 권한 미부여 / 데이터 없음 시 둘 다 0 → 데이터 없음으로 간주 → mock fallback
-                if (steps == 0 && sleep == 0) {
+                if (steps == 0L && sleep == 0) {
                     null
                 } else {
-                    DailyHealthSummary(steps = steps, sleepMinutes = sleep)
+                    DailyHealthSummary(steps = steps.toInt(), sleepMinutes = sleep)
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "Samsung Health summary fetch 실패", t)
