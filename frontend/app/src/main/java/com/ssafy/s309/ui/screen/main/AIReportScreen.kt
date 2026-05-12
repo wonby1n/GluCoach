@@ -63,7 +63,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -631,11 +630,35 @@ private fun WeeklyGlucoseChart(
         }
     val tabColors = listOf(GlucoachColors.Primary, Color(0xFFE96A6A), Color(0xFF2196F3))
 
-    val dataMax = points.filterNotNull().maxOrNull() ?: 200f
-    val dataMin = points.filterNotNull().minOrNull() ?: 50f
-    val maxVal = maxOf(200f, dataMax + 20f)
-    val minVal = minOf(50f, dataMin - 20f).coerceAtLeast(0f)
-    val range = maxVal - minVal
+    val dataMax = points.filterNotNull().maxOrNull() ?: highThreshold
+    val dataMin = points.filterNotNull().minOrNull() ?: lowThreshold
+    val rawRange = (dataMax - dataMin).coerceAtLeast(60f)
+    val dataPadding = (rawRange * 0.25f).coerceAtLeast(20f)
+
+    val maxVal: Float
+    val minVal: Float
+    if (selectedMode == 0) {
+        // 평균: 60·180 기준선 모두 표시
+        maxVal = maxOf(highThreshold + dataPadding * 0.5f, dataMax + dataPadding)
+        minVal = (minOf(lowThreshold - dataPadding * 0.5f, dataMin - dataPadding)).coerceAtLeast(0f)
+    } else {
+        // 최고/최저: 데이터 범위에 가까운 기준선만 포함
+        val includeHigh = dataMax >= highThreshold - dataPadding
+        val includeLow = dataMin <= lowThreshold + dataPadding
+        maxVal =
+            if (includeHigh) {
+                maxOf(highThreshold + dataPadding * 0.5f, dataMax + dataPadding)
+            } else {
+                dataMax + dataPadding
+            }
+        minVal =
+            if (includeLow) {
+                (minOf(lowThreshold - dataPadding * 0.5f, dataMin - dataPadding)).coerceAtLeast(0f)
+            } else {
+                (dataMin - dataPadding).coerceAtLeast(0f)
+            }
+    }
+    val range = (maxVal - minVal).coerceAtLeast(1f)
 
     Column(
         modifier =
@@ -712,8 +735,26 @@ private fun WeeklyGlucoseChart(
         val density = LocalDensity.current
         val widthDp = with(density) { chartWidthPx.toDp() }
         val stepDp = if (points.size > 1 && chartWidthPx > 0) widthDp / (points.size - 1) else 0.dp
-        val y180 = (chartHeight * (1f - (highThreshold - minVal) / range) - 17.dp).coerceIn(0.dp, chartHeight - 14.dp)
-        val y60 = (chartHeight * (1f - (lowThreshold - minVal) / range) - 17.dp).coerceIn(0.dp, chartHeight - 14.dp)
+        val showHighLine = highThreshold in minVal..maxVal
+        val showLowLine = lowThreshold in minVal..maxVal
+        val y180 =
+            if (showHighLine) {
+                (chartHeight * (1f - (highThreshold - minVal) / range) - 17.dp).coerceIn(
+                    0.dp,
+                    chartHeight - 14.dp,
+                )
+            } else {
+                null
+            }
+        val y60 =
+            if (showLowLine) {
+                (chartHeight * (1f - (lowThreshold - minVal) / range) - 17.dp).coerceIn(
+                    0.dp,
+                    chartHeight - 14.dp,
+                )
+            } else {
+                null
+            }
 
         Box(
             modifier =
@@ -729,26 +770,26 @@ private fun WeeklyGlucoseChart(
 
                 fun yFor(v: Float) = h - ((v - minVal) / range) * h
 
-                if (selectedMode == 0) {
-                    drawRect(color = Color(0x1AE53935), topLeft = Offset(0f, 0f), size = Size(w, yFor(highThreshold)))
-                }
-
                 val dashEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
                 val gridColor = GlucoachColors.ChartGrid
-                drawLine(
-                    color = gridColor,
-                    start = Offset(0f, yFor(highThreshold)),
-                    end = Offset(w, yFor(highThreshold)),
-                    strokeWidth = 1f,
-                    pathEffect = dashEffect,
-                )
-                drawLine(
-                    color = gridColor,
-                    start = Offset(0f, yFor(lowThreshold)),
-                    end = Offset(w, yFor(lowThreshold)),
-                    strokeWidth = 1f,
-                    pathEffect = dashEffect,
-                )
+                if (showHighLine) {
+                    drawLine(
+                        color = gridColor,
+                        start = Offset(0f, yFor(highThreshold)),
+                        end = Offset(w, yFor(highThreshold)),
+                        strokeWidth = 1f,
+                        pathEffect = dashEffect,
+                    )
+                }
+                if (showLowLine) {
+                    drawLine(
+                        color = gridColor,
+                        start = Offset(0f, yFor(lowThreshold)),
+                        end = Offset(w, yFor(lowThreshold)),
+                        strokeWidth = 1f,
+                        pathEffect = dashEffect,
+                    )
+                }
 
                 if (points.size >= 2) {
                     val step = w / (points.size - 1)
@@ -823,20 +864,24 @@ private fun WeeklyGlucoseChart(
                 }
             }
 
-            Text(
-                text = "180",
-                color = Color(0xFFE96A6A),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.offset(y = y180),
-            )
-            Text(
-                text = "60",
-                color = Color(0xFF2196F3),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.offset(y = y60),
-            )
+            y180?.let { offset ->
+                Text(
+                    text = "180",
+                    color = Color(0xFFE96A6A),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.offset(y = offset),
+                )
+            }
+            y60?.let { offset ->
+                Text(
+                    text = "60",
+                    color = Color(0xFF2196F3),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.offset(y = offset),
+                )
+            }
 
             selectedIndex?.let { idx ->
                 val v = points.getOrNull(idx) ?: return@let
