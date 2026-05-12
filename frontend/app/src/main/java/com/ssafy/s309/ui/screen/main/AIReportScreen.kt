@@ -624,8 +624,7 @@ private fun AIReportDetailContent(
                 horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.md),
             ) {
                 OutlinedButton(
-                    onClick = onPreviousClick,
-                    enabled = state.hasPrevious,
+                    onClick = onBack,
                     modifier =
                         Modifier
                             .weight(1f)
@@ -634,16 +633,15 @@ private fun AIReportDetailContent(
                     colors =
                         ButtonDefaults.outlinedButtonColors(
                             contentColor = GlucoachColors.TextSecondary,
-                            disabledContentColor = GlucoachColors.TextSecondary.copy(alpha = 0.4f),
                         ),
                     border =
                         androidx.compose.foundation.BorderStroke(
                             1.dp,
-                            if (state.hasPrevious) GlucoachColors.Border else GlucoachColors.Border.copy(alpha = 0.4f),
+                            GlucoachColors.Border,
                         ),
                 ) {
                     Text(
-                        text = "지난 요약 보기",
+                        text = "리포트 목록으로",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
