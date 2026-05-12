@@ -24,10 +24,10 @@ data class MealEvent(
     val label: String = "식사",
 )
 
-/** 하루 누적 건강 요약 (칼로리, 수면) */
+/** 하루 누적 건강 요약 (걸음수, 수면) */
 @Serializable
 data class DailyHealthSummary(
-    val caloriesBurnedKcal: Int,
+    val steps: Int,
     val sleepMinutes: Int,
 )
 

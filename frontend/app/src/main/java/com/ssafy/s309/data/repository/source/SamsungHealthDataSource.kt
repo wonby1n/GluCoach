@@ -16,7 +16,7 @@ import javax.inject.Singleton
  * 반환할 수 있다. 그 외에는 빈 리스트 / null 을 반환하여 Repository 의 mock fallback 으로
  * 떨어진다.
  *
- * 현재 PR 에서는 칼로리 / 수면 요약만 시도하며, 권한 미부여 시 매니저가 0 을 반환하므로
+ * 현재 PR 에서는 걸음수 / 수면 요약만 시도하며, 권한 미부여 시 매니저가 0 을 반환하므로
  * (둘 다 0 이면) 데이터 없음으로 간주하여 null 을 반환한다.
  */
 @Singleton
@@ -36,13 +36,12 @@ class SamsungHealthDataSource
         override suspend fun getTodaySummary(): DailyHealthSummary? {
             val mgr = holder.manager ?: return null
             return try {
-                val calories = mgr.getTodayActiveCalories()
+                val steps = mgr.getTodaySteps().toInt()
                 val sleep = mgr.getLastSleepDurationMinutes()
-                // 권한 미부여 / 데이터 없음 시 둘 다 0 → 데이터 없음으로 간주 → mock fallback
-                if (calories == 0 && sleep == 0) {
+                if (steps == 0 && sleep == 0) {
                     null
                 } else {
-                    DailyHealthSummary(caloriesBurnedKcal = calories, sleepMinutes = sleep)
+                    DailyHealthSummary(steps = steps, sleepMinutes = sleep)
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "Samsung Health summary fetch 실패", t)

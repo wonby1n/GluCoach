@@ -127,12 +127,12 @@ internal fun glucoseZoneColor(
 }
 
 /**
- * 2x1 배치되는 하단 정보 카드 (칼로리 / 수면).
+ * 2x1 배치되는 하단 정보 카드 (걸음수 / 수면).
  *
- * @param title "칼로리 소모", "수면" 등 타이틀
+ * @param title "걸음수", "수면" 등 타이틀
  * @param periodLabel 타이틀 아래 기간 라벨 (예: "오늘")
- * @param primaryValue 크게 표시될 값 (예: "485", "7:")
- * @param unitOrSuffix primaryValue 오른쪽 단위 / 후행 값 (예: "kcal", "15")
+ * @param primaryValue 크게 표시될 값 (예: "6,230", "7:")
+ * @param unitOrSuffix primaryValue 오른쪽 단위 / 후행 값 (예: "걸음", "15")
  */
 @Composable
 fun SummaryStatCard(
