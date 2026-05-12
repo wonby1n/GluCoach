@@ -93,6 +93,9 @@ class MainActivity : ComponentActivity() {
     /** FCM 알림 탭 시 이동할 화면 경로 (null = 기본 동작) */
     private var pendingNavTarget by mutableStateOf<String?>(null)
 
+    /** 키보드 배너 → 음식 성적표 진입 시 자동 열 음식명 (null = 메인 화면만) */
+    private var pendingFoodName by mutableStateOf<String?>(null)
+
     private val notificationPermissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestPermission(),
@@ -124,6 +127,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         pendingNavTarget = intent?.getStringExtra(EXTRA_NAVIGATE_TO)
+        pendingFoodName = intent?.getStringExtra(EXTRA_FOOD_NAME)
         // enableEdgeToEdge()
         setContent {
             S309Theme {
@@ -139,6 +143,8 @@ class MainActivity : ComponentActivity() {
                     AppNavigation(
                         pendingNavTarget = pendingNavTarget,
                         onNavTargetConsumed = { pendingNavTarget = null },
+                        pendingFoodName = pendingFoodName,
+                        onFoodNameConsumed = { pendingFoodName = null },
                     )
                 }
             }
@@ -149,6 +155,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingNavTarget = intent.getStringExtra(EXTRA_NAVIGATE_TO)
+        pendingFoodName = intent.getStringExtra(EXTRA_FOOD_NAME)
     }
 
     override fun onResume() {
@@ -264,6 +271,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_NAVIGATE_TO = "navigate_to"
+        const val EXTRA_FOOD_NAME = "food_name"
         const val NAV_KIKI_ALARM_DETAIL = "kiki_alarm_detail"
         const val NAV_FOOD_REPORT = "food_report"
         private const val POLL_TAG = "SHPoller"

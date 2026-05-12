@@ -9,6 +9,7 @@ import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
+import android.view.inputmethod.EditorInfo
 import android.widget.LinearLayout
 import android.widget.LinearLayout.LayoutParams.MATCH_PARENT
 import android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
@@ -31,12 +32,28 @@ class GlucoseKeyboard : InputMethodService() {
     private val hangul = HangulComposer()
     private var isKorean = true
 
+    /** 배너에 현재 표시 중인 매칭 음식. 배너 클릭 시 앱으로 전달. null이면 매칭 없음. */
+    private var currentMatchedFood: com.ssafy.s309.feature.glucofit.data.KeyboardFoodItem? = null
+
     override fun onCreate() {
         super.onCreate()
         KeyboardFoodCache.load(applicationContext)
         // 메인 앱 미진입 상태에서도 IME 단독으로 혈당 시뮬레이터 가동.
         // 이미 실행 중이면 start() 내부 가드로 no-op.
         GlucoseSimulator.start(applicationContext)
+    }
+
+    /**
+     * 입력 세션 시작마다 캐시 mtime 체크. KeyboardFoodSyncManager가 로그인 후 파일을 새로 쓰면
+     * 그 다음 입력창 탭 시점에 자동 재로딩되어 stale grade=null 트랩을 회피한다.
+     * 파일 unchanged면 mtime 비교만 하고 즉시 return이라 비용 없음.
+     */
+    override fun onStartInput(
+        attribute: EditorInfo?,
+        restarting: Boolean,
+    ) {
+        super.onStartInput(attribute, restarting)
+        KeyboardFoodCache.load(applicationContext)
     }
 
     private val KO_ROW1 = listOf("ㅂ", "ㅈ", "ㄷ", "ㄱ", "ㅅ", "ㅛ", "ㅕ", "ㅑ", "ㅐ", "ㅔ")
@@ -121,6 +138,9 @@ class GlucoseKeyboard : InputMethodService() {
                 Intent().apply {
                     setClassName("com.ssafy.s309", "com.ssafy.s309.MainActivity")
                     putExtra("navigate_to", "food_report")
+                    currentMatchedFood?.let {
+                        putExtra("food_name", it.displayName ?: it.name)
+                    }
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
             startActivity(intent)
@@ -380,6 +400,7 @@ class GlucoseKeyboard : InputMethodService() {
         Log.d(TAG, "triggerBanner called: text='$text'")
         val food = KeyboardFoodCache.findExact(text) ?: KeyboardFoodCache.findContained(text)
         Log.d(TAG, "triggerBanner matched: ${food?.name ?: "NONE"} (grade=${food?.grade ?: "-"})")
+        currentMatchedFood = food
         if (food == null) {
             hideInlineBanner()
             return

@@ -107,6 +107,8 @@ fun MainScreen(
     userEmail: String = "",
     requestedTab: String? = null,
     onTabHandled: () -> Unit = {},
+    targetFoodName: String? = null,
+    onTargetFoodHandled: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -134,6 +136,8 @@ fun MainScreen(
         userEmail = userEmail,
         requestedTab = requestedTab,
         onTabHandled = onTabHandled,
+        targetFoodName = targetFoodName,
+        onTargetFoodHandled = onTargetFoodHandled,
         // [DEBUG_KIKI_TEST]
     )
 }
@@ -163,6 +167,8 @@ fun MainScreenContent(
     userEmail: String = "",
     requestedTab: String? = null,
     onTabHandled: () -> Unit = {},
+    targetFoodName: String? = null,
+    onTargetFoodHandled: () -> Unit = {},
 ) {
     var selectedTab by rememberSaveable { mutableStateOf("home") }
     var mealLogTargetDate by remember { mutableStateOf<String?>(null) }
@@ -263,6 +269,8 @@ fun MainScreenContent(
                                     mealLogTargetDate = date
                                     selectedTab = "meallog"
                                 },
+                                targetFoodName = targetFoodName,
+                                onTargetFoodHandled = onTargetFoodHandled,
                             )
 
                         else ->
