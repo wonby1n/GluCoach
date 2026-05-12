@@ -184,6 +184,8 @@ fun AppNavigation(
     navController: NavHostController = rememberNavController(),
     pendingNavTarget: String? = null,
     onNavTargetConsumed: () -> Unit = {},
+    pendingFoodName: String? = null,
+    onFoodNameConsumed: () -> Unit = {},
 ) {
     val authViewModel: AuthViewModel = hiltViewModel()
     val authState by authViewModel.uiState.collectAsState()
@@ -319,9 +321,10 @@ fun AppNavigation(
         }
         composable(Screen.Main.route) { backStackEntry ->
             val requestedTab = backStackEntry.savedStateHandle.get<String>("requestedTab")
+            val targetFoodName = backStackEntry.savedStateHandle.get<String>("targetFoodName")
 
             // FCM 알림 탭 → KikiAlarmDetail 딥링크 처리
-            LaunchedEffect(pendingNavTarget) {
+            LaunchedEffect(pendingNavTarget, pendingFoodName) {
                 if (pendingNavTarget == com.ssafy.s309.MainActivity.NAV_KIKI_ALARM_DETAIL) {
                     navController.navigate(Screen.KikiAlarmDetail.route) { launchSingleTop = true }
                     onNavTargetConsumed()
@@ -329,6 +332,10 @@ fun AppNavigation(
                 if (pendingNavTarget == com.ssafy.s309.MainActivity.NAV_FOOD_REPORT) {
                     backStackEntry.savedStateHandle["requestedTab"] = "food-report"
                     onNavTargetConsumed()
+                }
+                if (pendingFoodName != null) {
+                    backStackEntry.savedStateHandle["targetFoodName"] = pendingFoodName
+                    onFoodNameConsumed()
                 }
             }
 
@@ -356,6 +363,8 @@ fun AppNavigation(
                 userEmail = authViewModel.userEmail,
                 requestedTab = requestedTab,
                 onTabHandled = { backStackEntry.savedStateHandle.remove<String>("requestedTab") },
+                targetFoodName = targetFoodName,
+                onTargetFoodHandled = { backStackEntry.savedStateHandle.remove<String>("targetFoodName") },
             )
         }
         composable(Screen.MyAccount.route) {

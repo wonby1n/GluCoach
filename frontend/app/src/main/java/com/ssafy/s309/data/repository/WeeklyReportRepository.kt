@@ -16,6 +16,10 @@ class WeeklyReportRepository
             runCatching { api.getWeeklyReports() }
                 .onFailure { Log.w(TAG, "getWeeklyReports failed", it) }
 
+        suspend fun generateReport(): Result<WeeklyReportResponse> =
+            runCatching { api.generateReport() }
+                .onFailure { Log.w(TAG, "generateReport failed", it) }
+
         suspend fun getPdfUrl(id: Int): Result<String> =
             runCatching {
                 val response = api.getPdfRedirect(id)

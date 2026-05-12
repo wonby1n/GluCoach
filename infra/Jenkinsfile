@@ -57,8 +57,8 @@ pipeline {
                                 git reset --hard origin/release &&
                                 git clean -fd &&
                                 cp ~/firebase-service-account.json backend/src/main/resources/firebase-service-account.json &&
-                                docker compose -f infra/docker-compose.yml down &&
-                                docker compose -f infra/docker-compose.yml up -d --build
+                                chmod +x infra/scripts/deploy-bg.sh &&
+                                infra/scripts/deploy-bg.sh
                             "
                         """
                     }

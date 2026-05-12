@@ -24,30 +24,49 @@ object KeyboardFoodCache {
 
     private val byName: MutableMap<String, KeyboardFoodItem> = HashMap(20_000)
     private val nameList: MutableList<String> = ArrayList(20_000)
-    private var loaded = false
 
+    /** 마지막으로 로딩한 파일의 mtime. 파일이 새로 동기화되면 mtime이 바뀌어 재로딩 트리거. */
+    private var loadedMtime: Long = -1L
+
+    /**
+     * 캐시 로드. 파일 mtime이 마지막 로드 시점과 다르면 재로딩.
+     *
+     * IME는 app 모듈과 같은 프로세스에서 돌지만 라이프사이클이 별개라, KeyboardFoodSyncManager가
+     * 로그인 후 파일을 새로 쓰는 시점에 IME 서비스가 이미 살아있을 수 있다. 그 경우 옛 파일을 캐싱한
+     * 상태로 남아 grade=null로 응답하는 트랩이 발생 (S14P31S309-1285 진단). mtime 비교로 자동 복구.
+     */
     fun load(context: Context) {
-        if (loaded) return
-        synchronized(this) {
-            if (loaded) return
-            val file = File(context.filesDir, FILE_NAME)
-            if (!file.exists()) {
-                Log.w(TAG, "no sync file — IME will not match foods until app syncs")
-                loaded = true
-                return
+        val file = File(context.filesDir, FILE_NAME)
+        if (!file.exists()) {
+            if (loadedMtime != -1L) {
+                // 파일이 사라졌으면 캐시도 비움
+                synchronized(this) {
+                    byName.clear()
+                    nameList.clear()
+                    loadedMtime = -1L
+                }
             }
+            Log.w(TAG, "no sync file — IME will not match foods until app syncs")
+            return
+        }
+        val mtime = file.lastModified()
+        if (mtime == loadedMtime) return
+        synchronized(this) {
+            if (mtime == loadedMtime) return
             val start = System.currentTimeMillis()
             runCatching {
                 val type = object : TypeToken<List<KeyboardFoodItem>>() {}.type
                 val items: List<KeyboardFoodItem> = Gson().fromJson(file.readText(), type)
+                byName.clear()
+                nameList.clear()
                 items.forEach { item ->
                     indexKey(item.name, item)
                     item.displayName?.takeIf { it.isNotBlank() && it != item.name }
                         ?.let { indexKey(it, item) }
                 }
-                Log.i(TAG, "loaded ${items.size} foods (${byName.size} keys) in ${System.currentTimeMillis() - start}ms")
+                Log.i(TAG, "loaded ${items.size} foods (${byName.size} keys) in ${System.currentTimeMillis() - start}ms (mtime=$mtime)")
             }.onFailure { Log.w(TAG, "parse failed", it) }
-            loaded = true
+            loadedMtime = mtime
         }
     }
 

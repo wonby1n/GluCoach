@@ -31,6 +31,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -84,6 +85,8 @@ fun FoodReportContent(
     modifier: Modifier = Modifier,
     viewModel: FoodReportViewModel = hiltViewModel(),
     onNavigateToMealLog: (date: String, mealId: Int) -> Unit = { _, _ -> },
+    targetFoodName: String? = null,
+    onTargetFoodHandled: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val foodHistoryState by viewModel.foodHistory.collectAsStateWithLifecycle()
@@ -91,6 +94,24 @@ fun FoodReportContent(
 
     if (selectedGrade != null) {
         BackHandler { selectedGrade = null }
+    }
+
+    // 키보드 배너 딥링크: targetFoodName 매칭되는 GradeFoodItem 찾아 자동으로 상세 히스토리 시트까지 연다.
+    // 매칭 실패 시 (사용자가 안 먹은 음식 등) 메인 화면만 열고 조용히 종료.
+    LaunchedEffect(uiState, targetFoodName) {
+        if (targetFoodName == null) return@LaunchedEffect
+        val state = uiState as? FoodReportUiState.Success ?: return@LaunchedEffect
+        val match =
+            state.gradeFoodItems.entries
+                .asSequence()
+                .flatMap { (grade, foods) -> foods.asSequence().map { food -> food to grade } }
+                .firstOrNull { (food, _) -> food.name == targetFoodName }
+        if (match != null) {
+            val (food, grade) = match
+            selectedGrade = grade
+            viewModel.loadFoodHistory(food, grade)
+        }
+        onTargetFoodHandled()
     }
 
     when (val state = uiState) {
