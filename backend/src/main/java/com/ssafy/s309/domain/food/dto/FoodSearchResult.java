@@ -50,6 +50,9 @@ public record FoodSearchResult(
   }
 
   private static boolean isDemoExaggerated(Food food) {
-    return "마라탕".equals(food.getDisplayName());
+    // displayName 또는 raw name 에 "마라탕" 포함이면 매칭 — equals 는 NFC/NFD 정규화 차이,
+    // trailing 공백, V18 정제 변형(예: "마라탕 (매운맛)") 등에 취약하므로 contains 로 완화.
+    return (food.getDisplayName() != null && food.getDisplayName().contains("마라탕"))
+        || (food.getName() != null && food.getName().contains("마라탕"));
   }
 }
