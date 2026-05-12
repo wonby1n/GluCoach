@@ -1410,10 +1410,18 @@ private fun GlucosePredictionChart(prediction: GlucosePrediction) {
                     Path().apply {
                         moveTo(pts[0].x, pts[0].y)
                         for (i in 1 until pts.size) {
-                            val prev = pts[i - 1]
-                            val curr = pts[i]
-                            val cpx = (prev.x + curr.x) / 2f
-                            cubicTo(cpx, prev.y, cpx, curr.y, curr.x, curr.y)
+                            val p0 = pts[maxOf(i - 2, 0)]
+                            val p1 = pts[i - 1]
+                            val p2 = pts[i]
+                            val p3 = pts[minOf(i + 1, pts.lastIndex)]
+                            cubicTo(
+                                p1.x + (p2.x - p0.x) / 6f,
+                                p1.y + (p2.y - p0.y) / 6f,
+                                p2.x - (p3.x - p1.x) / 6f,
+                                p2.y - (p3.y - p1.y) / 6f,
+                                p2.x,
+                                p2.y,
+                            )
                         }
                     }
 
