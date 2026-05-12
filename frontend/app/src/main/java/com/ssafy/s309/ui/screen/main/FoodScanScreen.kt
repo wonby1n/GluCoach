@@ -104,6 +104,7 @@ fun FoodScanContent(
     onBack: () -> Unit,
     onRetakePhoto: () -> Unit,
     onMealSaved: () -> Unit,
+    onGoHome: () -> Unit = onBack,
     viewModel: FoodScanViewModel = hiltViewModel(),
 ) {
     val scanState by viewModel.state.collectAsStateWithLifecycle()
@@ -204,15 +205,75 @@ fun FoodScanContent(
         }
 
         is FoodScanState.Error -> {
-            BackHandler { onBack() }
-            ErrorScreen(
-                message = s.message,
-                onRetake = {
-                    viewModel.resetError()
-                    onRetakePhoto()
-                },
-                onBack = onBack,
-            )
+            if (showManualSearch) {
+                BackHandler {
+                    showManualSearch = false
+                    viewModel.clearManualSearch()
+                }
+                FoodManualSearchScreen(
+                    searchResults = manualSearchResults,
+                    onSearch = { viewModel.searchManualFood(it) },
+                    onSelectFood = { item ->
+                        selectedManualCandidate =
+                            FoodScanCandidate(
+                                rank = 1,
+                                foodId = item.id,
+                                name = item.displayName ?: item.name,
+                                kcal = item.kcal,
+                                carbsG = item.carbsG,
+                                proteinG = item.proteinG,
+                                fatG = item.fatG,
+                                confidence = 1.0f,
+                            )
+                        showManualSearch = false
+                        viewModel.clearManualSearch()
+                        showSimulation = true
+                    },
+                    onBack = {
+                        showManualSearch = false
+                        viewModel.clearManualSearch()
+                    },
+                )
+            } else if (showSimulation && selectedManualCandidate != null) {
+                var memo by remember { mutableStateOf("") }
+                var selectedDateTime by remember { mutableStateOf(java.time.LocalDateTime.now()) }
+                BackHandler {
+                    showSimulation = false
+                    selectedManualCandidate = null
+                }
+                SimulationScreen(
+                    food = selectedManualCandidate!!,
+                    isSaving = false,
+                    memo = memo,
+                    onMemoChange = { memo = it },
+                    selectedDateTime = selectedDateTime,
+                    onDateTimeChange = { selectedDateTime = it },
+                    onBack = {
+                        showSimulation = false
+                        selectedManualCandidate = null
+                    },
+                    onRetakePhoto = {
+                        viewModel.resetError()
+                        onRetakePhoto()
+                    },
+                    onRecordMeal = { viewModel.saveMeal(selectedManualCandidate!!, photoFile, memo, selectedDateTime) },
+                    prediction = null,
+                )
+            } else {
+                BackHandler { onGoHome() }
+                ErrorScreen(
+                    message = s.message,
+                    onRetake = {
+                        viewModel.resetError()
+                        onRetakePhoto()
+                    },
+                    onBack = onGoHome,
+                    onManualSearch = {
+                        selectedManualCandidate = null
+                        showManualSearch = true
+                    },
+                )
+            }
         }
 
         FoodScanState.Saved -> {}
@@ -1157,6 +1218,7 @@ private fun ErrorScreen(
     message: String,
     onRetake: () -> Unit,
     onBack: () -> Unit,
+    onManualSearch: () -> Unit,
 ) {
     Column(
         modifier =
@@ -1196,6 +1258,19 @@ private fun ErrorScreen(
                 ),
         ) {
             Text(text = "다시 촬영하기", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        }
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+
+        OutlinedButton(
+            onClick = onManualSearch,
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors =
+                ButtonDefaults.outlinedButtonColors(contentColor = GlucoachColors.TextPrimary),
+            border = androidx.compose.foundation.BorderStroke(1.dp, GlucoachColors.Border),
+        ) {
+            Text(text = "직접 입력할래요", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.md))
@@ -1410,10 +1485,18 @@ private fun GlucosePredictionChart(prediction: GlucosePrediction) {
                     Path().apply {
                         moveTo(pts[0].x, pts[0].y)
                         for (i in 1 until pts.size) {
-                            val prev = pts[i - 1]
-                            val curr = pts[i]
-                            val cpx = (prev.x + curr.x) / 2f
-                            cubicTo(cpx, prev.y, cpx, curr.y, curr.x, curr.y)
+                            val p0 = pts[maxOf(i - 2, 0)]
+                            val p1 = pts[i - 1]
+                            val p2 = pts[i]
+                            val p3 = pts[minOf(i + 1, pts.lastIndex)]
+                            cubicTo(
+                                p1.x + (p2.x - p0.x) / 6f,
+                                p1.y + (p2.y - p0.y) / 6f,
+                                p2.x - (p3.x - p1.x) / 6f,
+                                p2.y - (p3.y - p1.y) / 6f,
+                                p2.x,
+                                p2.y,
+                            )
                         }
                     }
 
