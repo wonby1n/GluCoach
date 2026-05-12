@@ -1,6 +1,9 @@
 package com.ssafy.s309.ui.screen.main
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,16 +14,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Bluetooth
+import androidx.compose.material.icons.outlined.BluetoothDisabled
 import androidx.compose.material.icons.outlined.FamilyRestroom
 import androidx.compose.material.icons.outlined.ManageAccounts
 import androidx.compose.material.icons.outlined.SentimentSatisfied
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Smartphone
-import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -34,11 +39,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.s309.ui.theme.GlucoachColors
+import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
 
 @Composable
@@ -48,9 +56,9 @@ fun MyPageContent(
     onGuardianClick: () -> Unit = {},
     onDeviceClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
-    onProjectorClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
     onWithdrawClick: (String) -> Unit = {},
+    isDeviceConnected: Boolean = false,
     userEmail: String = "",
     modifier: Modifier = Modifier,
 ) {
@@ -160,10 +168,12 @@ fun MyPageContent(
             title = "설정",
             onClick = onSettingsClick,
         )
-        InfoMenuItem(
-            icon = Icons.Outlined.Videocam,
-            title = "프로젝터 제어",
-            onClick = onProjectorClick,
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+
+        BluetoothCard(
+            isConnected = isDeviceConnected,
+            onClick = onDeviceClick,
         )
 
         Spacer(modifier = Modifier.height(64.dp))
@@ -252,6 +262,66 @@ private fun InfoMenuItem(
                 fontSize = 14.sp,
             )
             Spacer(modifier = Modifier.width(GlucoachSpacing.xs))
+        }
+
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+            contentDescription = null,
+            tint = GlucoachColors.TextSecondary,
+            modifier = Modifier.size(24.dp),
+        )
+    }
+}
+
+@Composable
+private fun BluetoothCard(
+    isConnected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .shadow(elevation = 2.dp, shape = RoundedCornerShape(GlucoachCorner.card))
+                .clip(RoundedCornerShape(GlucoachCorner.card))
+                .background(GlucoachColors.Surface)
+                .clickable(onClick = onClick)
+                .padding(horizontal = GlucoachSpacing.lg, vertical = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.md),
+    ) {
+        val iconColor = if (isConnected) GlucoachColors.Primary else GlucoachColors.TextSecondary
+        val bgColor = if (isConnected) GlucoachColors.Primary.copy(alpha = 0.1f) else GlucoachColors.TextSecondary.copy(alpha = 0.08f)
+
+        Box(
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(bgColor),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = if (isConnected) Icons.Outlined.Bluetooth else Icons.Outlined.BluetoothDisabled,
+                contentDescription = null,
+                tint = iconColor,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Gluco Patch 블루투스",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = if (isConnected) "연결됨" else "연결 안됨 — 탭하여 연결",
+                color = iconColor,
+                fontSize = 13.sp,
+            )
         }
 
         Icon(

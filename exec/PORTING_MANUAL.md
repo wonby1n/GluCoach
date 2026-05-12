@@ -11,7 +11,6 @@
 7. [AWS S3 파일 저장소](#7-aws-s3-파일-저장소)
 8. [환경변수 설정](#8-환경변수-설정)
 9. [신규 서버 세팅 순서](#9-신규-서버-세팅-순서)
-10. [남은 작업](#10-남은-작업)
 
 ---
 
@@ -34,41 +33,52 @@
      │
      │ HTTPS
      ▼
-[nginx :443]  ─────────────────────────────────────────
-     │                                                 │
-     │ /api/*                    /ai/*                 │ /
-     ▼                           ▼                     ▼
-[backend :8080]          [ai :8000]           [정적 랜딩페이지]
-     │                       │
-     ▼                       ▼
-[PostgreSQL :5432]      [Redis :6379]
-     (Docker)               (Docker)
+[nginx :443]  ← SSL 종단, 리버스 프록시, Blue/Green 트래픽 전환
+     │
+     ├── /api, /swagger-ui, /v3/api-docs  →  [backend-blue 또는 backend-green :8080]
+     │                                              │
+     │                                              └── http://ai-{color}:8000
+     ├── /ai/                             →  [ai-blue 또는 ai-green :8000]
+     ├── /n8n/                            →  [n8n :5678]
+     └── /                               →  정적 랜딩페이지
 
-[Jenkins :9090]  ← GitLab Webhook (release 브랜치)
+[PostgreSQL :5432]  ← backend, n8n 공유 DB
+[Redis :6379]       ← backend 세션/캐시
+
+[Jenkins :9090]  ← GitLab Webhook (release 브랜치 MR 머지 시 트리거)
      │ SSH
      ▼
-[EC2: docker compose up]
+[EC2: infra/scripts/deploy-bg.sh]  ← Blue-Green 무중단 배포
 
-[AWS S3]  ← 음식 사진 등 파일 저장 (백엔드에서 연동)
+[AWS S3]  ← 음식 사진 등 파일 저장
 ```
 
 ---
 
 ## 3. Docker 컨테이너 구성
 
-`infra/docker-compose.yml` 기준. EC2 서버에서 실행.
+### Compose 파일 구조
+
+| 파일 | 역할 |
+|---|---|
+| `infra/docker-compose.infra.yml` | 공유 인프라 (nginx, postgres, redis, n8n) — 배포 시 재시작 없음 |
+| `infra/docker-compose.blue.yml` | Blue 앱 서비스 (backend-blue, ai-blue) |
+| `infra/docker-compose.green.yml` | Green 앱 서비스 (backend-green, ai-green) |
+
+### 실행 중인 컨테이너
 
 | 컨테이너 | 이미지 | 포트 | 역할 |
 |---|---|---|---|
-| `s309-nginx` | `nginx:alpine` | 80, 443 | 리버스 프록시, HTTPS 종단 |
-| `s309-backend` | 자체 빌드 | 8080 (내부) | Spring Boot API 서버 |
-| `s309-ai` | 자체 빌드 | 8000 (내부) | AI 추론 서버 (FastAPI) |
+| `s309-nginx` | `nginx:alpine` | 80, 443 | 리버스 프록시, HTTPS 종단, 트래픽 전환 |
+| `s309-backend-blue` / `s309-backend-green` | 자체 빌드 | 8080 (내부) | Spring Boot API 서버 |
+| `s309-ai-blue` / `s309-ai-green` | 자체 빌드 | 8000 (내부) | FastAPI AI 서버 |
 | `s309-postgres` | `postgres:17-alpine` | 5432 (localhost만) | 메인 DB |
 | `s309-redis` | `redis:7-alpine` | 6379 (localhost만) | 캐시, 세션 |
+| `s309-n8n` | `n8nio/n8n:latest` | 5678 | 워크플로우 자동화 |
 
 > PostgreSQL, Redis는 외부에 노출되지 않으며 SSH 터널을 통해서만 접근 가능.
 
-**Jenkins는 docker-compose에 포함되지 않음** — 자기 자신을 down시키는 문제로 별도 컨테이너로 운영.
+**Jenkins는 compose에 포함되지 않음** — 배포 중 자기 자신을 down시키는 문제로 별도 컨테이너로 운영.
 
 ```bash
 # Jenkins 컨테이너 실행 명령 (참고)
@@ -78,6 +88,13 @@ docker run -d \
   --name jenkins \
   --restart unless-stopped \
   jenkins/jenkins:lts
+```
+
+### 현재 활성 환경 확인
+
+```bash
+cat /home/ubuntu/S14P31S309/infra/.active-color   # "blue" 또는 "green"
+docker ps --format "table {{.Names}}\t{{.Status}}"
 ```
 
 ---
@@ -116,13 +133,24 @@ SSH 터널 방식으로만 접근 가능. 자세한 설정은 `docs/DATAGRIP_GUI
 
 ## 5. CI/CD 파이프라인
 
-### 흐름
+### 배포 흐름
 
 ```
-개발자 → release 브랜치 push/merge
-    → GitLab Webhook → Jenkins 빌드 트리거
-    → Jenkins: 코드 체크아웃 + Gradle 빌드
-    → Jenkins: EC2 SSH 접속 → git pull → docker compose 재시작
+① 개발자가 develop 브랜치에 push
+② develop → release MR 머지
+③ GitLab Webhook → Jenkins 빌드 자동 트리거
+④ Jenkins: backend Gradle 빌드 (bootJar, ~20초)
+⑤ Jenkins: EC2 SSH 접속
+   └── git pull (release 최신화)
+   └── infra/scripts/deploy-bg.sh 실행
+        ├── .active-color 읽기 (현재: blue → 다음: green)
+        ├── backend-green, ai-green 빌드 & 시작
+        │    ↕ 이 동안 blue가 계속 서비스 중 (다운타임 없음)
+        ├── green 헬스체크 통과 대기 (최대 3분)
+        ├── nginx upstream.conf 교체 → nginx -s reload (트래픽 전환)
+        ├── .active-color → "green" 갱신
+        └── 60초 후 blue 컨테이너 정리
+⑥ Mattermost 채널에 성공/실패 알림
 ```
 
 ### Jenkins 설정 항목
@@ -133,20 +161,33 @@ Jenkins (`http://k14s309.p.ssafy.io:9090`) 에서 설정된 Credentials:
 |---|---|---|
 | `gitlab-token` | Username with Password | GitLab HTTPS 체크아웃 |
 | `ec2-ssh-key` | SSH Private Key | EC2 배포 SSH 접속 |
+| `firebase-key` | Secret File | Firebase 서비스 계정 키 |
+| `food-api-key` | Secret Text | 공공 식품 API 키 |
 
 ### 트리거 조건
 
-- **대상 브랜치**: `release` 브랜치에 push 또는 merge 시에만 빌드
+- **대상 브랜치**: `release` 브랜치 MR 머지 시에만 빌드
 - GitLab Webhook URL: `http://k14s309.p.ssafy.io:9090/project/glucoach`
-- Secret token: Jenkins 파이프라인 설정에서 확인
 
 ### 파이프라인 단계
 
 1. **Checkout** — GitLab에서 release 브랜치 소스 체크아웃
-2. **Build Backend** — `./gradlew bootJar -x test` (테스트 제외 빌드)
-3. **Deploy to EC2** — EC2에 SSH 접속 후 `git pull` + `docker compose down && up`
+2. **Build Backend** — `./gradlew bootJar -x test` (테스트 제외, Jenkins에서 실행)
+3. **Deploy to EC2** — EC2에서 `deploy-bg.sh` 실행 (Blue-Green 무중단 배포)
 
-> AI 서버는 Jenkins에서 별도 빌드하지 않음. EC2에서 `docker compose up --build` 시 자동 빌드.
+> AI 서버는 Jenkins에서 별도 빌드하지 않음. `deploy-bg.sh` 실행 시 EC2에서 `docker compose --build`로 자동 빌드.
+
+### 롤백
+
+배포 후 문제 발생 시 EC2에서 즉시 롤백 가능:
+
+```bash
+# 이전 색상으로 nginx upstream 교체 후 reload
+PREV="blue"   # 또는 green
+cp infra/nginx/upstream.${PREV}.conf infra/nginx/upstream.conf
+docker exec s309-nginx nginx -s reload
+echo "${PREV}" > infra/.active-color
+```
 
 ---
 
@@ -162,22 +203,29 @@ Jenkins (`http://k14s309.p.ssafy.io:9090`) 에서 설정된 Credentials:
 | SSL 인증서 | Let's Encrypt (`/etc/nginx/ssl/fullchain.pem`) |
 | SSL 자동 갱신 | systemd timer (`certbot.timer`) — EC2에서 운영 중 |
 | Rate Limiting | IP당 100req/min, 초과 시 429 응답 |
+| 업스트림 전환 | `nginx/upstream.conf` include 방식 — `nginx -s reload`로 무중단 전환 |
 
-### 보안 헤더
+### Blue-Green upstream 구조
 
-- `Strict-Transport-Security` (HSTS)
-- `X-Frame-Options: DENY`
-- `X-Content-Type-Options: nosniff`
-- `X-XSS-Protection`
-- `Referrer-Policy`
+```
+nginx.conf
+  └── include /etc/nginx/upstream.conf   ← 배포 시 교체되는 파일
+
+upstream.conf (현재 활성이 blue인 경우):
+  upstream backend { server backend-blue:8080; }
+  upstream ai      { server ai-blue:8000;      }
+```
 
 ### 라우팅 규칙
 
 | 경로 | 대상 |
 |---|---|
 | `/` | 랜딩 페이지 (`infra/nginx/html/index.html`) |
-| `/api/*` | Backend (`:8080`) |
-| `/ai/*` | AI 서버 (`:8000`) |
+| `/api/*` | Backend (rate limit 적용) |
+| `/swagger-ui`, `/v3/api-docs` | Backend |
+| `/ai/*` | AI 서버 (rate limit 적용) |
+| `/n8n/` | n8n 워크플로우 (WebSocket 지원) |
+| `/health` | nginx 헬스체크 엔드포인트 |
 
 ---
 
@@ -190,7 +238,7 @@ Jenkins (`http://k14s309.p.ssafy.io:9090`) 에서 설정된 Credentials:
 | 버킷 이름 | `glucoach-images` |
 | 리전 | `ap-northeast-2` (서울) |
 | IAM 사용자 | `glucoach-s3` |
-| 접근 방식 | Presigned URL (앱에서 직접 업로드) 또는 백엔드 경유 |
+| 접근 방식 | 백엔드 경유 업로드 / Presigned URL |
 
 ### IAM 정책 (최소 권한)
 
@@ -204,12 +252,6 @@ Jenkins (`http://k14s309.p.ssafy.io:9090`) 에서 설정된 Credentials:
   }]
 }
 ```
-
-### 백엔드 연동 현황
-
-- `S3Config.java` — AWS SDK v2 클라이언트 설정 ✅
-- `S3Service.java` — 업로드/다운로드/Presigned URL 로직 ✅
-- **API 엔드포인트(Controller)** — 미구현 ❌ (백엔드 팀 작업 필요)
 
 ---
 
@@ -228,20 +270,28 @@ DB_URL=jdbc:postgresql://postgres:5432/s309
 DB_USERNAME=<DB 사용자명>
 DB_PASSWORD=<DB 비밀번호>
 SPRING_PROFILES_ACTIVE=prod
+JWT_SECRET=<JWT 서명 키>
+ADMIN_API_KEY=<관리자 API 키>
 
 # Redis
-REDIS_HOST=redis
-REDIS_PORT=6379
 REDIS_PASSWORD=<Redis 비밀번호>
 
 # AI
 AI_DEBUG=false
+OPENAI_API_KEY=<OpenAI API 키>
+OPENAI_BASE_URL=https://gms.ssafy.io/gmsapi/api.openai.com/v1
+ANTHROPIC_API_KEY=<Anthropic API 키>
+AGENT_API_KEY=<AI 서버 내부 인증 키>
 
 # AWS S3
 AWS_S3_ACCESS_KEY=<IAM Access Key>
 AWS_S3_SECRET_KEY=<IAM Secret Key>
 AWS_S3_REGION=ap-northeast-2
 AWS_S3_BUCKET=glucoach-images
+AWS_S3_ENDPOINT=<S3 엔드포인트>
+
+# 공공 식품 API (Jenkins Credentials에서 주입)
+FOOD_API_KEY=<식품안전처 API 키>
 ```
 
 > `.env` 파일은 Git에 포함되지 않음. 팀 내부 채널에서 공유.
@@ -252,30 +302,63 @@ AWS_S3_BUCKET=glucoach-images
 
 새 서버에 처음 세팅하는 경우 아래 순서대로 진행.
 
+### 사전 준비
+
 ```bash
-# 1. Docker 설치
+# Docker 설치
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker ubuntu
+newgrp docker
 
-# 2. 소스 클론
+# 소스 클론
 cd /home/ubuntu
-git clone https://lab.ssafy.com/s14-final/S14P31S309.git
+git clone https://lab.ssafy.com/s14-final/S14P31S309.git S14P31S309
+cd S14P31S309
 
-# 3. .env 파일 생성
-cd S14P31S309/infra
-cp .env.example .env
-# .env 파일에 실제 값 입력
+# .env 파일 생성
+cp infra/.env.example infra/.env
+# infra/.env 파일에 실제 값 입력
+```
 
-# 4. SSL 인증서 발급 (certbot)
+### SSL 인증서 발급
+
+```bash
 sudo snap install --classic certbot
+# 80 포트를 사용 중인 프로세스가 없어야 함
 sudo certbot certonly --standalone -d k14s309.p.ssafy.io
-sudo cp /etc/letsencrypt/live/k14s309.p.ssafy.io/fullchain.pem infra/nginx/ssl/
-sudo cp /etc/letsencrypt/live/k14s309.p.ssafy.io/privkey.pem infra/nginx/ssl/
+sudo mkdir -p /home/ubuntu/ssl
+sudo cp /etc/letsencrypt/live/k14s309.p.ssafy.io/fullchain.pem /home/ubuntu/ssl/
+sudo cp /etc/letsencrypt/live/k14s309.p.ssafy.io/privkey.pem /home/ubuntu/ssl/
+sudo chmod 644 /home/ubuntu/ssl/*.pem
+```
 
-# 5. 컨테이너 실행
-docker compose -f infra/docker-compose.yml up -d --build
+### 컨테이너 초기 기동 (Blue-Green)
 
-# 6. Jenkins 실행
+```bash
+# 1. 공유 인프라 시작 (네트워크 s309-internal, 볼륨 생성)
+docker compose -f infra/docker-compose.infra.yml --env-file infra/.env up -d
+
+# 2. blue를 초기 활성으로 설정
+echo "blue" > infra/.active-color
+cp infra/nginx/upstream.blue.conf infra/nginx/upstream.conf
+
+# 3. blue 앱 컨테이너 시작
+docker compose \
+  -f infra/docker-compose.infra.yml \
+  -f infra/docker-compose.blue.yml \
+  --env-file infra/.env \
+  up -d --build
+
+# 4. nginx upstream 반영
+docker exec s309-nginx nginx -s reload
+
+# 5. 상태 확인
+docker ps --format "table {{.Names}}\t{{.Status}}"
+```
+
+### Jenkins 컨테이너 실행
+
+```bash
 docker run -d \
   -p 9090:8080 \
   -v jenkins_home:/var/jenkins_home \
@@ -284,36 +367,20 @@ docker run -d \
   jenkins/jenkins:lts
 ```
 
-**Jenkins 초기 설정 (웹 UI)**
+### Jenkins 초기 설정 (웹 UI)
+
 1. `http://서버IP:9090` 접속
-2. 초기 비밀번호: `docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword`
+2. 초기 비밀번호 확인: `docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword`
 3. 권장 플러그인 설치
-4. GitLab, SSH Agent 플러그인 추가 설치
-5. Credentials 등록: `gitlab-token`, `ec2-ssh-key`
-6. 파이프라인 생성: SCM에서 `infra/Jenkinsfile` 경로 지정
-7. Jenkins URL 설정: `http://서버IP:9090/`
+4. 추가 플러그인 설치: **GitLab**, **SSH Agent**
+5. Credentials 등록:
 
----
-
-## 10. 남은 작업
-
-### 인프라
-
-| 항목 | 상태 | 내용 |
+| ID | 종류 | 값 |
 |---|---|---|
-| S3 업로드 API (Controller) | ❌ | 백엔드 팀에서 도메인별 파일 업로드 엔드포인트 구현 필요 |
-| Mattermost 배포 알림 | ❌ | Jenkins post 블록에 Mattermost Webhook 연동 필요 |
-| GitLab Webhook 인증 | 확인 필요 | Jenkins Secret Token 설정 후 403 오류 해결 확인 |
+| `gitlab-token` | Username with Password | GitLab 계정 + 토큰 |
+| `ec2-ssh-key` | SSH Private Key | EC2 `.pem` 키 내용 |
+| `firebase-key` | Secret File | `firebase-service-account.json` |
+| `food-api-key` | Secret Text | 공공 식품 API 키 |
 
-### 백엔드
-
-| 항목 | 상태 | 내용 |
-|---|---|---|
-| S3Service 활용 Controller | ❌ | 음식 사진 등 파일 업로드 API 구현 |
-| Redis 활용 캐싱 | 미확인 | Spring Data Redis 실제 사용 여부 확인 |
-
-### 앱
-
-| 항목 | 상태 | 내용 |
-|---|---|---|
-| API BASE_URL 설정 | 확인 필요 | `https://k14s309.p.ssafy.io` 로 설정되어 있는지 확인 |
+6. 파이프라인 생성: Pipeline script from SCM → Git → `infra/Jenkinsfile` 경로 지정
+7. GitLab Webhook 설정: `http://서버IP:9090/project/glucoach`

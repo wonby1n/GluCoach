@@ -111,34 +111,36 @@ public class PredictionService {
   private GlucosePredictRequest buildAiRequest(
       User user, PredictRequest request, Optional<Food> foodOpt) {
     // foodId가 있으면 DB 값 우선. foods.carbs_g 가 NULL/0이면 클라이언트 값으로 fallback.
+    // AI 모델이 macro 4개(carbs/protein/fat/fiber)로 곡선 계산하므로 NULL은 0.0 으로 치환해야
+    // 예측 그래프가 정상 반환된다 (NULL 시 AI 단에서 계산 실패).
     double carbs =
         foodOpt
             .map(Food::getCarbsG)
             .filter(v -> v != null && v.compareTo(BigDecimal.ZERO) > 0)
             .map(BigDecimal::doubleValue)
-            .orElseGet(() -> request.carbsG().doubleValue());
+            .orElseGet(() -> request.carbsG() != null ? request.carbsG().doubleValue() : 0.0);
 
-    // macro: foodId 있으면 DB 값, 없으면 클라이언트 요청값 사용 (null 허용)
+    // macro: foodId 있으면 DB 값, 없으면 클라이언트 요청값, 둘 다 없으면 0.0 fallback.
     Double proteinG =
         foodOpt
             .map(Food::getProteinG)
             .map(BigDecimal::doubleValue)
-            .orElse(request.proteinG() != null ? request.proteinG().doubleValue() : null);
+            .orElseGet(() -> request.proteinG() != null ? request.proteinG().doubleValue() : 0.0);
     Double fatG =
         foodOpt
             .map(Food::getFatG)
             .map(BigDecimal::doubleValue)
-            .orElse(request.fatG() != null ? request.fatG().doubleValue() : null);
+            .orElseGet(() -> request.fatG() != null ? request.fatG().doubleValue() : 0.0);
     Double fiberG =
         foodOpt
             .map(Food::getFiberG)
             .map(BigDecimal::doubleValue)
-            .orElse(request.fiberG() != null ? request.fiberG().doubleValue() : null);
+            .orElseGet(() -> request.fiberG() != null ? request.fiberG().doubleValue() : 0.0);
     Double kcal =
         foodOpt
             .map(Food::getKcal)
             .map(BigDecimal::doubleValue)
-            .orElse(request.kcal() != null ? request.kcal().doubleValue() : null);
+            .orElseGet(() -> request.kcal() != null ? request.kcal().doubleValue() : 0.0);
 
     MealInfo meal =
         new MealInfo(carbs, LocalDateTime.now(KST).toString(), proteinG, fatG, fiberG, kcal);

@@ -26,7 +26,7 @@ class MockHealthDataSource
 
         override suspend fun getTodaySummary(): DailyHealthSummary =
             DailyHealthSummary(
-                steps = 6230,
+                steps = 4200,
                 sleepMinutes = 7 * 60 + 15,
             )
 

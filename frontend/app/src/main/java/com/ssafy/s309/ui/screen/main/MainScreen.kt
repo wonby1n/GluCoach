@@ -100,19 +100,24 @@ fun MainScreen(
     onWithdrawClick: (String) -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onGuardianClick: () -> Unit = {},
-    onProjectorClick: () -> Unit = {},
     onAccountClick: () -> Unit = {},
     onKikiChatClick: () -> Unit = {},
     onKikiAlarmClick: () -> Unit = {},
     userEmail: String = "",
     requestedTab: String? = null,
     onTabHandled: () -> Unit = {},
+    targetFoodName: String? = null,
+    onTargetFoodHandled: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     MainScreenContent(
         state = uiState,
-        onBellClick = viewModel::openNotificationPanel,
+        onBellClick = {
+            // 패널 열 때마다 최신 알림 + timeAgo 재조회 (다른 단말 메시지/시간 sync용)
+            viewModel.loadDashboard()
+            viewModel.openNotificationPanel()
+        },
         onNotificationBack = viewModel::closeNotificationPanel,
         onClearAllNotifications = viewModel::clearAllNotifications,
         onMarkAllNotificationsRead = viewModel::markAllNotificationsRead,
@@ -127,13 +132,14 @@ fun MainScreen(
         onWithdrawClick = onWithdrawClick,
         onSettingsClick = onSettingsClick,
         onGuardianClick = onGuardianClick,
-        onProjectorClick = onProjectorClick,
         onAccountClick = onAccountClick,
         onKikiChatClick = onKikiChatClick,
         onKikiAlarmClick = onKikiAlarmClick,
         userEmail = userEmail,
         requestedTab = requestedTab,
         onTabHandled = onTabHandled,
+        targetFoodName = targetFoodName,
+        onTargetFoodHandled = onTargetFoodHandled,
         // [DEBUG_KIKI_TEST]
     )
 }
@@ -156,13 +162,14 @@ fun MainScreenContent(
     onWithdrawClick: (String) -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onGuardianClick: () -> Unit = {},
-    onProjectorClick: () -> Unit = {},
     onAccountClick: () -> Unit = {},
     onKikiChatClick: () -> Unit = {},
     onKikiAlarmClick: () -> Unit = {},
     userEmail: String = "",
     requestedTab: String? = null,
     onTabHandled: () -> Unit = {},
+    targetFoodName: String? = null,
+    onTargetFoodHandled: () -> Unit = {},
 ) {
     var selectedTab by rememberSaveable { mutableStateOf("home") }
     var mealLogTargetDate by remember { mutableStateOf<String?>(null) }
@@ -246,7 +253,7 @@ fun MainScreenContent(
                                 onDeviceClick = onConnectedDeviceClick,
                                 onHealthDetailClick = onSettingsClick,
                                 onGuardianClick = onGuardianClick,
-                                onProjectorClick = onProjectorClick,
+                                isDeviceConnected = state.isDeviceConnected,
                                 userEmail = userEmail,
                             )
                         "meallog" ->
@@ -263,6 +270,8 @@ fun MainScreenContent(
                                     mealLogTargetDate = date
                                     selectedTab = "meallog"
                                 },
+                                targetFoodName = targetFoodName,
+                                onTargetFoodHandled = onTargetFoodHandled,
                             )
 
                         else ->
@@ -643,7 +652,7 @@ private fun SummaryRow(
         horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.lg),
     ) {
         SummaryStatCard(
-            title = "걸음수",
+            title = "걸음 수",
             periodLabel = "오늘",
             primaryValue = "%,d".format(steps),
             unitOrSuffix = "걸음",
