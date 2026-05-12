@@ -203,7 +203,7 @@ def health_check() -> HealthResponse:
     stage2_dir = models_dir / "stage2_meal"
     stage2_loaded = (stage2_dir / "meta.json").exists() and all(
         (stage2_dir / f"{name}.pkl").exists()
-        for name in ("peak_delta", "time_to_peak", "decay_rate", "iauc")
+        for name in ("peak_delta", "time_to_peak", "decay_rate")
     )
 
     if (meal_loaded or stage2_loaded) and now_loaded and scaler_loaded:
