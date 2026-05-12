@@ -62,7 +62,6 @@ services:
 
 volumes:
   ai-models:
-    external: true
     name: s309-ai-models
 
 networks:
