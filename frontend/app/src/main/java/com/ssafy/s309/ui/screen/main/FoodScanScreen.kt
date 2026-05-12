@@ -104,6 +104,7 @@ fun FoodScanContent(
     onBack: () -> Unit,
     onRetakePhoto: () -> Unit,
     onMealSaved: () -> Unit,
+    onGoHome: () -> Unit = onBack,
     viewModel: FoodScanViewModel = hiltViewModel(),
 ) {
     val scanState by viewModel.state.collectAsStateWithLifecycle()
@@ -259,14 +260,14 @@ fun FoodScanContent(
                     prediction = null,
                 )
             } else {
-                BackHandler { onBack() }
+                BackHandler { onGoHome() }
                 ErrorScreen(
                     message = s.message,
                     onRetake = {
                         viewModel.resetError()
                         onRetakePhoto()
                     },
-                    onBack = onBack,
+                    onBack = onGoHome,
                     onManualSearch = {
                         selectedManualCandidate = null
                         showManualSearch = true
