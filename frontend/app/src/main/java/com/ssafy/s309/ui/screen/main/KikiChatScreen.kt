@@ -779,7 +779,7 @@ private fun KikiChatBubble(
                 }
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = item.timeAgoText,
+                    text = formatTimestamp(parseIsoTimestamp(item.createdAt)),
                     color = GlucoachColors.TextSecondary,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(bottom = 2.dp),
