@@ -32,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -47,7 +48,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.ssafy.s309.R
@@ -176,6 +180,47 @@ class KikiChatViewModel
             }
         }
 
+        /**
+         * 화면 진입/포그라운드 복귀 시 호출 — page=0 응답으로 메시지 전체 교체.
+         * 다른 단말이 보낸 user 메시지까지 가져오고, timeAgo도 재계산됨.
+         */
+        fun refresh() {
+            viewModelScope.launch {
+                runCatching { healthRepository.getChatMessagesPage(page = 0) }
+                    .onSuccess { response ->
+                        val fresh: List<ChatMessage> =
+                            response.content
+                                .sortedByDescending { it.id }
+                                .map { m ->
+                                    if (m.sender == "user") {
+                                        ChatMessage.UserMessage(
+                                            text = m.message ?: "",
+                                            timestamp = parseIsoTimestamp(m.createdAt),
+                                            createdAt = m.createdAt,
+                                        )
+                                    } else {
+                                        ChatMessage.KikiMessage(
+                                            NotificationItem(
+                                                id = m.id,
+                                                title = "키키",
+                                                message = m.message ?: "",
+                                                timeAgoText = healthRepository.formatTimeAgo(m.createdAt),
+                                                isUnread = !m.isRead,
+                                                alertType = m.messageType ?: "",
+                                                createdAt = m.createdAt,
+                                                displayTrace = m.displayTrace,
+                                            ),
+                                        )
+                                    }
+                                }
+                        _messages.value = withDateSeparators(fresh)
+                        currentPage = 0
+                        _hasMore.value = PAGE_SIZE < response.total
+                    }
+                    .onFailure { Log.w(TAG, "refresh 실패", it) }
+            }
+        }
+
         /** FCM data.chatMessageId 수신 시 호출 — 인디케이터 OFF + page=0 재조회 */
         fun onFcmReceived() {
             timeoutJob?.cancel()
@@ -196,8 +241,8 @@ class KikiChatViewModel
                         val newMessages =
                             response.content
                                 .sortedByDescending { it.id }
-                                // 유저 메시지는 sendUserReply 낙관적 추가로 이미 로컬에 존재 → skip하여 중복 방지
-                                .filter { it.createdAt !in existingCreatedAts && it.sender != "user" }
+                                // 이미 로컬에 있는 createdAt은 dedupe. 다른 단말이 보낸 user 메시지는 받기 위해 sender 필터 제거.
+                                .filter { it.createdAt !in existingCreatedAts }
                                 .map { m ->
                                     if (m.sender == "user") {
                                         ChatMessage.UserMessage(
@@ -380,6 +425,17 @@ fun KikiChatScreen(
     val fontSize by viewModel.fontSize.collectAsStateWithLifecycle()
     val isWaitingForAgent by viewModel.isWaitingForAgent.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+
+    // 화면 진입/포그라운드 복귀 시 page=0 재조회 — FCM 미수신 단말에서도 최신 메시지 보장
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     // 새 메시지 도착 시 맨 아래로 스크롤 (reverseLayout=true 기준 index 0)
     LaunchedEffect(messages.size) {
