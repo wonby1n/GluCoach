@@ -113,7 +113,11 @@ fun MainScreen(
 
     MainScreenContent(
         state = uiState,
-        onBellClick = viewModel::openNotificationPanel,
+        onBellClick = {
+            // 패널 열 때마다 최신 알림 + timeAgo 재조회 (다른 단말 메시지/시간 sync용)
+            viewModel.loadDashboard()
+            viewModel.openNotificationPanel()
+        },
         onNotificationBack = viewModel::closeNotificationPanel,
         onClearAllNotifications = viewModel::clearAllNotifications,
         onMarkAllNotificationsRead = viewModel::markAllNotificationsRead,

@@ -188,6 +188,21 @@ class MainViewModel
 
         fun openNotificationPanel() {
             _uiState.update { it.copy(isNotificationPanelOpen = true) }
+            // FCM 미수신 단말도 패널 열 때 항상 최신 알림 보이도록 강제 재조회
+            viewModelScope.launch {
+                val refreshed = healthRepository.getNotifications()
+                val locallyReadIds =
+                    _uiState.value.notifications
+                        .filter { !it.isUnread }.map { it.id }.toSet()
+                _uiState.update {
+                    it.copy(
+                        notifications =
+                            refreshed.map { n ->
+                                if (n.id in locallyReadIds) n.copy(isUnread = false) else n
+                            },
+                    )
+                }
+            }
         }
 
         fun closeNotificationPanel() {
