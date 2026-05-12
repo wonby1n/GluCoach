@@ -40,13 +40,33 @@ object KeyboardFoodCache {
             runCatching {
                 val type = object : TypeToken<List<KeyboardFoodItem>>() {}.type
                 val items: List<KeyboardFoodItem> = Gson().fromJson(file.readText(), type)
-                items.forEach {
-                    byName[it.name] = it
-                    nameList.add(it.name)
+                items.forEach { item ->
+                    indexKey(item.name, item)
+                    item.displayName?.takeIf { it.isNotBlank() && it != item.name }
+                        ?.let { indexKey(it, item) }
                 }
-                Log.i(TAG, "loaded ${items.size} foods in ${System.currentTimeMillis() - start}ms")
+                Log.i(TAG, "loaded ${items.size} foods (${byName.size} keys) in ${System.currentTimeMillis() - start}ms")
             }.onFailure { Log.w(TAG, "parse failed", it) }
             loaded = true
+        }
+    }
+
+    /**
+     * 같은 키에 여러 아이템이 매핑될 수 있음 (예: displayName="삼겹살"이 여러 풀네임에 존재).
+     * grade 있는 아이템이 우선. 이미 grade 있는 게 들어가 있으면 덮어쓰지 않음.
+     */
+    private fun indexKey(
+        key: String,
+        item: KeyboardFoodItem,
+    ) {
+        val trimmed = key.trim()
+        if (trimmed.isEmpty()) return
+        val existing = byName[trimmed]
+        if (existing == null) {
+            byName[trimmed] = item
+            nameList.add(trimmed)
+        } else if (existing.grade == null && item.grade != null) {
+            byName[trimmed] = item
         }
     }
 
@@ -69,7 +89,21 @@ object KeyboardFoodCache {
                 bestLen = name.length
             }
         }
-        return best
+        if (best != null) return best
+        // Reverse fallback — DB name이 input을 포함 (예: input "삼겹살" → "삼겹살구이").
+        // 가장 짧은 매칭 우선 (입력에 가까운 것). 동률이면 grade 있는 쪽 우선.
+        if (trimmed.length < 2) return null
+        var rev: KeyboardFoodItem? = null
+        var revLen = Int.MAX_VALUE
+        for (name in nameList) {
+            if (name.length >= revLen || !name.contains(trimmed)) continue
+            val item = byName[name] ?: continue
+            if (name.length < revLen || (rev?.grade == null && item.grade != null)) {
+                rev = item
+                revLen = name.length
+            }
+        }
+        return rev
     }
 
     /** 사용자 등급이 있는 음식 Top N — 추천 칩으로 사용 (등급 좋은 순 / 동률이면 input order). */
