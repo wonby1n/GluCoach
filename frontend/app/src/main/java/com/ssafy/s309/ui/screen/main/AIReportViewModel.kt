@@ -23,10 +23,18 @@ class AIReportViewModel
         sealed class UiState {
             data object Loading : UiState()
 
-            data class Success(
+            /** 날짜 목록 화면 — 처음 진입 시 표시 */
+            data class DateList(
                 val reports: List<WeeklyReportResponse>,
                 val gradeMap: Map<Int, String>,
-                val selectedIndex: Int = 0,
+                val isGenerating: Boolean = false,
+            ) : UiState()
+
+            /** 특정 주 리포트 상세 화면 */
+            data class Detail(
+                val reports: List<WeeklyReportResponse>,
+                val gradeMap: Map<Int, String>,
+                val selectedIndex: Int,
             ) : UiState() {
                 val current: WeeklyReportResponse get() = reports[selectedIndex]
                 val hasPrevious: Boolean get() = selectedIndex < reports.lastIndex
@@ -43,6 +51,7 @@ class AIReportViewModel
             load()
         }
 
+        /** 최초 진입 or 재시도 — 기존 리포트 목록을 불러와 DateList 상태로 전환 */
         fun load() {
             viewModelScope.launch {
                 _uiState.value = UiState.Loading
@@ -55,27 +64,63 @@ class AIReportViewModel
                         return@launch
                     }
 
-                if (reports.isEmpty()) {
-                    _uiState.value = UiState.Error("아직 생성된 주간 보고서가 없어요")
-                    return@launch
-                }
-
                 val gradeMap =
                     gradesDeferred.await()
                         .getOrDefault(emptyList())
                         .associate { it.foodId to it.grade }
 
-                _uiState.value = UiState.Success(reports, gradeMap)
+                _uiState.value = UiState.DateList(reports = reports, gradeMap = gradeMap)
             }
         }
 
+        /** 새로 생성하기 버튼 — POST로 새 리포트 생성 후 목록을 갱신 */
+        fun generateReport() {
+            val current = _uiState.value as? UiState.DateList ?: return
+            viewModelScope.launch {
+                _uiState.value = current.copy(isGenerating = true)
+
+                repository.generateReport().getOrElse {
+                    _uiState.value = current.copy(isGenerating = false)
+                    return@launch
+                }
+
+                val reportsDeferred = async { repository.getWeeklyReports() }
+                val gradesDeferred = async { foodRepository.getFoodGrades() }
+
+                val reports =
+                    reportsDeferred.await().getOrElse {
+                        _uiState.value = current.copy(isGenerating = false)
+                        return@launch
+                    }
+                val gradeMap =
+                    gradesDeferred.await()
+                        .getOrDefault(emptyList())
+                        .associate { it.foodId to it.grade }
+
+                _uiState.value = UiState.DateList(reports = reports, gradeMap = gradeMap)
+            }
+        }
+
+        /** 날짜 목록에서 특정 주 선택 → 상세 화면으로 전환 */
+        fun selectReport(index: Int) {
+            val current = _uiState.value as? UiState.DateList ?: return
+            if (index !in current.reports.indices) return
+            _uiState.value = UiState.Detail(current.reports, current.gradeMap, index)
+        }
+
+        /** 상세 화면에서 목록으로 돌아가기 */
+        fun backToList() {
+            val current = _uiState.value as? UiState.Detail ?: return
+            _uiState.value = UiState.DateList(current.reports, current.gradeMap)
+        }
+
         fun showPrevious() {
-            val s = _uiState.value as? UiState.Success ?: return
+            val s = _uiState.value as? UiState.Detail ?: return
             if (s.hasPrevious) _uiState.value = s.copy(selectedIndex = s.selectedIndex + 1)
         }
 
         fun showNext() {
-            val s = _uiState.value as? UiState.Success ?: return
+            val s = _uiState.value as? UiState.Detail ?: return
             if (s.hasNext) _uiState.value = s.copy(selectedIndex = s.selectedIndex - 1)
         }
 

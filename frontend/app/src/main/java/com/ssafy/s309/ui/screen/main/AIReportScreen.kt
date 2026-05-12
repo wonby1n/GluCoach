@@ -31,6 +31,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.TrendingDown
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.Bedtime
@@ -63,7 +65,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
@@ -235,10 +236,19 @@ fun AIReportContent(
                 }
             }
         }
-        is AIReportViewModel.UiState.Success -> {
-            AIReportSuccessContent(
+        is AIReportViewModel.UiState.DateList -> {
+            AIReportDateListContent(
                 state = state,
                 modifier = modifier,
+                onSelectReport = { viewModel.selectReport(it) },
+                onGenerate = { viewModel.generateReport() },
+            )
+        }
+        is AIReportViewModel.UiState.Detail -> {
+            AIReportDetailContent(
+                state = state,
+                modifier = modifier,
+                onBack = { viewModel.backToList() },
                 onPreviousClick = { viewModel.showPrevious() },
                 onNextClick = { viewModel.showNext() },
                 onPdfClick = {
@@ -255,13 +265,154 @@ fun AIReportContent(
     }
 }
 
-// ── 성공 화면 ────────────────────────────────────────────
+// ── 날짜 목록 화면 ──────────────────────────────────────────
+
+@Composable
+private fun AIReportDateListContent(
+    state: AIReportViewModel.UiState.DateList,
+    onSelectReport: (Int) -> Unit,
+    onGenerate: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 22.dp)) {
+            Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+
+            Text(
+                text = "AI 주간 리포트",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+            )
+
+            Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+
+            Button(
+                onClick = onGenerate,
+                enabled = !state.isGenerating,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = GlucoachColors.Primary),
+            ) {
+                if (state.isGenerating) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(
+                    text = if (state.isGenerating) "생성 중..." else "새로 생성하기",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+            if (state.reports.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 60.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "아직 생성된 주간 보고서가 없어요\n새로 생성하기 버튼을 눌러보세요",
+                        color = GlucoachColors.TextSecondary,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 22.sp,
+                    )
+                }
+            } else {
+                Text(
+                    text = "기간별 리포트",
+                    color = GlucoachColors.TextPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+
+                Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    state.reports.forEachIndexed { index, report ->
+                        ReportDateCard(
+                            report = report,
+                            onClick = { onSelectReport(index) },
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+        }
+    }
+}
+
+@Composable
+private fun ReportDateCard(
+    report: WeeklyReportResponse,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .shadow(2.dp, RoundedCornerShape(GlucoachCorner.card))
+                .clip(RoundedCornerShape(GlucoachCorner.card))
+                .background(GlucoachColors.Surface)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 18.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.DateRange,
+                    contentDescription = null,
+                    tint = GlucoachColors.Primary,
+                    modifier = Modifier.size(13.dp),
+                )
+                Text(
+                    text = formatWeekRange(report.weekStart),
+                    color = GlucoachColors.Primary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Text(
+                text = "목표 범위 내 ${report.timeInRange.toInt()}%  ·  평균 ${report.avgGlucose.toInt()} mg/dL",
+                color = GlucoachColors.TextSecondary,
+                fontSize = 12.sp,
+            )
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+            contentDescription = null,
+            tint = GlucoachColors.TextSecondary,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+// ── 리포트 상세 화면 ─────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AIReportSuccessContent(
-    state: AIReportViewModel.UiState.Success,
+private fun AIReportDetailContent(
+    state: AIReportViewModel.UiState.Detail,
     modifier: Modifier = Modifier,
+    onBack: () -> Unit,
     onPreviousClick: () -> Unit,
     onNextClick: () -> Unit,
     onPdfClick: () -> Unit,
@@ -317,12 +468,25 @@ private fun AIReportSuccessContent(
         Column(modifier = Modifier.padding(horizontal = 22.dp)) {
             Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
 
-            Text(
-                text = "AI 주간 리포트",
-                color = GlucoachColors.TextPrimary,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                IconButton(onClick = onBack, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                        contentDescription = "목록으로",
+                        tint = GlucoachColors.TextPrimary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                Text(
+                    text = "AI 주간 리포트",
+                    color = GlucoachColors.TextPrimary,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -460,8 +624,7 @@ private fun AIReportSuccessContent(
                 horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.md),
             ) {
                 OutlinedButton(
-                    onClick = onPreviousClick,
-                    enabled = state.hasPrevious,
+                    onClick = onBack,
                     modifier =
                         Modifier
                             .weight(1f)
@@ -470,16 +633,15 @@ private fun AIReportSuccessContent(
                     colors =
                         ButtonDefaults.outlinedButtonColors(
                             contentColor = GlucoachColors.TextSecondary,
-                            disabledContentColor = GlucoachColors.TextSecondary.copy(alpha = 0.4f),
                         ),
                     border =
                         androidx.compose.foundation.BorderStroke(
                             1.dp,
-                            if (state.hasPrevious) GlucoachColors.Border else GlucoachColors.Border.copy(alpha = 0.4f),
+                            GlucoachColors.Border,
                         ),
                 ) {
                     Text(
-                        text = "지난 요약 보기",
+                        text = "리포트 목록으로",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -552,54 +714,50 @@ private fun SummaryStatItem(
     Column(
         modifier =
             modifier
-                .height(120.dp)
+                .height(130.dp)
                 .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
                 .clip(RoundedCornerShape(GlucoachCorner.card))
                 .background(GlucoachColors.Surface)
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
                 .padding(GlucoachSpacing.lg),
+        verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    text = card.title,
-                    color = GlucoachColors.TextSecondary,
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                if (onClick != null) {
-                    Text(
-                        text = "상세",
-                        color = card.changeColor,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-            }
-        }
-        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(text = card.value, color = GlucoachColors.TextPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(text = card.unit, color = GlucoachColors.TextSecondary, fontSize = 11.sp)
-            }
-        }
-        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
             Text(
-                text = card.changeText,
-                color = card.changeColor,
+                text = card.title,
+                color = GlucoachColors.TextSecondary,
                 fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
+            if (onClick != null) {
+                Text(
+                    text = "상세",
+                    color = card.changeColor,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(text = card.value, color = GlucoachColors.TextPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(text = card.unit, color = GlucoachColors.TextSecondary, fontSize = 11.sp)
+        }
+        Text(
+            text = card.changeText,
+            color = card.changeColor,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            lineHeight = 15.sp,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -631,11 +789,23 @@ private fun WeeklyGlucoseChart(
         }
     val tabColors = listOf(GlucoachColors.Primary, Color(0xFFE96A6A), Color(0xFF2196F3))
 
-    val dataMax = points.filterNotNull().maxOrNull() ?: 200f
-    val dataMin = points.filterNotNull().minOrNull() ?: 50f
-    val maxVal = maxOf(200f, dataMax + 20f)
-    val minVal = minOf(50f, dataMin - 20f).coerceAtLeast(0f)
-    val range = maxVal - minVal
+    val dataMax = points.filterNotNull().maxOrNull() ?: highThreshold
+    val dataMin = points.filterNotNull().minOrNull() ?: lowThreshold
+    val rawRange = (dataMax - dataMin).coerceAtLeast(60f)
+    val dataPadding = (rawRange * 0.25f).coerceAtLeast(20f)
+
+    val maxVal: Float
+    val minVal: Float
+    if (selectedMode == 0) {
+        // 평균: 60·180 기준선 모두 표시
+        maxVal = maxOf(highThreshold + dataPadding * 0.5f, dataMax + dataPadding)
+        minVal = (minOf(lowThreshold - dataPadding * 0.5f, dataMin - dataPadding)).coerceAtLeast(0f)
+    } else {
+        // 최고/최저: 실제 데이터 범위 기준으로만 Y축 결정 (데이터 min~max + 패딩)
+        maxVal = dataMax + dataPadding
+        minVal = (dataMin - dataPadding).coerceAtLeast(0f)
+    }
+    val range = (maxVal - minVal).coerceAtLeast(1f)
 
     Column(
         modifier =
@@ -712,8 +882,26 @@ private fun WeeklyGlucoseChart(
         val density = LocalDensity.current
         val widthDp = with(density) { chartWidthPx.toDp() }
         val stepDp = if (points.size > 1 && chartWidthPx > 0) widthDp / (points.size - 1) else 0.dp
-        val y180 = (chartHeight * (1f - (highThreshold - minVal) / range) - 17.dp).coerceIn(0.dp, chartHeight - 14.dp)
-        val y60 = (chartHeight * (1f - (lowThreshold - minVal) / range) - 17.dp).coerceIn(0.dp, chartHeight - 14.dp)
+        val showHighLine = highThreshold in minVal..maxVal
+        val showLowLine = lowThreshold in minVal..maxVal
+        val y180 =
+            if (showHighLine) {
+                (chartHeight * (1f - (highThreshold - minVal) / range) - 17.dp).coerceIn(
+                    0.dp,
+                    chartHeight - 14.dp,
+                )
+            } else {
+                null
+            }
+        val y60 =
+            if (showLowLine) {
+                (chartHeight * (1f - (lowThreshold - minVal) / range) - 17.dp).coerceIn(
+                    0.dp,
+                    chartHeight - 14.dp,
+                )
+            } else {
+                null
+            }
 
         Box(
             modifier =
@@ -729,26 +917,26 @@ private fun WeeklyGlucoseChart(
 
                 fun yFor(v: Float) = h - ((v - minVal) / range) * h
 
-                if (selectedMode == 0) {
-                    drawRect(color = Color(0x1AE53935), topLeft = Offset(0f, 0f), size = Size(w, yFor(highThreshold)))
-                }
-
                 val dashEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))
                 val gridColor = GlucoachColors.ChartGrid
-                drawLine(
-                    color = gridColor,
-                    start = Offset(0f, yFor(highThreshold)),
-                    end = Offset(w, yFor(highThreshold)),
-                    strokeWidth = 1f,
-                    pathEffect = dashEffect,
-                )
-                drawLine(
-                    color = gridColor,
-                    start = Offset(0f, yFor(lowThreshold)),
-                    end = Offset(w, yFor(lowThreshold)),
-                    strokeWidth = 1f,
-                    pathEffect = dashEffect,
-                )
+                if (showHighLine) {
+                    drawLine(
+                        color = gridColor,
+                        start = Offset(0f, yFor(highThreshold)),
+                        end = Offset(w, yFor(highThreshold)),
+                        strokeWidth = 1f,
+                        pathEffect = dashEffect,
+                    )
+                }
+                if (showLowLine) {
+                    drawLine(
+                        color = gridColor,
+                        start = Offset(0f, yFor(lowThreshold)),
+                        end = Offset(w, yFor(lowThreshold)),
+                        strokeWidth = 1f,
+                        pathEffect = dashEffect,
+                    )
+                }
 
                 if (points.size >= 2) {
                     val step = w / (points.size - 1)
@@ -823,20 +1011,24 @@ private fun WeeklyGlucoseChart(
                 }
             }
 
-            Text(
-                text = "180",
-                color = Color(0xFFE96A6A),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.offset(y = y180),
-            )
-            Text(
-                text = "60",
-                color = Color(0xFF2196F3),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.offset(y = y60),
-            )
+            y180?.let { offset ->
+                Text(
+                    text = "180",
+                    color = Color(0xFFE96A6A),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.offset(y = offset),
+                )
+            }
+            y60?.let { offset ->
+                Text(
+                    text = "60",
+                    color = Color(0xFF2196F3),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.offset(y = offset),
+                )
+            }
 
             selectedIndex?.let { idx ->
                 val v = points.getOrNull(idx) ?: return@let

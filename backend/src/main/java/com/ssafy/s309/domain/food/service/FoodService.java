@@ -64,15 +64,26 @@ public class FoodService {
   }
 
   /**
-   * name 의 공백/언더스코어/하이픈을 제거한 키 기준 중복 제거.
+   * 사용자 노출 기준 중복 제거.
    *
-   * <p>입력은 이미 search_count desc 정렬 상태이므로 LinkedHashMap putIfAbsent 로 첫 번째(가장 인기) row 만 유지된다. 동일 식약처
-   * 항목이 띄어쓰기/표기 차이로 여러 row 로 적재된 케이스(예: "소고기 샤브샤브" vs "소고기샤브샤브")를 단일 표시로 통합.
+   * <p>키 선택 정책:
+   *
+   * <ul>
+   *   <li>display_name 이 있으면 그것의 공백 제거값을 키로 — V18 LLM 정제 결과가 같으면 같은 음식으로 간주. raw name 이 달라도 사용자에겐
+   *       동일 표시명이라 한 줄로 통합 (예: raw "국밥_돼지머리" + raw "돼지머리국밥" → 둘 다 display "돼지머리국밥").
+   *   <li>display_name 이 없으면 raw name 의 공백/언더스코어/하이픈을 제거한 값으로 fallback — 띄어쓰기/표기 차이만 있는 row 통합 (예:
+   *       "소고기 샤브샤브" vs "소고기샤브샤브").
+   * </ul>
+   *
+   * <p>입력은 이미 search_count desc 정렬 상태이므로 LinkedHashMap putIfAbsent 로 첫 번째(가장 인기) row 만 유지된다.
    */
   private static List<FoodSearchResult> dedupByNormalizedName(List<FoodSearchResult> results) {
     LinkedHashMap<String, FoodSearchResult> seen = new LinkedHashMap<>();
     for (FoodSearchResult r : results) {
-      String key = r.name().replaceAll("[\\s_-]", "");
+      String key =
+          (r.displayName() != null && !r.displayName().isBlank())
+              ? r.displayName().replaceAll("\\s", "")
+              : r.name().replaceAll("[\\s_-]", "");
       seen.putIfAbsent(key, r);
     }
     return new ArrayList<>(seen.values());
