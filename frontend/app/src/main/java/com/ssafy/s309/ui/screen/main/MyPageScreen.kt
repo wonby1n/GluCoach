@@ -2,6 +2,7 @@ package com.ssafy.s309.ui.screen.main
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -287,7 +288,7 @@ private fun BluetoothCard(
                 .clickable(onClick = onClick)
                 .padding(horizontal = GlucoachSpacing.lg, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(GlucoachSpacing.md),
+        horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.md),
     ) {
         val iconColor = if (isConnected) GlucoachColors.Primary else GlucoachColors.TextSecondary
         val bgColor = if (isConnected) GlucoachColors.Primary.copy(alpha = 0.1f) else GlucoachColors.TextSecondary.copy(alpha = 0.08f)
