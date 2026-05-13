@@ -137,6 +137,7 @@ class AuthViewModel
                             )
                         userRepository.updateSettings(settingsRequest)
                         clearPendingData()
+                        tokenManager.setJustSignedUp(true)
                         _uiState.value = AuthUiState.LoginSuccess(isNewUser = true)
                     }
                     .onFailure { _uiState.value = AuthUiState.Error(it.message ?: "회원가입 실패") }

@@ -45,6 +45,7 @@ class MainViewModel
 
         fun loadDashboard() {
             viewModelScope.launch {
+                val isNewUser = tokenManager.consumeJustSignedUp()
                 val range = healthRepository.getGlucoseTargetRange()
                 val summary = healthRepository.getTodaySummary()
                 val notifications = healthRepository.getNotifications()
@@ -55,6 +56,7 @@ class MainViewModel
                         glucoseRange = range,
                         summary = summary,
                         notifications = notifications,
+                        isNewUser = isNewUser,
                     )
                 }
 

@@ -33,4 +33,5 @@ data class MainUiState(
     val notifications: List<NotificationItem> = emptyList(),
     val isNotificationPanelOpen: Boolean = false,
     val selectedNotification: NotificationItem? = null,
+    val isNewUser: Boolean = false,
 )

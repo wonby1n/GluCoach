@@ -198,7 +198,7 @@ class HealthRepository
                 }
             }.onFailure { Log.w(TAG, "BE 알림 조회 실패, mock으로 fallback", it) }
 
-            return firstNonEmptyList { it.getNotifications() } ?: mockDataSource.getNotifications()
+            return firstNonEmptyList { it.getNotifications() } ?: emptyList()
         }
 
         /** 날짜별 식사 기록 조회 */
