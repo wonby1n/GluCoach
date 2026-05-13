@@ -28,7 +28,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -272,33 +271,24 @@ private fun GlucoseChartBody(
                 return chartWidth * ratio.coerceIn(0f, 1f)
             }
 
-            // 1) 목표 범위 회색 박스
-            val rangeTop = yFor(range.maxMgDl)
-            val rangeBottom = yFor(range.minMgDl)
-            drawRect(
-                color = GlucoachColors.RangeBox,
-                topLeft = Offset(0f, rangeTop),
-                size = Size(chartWidth, rangeBottom - rangeTop),
-            )
-
-            // 2) 상/하한 점선
+            // 1) X축·Y축 기준선 (점선)
             val dash = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
             drawLine(
                 color = GlucoachColors.ChartGrid,
-                start = Offset(0f, rangeTop),
-                end = Offset(chartWidth, rangeTop),
-                strokeWidth = 1.5f,
+                start = Offset(0f, chartHeight),
+                end = Offset(chartWidth, chartHeight),
+                strokeWidth = 1f,
                 pathEffect = dash,
             )
             drawLine(
                 color = GlucoachColors.ChartGrid,
-                start = Offset(0f, rangeBottom),
-                end = Offset(chartWidth, rangeBottom),
-                strokeWidth = 1.5f,
+                start = Offset(0f, 0f),
+                end = Offset(0f, chartHeight),
+                strokeWidth = 1f,
                 pathEffect = dash,
             )
 
-            // 3) 혈당 라인 (Catmull-Rom 곡선)
+            // 2) 혈당 라인 (Catmull-Rom 곡선)
             if (readings.size >= 2) {
                 val pts = readings.map { Offset(xFor(it.timestampMillis), yFor(it.valueMgDl)) }
                 val path =

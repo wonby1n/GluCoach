@@ -831,6 +831,7 @@ private fun InstagramCameraPanel(
                             capturedFile = null
                         },
                         onMealSaved = onMealSaved,
+                        onGoHome = onClose,
                     )
                 }
             }

@@ -27,6 +27,17 @@ public interface MealRecordRepository extends JpaRepository<MealRecord, Integer>
       @Param("from") LocalDateTime from,
       @Param("to") LocalDateTime to);
 
+  @Query(
+      """
+      SELECT m FROM MealRecord m
+      LEFT JOIN FETCH m.food
+      WHERE m.userId = :userId
+        AND m.foodId = :foodId
+      ORDER BY m.recordedAt DESC
+      """)
+  List<MealRecord> findWithFoodByUserIdAndFoodId(
+      @Param("userId") Integer userId, @Param("foodId") Integer foodId);
+
   /**
    * Agent #4 meals: MealRecord.food (@ManyToOne readonly) 관계로 정통 JPQL. ERD(real_end(MVP).sql) 기준
    * food_id NOT NULL이라 inner join 안전. constructor projection으로 단건당 7필드 한 쿼리로 매핑.

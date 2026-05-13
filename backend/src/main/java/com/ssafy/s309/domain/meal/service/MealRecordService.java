@@ -81,4 +81,18 @@ public class MealRecordService {
             })
         .toList();
   }
+
+  @Transactional(readOnly = true)
+  public List<MealRecordResponse> getByFoodId(Integer userId, Integer foodId) {
+    return mealRecordRepository.findWithFoodByUserIdAndFoodId(userId, foodId).stream()
+        .map(
+            meal -> {
+              String imageUrl =
+                  meal.getImageStorageKey() != null
+                      ? s3Service.getPresignedDownloadUrl(meal.getImageStorageKey())
+                      : null;
+              return MealRecordResponse.from(meal, imageUrl);
+            })
+        .toList();
+  }
 }

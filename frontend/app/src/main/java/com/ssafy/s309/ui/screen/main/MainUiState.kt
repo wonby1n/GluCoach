@@ -16,7 +16,7 @@ import com.ssafy.s309.data.model.NotificationItem
  * @property glucoseSeries 그래프용 시리즈
  * @property glucoseRange 목표 범위 (회색 박스)
  * @property meals 식사 이벤트
- * @property summary 칼로리/수면 요약
+ * @property summary 걸음수/수면 요약
  * @property notifications 알림 목록
  * @property isNotificationPanelOpen 알림 패널 열림 여부
  */
