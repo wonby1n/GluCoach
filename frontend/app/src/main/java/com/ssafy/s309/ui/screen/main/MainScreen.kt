@@ -830,7 +830,11 @@ private fun InstagramCameraPanel(
                             sessionId++
                             capturedFile = null
                         },
-                        onMealSaved = onMealSaved,
+                        onMealSaved = {
+                            sessionId++
+                            capturedFile = null
+                            onMealSaved()
+                        },
                         onGoHome = onClose,
                     )
                 }
