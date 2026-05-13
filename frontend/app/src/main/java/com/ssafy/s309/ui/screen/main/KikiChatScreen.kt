@@ -679,7 +679,7 @@ private fun KikiChatTopBar(
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "GlucoFit AI 어시스턴트",
+                text = "내 손 안의 작은 비서",
                 color = GlucoachColors.TextSecondary,
                 fontSize = 12.sp,
             )

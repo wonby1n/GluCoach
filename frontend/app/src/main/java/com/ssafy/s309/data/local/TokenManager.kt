@@ -68,6 +68,17 @@ class TokenManager
 
         fun getFcmToken(): String? = prefs.getString(KEY_FCM_TOKEN, null)
 
+        fun setJustSignedUp(value: Boolean) {
+            prefs.edit().putBoolean(KEY_JUST_SIGNED_UP, value).apply()
+        }
+
+        /** 1회성 플래그. 읽으면 즉시 false로 클리어된다. */
+        fun consumeJustSignedUp(): Boolean {
+            val v = prefs.getBoolean(KEY_JUST_SIGNED_UP, false)
+            if (v) prefs.edit().remove(KEY_JUST_SIGNED_UP).apply()
+            return v
+        }
+
         fun clearTokens() {
             // FCM 토큰은 디바이스에 묶인 값이라 로그아웃과 무관하게 보존한다.
             // 같이 지우면 재로그인 시 서버 PUT 할 토큰이 없고, FcmService.onNewToken 은
@@ -85,5 +96,6 @@ class TokenManager
             const val KEY_EMAIL = "user_email"
             const val KEY_USER_ID = "user_id"
             const val KEY_FCM_TOKEN = "fcm_token"
+            const val KEY_JUST_SIGNED_UP = "just_signed_up"
         }
     }

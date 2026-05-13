@@ -63,6 +63,7 @@ import com.ssafy.s309.ui.theme.GlucoachSpacing
 @Composable
 fun KikiAlarmDetailScreen(
     notification: com.ssafy.s309.data.model.NotificationItem? = null,
+    isNewUser: Boolean = false,
     onBack: () -> Unit = {},
     onChatClick: () -> Unit = {},
     onMealReply: (replyText: String, displayLabel: String) -> Unit = { _, _ -> },
@@ -81,12 +82,18 @@ fun KikiAlarmDetailScreen(
             it.startsWith("AGENT_MEAL_FOLLOWUP")
         } == true
     android.util.Log.d("KikiAlarm", "recompose: selectedOption=$selectedOption isPostMeal=$isPostMeal")
+    val emptyStateLines =
+        if (isNewUser && notification == null) {
+            listOf("반가워요. 키키와 함께해요.")
+        } else {
+            listOf("키키가 오늘 컨디션을 보고 있어요.")
+        }
     val speechLines =
         when (selectedOption) {
             "OKAY" -> listOf("좋아요! 지금 바로 움직여봐요.", "조금만 움직여도 혈당 조절에 도움이 돼요.")
             "BUSY" -> listOf("알겠어요!", "회의 끝나고 30분 뒤에 다시 알려드릴게요.")
-            "DECLINE" -> notification?.message?.split("\n") ?: listOf("키키가 오늘 컨디션을 보고 있어요.")
-            else -> notification?.message?.split("\n") ?: listOf("키키가 오늘 컨디션을 보고 있어요.")
+            "DECLINE" -> notification?.message?.split("\n") ?: emptyStateLines
+            else -> notification?.message?.split("\n") ?: emptyStateLines
         }
 
     Column(
