@@ -6,6 +6,8 @@ import com.ssafy.s309.R
 enum class KikiSymptom { THIRST, TIRED, BLUR }
 
 object KikiCharacterMapper {
+    private const val LOW_THRESHOLD = 70
+
     private data class Thresholds(val ok: Int, val mild: Int, val moderate: Int)
 
     private val THRESHOLDS =
@@ -26,6 +28,7 @@ object KikiCharacterMapper {
         val adjusted = applyTrend(glucose, trendRateMgDlPerMin)
         val thresholds = THRESHOLDS[diabetesType] ?: THRESHOLDS.getValue("NONE")
 
+        if (adjusted < LOW_THRESHOLD) return R.drawable.kiki_fell_off
         val severity = classifySeverity(adjusted, thresholds) ?: return R.drawable.kiki_main_anim
         val symptom = classifySymptom(trendRateMgDlPerMin)
         return drawableFor(severity, symptom)

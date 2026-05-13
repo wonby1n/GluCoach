@@ -252,10 +252,6 @@ class MealLogViewModel
                     foodRepository.getFoodGrades()
                         .onSuccess { grades ->
                             _foodGradeMap.value = grades.associate { it.foodId to it.grade }
-                            Log.d("MealLogVM", "등급 ${grades.size}건 로드: ${_foodGradeMap.value}")
-                        }
-                        .onFailure { e ->
-                            Log.w("MealLogVM", "등급 조회 실패", e)
                         }
                 }
         }
@@ -1102,6 +1098,7 @@ private fun MealDetailContent(
                     ) {
                         Text(
                             text = meal.name,
+                            modifier = Modifier.weight(1f, fill = false),
                             color = GlucoachColors.TextPrimary,
                             fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
