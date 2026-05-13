@@ -8,7 +8,15 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     debug: bool = False
 
-    # 음식 인식 (EfficientNet-B0 임베딩 + prototype DB cosine 검색)
+    # 음식 인식 — YOLO (1차) + EfficientNet-B0 임베딩 (fallback)
+    # YOLO
+    yolo_model_path: str = "models/yolo_food/best.pt"
+    # YOLO 클래스명(영문 발음 표기) → 한국어 매핑
+    yolo_class_to_name_path: str = "models/yolo_food/class_to_name.json"
+    # YOLO top-1 confidence 가 이 값 미만이면 EfficientNet 으로 fallback
+    yolo_min_confidence: float = 0.7
+
+    # EfficientNet-B0 (prototype DB cosine 검색)
     food_model_path: str = "models/food/best.pt"
     food_db_path: str = "models/food/prototype_db.pt"
     # AI Hub 코드 → 한글 음식명 매핑. PDF 가이드 표에서 추출 (96% 커버리지).
