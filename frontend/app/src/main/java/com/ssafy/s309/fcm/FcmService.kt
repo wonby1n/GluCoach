@@ -62,9 +62,28 @@ class FcmService : FirebaseMessagingService() {
                 ?: if (title == MEAL_FOLLOWUP_TITLE) ALERT_TYPE_MEAL_FOLLOWUP else null
 
         if (alertType?.startsWith(ALERT_TYPE_MEAL_FOLLOWUP) == true) {
-            showMealFollowupNotification(title, body)
+            pushNotification(
+                title = title,
+                body = body,
+                channelId = CHANNEL_COACHING,
+                channelName = "키키 코칭 알림",
+                channelDescription = "식후 활동 유도 및 선택 응답 알림",
+                actionsBuilder = { notifId ->
+                    listOf(
+                        replyAction("알겠어요", NotificationActionReceiver.REPLY_OKAY, notifId),
+                        replyAction("회의 중", NotificationActionReceiver.REPLY_BUSY, notifId),
+                        replyAction("괜찮아요", NotificationActionReceiver.REPLY_DECLINE, notifId),
+                    )
+                },
+            )
         } else {
-            showNotification(title, body)
+            pushNotification(
+                title = title,
+                body = body,
+                channelId = CHANNEL_COACHING,
+                channelName = "키키 코칭 알림",
+                channelDescription = "혈당 코칭 및 아침 브리핑 알림",
+            )
         }
         ttsManager.playSound(resIdForAlertType(alertType))
 
@@ -77,37 +96,32 @@ class FcmService : FirebaseMessagingService() {
         }
     }
 
-    private fun showMealFollowupNotification(
+    /**
+     * 단일 알림 발행 헬퍼. showNotification / showMealFollowupNotification 의 공통부를 통합.
+     *
+     * - notifId 한 번 발급 → PendingIntent.requestCode 와 manager.notify(id) 양쪽에 같은 값 사용
+     *   (옛 currentTimeMillis().toInt() 두 번 호출로 어긋나던 버그 회피)
+     * - actionsBuilder 는 notifId 를 받아 액션 리스트를 만든다 — meal followup 같은 케이스에서
+     *   EXTRA_NOTIF_ID 로 알림 본체 ID 를 전달해야 하기 때문.
+     */
+    private fun pushNotification(
         title: String,
         body: String,
+        channelId: String,
+        channelName: String,
+        channelDescription: String,
+        importance: Int = NotificationManager.IMPORTANCE_HIGH,
+        priority: Int = NotificationCompat.PRIORITY_HIGH,
+        actionsBuilder: (notifId: Int) -> List<NotificationCompat.Action> = { emptyList() },
     ) {
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_COACHING, "키키 코칭 알림", NotificationManager.IMPORTANCE_HIGH)
-                .apply { description = "식후 활동 유도 및 선택 응답 알림" },
+            NotificationChannel(channelId, channelName, importance)
+                .apply { description = channelDescription },
         )
 
         val notifId = NotificationIds.nextEphemeral()
-
-        fun actionPendingIntent(
-            reply: String,
-            code: Int,
-        ): PendingIntent {
-            val intent =
-                Intent(this, NotificationActionReceiver::class.java).apply {
-                    action = NotificationActionReceiver.ACTION_MEAL_REPLY
-                    putExtra(NotificationActionReceiver.EXTRA_USER_REPLY, reply)
-                    putExtra(NotificationActionReceiver.EXTRA_NOTIF_ID, notifId)
-                }
-            return PendingIntent.getBroadcast(
-                this,
-                code,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
-        }
-
-        val openAppIntent =
+        val openApp =
             PendingIntent.getActivity(
                 this,
                 notifId,
@@ -118,56 +132,40 @@ class FcmService : FirebaseMessagingService() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
 
-        manager.notify(
-            notifId,
-            NotificationCompat.Builder(this, CHANNEL_COACHING)
+        val builder =
+            NotificationCompat.Builder(this, channelId)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                 .setSmallIcon(R.drawable.ic_notification)
                 .setAutoCancel(true)
-                .setContentIntent(openAppIntent)
-                .addAction(0, "알겠어요", actionPendingIntent(NotificationActionReceiver.REPLY_OKAY, NotificationIds.nextRequestCode()))
-                .addAction(0, "회의 중", actionPendingIntent(NotificationActionReceiver.REPLY_BUSY, NotificationIds.nextRequestCode()))
-                .addAction(0, "괜찮아요", actionPendingIntent(NotificationActionReceiver.REPLY_DECLINE, NotificationIds.nextRequestCode()))
-                .build(),
-        )
+                .setContentIntent(openApp)
+                .setPriority(priority)
+        actionsBuilder(notifId).forEach { builder.addAction(it) }
+
+        manager.notify(notifId, builder.build())
     }
 
-    private fun showNotification(
-        title: String,
-        body: String,
-    ) {
-        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_COACHING, "키키 코칭 알림", NotificationManager.IMPORTANCE_HIGH)
-                .apply { description = "혈당 코칭 및 아침 브리핑 알림" },
-        )
-
-        val notifId = NotificationIds.nextEphemeral()
-        val pendingIntent =
-            PendingIntent.getActivity(
+    /** Meal followup 응답 액션 빌더 — notifId 를 broadcast intent extra 로 함께 전달. */
+    private fun replyAction(
+        label: String,
+        reply: String,
+        notifId: Int,
+    ): NotificationCompat.Action {
+        val intent =
+            Intent(this, NotificationActionReceiver::class.java).apply {
+                action = NotificationActionReceiver.ACTION_MEAL_REPLY
+                putExtra(NotificationActionReceiver.EXTRA_USER_REPLY, reply)
+                putExtra(NotificationActionReceiver.EXTRA_NOTIF_ID, notifId)
+            }
+        val pi =
+            PendingIntent.getBroadcast(
                 this,
                 NotificationIds.nextRequestCode(),
-                Intent(this, MainActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    putExtra(MainActivity.EXTRA_NAVIGATE_TO, MainActivity.NAV_KIKI_ALARM_DETAIL)
-                },
+                intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
-
-        manager.notify(
-            notifId,
-            NotificationCompat.Builder(this, CHANNEL_COACHING)
-                .setContentTitle(title)
-                .setContentText(body)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-                .setSmallIcon(R.drawable.ic_notification)
-                .setAutoCancel(true)
-                .setContentIntent(pendingIntent)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .build(),
-        )
+        return NotificationCompat.Action(0, label, pi)
     }
 
     @androidx.annotation.RawRes

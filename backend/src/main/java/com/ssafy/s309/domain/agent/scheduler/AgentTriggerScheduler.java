@@ -23,7 +23,9 @@ public class AgentTriggerScheduler {
   private final AgentPendingTriggerRepository triggerRepository;
   private final AgentTriggerDispatcher dispatcher;
 
-  @Scheduled(fixedDelay = 60_000)
+  // 폴링 주기 — trigger 가 1분 뒤로 예약되는 케이스에서 최악 2분 지연되던 문제 완화.
+  // 15초로 단축해 "알림 느리게 옴" 체감 개선.
+  @Scheduled(fixedDelay = 15_000)
   public void dispatchPendingTriggers() {
     List<AgentPendingTrigger> pending =
         triggerRepository.findPendingTriggers(LocalDateTime.now(KST));
