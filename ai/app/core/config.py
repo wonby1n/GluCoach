@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     # YOLO 클래스명(영문 발음 표기) → 한국어 매핑
     yolo_class_to_name_path: str = "models/yolo_food/class_to_name.json"
     # YOLO top-1 confidence 가 이 값 미만이면 EfficientNet 으로 fallback
-    yolo_min_confidence: float = 0.7
+    yolo_min_confidence: float = 0.9
 
     # EfficientNet-B0 (prototype DB cosine 검색)
     food_model_path: str = "models/food/best.pt"
