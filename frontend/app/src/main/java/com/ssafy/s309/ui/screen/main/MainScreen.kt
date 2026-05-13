@@ -300,6 +300,14 @@ fun MainScreenContent(
                                         trendRateMgDlPerMin = state.trendRateMgDlPerMin,
                                         diabetesType = state.diabetesType,
                                     )
+                                KikiSuggestionCard(
+                                    notifications = state.notifications,
+                                    isNewUser = state.isNewUser,
+                                    onAlarmClick = onKikiAlarmClick,
+                                    onChatClick = onKikiChatClick,
+                                )
+                                Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
                                 CurrentGlucoseCard(
                                     currentMgDl = state.currentGlucoseMgDl ?: 0,
                                     diffFromPrevious = state.diffFromPrevious,
@@ -310,13 +318,6 @@ fun MainScreenContent(
                                             modifier = Modifier.fillMaxSize(),
                                         )
                                     },
-                                )
-                                Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
-
-                                KikiSuggestionCard(
-                                    notifications = state.notifications,
-                                    onAlarmClick = onKikiAlarmClick,
-                                    onChatClick = onKikiChatClick,
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
@@ -556,12 +557,13 @@ private fun TodayConditionHeader(
 @Composable
 private fun KikiSuggestionCard(
     notifications: List<com.ssafy.s309.data.model.NotificationItem>,
+    isNewUser: Boolean,
     onAlarmClick: () -> Unit,
     onChatClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val unread = notifications.filter { it.isUnread }
-    val bannerText = resolveBannerText(unread)
+    val bannerText = resolveBannerText(unread, isNewUser)
     val onClick = if (unread.size >= 2) onChatClick else onAlarmClick
 
     Row(
@@ -624,8 +626,12 @@ private fun KikiSuggestionCard(
     }
 }
 
-private fun resolveBannerText(unread: List<com.ssafy.s309.data.model.NotificationItem>): String =
+private fun resolveBannerText(
+    unread: List<com.ssafy.s309.data.model.NotificationItem>,
+    isNewUser: Boolean,
+): String =
     when {
+        isNewUser -> "반가워요. 키키와 함께해요"
         unread.isEmpty() -> "키키가 오늘 컨디션을 보고 있어요"
         unread.size >= 2 -> "키키가 기다리고 있어요"
         else ->
@@ -830,7 +836,12 @@ private fun InstagramCameraPanel(
                             sessionId++
                             capturedFile = null
                         },
-                        onMealSaved = onMealSaved,
+                        onMealSaved = {
+                            sessionId++
+                            capturedFile = null
+                            onMealSaved()
+                        },
+                        onGoHome = onClose,
                     )
                 }
             }

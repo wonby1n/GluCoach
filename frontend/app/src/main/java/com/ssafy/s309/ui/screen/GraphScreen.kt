@@ -40,7 +40,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
@@ -745,13 +744,6 @@ private fun GlucoseCanvas(
 
         val rangeTop = 140f.coerceIn(yMin, yMax)
         val rangeBottom = 70f.coerceIn(yMin, yMax)
-        if (rangeTop > yMin && rangeBottom < yMax) {
-            drawRect(
-                color = Primary.copy(alpha = 0.07f),
-                topLeft = Offset(leftPad, yOf(rangeTop)),
-                size = Size(chartW, yOf(rangeBottom) - yOf(rangeTop)),
-            )
-        }
 
         val tickCount = 4
         val tickStep = (yMax - yMin) / tickCount

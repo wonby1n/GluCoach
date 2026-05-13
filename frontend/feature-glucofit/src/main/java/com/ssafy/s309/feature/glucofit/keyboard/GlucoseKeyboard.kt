@@ -30,7 +30,6 @@ class GlucoseKeyboard : InputMethodService() {
     private lateinit var inlineBannerText: TextView
     private val bannerManager by lazy { OverlayBannerManager(applicationContext) }
     private val hangul = HangulComposer()
-    private var isKorean = true
 
     /** 배너에 현재 표시 중인 매칭 음식. 배너 클릭 시 앱으로 전달. null이면 매칭 없음. */
     private var currentMatchedFood: com.ssafy.s309.feature.glucofit.data.KeyboardFoodItem? = null
@@ -65,6 +64,13 @@ class GlucoseKeyboard : InputMethodService() {
     private val EN_ROW2 = listOf("a", "s", "d", "f", "g", "h", "j", "k", "l")
     private val EN_ROW3 = listOf("z", "x", "c", "v", "b", "n", "m")
 
+    private val SYM_ROW1 = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
+    private val SYM_ROW2 = listOf("@", "#", "$", "%", "&", "-", "+", "(", ")", "/")
+    private val SYM_ROW3 = listOf("!", "?", ".", ",", ":", ";", "'", "\"")
+
+    private enum class KeyboardMode { KOREAN, ENGLISH, SYMBOLS }
+
+    private var mode = KeyboardMode.KOREAN
     private var isShift = false
 
     override fun onCreateInputView(): View {
@@ -141,7 +147,13 @@ class GlucoseKeyboard : InputMethodService() {
                     currentMatchedFood?.let {
                         putExtra("food_name", it.displayName ?: it.name)
                     }
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    // NEW_TASK: Service에서 Activity 시작에 필수.
+                    // CLEAR_TOP + SINGLE_TOP: 기존 MainActivity 인스턴스를 재사용하면서 onNewIntent로 새 extras 전달,
+                    // 백그라운드에 있던 앱을 foreground로 끌어올림. (Samsung One UI 등 OEM에서 누락되는 케이스 방지)
+                    flags =
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP
                 }
             startActivity(intent)
         }
@@ -177,28 +189,42 @@ class GlucoseKeyboard : InputMethodService() {
     private fun buildLetterRows(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            if (isKorean) {
-                val row1 = if (isShift) KO_ROW1S else KO_ROW1
-                addView(buildRow(row1.map { it to 1f }))
-                addView(buildRow(KO_ROW2.map { it to 1f }, sidePad = dp(18)))
-                addView(
-                    buildRow(
-                        listOf("⇧" to 1.5f) +
-                            KO_ROW3.map { it to 1f } +
-                            listOf("⌫" to 1.5f),
-                    ),
-                )
-            } else {
-                val transform: (String) -> String = if (isShift) String::uppercase else String::lowercase
-                addView(buildRow(EN_ROW1.map { transform(it) to 1f }))
-                addView(buildRow(EN_ROW2.map { transform(it) to 1f }, sidePad = dp(18)))
-                addView(
-                    buildRow(
-                        listOf("⇧" to 1.5f) +
-                            EN_ROW3.map { transform(it) to 1f } +
-                            listOf("⌫" to 1.5f),
-                    ),
-                )
+            when (mode) {
+                KeyboardMode.KOREAN -> {
+                    val row1 = if (isShift) KO_ROW1S else KO_ROW1
+                    addView(buildRow(row1.map { it to 1f }))
+                    addView(buildRow(KO_ROW2.map { it to 1f }, sidePad = dp(18)))
+                    addView(
+                        buildRow(
+                            listOf("⇧" to 1.5f) +
+                                KO_ROW3.map { it to 1f } +
+                                listOf("⌫" to 1.5f),
+                        ),
+                    )
+                }
+                KeyboardMode.ENGLISH -> {
+                    val transform: (String) -> String = if (isShift) String::uppercase else String::lowercase
+                    addView(buildRow(EN_ROW1.map { transform(it) to 1f }))
+                    addView(buildRow(EN_ROW2.map { transform(it) to 1f }, sidePad = dp(18)))
+                    addView(
+                        buildRow(
+                            listOf("⇧" to 1.5f) +
+                                EN_ROW3.map { transform(it) to 1f } +
+                                listOf("⌫" to 1.5f),
+                        ),
+                    )
+                }
+                KeyboardMode.SYMBOLS -> {
+                    addView(buildRow(SYM_ROW1.map { it to 1f }))
+                    addView(buildRow(SYM_ROW2.map { it to 1f }))
+                    addView(
+                        buildRow(
+                            listOf("⇧" to 1.5f) +
+                                SYM_ROW3.map { it to 1f } +
+                                listOf("⌫" to 1.5f),
+                        ),
+                    )
+                }
             }
         }
     }
@@ -211,11 +237,19 @@ class GlucoseKeyboard : InputMethodService() {
                 LinearLayout.LayoutParams(MATCH_PARENT, dp(50)).apply {
                     setMargins(0, 0, 0, dp(5))
                 }
-            addView(buildKey("한/EN", 1.5f, KeyType.SPECIAL).also { btnLang = it as TextView })
+            addView(buildKey(nextModeLabel(), 1.5f, KeyType.SPECIAL).also { btnLang = it as TextView })
             addView(buildKey("SPACE", 5f, KeyType.NORMAL))
             addView(buildKey("확인", 1.5f, KeyType.CONFIRM))
         }
     }
+
+    /** 현재 모드에서 토글 키 라벨 — 다음에 전환될 모드를 표시한다. */
+    private fun nextModeLabel(): String =
+        when (mode) {
+            KeyboardMode.KOREAN -> "EN"
+            KeyboardMode.ENGLISH -> "123"
+            KeyboardMode.SYMBOLS -> "한"
+        }
 
     private fun buildRow(
         keys: List<Pair<String, Float>>,
@@ -292,40 +326,49 @@ class GlucoseKeyboard : InputMethodService() {
             "⇧" -> toggleShift()
             "SPACE" -> handleSpace()
             "확인" -> confirm()
-            "한/EN" -> toggleLang()
+            "한", "EN", "123" -> cycleMode()
             else -> handleChar(label)
         }
     }
 
     private fun handleChar(label: String) {
-        if (isKorean) {
-            val jamo = label.first()
-            val result = hangul.input(jamo)
-            when (result) {
-                is HangulComposer.Result.Compose -> {
-                    if (result.commit.isNotEmpty()) {
-                        currentInputConnection?.commitText(result.commit, 1)
-                        currentText.append(result.commit)
+        when (mode) {
+            KeyboardMode.KOREAN -> {
+                val jamo = label.first()
+                val result = hangul.input(jamo)
+                when (result) {
+                    is HangulComposer.Result.Compose -> {
+                        if (result.commit.isNotEmpty()) {
+                            currentInputConnection?.commitText(result.commit, 1)
+                            currentText.append(result.commit)
+                        }
+                        currentInputConnection?.setComposingText(result.composing, 1)
+                        refreshDisplay(result.composing)
                     }
-                    currentInputConnection?.setComposingText(result.composing, 1)
-                    refreshDisplay(result.composing)
+                    else -> {}
                 }
-                else -> {}
             }
-        } else {
-            val ch = if (isShift) label.uppercase() else label.lowercase()
-            currentInputConnection?.commitText(ch, 1)
-            currentText.append(ch)
-            refreshDisplay()
-            if (isShift) {
-                isShift = false
-                rebuildKeys()
+            KeyboardMode.ENGLISH -> {
+                val ch = if (isShift) label.uppercase() else label.lowercase()
+                currentInputConnection?.commitText(ch, 1)
+                currentText.append(ch)
+                refreshDisplay()
+                if (isShift) {
+                    isShift = false
+                    rebuildKeys()
+                }
+            }
+            KeyboardMode.SYMBOLS -> {
+                // 기호 모드: 한글 composer 거치지 않고 입력 즉시 commit.
+                currentInputConnection?.commitText(label, 1)
+                currentText.append(label)
+                refreshDisplay()
             }
         }
     }
 
     private fun handleBackspace() {
-        if (isKorean) {
+        if (mode == KeyboardMode.KOREAN) {
             val result = hangul.backspace()
             when (result) {
                 is HangulComposer.Result.Backspace -> {
@@ -347,7 +390,7 @@ class GlucoseKeyboard : InputMethodService() {
     }
 
     private fun handleSpace() {
-        if (isKorean && !hangul.isEmpty()) {
+        if (mode == KeyboardMode.KOREAN && !hangul.isEmpty()) {
             val committed = hangul.flush()
             currentInputConnection?.commitText(committed, 1)
             currentText.append(committed)
@@ -359,7 +402,7 @@ class GlucoseKeyboard : InputMethodService() {
 
     private fun confirm() {
         Log.d(TAG, "confirm() called — currentText='$currentText' hangul.isEmpty=${hangul.isEmpty()}")
-        if (isKorean && !hangul.isEmpty()) {
+        if (mode == KeyboardMode.KOREAN && !hangul.isEmpty()) {
             val last = hangul.flush()
             Log.d(TAG, "confirm: flushing hangul='$last'")
             currentInputConnection?.commitText(last, 1)
@@ -375,18 +418,27 @@ class GlucoseKeyboard : InputMethodService() {
     }
 
     private fun toggleShift() {
+        // 기호 모드에선 shift 무시. 보조 기호 레이아웃은 향후 작업.
+        if (mode == KeyboardMode.SYMBOLS) return
         isShift = !isShift
         rebuildKeys()
     }
 
-    private fun toggleLang() {
-        if (isKorean && !hangul.isEmpty()) {
+    /** 한 → EN → 123 → 한 순환. 모드 전환 시 한글 composer flush + shift 초기화. */
+    private fun cycleMode() {
+        if (mode == KeyboardMode.KOREAN && !hangul.isEmpty()) {
             val last = hangul.flush()
             currentInputConnection?.commitText(last, 1)
             currentText.append(last)
         }
-        isKorean = !isKorean
+        mode =
+            when (mode) {
+                KeyboardMode.KOREAN -> KeyboardMode.ENGLISH
+                KeyboardMode.ENGLISH -> KeyboardMode.SYMBOLS
+                KeyboardMode.SYMBOLS -> KeyboardMode.KOREAN
+            }
         hangul.reset()
+        isShift = false
         rebuildKeys()
     }
 

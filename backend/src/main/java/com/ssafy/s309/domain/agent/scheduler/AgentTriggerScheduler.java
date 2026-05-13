@@ -18,7 +18,7 @@ public class AgentTriggerScheduler {
   private final AgentPendingTriggerRepository triggerRepository;
   private final AgentTriggerDispatcher dispatcher;
 
-  @Scheduled(fixedDelay = 60_000)
+  @Scheduled(fixedDelay = 30_000)
   public void dispatchPendingTriggers() {
     List<AgentPendingTrigger> pending = triggerRepository.findPendingTriggers(LocalDateTime.now());
 

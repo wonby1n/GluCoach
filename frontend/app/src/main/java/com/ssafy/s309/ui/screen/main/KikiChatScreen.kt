@@ -334,10 +334,11 @@ class KikiChatViewModel
 
 private fun parseIsoTimestamp(iso: String): Long =
     try {
+        val normalized = iso.replace(' ', 'T')
         try {
-            OffsetDateTime.parse(iso).toInstant().toEpochMilli()
+            OffsetDateTime.parse(normalized).toInstant().toEpochMilli()
         } catch (e: Exception) {
-            LocalDateTime.parse(iso).atZone(ZoneId.of("UTC")).toInstant().toEpochMilli()
+            LocalDateTime.parse(normalized).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         }
     } catch (e: Exception) {
         System.currentTimeMillis()
@@ -678,7 +679,7 @@ private fun KikiChatTopBar(
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "GlucoFit AI 어시스턴트",
+                text = "내 손 안의 작은 비서",
                 color = GlucoachColors.TextSecondary,
                 fontSize = 12.sp,
             )
@@ -779,7 +780,7 @@ private fun KikiChatBubble(
                 }
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = item.timeAgoText,
+                    text = formatTimestamp(parseIsoTimestamp(item.createdAt)),
                     color = GlucoachColors.TextSecondary,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(bottom = 2.dp),

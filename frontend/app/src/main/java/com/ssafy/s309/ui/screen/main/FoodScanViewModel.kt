@@ -74,6 +74,11 @@ class FoodScanViewModel
                 }
                 val response = predictResult.getOrNull()!!
 
+                if (response.status == "LOW_CONFIDENCE") {
+                    _state.value = FoodScanState.Error("음식을 인식하지 못했어요")
+                    return@launch
+                }
+
                 // Stage 2: 후보 영양정보 보강
                 // OK / PENDING_NUTRITION 시 BE 가 foodId/foodName 채움 → top-1 보강.
                 // BE 이상으로 foodId 가 null 이면 detected[] 전체에 대해 search 로 fallback 처리.
@@ -154,9 +159,11 @@ class FoodScanViewModel
             memo: String? = null,
             recordedAt: LocalDateTime = LocalDateTime.now(),
         ) {
-            val current = _state.value as? FoodScanState.Result ?: return
+            val current = _state.value
             viewModelScope.launch {
-                _state.value = current.copy(isSaving = true)
+                if (current is FoodScanState.Result) {
+                    _state.value = current.copy(isSaving = true)
+                }
                 val result =
                     mealRepository.createMeal(
                         foodId = candidate.foodId,
@@ -167,8 +174,10 @@ class FoodScanViewModel
                 _state.value =
                     if (result.isSuccess) {
                         FoodScanState.Saved
-                    } else {
+                    } else if (current is FoodScanState.Result) {
                         current.copy(isSaving = false)
+                    } else {
+                        current
                     }
             }
         }
