@@ -467,6 +467,7 @@ fun AppNavigation(
             SubScreenWithBottomNav(navController = navController, selectedId = "home") {
                 KikiAlarmDetailScreen(
                     notification = notification,
+                    isNewUser = mainUiState.isNewUser,
                     onBack = { navController.popBackStack() },
                     onChatClick = { navController.navigate(Screen.KikiChat.route) },
                     onMealReply = { replyText, displayLabel ->

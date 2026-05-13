@@ -4,6 +4,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.media.AudioAttributes
+import android.net.Uri
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -52,6 +54,12 @@ class FcmService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
+        Log.d(
+            TAG,
+            "FCM 수신: alertType=${message.data["alertType"]}, " +
+                "title=${message.notification?.title ?: message.data["title"]}, " +
+                "data=${message.data}",
+        )
         val title = message.notification?.title ?: message.data["title"] ?: "GluCoach"
         val body = message.notification?.body ?: message.data["body"] ?: return
 
@@ -60,12 +68,14 @@ class FcmService : FirebaseMessagingService() {
             message.data["alertType"]
                 ?: if (title == MEAL_FOLLOWUP_TITLE) ALERT_TYPE_MEAL_FOLLOWUP else null
 
+        // alertType별 전용 채널 (각 채널에 mp3가 사운드로 등록되어 있어 OS가 자동 재생)
+        val channelId = ensureChannelForAlertType(alertType)
+
         if (alertType?.startsWith(ALERT_TYPE_MEAL_FOLLOWUP) == true) {
-            showMealFollowupNotification(title, body)
+            showMealFollowupNotification(title, body, channelId)
         } else {
-            showNotification(title, body)
+            showNotification(title, body, channelId)
         }
-        ttsManager.playSound(resIdForAlertType(alertType))
 
         // 홈 대시보드(KikiSuggestionCard + 뱃지)용 — 모든 알림을 alertStream에 emit
         glucoseAlertManager.emitFcmAlert(title, body, alertType ?: "")
@@ -76,15 +86,60 @@ class FcmService : FirebaseMessagingService() {
         }
     }
 
+    /** alertType에 해당하는 채널을 (없으면) 생성하고 채널 ID를 반환. */
+    private fun ensureChannelForAlertType(alertType: String?): String {
+        val channelId = channelIdForAlertType(alertType)
+        val channelName = channelNameForAlertType(alertType)
+        val soundResId = resIdForAlertType(alertType)
+
+        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        if (manager.getNotificationChannel(channelId) == null) {
+            val soundUri = Uri.parse("android.resource://$packageName/$soundResId")
+            val audioAttrs =
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            val channel =
+                NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_HIGH)
+                    .apply {
+                        description = channelName
+                        setSound(soundUri, audioAttrs)
+                    }
+            manager.createNotificationChannel(channel)
+        }
+        return channelId
+    }
+
+    private fun channelIdForAlertType(alertType: String?): String =
+        when {
+            alertType == null -> CHANNEL_DEFAULT
+            alertType.startsWith("AGENT_WAKE_UP") -> CHANNEL_WAKE_UP
+            alertType.startsWith("AGENT_MEAL_FOLLOWUP") -> CHANNEL_MEAL_FOLLOWUP
+            alertType.startsWith("AGENT_MEAL_REPLY") -> CHANNEL_MEAL_REPLY
+            alertType.startsWith("AGENT_MEAL_RETRY") -> CHANNEL_MEAL_RETRY
+            alertType.startsWith("AGENT_SLEEP_INSIGHT") -> CHANNEL_SLEEP_INSIGHT
+            else -> CHANNEL_DEFAULT
+        }
+
+    private fun channelNameForAlertType(alertType: String?): String =
+        when {
+            alertType == null -> "키키 알림"
+            alertType.startsWith("AGENT_WAKE_UP") -> "아침 브리핑"
+            alertType.startsWith("AGENT_MEAL_FOLLOWUP") -> "식후 활동 제안"
+            alertType.startsWith("AGENT_MEAL_REPLY") -> "키키 답변"
+            alertType.startsWith("AGENT_MEAL_RETRY") -> "식후 재확인"
+            alertType.startsWith("AGENT_SLEEP_INSIGHT") -> "수면 리포트"
+            else -> "키키 알림"
+        }
+
     private fun showMealFollowupNotification(
         title: String,
         body: String,
+        channelId: String,
     ) {
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_COACHING, "키키 코칭 알림", NotificationManager.IMPORTANCE_HIGH)
-                .apply { description = "식후 활동 유도 및 선택 응답 알림" },
-        )
+        // 채널 생성/사운드 등록은 ensureChannelForAlertType에서 처리됨
 
         val notifId = System.currentTimeMillis().toInt()
 
@@ -119,7 +174,7 @@ class FcmService : FirebaseMessagingService() {
 
         manager.notify(
             notifId,
-            NotificationCompat.Builder(this, CHANNEL_COACHING)
+            NotificationCompat.Builder(this, channelId)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
@@ -136,12 +191,10 @@ class FcmService : FirebaseMessagingService() {
     private fun showNotification(
         title: String,
         body: String,
+        channelId: String,
     ) {
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_COACHING, "키키 코칭 알림", NotificationManager.IMPORTANCE_HIGH)
-                .apply { description = "혈당 코칭 및 아침 브리핑 알림" },
-        )
+        // 채널 생성/사운드 등록은 ensureChannelForAlertType에서 처리됨
 
         val pendingIntent =
             PendingIntent.getActivity(
@@ -156,7 +209,7 @@ class FcmService : FirebaseMessagingService() {
 
         manager.notify(
             System.currentTimeMillis().toInt(),
-            NotificationCompat.Builder(this, CHANNEL_COACHING)
+            NotificationCompat.Builder(this, channelId)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
@@ -182,7 +235,16 @@ class FcmService : FirebaseMessagingService() {
 
     companion object {
         private const val TAG = "FcmService"
-        private const val CHANNEL_COACHING = "glucose_coaching"
+
+        // alertType별 전용 채널. 기존 채널(glucose_coaching)은 사운드 변경이 불가능하므로
+        // 새 ID 5종으로 분리해 각각 mp3를 사운드로 등록한다.
+        private const val CHANNEL_DEFAULT = "kiki_default_v2"
+        private const val CHANNEL_WAKE_UP = "kiki_wake_up_v2"
+        private const val CHANNEL_MEAL_FOLLOWUP = "kiki_meal_followup_v2"
+        private const val CHANNEL_MEAL_REPLY = "kiki_meal_reply_v2"
+        private const val CHANNEL_MEAL_RETRY = "kiki_meal_retry_v2"
+        private const val CHANNEL_SLEEP_INSIGHT = "kiki_sleep_insight_v2"
+
         private const val ALERT_TYPE_MEAL_FOLLOWUP = "AGENT_MEAL_FOLLOWUP"
         private const val MEAL_FOLLOWUP_TITLE = "식후 컨디션"
     }
