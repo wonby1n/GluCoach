@@ -70,12 +70,7 @@ object KikiCharacterMapper {
         symptom: KikiSymptom,
     ): Int =
         when (severity) {
-            "mild" ->
-                when (symptom) {
-                    KikiSymptom.THIRST -> R.drawable.kiki_mild_thirst
-                    KikiSymptom.TIRED -> R.drawable.kiki_mild_tired
-                    KikiSymptom.BLUR -> R.drawable.kiki_mild_blur
-                }
+            "mild" -> R.drawable.kiki_dehydrated_high
             "moderate" ->
                 when (symptom) {
                     KikiSymptom.THIRST -> R.drawable.kiki_moderate_thirst
