@@ -117,6 +117,7 @@ data class MealRecord(
     val maxGlucose: Int? = null,
     val glucose1h: Int? = null,
     val glucose2h: Int? = null,
+    val grade: String? = null,
 )
 
 enum class MealType(val label: String) {
@@ -163,6 +164,9 @@ class MealLogViewModel
         private val _maxGlucoseMap = MutableStateFlow<Map<Int, GlucoseDetail>>(emptyMap())
         val maxGlucoseMap: StateFlow<Map<Int, GlucoseDetail>> = _maxGlucoseMap.asStateFlow()
 
+        private val _foodGradeMap = MutableStateFlow<Map<Int, String>>(emptyMap())
+        val foodGradeMap: StateFlow<Map<Int, String>> = _foodGradeMap.asStateFlow()
+
         private var loadedMonth: Pair<Int, Int>? = null
 
         fun invalidateMonthCache() {
@@ -171,6 +175,11 @@ class MealLogViewModel
 
         private var loadMealsJob: Job? = null
         private var monthScanJob: Job? = null
+        private var foodGradeJob: Job? = null
+
+        init {
+            loadFoodGrades()
+        }
 
         fun loadMeals(date: String) {
             loadMealsJob?.cancel()
@@ -198,6 +207,7 @@ class MealLogViewModel
                             meals.forEach { meal ->
                                 launch { lookupMaxGlucose(meal.mealId, meal.recordedAt) }
                             }
+                            loadFoodGrades()
                         }
                         .onFailure {
                             Log.w("MealLogVM", "식사 조회 실패", it)
@@ -233,6 +243,21 @@ class MealLogViewModel
             }.onFailure {
                 Log.w("MealLogVM", "혈당 조회 실패 mealId=$mealId", it)
             }
+        }
+
+        private fun loadFoodGrades() {
+            foodGradeJob?.cancel()
+            foodGradeJob =
+                viewModelScope.launch {
+                    foodRepository.getFoodGrades()
+                        .onSuccess { grades ->
+                            _foodGradeMap.value = grades.associate { it.foodId to it.grade }
+                            Log.d("MealLogVM", "등급 ${grades.size}건 로드: ${_foodGradeMap.value}")
+                        }
+                        .onFailure { e ->
+                            Log.w("MealLogVM", "등급 조회 실패", e)
+                        }
+                }
         }
 
         fun clearError() {
@@ -435,9 +460,10 @@ private fun MealLogCalendarContent(
     }
 
     val glucoseMap by mealLogViewModel.maxGlucoseMap.collectAsState()
+    val foodGradeMap by mealLogViewModel.foodGradeMap.collectAsState()
 
     val selectedDateMeals =
-        remember(beMeals, selectedYear, selectedMonth, selectedDay, nutritionMap, glucoseMap) {
+        remember(beMeals, selectedYear, selectedMonth, selectedDay, nutritionMap, glucoseMap, foodGradeMap) {
             beMeals.map { m ->
                 val food = m.foodId?.let { nutritionMap[it] }
                 MealRecord(
@@ -457,6 +483,7 @@ private fun MealLogCalendarContent(
                     maxGlucose = glucoseMap[m.mealId]?.max,
                     glucose1h = glucoseMap[m.mealId]?.at1h,
                     glucose2h = glucoseMap[m.mealId]?.at2h,
+                    grade = m.foodId?.let { foodGradeMap[it] },
                 )
             }
         }
@@ -1069,12 +1096,18 @@ private fun MealDetailContent(
                         fontSize = 13.sp,
                     )
                     Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = meal.name,
-                        color = GlucoachColors.TextPrimary,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = meal.name,
+                            color = GlucoachColors.TextPrimary,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        FoodGradeBadge(grade = meal.grade)
+                    }
                 }
                 IconButton(onClick = onBack, modifier = Modifier.size(32.dp)) {
                     Icon(
@@ -1464,6 +1497,37 @@ private fun formatMealDateTimeLabel(meal: MealRecord): String =
     } catch (_: Exception) {
         "${meal.year}년 ${meal.month}월 ${meal.day}일 ${mealTypeDisplayName(meal.mealType)}"
     }
+
+@Composable
+private fun FoodGradeBadge(grade: String?) {
+    val isPending = grade == null
+    val bgColor = if (isPending) Color(0xFFA9A9A9) else gradeColor(grade)
+    val textColor =
+        if (isPending) {
+            Color.White
+        } else {
+            when (grade) {
+                "B", "C" -> GlucoachColors.TextPrimary
+                else -> Color.White
+            }
+        }
+
+    Box(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(bgColor)
+                .padding(horizontal = 8.dp, vertical = 2.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = if (isPending) "측정 중" else grade!!.uppercase(),
+            color = textColor,
+            fontSize = if (isPending) 11.sp else 13.sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
 
 private fun guessMealType(isoDateTime: String): MealType =
     try {
