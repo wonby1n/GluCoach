@@ -88,6 +88,7 @@ import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import java.io.File
 
 // ── 상태 ──────────────────────────────────────────────
@@ -117,10 +118,8 @@ fun FoodScanContent(
     LaunchedEffect(Unit) {
         viewModel.reset()
         viewModel.analyze(photoFile)
-    }
-
-    LaunchedEffect(scanState) {
-        if (scanState is FoodScanState.Saved) onMealSaved()
+        viewModel.state.first { it is FoodScanState.Saved }
+        onMealSaved()
     }
 
     when (val s = scanState) {
