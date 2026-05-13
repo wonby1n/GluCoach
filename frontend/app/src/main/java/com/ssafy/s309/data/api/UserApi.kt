@@ -9,6 +9,7 @@ import com.ssafy.s309.data.model.UserSettingsUpdateRequest
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.HTTP
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
@@ -17,6 +18,12 @@ import retrofit2.http.Query
 interface UserApi {
     @PUT("api/user/fcm-token")
     suspend fun registerFcmToken(
+        @Body request: FcmTokenRequest,
+    )
+
+    /** 로그아웃 시 이 기기의 FCM 토큰만 백엔드에서 is_active=false 로 전환. */
+    @HTTP(method = "DELETE", path = "api/user/fcm-token", hasBody = true)
+    suspend fun deactivateFcmToken(
         @Body request: FcmTokenRequest,
     )
 

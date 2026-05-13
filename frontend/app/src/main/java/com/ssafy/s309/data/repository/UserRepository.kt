@@ -18,6 +18,8 @@ class UserRepository
     ) {
         suspend fun registerFcmToken(token: String): Result<Unit> = runCatching { userApi.registerFcmToken(FcmTokenRequest(token)) }
 
+        suspend fun deactivateFcmToken(token: String): Result<Unit> = runCatching { userApi.deactivateFcmToken(FcmTokenRequest(token)) }
+
         suspend fun getSettings(): Result<UserSettings> = runCatching { userApi.getSettings() }
 
         suspend fun updateSettings(request: UserSettingsUpdateRequest): Result<UserSettings> =

@@ -32,6 +32,17 @@ public class NotificationTokenService {
                         .build()));
   }
 
+  /**
+   * 로그아웃 시점에 호출 — 이 기기의 토큰만 비활성화한다.
+   *
+   * <p>같은 사용자의 다른 기기 토큰은 건드리지 않고, 사용자가 모르는 사이 다른 기기로 다른 사용자가 로그인했을 때 이전 사용자의 알림이 새 사용자에게 가는 사고를
+   * 막는다.
+   */
+  @Transactional
+  public void deactivateToken(User user, String token) {
+    tokenRepository.findByUserAndToken(user, token).ifPresent(NotificationToken::deactivate);
+  }
+
   public void sendAlert(User user, String title, String body) {
     List<String> tokens =
         tokenRepository.findByUserAndIsActiveTrue(user).stream()

@@ -19,7 +19,9 @@ public class AiAgentCommandClient {
 
   private final RestClient aiRestClient;
 
-  @Async
+  // 명시적 executor 지정 — bare @Async 는 SimpleAsyncTaskExecutor 로 폴백해 무제한 스레드를 만든다.
+  // asyncExecutor: core=4, max=16, queue=50 (AsyncConfig)
+  @Async("asyncExecutor")
   public void dispatchAsync(
       Integer userId, Long chatMessageId, String commandType, Map<String, Object> payload) {
     Map<String, Object> body = new HashMap<>();

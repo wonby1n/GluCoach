@@ -14,6 +14,7 @@ import com.ssafy.s309.data.local.TokenManager
 import com.ssafy.s309.data.repository.HealthRepository
 import com.ssafy.s309.data.repository.UserRepository
 import com.ssafy.s309.notification.GlucoseAlertManager
+import com.ssafy.s309.notification.NotificationIds
 import com.ssafy.s309.notification.TtsManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -86,7 +87,7 @@ class FcmService : FirebaseMessagingService() {
                 .apply { description = "식후 활동 유도 및 선택 응답 알림" },
         )
 
-        val notifId = System.currentTimeMillis().toInt()
+        val notifId = NotificationIds.nextEphemeral()
 
         fun actionPendingIntent(
             reply: String,
@@ -126,9 +127,9 @@ class FcmService : FirebaseMessagingService() {
                 .setSmallIcon(R.drawable.ic_notification)
                 .setAutoCancel(true)
                 .setContentIntent(openAppIntent)
-                .addAction(0, "알겠어요", actionPendingIntent(NotificationActionReceiver.REPLY_OKAY, notifId + 1))
-                .addAction(0, "회의 중", actionPendingIntent(NotificationActionReceiver.REPLY_BUSY, notifId + 2))
-                .addAction(0, "괜찮아요", actionPendingIntent(NotificationActionReceiver.REPLY_DECLINE, notifId + 3))
+                .addAction(0, "알겠어요", actionPendingIntent(NotificationActionReceiver.REPLY_OKAY, NotificationIds.nextRequestCode()))
+                .addAction(0, "회의 중", actionPendingIntent(NotificationActionReceiver.REPLY_BUSY, NotificationIds.nextRequestCode()))
+                .addAction(0, "괜찮아요", actionPendingIntent(NotificationActionReceiver.REPLY_DECLINE, NotificationIds.nextRequestCode()))
                 .build(),
         )
     }
@@ -143,10 +144,11 @@ class FcmService : FirebaseMessagingService() {
                 .apply { description = "혈당 코칭 및 아침 브리핑 알림" },
         )
 
+        val notifId = NotificationIds.nextEphemeral()
         val pendingIntent =
             PendingIntent.getActivity(
                 this,
-                System.currentTimeMillis().toInt(),
+                NotificationIds.nextRequestCode(),
                 Intent(this, MainActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                     putExtra(MainActivity.EXTRA_NAVIGATE_TO, MainActivity.NAV_KIKI_ALARM_DETAIL)
@@ -155,7 +157,7 @@ class FcmService : FirebaseMessagingService() {
             )
 
         manager.notify(
-            System.currentTimeMillis().toInt(),
+            notifId,
             NotificationCompat.Builder(this, CHANNEL_COACHING)
                 .setContentTitle(title)
                 .setContentText(body)

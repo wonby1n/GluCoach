@@ -15,4 +15,7 @@ public interface NotificationTokenRepository extends JpaRepository<NotificationT
   List<NotificationToken> findByUser_IdAndIsActiveTrue(Integer userId);
 
   Optional<NotificationToken> findByUserAndDeviceType(User user, DeviceType deviceType);
+
+  /** 로그아웃 시 이 기기의 토큰만 deactivate 하기 위한 lookup. */
+  Optional<NotificationToken> findByUserAndToken(User user, String token);
 }

@@ -79,6 +79,13 @@ class AuthRepository
                 val refreshToken =
                     tokenManager.getRefreshToken()
                         ?: error("리프레시 토큰이 없습니다")
+                // 이 기기의 FCM 토큰을 백엔드에서 deactivate — 같은 기기에 다른 사용자가
+                // 로그인했을 때 이전 사용자의 알림이 새 사용자에게 가는 사고를 막는다.
+                // 실패해도 로그아웃 자체는 진행해야 하므로 결과 무시.
+                tokenManager.getFcmToken()?.let { fcm ->
+                    runCatching { userApi.deactivateFcmToken(FcmTokenRequest(fcm)) }
+                        .onFailure { Log.w("AuthRepo", "FCM 토큰 deactivate 실패 (무시)", it) }
+                }
                 authApi.logout(ReissueRequest(refreshToken))
                 tokenManager.clearTokens()
             }
