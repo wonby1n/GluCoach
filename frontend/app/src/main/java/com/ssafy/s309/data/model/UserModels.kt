@@ -13,8 +13,8 @@ data class UserSettings(
     val weight: Float? = null,
     val diabetesType: String? = null,
     val isMedicated: Boolean? = null,
-    val targetLow: Int? = null,
-    val targetHigh: Int? = null,
+    val targetLow: Double? = null,
+    val targetHigh: Double? = null,
     val weekStartDay: Int? = null,
     // 백엔드 SettingsResponse에 없는 클라이언트 전용 필드 (null로 수신됨)
     val alertLow: Int? = null,
@@ -32,8 +32,8 @@ data class UserSettingsUpdateRequest(
     val weight: Float? = null,
     val diabetesType: String? = null,
     val isMedicated: Boolean? = null,
-    val targetLow: Int? = null,
-    val targetHigh: Int? = null,
+    val targetLow: Double? = null,
+    val targetHigh: Double? = null,
     // 백엔드 SettingsUpdateRequest에 없는 필드 (서버가 무시함)
     val alertLow: Int? = null,
     val alertHigh: Int? = null,
