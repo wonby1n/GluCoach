@@ -110,6 +110,7 @@ fun FoodScanContent(
 ) {
     val scanState by viewModel.state.collectAsStateWithLifecycle()
     val manualSearchResults by viewModel.manualSearchResults.collectAsStateWithLifecycle()
+    val manualPrediction by viewModel.manualPrediction.collectAsStateWithLifecycle()
     var selectedIndex by remember { mutableIntStateOf(-1) }
     var showSimulation by remember { mutableStateOf(false) }
     var showManualSearch by remember { mutableStateOf(false) }
@@ -141,6 +142,7 @@ fun FoodScanContent(
                 BackHandler {
                     showSimulation = false
                     selectedManualCandidate = null
+                    viewModel.clearManualPrediction()
                 }
                 SimulationScreen(
                     food = simulationCandidate,
@@ -152,10 +154,11 @@ fun FoodScanContent(
                     onBack = {
                         showSimulation = false
                         selectedManualCandidate = null
+                        viewModel.clearManualPrediction()
                     },
                     onRetakePhoto = onRetakePhoto,
                     onRecordMeal = { viewModel.saveMeal(simulationCandidate, photoFile, memo, selectedDateTime) },
-                    prediction = s.prediction,
+                    prediction = if (selectedManualCandidate != null) manualPrediction else s.prediction,
                 )
             } else if (showManualSearch) {
                 BackHandler {
@@ -177,6 +180,7 @@ fun FoodScanContent(
                                 fatG = item.fatG,
                                 confidence = 1.0f,
                             )
+                        viewModel.fetchManualPrediction(item)
                         showManualSearch = false
                         showSimulation = true
                         viewModel.clearManualSearch()
@@ -197,6 +201,7 @@ fun FoodScanContent(
                     onBack = onBack,
                     onManualSearch = {
                         selectedManualCandidate = null
+                        viewModel.clearManualPrediction()
                         showManualSearch = true
                     },
                 )
@@ -224,6 +229,7 @@ fun FoodScanContent(
                                 fatG = item.fatG,
                                 confidence = 1.0f,
                             )
+                        viewModel.fetchManualPrediction(item)
                         showManualSearch = false
                         viewModel.clearManualSearch()
                         showSimulation = true
@@ -239,6 +245,7 @@ fun FoodScanContent(
                 BackHandler {
                     showSimulation = false
                     selectedManualCandidate = null
+                    viewModel.clearManualPrediction()
                 }
                 SimulationScreen(
                     food = selectedManualCandidate!!,
@@ -250,13 +257,15 @@ fun FoodScanContent(
                     onBack = {
                         showSimulation = false
                         selectedManualCandidate = null
+                        viewModel.clearManualPrediction()
                     },
                     onRetakePhoto = {
                         viewModel.resetError()
+                        viewModel.clearManualPrediction()
                         onRetakePhoto()
                     },
                     onRecordMeal = { viewModel.saveMeal(selectedManualCandidate!!, photoFile, memo, selectedDateTime) },
-                    prediction = null,
+                    prediction = manualPrediction,
                 )
             } else {
                 BackHandler { onGoHome() }
@@ -269,6 +278,7 @@ fun FoodScanContent(
                     onBack = onGoHome,
                     onManualSearch = {
                         selectedManualCandidate = null
+                        viewModel.clearManualPrediction()
                         showManualSearch = true
                     },
                 )
@@ -848,7 +858,7 @@ private fun AnalyzingResultScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "음식을 인식하지 못했습니다\n직접 입력해 주세요",
+                        text = "음식을 인식하지 못했습니다\n음식명을 직접 입력해 주세요",
                         color = GlucoachColors.TextSecondary,
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center,
@@ -947,7 +957,7 @@ private fun AnalyzingResultScreen(
                 border = androidx.compose.foundation.BorderStroke(1.dp, GlucoachColors.Border),
             ) {
                 Text(
-                    text = "직접 입력할래요",
+                    text = "음식명 직접 입력하기",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -1269,7 +1279,7 @@ private fun ErrorScreen(
                 ButtonDefaults.outlinedButtonColors(contentColor = GlucoachColors.TextPrimary),
             border = androidx.compose.foundation.BorderStroke(1.dp, GlucoachColors.Border),
         ) {
-            Text(text = "직접 입력할래요", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(text = "음식명 직접 입력하기", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.md))

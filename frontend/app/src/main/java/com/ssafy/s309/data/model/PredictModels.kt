@@ -30,6 +30,19 @@ data class FoodDetection(
 )
 
 @Serializable
+data class PredictRequest(
+    val foodId: Int?,
+    val foodName: String,
+    val carbsG: Double,
+    val proteinG: Double,
+    val fatG: Double,
+    val fiberG: Double? = null,
+    val kcal: Double,
+    val sugarG: Double? = null,
+    val giScore: Int? = null,
+)
+
+@Serializable
 data class GlucoseCompareRequest(
     val foodA: FoodCompareItem,
     val foodB: FoodCompareItem,
