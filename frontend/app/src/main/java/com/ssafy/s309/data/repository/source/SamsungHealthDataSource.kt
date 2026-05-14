@@ -36,7 +36,7 @@ class SamsungHealthDataSource
         override suspend fun getTodaySummary(): DailyHealthSummary? {
             val mgr = holder.manager ?: return null
             return try {
-                val steps = mgr.getTodaySteps()
+                val steps = mgr.getTodaySteps().toInt()
                 val sleep = mgr.getLastSleepDurationMinutes()
                 if (steps == 0 && sleep == 0) {
                     null

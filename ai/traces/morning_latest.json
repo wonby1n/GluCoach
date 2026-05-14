@@ -21,7 +21,7 @@
       {
         "type": "meal",
         "title": "식사 기록",
-        "description": "전날 마지막 식사는 비빔밥 + 콜라였어요. 탄수화물은 95g으로 기록됐어요.",
+        "description": "전날 마지막 식사는 식사 기록였어요.",
         "severity": "info"
       }
     ],
