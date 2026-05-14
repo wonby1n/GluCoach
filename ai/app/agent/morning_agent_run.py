@@ -161,7 +161,12 @@ def run_agent(user_id: int = None):
 # ── 실행 ──────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    result = run_agent(user_id=5)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--user-id", type=int, default=5, help="로그인한 사용자의 user_id")
+    args = parser.parse_args()
+
+    result = run_agent(user_id=args.user_id)
     print(f"\n[최종 결과] message={result['message']}")
     filepath = save_trace(result, agent_type="morning")
     print(f"[trace 저장] {filepath}")
