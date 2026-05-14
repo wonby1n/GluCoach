@@ -33,13 +33,26 @@
 
 ## 1. 서버 환경
 
-| 항목      | 내용                                             |
-| --------- | ------------------------------------------------ |
-| 서버      | SSAFY 지급 AWS EC2 (Ubuntu 22.04 LTS)            |
-| 도메인    | `k14s309.p.ssafy.io`                             |
-| Jenkins   | `http://k14s309.p.ssafy.io:9090`                 |
-| 허용 포트 | 22 (SSH), 80 (HTTP), 443 (HTTPS), 9090 (Jenkins) |
-| GitLab    | `https://lab.ssafy.com/s14-final/S14P31S309`     |
+| 항목      | 내용                                         |
+| --------- | -------------------------------------------- |
+| 서버      | SSAFY 지급 AWS EC2 (Ubuntu 24.04 LTS)        |
+| 도메인    | `k14s309.p.ssafy.io`                         |
+| Jenkins   | `http://k14s309.p.ssafy.io:9090`             |
+| GitLab    | `https://lab.ssafy.com/s14-final/S14P31S309` |
+
+### 외부 노출 포트 (ufw + Docker)
+
+| 포트  | 용도                       | 노출 방식           |
+| ----- | -------------------------- | ------------------- |
+| 22    | SSH                        | ufw                 |
+| 80    | HTTP (→ 443 리다이렉트)    | ufw + Docker        |
+| 443   | HTTPS (nginx 종단)         | ufw + Docker        |
+| 9090  | Jenkins 웹 UI              | ufw + Docker        |
+| 50000 | Jenkins 에이전트 연결 포트 | Docker (기본 설정)  |
+| 5678  | n8n (`/n8n/` 외 직접 접근) | ufw + Docker        |
+| 8989  | Apache HTTP Server         | SSAFY EC2 기본 이미지 (GluCoach 외 서비스) |
+
+> PostgreSQL(5432), Redis(6379)는 `127.0.0.1`에만 바인딩되어 외부 노출되지 않으며 SSH 터널로만 접근 가능합니다.
 
 ---
 
@@ -89,12 +102,12 @@
 
 ### Infra
 
-| 항목    | 버전                                        |
-| ------- | ------------------------------------------- |
-| OS      | Ubuntu 22.04 LTS                            |
-| Docker  | 24.x 이상 (Docker Compose v2 플러그인 포함) |
-| Jenkins | jenkins/jenkins:lts                         |
-| Nginx   | nginx:alpine (Let's Encrypt SSL)            |
+| 항목    | 버전                                                  |
+| ------- | ----------------------------------------------------- |
+| OS      | Ubuntu 24.04 LTS                                      |
+| Docker  | 24.x 이상 (운영 환경: 29.x, Compose 플러그인 v2 이상) |
+| Jenkins | jenkins/jenkins:lts                                   |
+| Nginx   | nginx:alpine (Let's Encrypt SSL)                      |
 
 ---
 
@@ -150,6 +163,18 @@
 
 > PostgreSQL, Redis는 외부에 노출되지 않으며 SSH 터널을 통해서만 접근 가능.
 
+### Docker 볼륨
+
+| 볼륨 이름           | 실제 이름 (`docker volume ls`) | 용도                            |
+| ------------------- | ------------------------------ | ------------------------------- |
+| `postgres-data`     | `infra_postgres-data`          | PostgreSQL 데이터               |
+| `redis-data`        | `infra_redis-data`             | Redis 데이터                    |
+| `n8n-data`          | `infra_n8n-data`               | n8n 워크플로우 데이터           |
+| `ai-models`         | `s309-ai-models`               | AI 컨테이너의 ML 모델 가중치 캐시 |
+| `jenkins_home`      | `jenkins_home`                 | Jenkins 홈 디렉토리             |
+
+> `infra_` 접두사는 docker-compose 프로젝트 이름(`infra/` 디렉토리)에서 자동으로 붙음. `ai-models`는 `docker-compose.infra.yml`에서 `name: s309-ai-models`로 명시되어 접두사가 붙지 않음. 백업/복구 시 위 "실제 이름"을 사용해야 합니다.
+
 **Jenkins는 compose에 포함되지 않음** — 배포 중 자기 자신을 down시키는 문제로 별도 컨테이너로 운영.
 
 ```bash
@@ -176,7 +201,7 @@ docker ps --format "table {{.Names}}\t{{.Status}}"
 ### PostgreSQL
 
 - **버전**: 17 (Docker)
-- **데이터 영속화**: Docker Volume `postgres-data`
+- **데이터 영속화**: Docker Volume `postgres-data` (실제 이름: `infra_postgres-data`)
 - **스키마 관리**: Flyway 마이그레이션 (`backend/src/main/resources/db/migration/`)
     - `V1__init_schema.sql` — 초기 스키마
     - `V2__add_guardian_priority.sql` — 보호자 우선순위 추가
@@ -185,7 +210,7 @@ docker ps --format "table {{.Names}}\t{{.Status}}"
 ### Redis
 
 - **버전**: 7 (Docker)
-- **데이터 영속화**: Docker Volume `redis-data`
+- **데이터 영속화**: Docker Volume `redis-data` (실제 이름: `infra_redis-data`)
 - **인증**: 비밀번호 필수 (`REDIS_PASSWORD`)
 - **용도**: 세션 저장, API 캐시
 
@@ -368,8 +393,9 @@ upstream.conf (현재 활성이 blue인 경우):
 | 가입 URL        | `https://console.firebase.google.com`                                           |
 | 발급 절차       | 프로젝트 생성 → 프로젝트 설정 → 서비스 계정 → 새 비공개 키 생성 (JSON 다운로드) |
 | 사용처          | 백엔드 (보호자 푸시 알림 전송)                                                  |
-| 키 위치         | Jenkins Credentials `firebase-key`로 등록, 컨테이너에 파일 마운트               |
+| 키 위치         | Jenkins Credentials `firebase-key` (Secret File). 배포 시 `Jenkinsfile`이 EC2의 `~/firebase-service-account.json`에 scp → `backend/src/main/resources/firebase-service-account.json`으로 복사 → `bootJar` 빌드 시 JAR 내부에 포함 (마운트 아님) |
 | 안드로이드 연동 | `frontend/app/google-services.json` 별도 필요                                   |
+| 키 회전 시      | Jenkins Credential 갱신 후 release 브랜치에 빈 커밋 push → 재빌드 필요          |
 
 ### 9.5 식품안전처 공공 데이터 API
 
@@ -469,6 +495,28 @@ sudo cp /etc/letsencrypt/live/k14s309.p.ssafy.io/privkey.pem /home/ubuntu/ssl/
 sudo chmod 644 /home/ubuntu/ssl/*.pem
 ```
 
+### SSL 자동 갱신 hook 설정 (중요)
+
+nginx는 `/home/ubuntu/ssl/`을 마운트하지만, certbot은 `/etc/letsencrypt/live/`에 갱신본을 둡니다. 갱신본을 nginx가 인식하려면 deploy hook으로 마운트 경로에 복사하고 nginx를 reload해야 합니다.
+
+```bash
+sudo tee /etc/letsencrypt/renewal-hooks/deploy/copy-to-nginx.sh > /dev/null <<'EOF'
+#!/bin/bash
+set -e
+cp /etc/letsencrypt/live/k14s309.p.ssafy.io/fullchain.pem /home/ubuntu/ssl/
+cp /etc/letsencrypt/live/k14s309.p.ssafy.io/privkey.pem  /home/ubuntu/ssl/
+chmod 644 /home/ubuntu/ssl/fullchain.pem
+chmod 600 /home/ubuntu/ssl/privkey.pem
+docker exec s309-nginx nginx -s reload
+EOF
+sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/copy-to-nginx.sh
+
+# 검증: dry-run 실행 시 hook도 함께 실행됨
+sudo certbot renew --dry-run
+```
+
+> 이 hook이 없으면 인증서는 자동 갱신되지만 nginx는 옛 인증서를 계속 사용하게 됩니다 (실서비스에서 HTTPS 만료 → 접속 불가).
+
 ### 컨테이너 초기 기동 (Blue-Green)
 
 ```bash
@@ -498,11 +546,14 @@ docker ps --format "table {{.Names}}\t{{.Status}}"
 ```bash
 docker run -d \
   -p 9090:8080 \
+  -p 127.0.0.1:50000:50000 \
   -v jenkins_home:/var/jenkins_home \
   --name jenkins \
   --restart unless-stopped \
   jenkins/jenkins:lts
 ```
+
+> 50000은 Jenkins 에이전트 연결 포트입니다. 본 프로젝트는 빌트인 에이전트(master)만 사용하므로 외부 노출이 불필요해 `127.0.0.1`에만 바인딩합니다. 외부 에이전트를 붙일 경우에만 `0.0.0.0:50000:50000`으로 변경하세요.
 
 ### Jenkins 초기 설정 (웹 UI)
 

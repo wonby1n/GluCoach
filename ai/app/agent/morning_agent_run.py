@@ -10,6 +10,7 @@ agentic loop 구현.
     python -m app.agent.morning_agent_run
 """
 
+import argparse
 import json
 import sys
 import os
@@ -161,7 +162,11 @@ def run_agent(user_id: int = None):
 # ── 실행 ──────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    result = run_agent(user_id=5)
+    parser = argparse.ArgumentParser(description="Glucoach 아침 혈당 브리핑 에이전트")
+    parser.add_argument("--user-id", type=int, default=5, help="대상 사용자 ID")
+    args = parser.parse_args()
+
+    result = run_agent(user_id=args.user_id)
     print(f"\n[최종 결과] message={result['message']}")
     filepath = save_trace(result, agent_type="morning")
     print(f"[trace 저장] {filepath}")

@@ -5,7 +5,14 @@ Agent 시스템 프롬프트 모음
 - build_postmeal_prompt(): 식후 활동 유도 agent (시나리오 B) ← Phase 4에서 추가
 """
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from app.agent.mock_data import USER_INFO, GLUCOSE_THRESHOLD, DEMO_DATE
+
+
+def _now_kst_str() -> str:
+    return datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M KST")
 
 
 _NOTIFICATION_PAYLOAD_RULES = """[선택지 생성 규칙 — send_notification options]
@@ -32,6 +39,10 @@ def build_morning_prompt() -> str:
     """오늘의 혈당 전략 agent 시스템 프롬프트를 생성한다."""
     t = GLUCOSE_THRESHOLD
     return f"""당신은 당뇨 환자의 혈당 관리를 돕는 AI 코치입니다.
+
+[현재 시각]
+{_now_kst_str()}
+- 시각/시간대 판단은 반드시 이 값을 기준으로 한다. 도구가 반환한 데이터의 timestamp가 이 값보다 미래이면 잘못된 레코드로 간주하고 무시한다.
 
 [사용자 정보]
 - 이름: {USER_INFO["name"]}
@@ -197,6 +208,11 @@ def build_postmeal_prompt(trigger: dict) -> str:
 """
 
     return f"""당신은 당뇨 환자의 혈당 관리를 돕는 AI 코치입니다.
+
+[현재 시각]
+{_now_kst_str()}
+- 시각/시간대 판단은 반드시 이 값을 기준으로 한다. 도구가 반환한 데이터의 timestamp가 이 값보다 미래이거나 24시간 이전이면 분석 대상에서 제외한다.
+- 식사 기록 중 [현재 시각] 직전 1~3시간 이내에 발생한 것을 "방금 식사"로 본다.
 
 [사용자 정보]
 - 이름: {USER_INFO["name"]}
