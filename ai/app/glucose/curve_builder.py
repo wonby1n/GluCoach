@@ -51,33 +51,3 @@ def build_curve(
     # 혈당은 20 mg/dL 이하로 떨어지지 않도록 클리핑
     curve = np.clip(curve, 20.0, 600.0)
     return [round(float(v), 2) for v in curve]
-
-
-def scalars_to_response(
-    peak_delta: float,
-    time_to_peak: float,
-    decay_rate: float,
-    baseline_glucose: float,
-) -> dict:
-    """
-    build_curve 결과에서 peak/iAUC 메타도 함께 반환.
-
-    Returns:
-        {curve, peak_mgdl, peak_minute, iauc_2h}
-    """
-    curve = build_curve(peak_delta, time_to_peak, decay_rate, baseline_glucose)
-    arr = np.array(curve)
-    peak_idx = int(np.argmax(arr))
-
-    delta_arr = np.clip(arr - baseline_glucose, 0.0, None)
-    iauc = float(np.trapezoid(delta_arr) * 5)
-
-    return {
-        "curve": [
-            {"t_min": t, "glucose": v}
-            for t, v in zip(LABEL_STEPS, curve)
-        ],
-        "peak_mgdl": round(float(arr[peak_idx]), 2),
-        "peak_minute": LABEL_STEPS[peak_idx],
-        "iauc_2h": round(iauc, 1),
-    }

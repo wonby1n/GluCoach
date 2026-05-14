@@ -58,7 +58,7 @@ async def predict_now(req: NowPredictRequest) -> PredictResponse:
 @router.post("/personalize", response_model=PersonalizeResponse)
 async def personalize_user(req: PersonalizeRequest) -> PersonalizeResponse:
     """환자별 fine-tune. base 보다 개선 없으면 자동 폐기 (rejected)."""
-    base_path = Path(config.MODELS_DIR) / "lstm_meal.pt"
+    base_path = Path(config.MODELS_DIR) / "lstm_meal_t2dm_coef15.pt"
     if not base_path.exists():
         raise HTTPException(
             status_code=503,

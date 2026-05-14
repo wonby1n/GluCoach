@@ -131,6 +131,10 @@ class MealHistoryItem(BaseModel):
     """환자 본인의 식사 + 식후 24개 실측 BG 페어 (fine-tune 학습 데이터)."""
 
     carbs: float = Field(ge=0, le=300)
+    protein_g: float = Field(default=0.0, ge=0, le=300, description="단백질 g")
+    fat_g: float = Field(default=0.0, ge=0, le=300, description="지방 g")
+    fiber_g: float = Field(default=0.0, ge=0, le=100, description="식이섬유 g")
+    kcal: float | None = Field(default=None, ge=0, le=5000, description="열량 kcal. 없으면 매크로로 계산.")
     meal_time_iso: str
     current_glucose: float = Field(ge=20, le=600)
     bg_curve: list[float] = Field(
