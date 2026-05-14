@@ -1169,21 +1169,52 @@ private fun MealDetailContent(
                 }
             }
 
-            androidx.compose.material3.Button(
-                onClick = onNavigateToFoodReport,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp)
-                        .height(48.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors =
-                    androidx.compose.material3.ButtonDefaults.buttonColors(
-                        containerColor = GlucoachColors.Primary,
-                        contentColor = Color.White,
-                    ),
-            ) {
-                Text("음식 성적표로 가기", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            val isPending =
+                meal.grade == null &&
+                    runCatching {
+                        val elapsed =
+                            java.time.Duration.between(
+                                LocalDateTime.parse(meal.recordedAt),
+                                LocalDateTime.now(),
+                            )
+                        elapsed.toHours() < 2
+                    }.getOrDefault(false)
+
+            if (isPending) {
+                androidx.compose.material3.Button(
+                    onClick = {},
+                    enabled = false,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                            .height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors =
+                        androidx.compose.material3.ButtonDefaults.buttonColors(
+                            disabledContainerColor = GlucoachColors.Border,
+                            disabledContentColor = Color.White,
+                        ),
+                ) {
+                    Text("지금은 성적표 생성 중이에요", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+            } else {
+                androidx.compose.material3.Button(
+                    onClick = onNavigateToFoodReport,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                            .height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors =
+                        androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = GlucoachColors.Primary,
+                            contentColor = Color.White,
+                        ),
+                ) {
+                    Text("음식 성적표로 가기", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
         }
 
