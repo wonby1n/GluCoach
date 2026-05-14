@@ -131,6 +131,11 @@ dependencies {
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
 
+    // WorkManager + Hilt-Work (위젯 30분 주기 갱신)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
+
     // Wear OS — 폰 → 워치(:wear) 혈당 송신용 (WearDataSender)
     implementation(libs.play.services.wearable)
     implementation(libs.kotlinx.coroutines.play.services)

@@ -92,8 +92,10 @@ class FoodScanViewModel
                     val topDisplayName = response.detected.firstOrNull()?.nameKo ?: response.foodName.orEmpty()
                     // searchFoods 결과를 한 번만 받아 재사용 — 중복 호출 회피.
                     val results = foodRepository.searchFoods(response.foodName ?: topDisplayName).getOrNull().orEmpty()
+                    // BE 가 정확 일치 row 를 결정해 보낸 topFoodId 와 일치하는 것만 사용.
+                    // firstOrNull() 로 폴백하면 검색 1위(인기순)가 다른 음식이라 가짜 매칭 발생.
                     val foodItem: FoodSearchItem? =
-                        results.firstOrNull { it.id == topFoodId } ?: results.firstOrNull()
+                        results.firstOrNull { it.id == topFoodId }
                     if (foodItem != null) {
                         candidates.add(
                             FoodScanCandidate(
