@@ -148,8 +148,8 @@ private fun SettingsForm(
     var weight by remember(settings) { mutableStateOf(settings.weight?.toString() ?: "") }
     var diabetesType by remember(settings) { mutableStateOf(settings.diabetesType ?: "") }
     var isMedicated by remember(settings) { mutableStateOf(settings.isMedicated ?: false) }
-    var targetLow by remember(settings) { mutableStateOf(settings.targetLow?.toString() ?: "") }
-    var targetHigh by remember(settings) { mutableStateOf(settings.targetHigh?.toString() ?: "") }
+    var targetLow by remember(settings) { mutableStateOf(settings.targetLow?.toInt()?.toString() ?: "") }
+    var targetHigh by remember(settings) { mutableStateOf(settings.targetHigh?.toInt()?.toString() ?: "") }
     var alertLow by remember(settings) { mutableStateOf(settings.alertLow?.toString() ?: "") }
     var alertHigh by remember(settings) { mutableStateOf(settings.alertHigh?.toString() ?: "") }
     var nightWatch by remember(settings) { mutableStateOf(settings.nightWatch ?: false) }
@@ -303,8 +303,8 @@ private fun SettingsForm(
                         weight = weight.toFloatOrNull(),
                         diabetesType = diabetesType,
                         isMedicated = isMedicated,
-                        targetLow = targetLow.toIntOrNull(),
-                        targetHigh = targetHigh.toIntOrNull(),
+                        targetLow = targetLow.toDoubleOrNull(),
+                        targetHigh = targetHigh.toDoubleOrNull(),
                         alertLow = alertLow.toIntOrNull(),
                         alertHigh = alertHigh.toIntOrNull(),
                         nightWatch = nightWatch,
