@@ -68,8 +68,8 @@ class MainViewModel
                         }
                         GlucoseSimulator.stop()
                         GlucoseSimulator.start(context, diabetesType)
-                        val low = settings.targetLow ?: return@onSuccess
-                        val high = settings.targetHigh ?: return@onSuccess
+                        val low = settings.targetLow?.toInt() ?: return@onSuccess
+                        val high = settings.targetHigh?.toInt() ?: return@onSuccess
                         healthRepository.updateAlertThresholds(low, high)
                     }
             }
