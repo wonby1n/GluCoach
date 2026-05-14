@@ -92,7 +92,22 @@ class FoodResolutionTxHelper {
         .findFirst();
   }
 
+  /**
+   * 같은 이름의 customized row 가 이미 있으면 재사용. 없으면 새로 생성.
+   *
+   * <p>식약처 API 에 없는 음식명(예: CV 라벨 'samgupsal', '돼지고기수육')으로 매번 호출되면 carbsG=NULL 인 customized row 가 캐시
+   * 필터에서 reject 되어 매 업로드마다 새 row 가 쌓이는 현상을 차단한다.
+   */
   private Food saveCustomized(String name) {
+    Optional<Food> existing =
+        foodRepository.findByNameIgnoreCaseOrderBySearchCountDesc(name).stream()
+            .filter(Food::isCustomized)
+            .findFirst();
+    if (existing.isPresent()) {
+      Food food = existing.get();
+      food.incrementSearchCount();
+      return food;
+    }
     return foodRepository.save(
         Food.builder()
             .name(name)

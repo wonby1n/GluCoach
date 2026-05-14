@@ -57,6 +57,9 @@ class FoodScanViewModel
         private val _manualSearchResults = MutableStateFlow<List<FoodSearchItem>>(emptyList())
         val manualSearchResults: StateFlow<List<FoodSearchItem>> = _manualSearchResults.asStateFlow()
 
+        private val _manualPrediction = MutableStateFlow<GlucosePrediction?>(null)
+        val manualPrediction: StateFlow<GlucosePrediction?> = _manualPrediction.asStateFlow()
+
         fun analyze(photoFile: File) {
             if (_state.value !is FoodScanState.Idle) return
             viewModelScope.launch {
@@ -198,11 +201,23 @@ class FoodScanViewModel
             _manualSearchResults.value = emptyList()
         }
 
+        fun fetchManualPrediction(item: FoodSearchItem) {
+            _manualPrediction.value = null
+            viewModelScope.launch {
+                _manualPrediction.value = foodRepository.predictByFood(item).getOrNull()
+            }
+        }
+
+        fun clearManualPrediction() {
+            _manualPrediction.value = null
+        }
+
         fun resetError() {
             _state.value = FoodScanState.Idle
         }
 
         fun reset() {
             _state.value = FoodScanState.Idle
+            _manualPrediction.value = null
         }
     }

@@ -5,7 +5,9 @@ import com.ssafy.s309.data.api.PredictApi
 import com.ssafy.s309.data.model.FoodGradeResponse
 import com.ssafy.s309.data.model.FoodSearchItem
 import com.ssafy.s309.data.model.FromImagePredictResponse
+import com.ssafy.s309.data.model.GlucosePrediction
 import com.ssafy.s309.data.model.MealRecordResponse
+import com.ssafy.s309.data.model.PredictRequest
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
@@ -39,5 +41,25 @@ class FoodRepository
                         photoFile.asRequestBody("image/jpeg".toMediaType()),
                     )
                 predictApi.predictFromImage(imagePart)
+            }
+
+        /**
+         * 사용자가 검색에서 직접 고른 음식의 식전 혈당 예측.
+         * 영양정보 없는 (PENDING_NUTRITION) 음식은 0으로 채워 BE 호출 — 예측 정확도는 낮음.
+         */
+        suspend fun predictByFood(item: FoodSearchItem): Result<GlucosePrediction> =
+            runCatching {
+                val request =
+                    PredictRequest(
+                        foodId = item.id,
+                        foodName = item.displayName ?: item.name,
+                        carbsG = item.carbsG ?: 0.0,
+                        proteinG = item.proteinG ?: 0.0,
+                        fatG = item.fatG ?: 0.0,
+                        fiberG = item.fiberG,
+                        kcal = item.kcal ?: 0.0,
+                        sugarG = item.sugarG,
+                    )
+                predictApi.predictGlucose(request)
             }
     }

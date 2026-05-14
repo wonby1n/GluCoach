@@ -1,9 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- 식사 알림: 부팅 후 알람 재예약 + Doze 모드 통과용 정시 알람 -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <!-- BLE: Android 11 (API 30) 이하 -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
@@ -54,6 +60,54 @@
                 <action android:name="com.ssafy.s309.ACTION_MEAL_REPLY" />
             </intent-filter>
         </receiver>
+
+        <!-- 식사 알림 발화 (AlarmManager → Receiver → Notification) -->
+        <receiver
+            android:name=".notification.MealReminderReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.ssafy.s309.ACTION_MEAL_REMINDER_FIRE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 부팅/업데이트 후 식사 알림 재예약 -->
+        <receiver
+            android:name=".notification.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 혈당 추이 위젯 (Glance) -->
+        <receiver
+            android:name=".widget.GlucoseTimelineWidgetReceiver"
+            android:exported="false"
+            android:label="혈당 추이">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/glucose_widget_info" />
+        </receiver>
+
+        <!--
+            WorkManager 기본 초기화를 비활성화한다 — HiltWorker(GlucoseWidgetUpdateWorker)는
+            HiltWorkerFactory 를 거쳐야 인스턴스화되므로, Application 의 Configuration.Provider
+            구현에서 직접 초기화한다.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
     </application>
 
 </manifest>
