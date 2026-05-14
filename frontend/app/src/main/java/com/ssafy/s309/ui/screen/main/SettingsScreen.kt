@@ -185,7 +185,7 @@ private fun SettingsForm(
             Text(text = "당뇨 유형", fontSize = 13.sp, color = TextLabel, fontWeight = FontWeight.Medium)
             Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
             Row(horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.sm)) {
-                listOf("NONE" to "없음", "TYPE1" to "1형", "TYPE2" to "2형").forEach { (key, label) ->
+                listOf("NORMAL" to "없음", "T1D" to "1형", "T2D" to "2형").forEach { (key, label) ->
                     DiabetesTypeChip(
                         label = label,
                         selected = diabetesType == key,

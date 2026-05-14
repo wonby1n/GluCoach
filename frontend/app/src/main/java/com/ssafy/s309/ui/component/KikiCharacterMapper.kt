@@ -12,21 +12,21 @@ object KikiCharacterMapper {
 
     private val THRESHOLDS =
         mapOf(
-            "NONE" to Thresholds(ok = 140, mild = 180, moderate = 250),
-            "TYPE1" to Thresholds(ok = 150, mild = 180, moderate = 250),
-            "TYPE2" to Thresholds(ok = 140, mild = 180, moderate = 250),
+            "NORMAL" to Thresholds(ok = 140, mild = 180, moderate = 250),
+            "T1D" to Thresholds(ok = 150, mild = 180, moderate = 250),
+            "T2D" to Thresholds(ok = 140, mild = 180, moderate = 250),
         )
 
     @DrawableRes
     fun resolve(
         glucoseMgDl: Int?,
         trendRateMgDlPerMin: Float,
-        diabetesType: String = "NONE",
+        diabetesType: String = "NORMAL",
     ): Int {
         val glucose = glucoseMgDl ?: return R.drawable.kiki_main_anim
 
         val adjusted = applyTrend(glucose, trendRateMgDlPerMin)
-        val thresholds = THRESHOLDS[diabetesType] ?: THRESHOLDS.getValue("NONE")
+        val thresholds = THRESHOLDS[diabetesType] ?: THRESHOLDS.getValue("NORMAL")
 
         if (adjusted < LOW_THRESHOLD) return R.drawable.kiki_fell_off
         val severity = classifySeverity(adjusted, thresholds) ?: return R.drawable.kiki_main_anim
