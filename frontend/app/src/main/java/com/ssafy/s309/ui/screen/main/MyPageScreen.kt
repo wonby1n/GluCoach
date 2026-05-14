@@ -55,6 +55,7 @@ fun MyPageContent(
     onHealthDetailClick: () -> Unit = {},
     onGuardianClick: () -> Unit = {},
     onDeviceClick: () -> Unit = {},
+    onBleClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
     onWithdrawClick: (String) -> Unit = {},
@@ -173,7 +174,7 @@ fun MyPageContent(
 
         BluetoothCard(
             isConnected = isDeviceConnected,
-            onClick = onDeviceClick,
+            onClick = onBleClick,
         )
 
         Spacer(modifier = Modifier.height(64.dp))
