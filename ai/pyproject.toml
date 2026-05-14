@@ -13,6 +13,8 @@ dependencies = [
     "Pillow>=10.0.0",
     "requests>=2.33.1",
     "python-multipart>=0.0.28",
+    "pandas>=3.0.3",
+    "scikit-learn>=1.8.0",
 ]
 
 [project.optional-dependencies]
