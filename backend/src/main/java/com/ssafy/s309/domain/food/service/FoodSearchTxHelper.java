@@ -29,8 +29,7 @@ class FoodSearchTxHelper {
   public List<FoodSearchResult> tryFreshCache(String query) {
     LocalDateTime threshold = LocalDateTime.now().minusDays(FoodService.CACHE_TTL_DAYS);
     List<Food> cached =
-        foodRepository.findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
-            query, threshold);
+        foodRepository.findTop20ByNameContainingWithExactMatchFirst(query, threshold);
     if (cached.isEmpty()) {
       return List.of();
     }
@@ -49,8 +48,7 @@ class FoodSearchTxHelper {
   @Transactional(readOnly = true)
   public List<FoodSearchResult> fallbackToStale(String query) {
     List<Food> stale =
-        foodRepository.findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
-            query, EPOCH_THRESHOLD);
+        foodRepository.findTop20ByNameContainingWithExactMatchFirst(query, EPOCH_THRESHOLD);
     return stale.stream().map(FoodSearchResult::from).toList();
   }
 }
