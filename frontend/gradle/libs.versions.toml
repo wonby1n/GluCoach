@@ -21,6 +21,8 @@ ksp = "2.3.2"
 fastble = "2.4.0"
 firebaseBom = "33.7.0"
 glance = "1.1.1"
+workManager = "2.10.0"
+hiltWork = "1.2.0"
 
 # Wear OS
 playServicesWearable = "18.0.0"
@@ -91,6 +93,11 @@ firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging
 # Glance (홈화면 위젯)
 androidx-glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
 androidx-glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "glance" }
+
+# WorkManager + Hilt-Work (위젯 주기 갱신)
+androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workManager" }
+androidx-hilt-work = { group = "androidx.hilt", name = "hilt-work", version.ref = "hiltWork" }
+androidx-hilt-compiler = { group = "androidx.hilt", name = "hilt-compiler", version.ref = "hiltWork" }
 
 # Wear OS — Phone↔Watch (폰 :app과 워치 :wear 모두 사용)
 play-services-wearable = { group = "com.google.android.gms", name = "play-services-wearable", version.ref = "playServicesWearable" }

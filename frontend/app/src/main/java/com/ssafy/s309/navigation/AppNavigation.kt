@@ -353,6 +353,7 @@ fun AppNavigation(
             MainScreen(
                 onGraphClick = { navController.navigate(Screen.Graph.route) },
                 onConnectedDeviceClick = { navController.navigate(Screen.HealthSource.route) },
+                onBleClick = { navController.navigate(Screen.Ble.route) },
                 onLogoutClick = { authViewModel.logout() },
                 onWithdrawClick = { password -> authViewModel.withdraw(password) },
                 onSettingsClick = { navController.navigate(Screen.Settings.route) },

@@ -3,6 +3,8 @@ package com.ssafy.s309.data.api
 import com.ssafy.s309.data.model.FromImagePredictResponse
 import com.ssafy.s309.data.model.GlucoseCompareRequest
 import com.ssafy.s309.data.model.GlucoseCompareResponse
+import com.ssafy.s309.data.model.GlucosePrediction
+import com.ssafy.s309.data.model.PredictRequest
 import okhttp3.MultipartBody
 import retrofit2.http.Body
 import retrofit2.http.Multipart
@@ -10,6 +12,11 @@ import retrofit2.http.POST
 import retrofit2.http.Part
 
 interface PredictApi {
+    @POST("api/predict/glucose")
+    suspend fun predictGlucose(
+        @Body request: PredictRequest,
+    ): GlucosePrediction
+
     @POST("api/predict/glucose/compare")
     suspend fun compareGlucose(
         @Body request: GlucoseCompareRequest,
