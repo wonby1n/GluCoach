@@ -130,24 +130,28 @@ class FoodScanViewModel
                 }
 
                 // top-1 이 위에서 처리됐으면 detected[1..2], 아니면 detected[0..2] 까지 search 로 보강.
+                // 서로 다른 AI detection 이 같은 foods row 로 매칭될 수 있어(prototype DB 동의어 키 등)
+                // foodId 기준 cross-detection dedup. 중복이면 다음 detection 으로 자리 양보.
                 val remainingStart = if (topFoodId != null) 1 else 0
-                response.detected.drop(remainingStart).take(3 - candidates.size).forEach { detection ->
-                    val foodItem: FoodSearchItem? =
+                val seenFoodIds = candidates.map { it.foodId }.toMutableSet()
+                for (detection in response.detected.drop(remainingStart)) {
+                    if (candidates.size >= 3) break
+                    val foodItem: FoodSearchItem =
                         foodRepository.searchFoods(detection.nameKo).getOrNull()?.firstOrNull()
-                    if (foodItem != null) {
-                        candidates.add(
-                            FoodScanCandidate(
-                                rank = candidates.size + 1,
-                                foodId = foodItem.id,
-                                name = foodItem.displayName ?: detection.nameKo,
-                                kcal = foodItem.kcal,
-                                carbsG = foodItem.carbsG,
-                                proteinG = foodItem.proteinG,
-                                fatG = foodItem.fatG,
-                                confidence = detection.confidence,
-                            ),
-                        )
-                    }
+                            ?: continue
+                    if (!seenFoodIds.add(foodItem.id)) continue
+                    candidates.add(
+                        FoodScanCandidate(
+                            rank = candidates.size + 1,
+                            foodId = foodItem.id,
+                            name = foodItem.displayName ?: detection.nameKo,
+                            kcal = foodItem.kcal,
+                            carbsG = foodItem.carbsG,
+                            proteinG = foodItem.proteinG,
+                            fatG = foodItem.fatG,
+                            confidence = detection.confidence,
+                        ),
+                    )
                 }
 
                 // Stage 3: 완료
