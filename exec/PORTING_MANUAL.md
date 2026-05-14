@@ -2,31 +2,116 @@
 
 ## 목차
 
+0. [사용 도구](#0-사용-도구)
 1. [서버 환경](#1-서버-환경)
-2. [전체 아키텍처](#2-전체-아키텍처)
-3. [Docker 컨테이너 구성](#3-docker-컨테이너-구성)
-4. [데이터베이스 관리](#4-데이터베이스-관리)
-5. [CI/CD 파이프라인](#5-cicd-파이프라인)
-6. [nginx 설정](#6-nginx-설정)
-7. [AWS S3 파일 저장소](#7-aws-s3-파일-저장소)
-8. [환경변수 설정](#8-환경변수-설정)
-9. [신규 서버 세팅 순서](#9-신규-서버-세팅-순서)
+2. [개발 환경 및 IDE 버전](#2-개발-환경-및-ide-버전)
+3. [전체 아키텍처](#3-전체-아키텍처)
+4. [Docker 컨테이너 구성](#4-docker-컨테이너-구성)
+5. [데이터베이스 관리](#5-데이터베이스-관리)
+6. [CI/CD 파이프라인](#6-cicd-파이프라인)
+7. [nginx 설정](#7-nginx-설정)
+8. [AWS S3 파일 저장소](#8-aws-s3-파일-저장소)
+9. [외부 서비스 계정 발급 가이드](#9-외부-서비스-계정-발급-가이드)
+10. [환경변수 설정](#10-환경변수-설정)
+11. [신규 서버 세팅 순서](#11-신규-서버-세팅-순서)
+12. [시연 계정](#12-시연-계정)
+
+---
+
+## 0. 사용 도구
+
+| 분류              | 도구           | 비고                                         |
+| ----------------- | -------------- | -------------------------------------------- |
+| 형상 관리         | GitLab (SSAFY) | `https://lab.ssafy.com/s14-final/S14P31S309` |
+| 이슈 관리         | Jira           | 스프린트 단위 이슈 관리, Story Point 기반    |
+| 커뮤니케이션      | Mattermost     | 팀 채널 + Jenkins 빌드 알림 봇               |
+| 문서              | Notion         | 회의록, 기획서, API 명세                     |
+| 디자인            | Figma          | UI/UX 시안 및 디자인 시스템                  |
+| 워크플로우 자동화 | n8n            | `/n8n/` 경로로 운영 중                       |
 
 ---
 
 ## 1. 서버 환경
 
-| 항목 | 내용 |
-|---|---|
-| 서버 | SSAFY 지급 AWS EC2 (Ubuntu 22.04 LTS) |
-| 도메인 | `k14s309.p.ssafy.io` |
-| Jenkins | `http://k14s309.p.ssafy.io:9090` |
-| 허용 포트 | 22 (SSH), 80 (HTTP), 443 (HTTPS), 9090 (Jenkins) |
-| GitLab | `https://lab.ssafy.com/s14-final/S14P31S309` |
+| 항목      | 내용                                         |
+| --------- | -------------------------------------------- |
+| 서버      | SSAFY 지급 AWS EC2 (Ubuntu 24.04 LTS)        |
+| 도메인    | `k14s309.p.ssafy.io`                         |
+| Jenkins   | `http://k14s309.p.ssafy.io:9090`             |
+| GitLab    | `https://lab.ssafy.com/s14-final/S14P31S309` |
+
+### 외부 노출 포트 (ufw + Docker)
+
+| 포트  | 용도                       | 노출 방식           |
+| ----- | -------------------------- | ------------------- |
+| 22    | SSH                        | ufw                 |
+| 80    | HTTP (→ 443 리다이렉트)    | ufw + Docker        |
+| 443   | HTTPS (nginx 종단)         | ufw + Docker        |
+| 9090  | Jenkins 웹 UI              | ufw + Docker        |
+| 50000 | Jenkins 에이전트 연결 포트 | Docker (기본 설정)  |
+| 5678  | n8n (`/n8n/` 외 직접 접근) | ufw + Docker        |
+| 8989  | Apache HTTP Server         | SSAFY EC2 기본 이미지 (GluCoach 외 서비스) |
+
+> PostgreSQL(5432), Redis(6379)는 `127.0.0.1`에만 바인딩되어 외부 노출되지 않으며 SSH 터널로만 접근 가능합니다.
 
 ---
 
-## 2. 전체 아키텍처
+## 2. 개발 환경 및 IDE 버전
+
+### Backend (Spring Boot)
+
+| 항목         | 버전                                 |
+| ------------ | ------------------------------------ |
+| 언어         | Java 21 (Eclipse Temurin)            |
+| 프레임워크   | Spring Boot 3.5.0                    |
+| 빌드 도구    | Gradle 8.14.4 (Wrapper 포함)         |
+| DB           | PostgreSQL 17                        |
+| 캐시/세션    | Redis 7                              |
+| 마이그레이션 | Flyway                               |
+| API 문서     | SpringDoc OpenAPI 2.8.6 (Swagger UI) |
+| JWT          | jjwt 0.12.6                          |
+| 권장 IDE     | IntelliJ IDEA Ultimate 2024.3+       |
+
+### Frontend (Android)
+
+| 항목                | 버전                                  |
+| ------------------- | ------------------------------------- |
+| 언어                | Kotlin                                |
+| UI 프레임워크       | Jetpack Compose                       |
+| DI                  | Hilt                                  |
+| 네트워크            | Retrofit 2                            |
+| 이미지 로딩         | Coil 3                                |
+| 네비게이션          | Navigation Compose                    |
+| 빌드 도구           | Gradle (KTS, Version Catalog 사용)    |
+| 코드 스타일         | ktlint 12.1.0, detekt 1.23.5          |
+| 권장 IDE            | Android Studio Panda 3 (또는 그 이상) |
+| 최소 SDK / 타겟 SDK | `frontend/app/build.gradle.kts` 참고  |
+
+### AI (FastAPI)
+
+| 항목       | 버전                                             |
+| ---------- | ------------------------------------------------ |
+| 언어       | Python 3.12                                      |
+| 프레임워크 | FastAPI ≥ 0.115                                  |
+| 서버       | Uvicorn ≥ 0.34 (standard)                        |
+| ML         | PyTorch ≥ 2.2, torchvision ≥ 0.17, XGBoost ≥ 2.0 |
+| CV         | Ultralytics (YOLO) ≥ 8.0, Pillow ≥ 10.0          |
+| LLM SDK    | anthropic ≥ 0.40, openai ≥ 1.30                  |
+| PDF 리포트 | WeasyPrint ≥ 61.0, Jinja2 ≥ 3.1                  |
+| 권장 IDE   | PyCharm Professional 2024.3+ 또는 VS Code        |
+
+### Infra
+
+| 항목    | 버전                                                  |
+| ------- | ----------------------------------------------------- |
+| OS      | Ubuntu 24.04 LTS                                      |
+| Docker  | 24.x 이상 (운영 환경: 29.x, Compose 플러그인 v2 이상) |
+| Jenkins | jenkins/jenkins:lts                                   |
+| Nginx   | nginx:alpine (Let's Encrypt SSL)                      |
+
+---
+
+## 3. 전체 아키텍처
 
 ```
 [Android App]
@@ -55,28 +140,40 @@
 
 ---
 
-## 3. Docker 컨테이너 구성
+## 4. Docker 컨테이너 구성
 
 ### Compose 파일 구조
 
-| 파일 | 역할 |
-|---|---|
+| 파일                             | 역할                                                            |
+| -------------------------------- | --------------------------------------------------------------- |
 | `infra/docker-compose.infra.yml` | 공유 인프라 (nginx, postgres, redis, n8n) — 배포 시 재시작 없음 |
-| `infra/docker-compose.blue.yml` | Blue 앱 서비스 (backend-blue, ai-blue) |
-| `infra/docker-compose.green.yml` | Green 앱 서비스 (backend-green, ai-green) |
+| `infra/docker-compose.blue.yml`  | Blue 앱 서비스 (backend-blue, ai-blue)                          |
+| `infra/docker-compose.green.yml` | Green 앱 서비스 (backend-green, ai-green)                       |
 
 ### 실행 중인 컨테이너
 
-| 컨테이너 | 이미지 | 포트 | 역할 |
-|---|---|---|---|
-| `s309-nginx` | `nginx:alpine` | 80, 443 | 리버스 프록시, HTTPS 종단, 트래픽 전환 |
-| `s309-backend-blue` / `s309-backend-green` | 자체 빌드 | 8080 (내부) | Spring Boot API 서버 |
-| `s309-ai-blue` / `s309-ai-green` | 자체 빌드 | 8000 (내부) | FastAPI AI 서버 |
-| `s309-postgres` | `postgres:17-alpine` | 5432 (localhost만) | 메인 DB |
-| `s309-redis` | `redis:7-alpine` | 6379 (localhost만) | 캐시, 세션 |
-| `s309-n8n` | `n8nio/n8n:latest` | 5678 | 워크플로우 자동화 |
+| 컨테이너                                   | 이미지               | 포트               | 역할                                   |
+| ------------------------------------------ | -------------------- | ------------------ | -------------------------------------- |
+| `s309-nginx`                               | `nginx:alpine`       | 80, 443            | 리버스 프록시, HTTPS 종단, 트래픽 전환 |
+| `s309-backend-blue` / `s309-backend-green` | 자체 빌드            | 8080 (내부)        | Spring Boot API 서버                   |
+| `s309-ai-blue` / `s309-ai-green`           | 자체 빌드            | 8000 (내부)        | FastAPI AI 서버                        |
+| `s309-postgres`                            | `postgres:17-alpine` | 5432 (localhost만) | 메인 DB                                |
+| `s309-redis`                               | `redis:7-alpine`     | 6379 (localhost만) | 캐시, 세션                             |
+| `s309-n8n`                                 | `n8nio/n8n:latest`   | 5678               | 워크플로우 자동화                      |
 
 > PostgreSQL, Redis는 외부에 노출되지 않으며 SSH 터널을 통해서만 접근 가능.
+
+### Docker 볼륨
+
+| 볼륨 이름           | 실제 이름 (`docker volume ls`) | 용도                            |
+| ------------------- | ------------------------------ | ------------------------------- |
+| `postgres-data`     | `infra_postgres-data`          | PostgreSQL 데이터               |
+| `redis-data`        | `infra_redis-data`             | Redis 데이터                    |
+| `n8n-data`          | `infra_n8n-data`               | n8n 워크플로우 데이터           |
+| `ai-models`         | `s309-ai-models`               | AI 컨테이너의 ML 모델 가중치 캐시 |
+| `jenkins_home`      | `jenkins_home`                 | Jenkins 홈 디렉토리             |
+
+> `infra_` 접두사는 docker-compose 프로젝트 이름(`infra/` 디렉토리)에서 자동으로 붙음. `ai-models`는 `docker-compose.infra.yml`에서 `name: s309-ai-models`로 명시되어 접두사가 붙지 않음. 백업/복구 시 위 "실제 이름"을 사용해야 합니다.
 
 **Jenkins는 compose에 포함되지 않음** — 배포 중 자기 자신을 down시키는 문제로 별도 컨테이너로 운영.
 
@@ -99,21 +196,21 @@ docker ps --format "table {{.Names}}\t{{.Status}}"
 
 ---
 
-## 4. 데이터베이스 관리
+## 5. 데이터베이스 관리
 
 ### PostgreSQL
 
 - **버전**: 17 (Docker)
-- **데이터 영속화**: Docker Volume `postgres-data`
+- **데이터 영속화**: Docker Volume `postgres-data` (실제 이름: `infra_postgres-data`)
 - **스키마 관리**: Flyway 마이그레이션 (`backend/src/main/resources/db/migration/`)
-  - `V1__init_schema.sql` — 초기 스키마
-  - `V2__add_guardian_priority.sql` — 보호자 우선순위 추가
+    - `V1__init_schema.sql` — 초기 스키마
+    - `V2__add_guardian_priority.sql` — 보호자 우선순위 추가
 - **특이사항**: `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true` 설정 (기존 DB에 Flyway 적용 시 필요)
 
 ### Redis
 
 - **버전**: 7 (Docker)
-- **데이터 영속화**: Docker Volume `redis-data`
+- **데이터 영속화**: Docker Volume `redis-data` (실제 이름: `infra_redis-data`)
 - **인증**: 비밀번호 필수 (`REDIS_PASSWORD`)
 - **용도**: 세션 저장, API 캐시
 
@@ -121,17 +218,17 @@ docker ps --format "table {{.Names}}\t{{.Status}}"
 
 SSH 터널 방식으로만 접근 가능. 자세한 설정은 `docs/DATAGRIP_GUIDE.md` 참고.
 
-| | PostgreSQL | Redis |
-|---|---|---|
-| SSH Host | `k14s309.p.ssafy.io:22` | 동일 |
-| SSH User | `ubuntu` | 동일 |
-| SSH 인증 | EC2 `.pem` 키 파일 | 동일 |
-| DB Host | `localhost` | `localhost` |
-| DB Port | `5432` | `6379` |
+|          | PostgreSQL              | Redis       |
+| -------- | ----------------------- | ----------- |
+| SSH Host | `k14s309.p.ssafy.io:22` | 동일        |
+| SSH User | `ubuntu`                | 동일        |
+| SSH 인증 | EC2 `.pem` 키 파일      | 동일        |
+| DB Host  | `localhost`             | `localhost` |
+| DB Port  | `5432`                  | `6379`      |
 
 ---
 
-## 5. CI/CD 파이프라인
+## 6. CI/CD 파이프라인
 
 ### 배포 흐름
 
@@ -157,12 +254,12 @@ SSH 터널 방식으로만 접근 가능. 자세한 설정은 `docs/DATAGRIP_GUI
 
 Jenkins (`http://k14s309.p.ssafy.io:9090`) 에서 설정된 Credentials:
 
-| ID | 종류 | 용도 |
-|---|---|---|
-| `gitlab-token` | Username with Password | GitLab HTTPS 체크아웃 |
-| `ec2-ssh-key` | SSH Private Key | EC2 배포 SSH 접속 |
-| `firebase-key` | Secret File | Firebase 서비스 계정 키 |
-| `food-api-key` | Secret Text | 공공 식품 API 키 |
+| ID             | 종류                   | 용도                    |
+| -------------- | ---------------------- | ----------------------- |
+| `gitlab-token` | Username with Password | GitLab HTTPS 체크아웃   |
+| `ec2-ssh-key`  | SSH Private Key        | EC2 배포 SSH 접속       |
+| `firebase-key` | Secret File            | Firebase 서비스 계정 키 |
+| `food-api-key` | Secret Text            | 공공 식품 API 키        |
 
 ### 트리거 조건
 
@@ -191,18 +288,18 @@ echo "${PREV}" > infra/.active-color
 
 ---
 
-## 6. nginx 설정
+## 7. nginx 설정
 
 파일 위치: `infra/nginx/nginx.conf`
 
 ### 주요 설정
 
-| 설정 | 내용 |
-|---|---|
-| HTTP → HTTPS | 80 포트 요청을 443으로 301 리다이렉트 |
-| SSL 인증서 | Let's Encrypt (`/etc/nginx/ssl/fullchain.pem`) |
-| SSL 자동 갱신 | systemd timer (`certbot.timer`) — EC2에서 운영 중 |
-| Rate Limiting | IP당 100req/min, 초과 시 429 응답 |
+| 설정          | 내용                                                                 |
+| ------------- | -------------------------------------------------------------------- |
+| HTTP → HTTPS  | 80 포트 요청을 443으로 301 리다이렉트                                |
+| SSL 인증서    | Let's Encrypt (`/etc/nginx/ssl/fullchain.pem`)                       |
+| SSL 자동 갱신 | systemd timer (`certbot.timer`) — EC2에서 운영 중                    |
+| Rate Limiting | IP당 100req/min, 초과 시 429 응답                                    |
 | 업스트림 전환 | `nginx/upstream.conf` include 방식 — `nginx -s reload`로 무중단 전환 |
 
 ### Blue-Green upstream 구조
@@ -218,44 +315,110 @@ upstream.conf (현재 활성이 blue인 경우):
 
 ### 라우팅 규칙
 
-| 경로 | 대상 |
-|---|---|
-| `/` | 랜딩 페이지 (`infra/nginx/html/index.html`) |
-| `/api/*` | Backend (rate limit 적용) |
-| `/swagger-ui`, `/v3/api-docs` | Backend |
-| `/ai/*` | AI 서버 (rate limit 적용) |
-| `/n8n/` | n8n 워크플로우 (WebSocket 지원) |
-| `/health` | nginx 헬스체크 엔드포인트 |
+| 경로                          | 대상                                        |
+| ----------------------------- | ------------------------------------------- |
+| `/`                           | 랜딩 페이지 (`infra/nginx/html/index.html`) |
+| `/api/*`                      | Backend (rate limit 적용)                   |
+| `/swagger-ui`, `/v3/api-docs` | Backend                                     |
+| `/ai/*`                       | AI 서버 (rate limit 적용)                   |
+| `/n8n/`                       | n8n 워크플로우 (WebSocket 지원)             |
+| `/health`                     | nginx 헬스체크 엔드포인트                   |
 
 ---
 
-## 7. AWS S3 파일 저장소
+## 8. AWS S3 파일 저장소
 
 ### 구성
 
-| 항목 | 내용 |
-|---|---|
-| 버킷 이름 | `glucoach-images` |
-| 리전 | `ap-northeast-2` (서울) |
-| IAM 사용자 | `glucoach-s3` |
-| 접근 방식 | 백엔드 경유 업로드 / Presigned URL |
+| 항목       | 내용                               |
+| ---------- | ---------------------------------- |
+| 버킷 이름  | `glucoach-images`                  |
+| 리전       | `ap-northeast-2` (서울)            |
+| IAM 사용자 | `glucoach-s3`                      |
+| 접근 방식  | 백엔드 경유 업로드 / Presigned URL |
 
 ### IAM 정책 (최소 권한)
 
 ```json
 {
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
-    "Resource": "arn:aws:s3:::glucoach-images/*"
-  }]
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+            "Resource": "arn:aws:s3:::glucoach-images/*"
+        }
+    ]
 }
 ```
 
 ---
 
-## 8. 환경변수 설정
+## 9. 외부 서비스 계정 발급 가이드
+
+신규 서버 세팅 시 아래 서비스들의 키가 필요합니다. 각 서비스에서 발급받은 키는 `infra/.env` 파일에 입력합니다.
+
+### 9.1 OpenAI API
+
+| 항목     | 내용                                      |
+| -------- | ----------------------------------------- |
+| 가입 URL | `https://platform.openai.com/signup`      |
+| 키 발급  | API Keys 메뉴 → Create new secret key     |
+| 사용처   | AI 서버 (영양 상담 LLM, 이미지 인식 보조) |
+| 환경변수 | `OPENAI_API_KEY`, `OPENAI_BASE_URL`       |
+
+### 9.2 Anthropic Claude API
+
+| 항목     | 내용                                   |
+| -------- | -------------------------------------- |
+| 가입 URL | `https://console.anthropic.com`        |
+| 키 발급  | Settings → API Keys → Create Key       |
+| 사용처   | AI 서버 (Claude 기반 챗봇/리포트 생성) |
+| 환경변수 | `ANTHROPIC_API_KEY`                    |
+
+### 9.3 AWS (S3 + IAM)
+
+| 항목      | 내용                                                                                          |
+| --------- | --------------------------------------------------------------------------------------------- |
+| 가입 URL  | `https://aws.amazon.com`                                                                      |
+| 발급 절차 | IAM → 사용자 생성 → 정책 연결(§8 정책 참고) → Access Key 발급                                 |
+| 사용처    | 백엔드 (음식 이미지 업로드)                                                                   |
+| 환경변수  | `AWS_S3_ACCESS_KEY`, `AWS_S3_SECRET_KEY`, `AWS_S3_REGION`, `AWS_S3_BUCKET`, `AWS_S3_ENDPOINT` |
+| 비고      | 버킷은 `ap-northeast-2` (서울) 리전에 생성, 퍼블릭 액세스 차단 권장                           |
+
+### 9.4 Firebase (FCM 푸시 알림)
+
+| 항목            | 내용                                                                            |
+| --------------- | ------------------------------------------------------------------------------- |
+| 가입 URL        | `https://console.firebase.google.com`                                           |
+| 발급 절차       | 프로젝트 생성 → 프로젝트 설정 → 서비스 계정 → 새 비공개 키 생성 (JSON 다운로드) |
+| 사용처          | 백엔드 (보호자 푸시 알림 전송)                                                  |
+| 키 위치         | Jenkins Credentials `firebase-key` (Secret File). 배포 시 `Jenkinsfile`이 EC2의 `~/firebase-service-account.json`에 scp → `backend/src/main/resources/firebase-service-account.json`으로 복사 → `bootJar` 빌드 시 JAR 내부에 포함 (마운트 아님) |
+| 안드로이드 연동 | `frontend/app/google-services.json` 별도 필요                                   |
+| 키 회전 시      | Jenkins Credential 갱신 후 release 브랜치에 빈 커밋 push → 재빌드 필요          |
+
+### 9.5 식품안전처 공공 데이터 API
+
+| 항목      | 내용                                                  |
+| --------- | ----------------------------------------------------- |
+| 가입 URL  | `https://www.data.go.kr/`                             |
+| 발급 절차 | 회원가입 → API 신청 → 인증키 발급 (영업일 1~2일 소요) |
+| 사용처    | DB (식품 영양 성분 조회 및 저장)                      |
+| 환경변수  | `FOOD_API_KEY`                                        |
+| 비고      | Jenkins Credentials에도 등록되어 빌드 시 주입됨       |
+
+### 9.6 SSAFY 인프라 제공 항목
+
+| 항목           | 내용                              |
+| -------------- | --------------------------------- |
+| EC2 인스턴스   | SSAFY 지급 (Ubuntu 22.04 LTS)     |
+| 도메인         | `k14s309.p.ssafy.io` (SSAFY 발급) |
+| `.pem` 키 파일 | SSAFY EduRoom에서 다운로드        |
+| GitLab 계정    | SSAFY EduRoom 계정                |
+
+---
+
+## 10. 환경변수 설정
 
 EC2 서버 `/home/ubuntu/S14P31S309/infra/.env` 파일에 설정. (`.env.example` 참고)
 
@@ -298,7 +461,7 @@ FOOD_API_KEY=<식품안전처 API 키>
 
 ---
 
-## 9. 신규 서버 세팅 순서
+## 11. 신규 서버 세팅 순서
 
 새 서버에 처음 세팅하는 경우 아래 순서대로 진행.
 
@@ -332,6 +495,28 @@ sudo cp /etc/letsencrypt/live/k14s309.p.ssafy.io/privkey.pem /home/ubuntu/ssl/
 sudo chmod 644 /home/ubuntu/ssl/*.pem
 ```
 
+### SSL 자동 갱신 hook 설정 (중요)
+
+nginx는 `/home/ubuntu/ssl/`을 마운트하지만, certbot은 `/etc/letsencrypt/live/`에 갱신본을 둡니다. 갱신본을 nginx가 인식하려면 deploy hook으로 마운트 경로에 복사하고 nginx를 reload해야 합니다.
+
+```bash
+sudo tee /etc/letsencrypt/renewal-hooks/deploy/copy-to-nginx.sh > /dev/null <<'EOF'
+#!/bin/bash
+set -e
+cp /etc/letsencrypt/live/k14s309.p.ssafy.io/fullchain.pem /home/ubuntu/ssl/
+cp /etc/letsencrypt/live/k14s309.p.ssafy.io/privkey.pem  /home/ubuntu/ssl/
+chmod 644 /home/ubuntu/ssl/fullchain.pem
+chmod 600 /home/ubuntu/ssl/privkey.pem
+docker exec s309-nginx nginx -s reload
+EOF
+sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/copy-to-nginx.sh
+
+# 검증: dry-run 실행 시 hook도 함께 실행됨
+sudo certbot renew --dry-run
+```
+
+> 이 hook이 없으면 인증서는 자동 갱신되지만 nginx는 옛 인증서를 계속 사용하게 됩니다 (실서비스에서 HTTPS 만료 → 접속 불가).
+
 ### 컨테이너 초기 기동 (Blue-Green)
 
 ```bash
@@ -361,11 +546,14 @@ docker ps --format "table {{.Names}}\t{{.Status}}"
 ```bash
 docker run -d \
   -p 9090:8080 \
+  -p 127.0.0.1:50000:50000 \
   -v jenkins_home:/var/jenkins_home \
   --name jenkins \
   --restart unless-stopped \
   jenkins/jenkins:lts
 ```
+
+> 50000은 Jenkins 에이전트 연결 포트입니다. 본 프로젝트는 빌트인 에이전트(master)만 사용하므로 외부 노출이 불필요해 `127.0.0.1`에만 바인딩합니다. 외부 에이전트를 붙일 경우에만 `0.0.0.0:50000:50000`으로 변경하세요.
 
 ### Jenkins 초기 설정 (웹 UI)
 
@@ -375,12 +563,12 @@ docker run -d \
 4. 추가 플러그인 설치: **GitLab**, **SSH Agent**
 5. Credentials 등록:
 
-| ID | 종류 | 값 |
-|---|---|---|
-| `gitlab-token` | Username with Password | GitLab 계정 + 토큰 |
-| `ec2-ssh-key` | SSH Private Key | EC2 `.pem` 키 내용 |
-| `firebase-key` | Secret File | `firebase-service-account.json` |
-| `food-api-key` | Secret Text | 공공 식품 API 키 |
+| ID             | 종류                   | 값                              |
+| -------------- | ---------------------- | ------------------------------- |
+| `gitlab-token` | Username with Password | GitLab 계정 + 토큰              |
+| `ec2-ssh-key`  | SSH Private Key        | EC2 `.pem` 키 내용              |
+| `firebase-key` | Secret File            | `firebase-service-account.json` |
+| `food-api-key` | Secret Text            | 공공 식품 API 키                |
 
 6. 파이프라인 생성: Pipeline script from SCM → Git → `infra/Jenkinsfile` 경로 지정
 7. GitLab Webhook 설정: `http://서버IP:9090/project/glucoach`
