@@ -6,6 +6,7 @@ import com.ssafy.s309.domain.food.entity.Food;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -15,8 +16,29 @@ public interface FoodRepository extends JpaRepository<Food, Integer> {
 
   Optional<Food> findByFoodApiId(String foodApiId);
 
-  List<Food> findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
-      String name, LocalDateTime cachedAtAfter);
+  /**
+   * 부분 일치 검색 — 정확 일치 row 를 최상단으로 고정한 뒤 그 안에서 search_count desc.
+   *
+   * <p>"라면" 입력 시 합성어("짬뽕라면", "라면_치즈" 등)가 인기 정렬로 앞서 나와 오매칭되는 것을 막기 위함. 자동완성/CV 라벨 해석 양쪽에서 공유.
+   */
+  @Query(
+      """
+      SELECT f FROM Food f
+      WHERE LOWER(f.name) LIKE LOWER(CONCAT('%', :name, '%'))
+      AND f.cachedAt > :cachedAtAfter
+      ORDER BY
+        CASE WHEN LOWER(f.name) = LOWER(:name) THEN 0 ELSE 1 END,
+        f.searchCount DESC
+      """)
+  List<Food> findByNameContainingWithExactMatchFirst(
+      @Param("name") String name,
+      @Param("cachedAtAfter") LocalDateTime cachedAtAfter,
+      Pageable pageable);
+
+  default List<Food> findTop20ByNameContainingWithExactMatchFirst(
+      String name, LocalDateTime cachedAtAfter) {
+    return findByNameContainingWithExactMatchFirst(name, cachedAtAfter, PageRequest.of(0, 20));
+  }
 
   /**
    * 정확 일치 (대소문자 무시) — CV 라벨 해석 시 부분일치보다 우선 매칭하기 위함.

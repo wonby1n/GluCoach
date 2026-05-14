@@ -67,8 +67,7 @@ class FoodResolutionTxHelper {
       return exact;
     }
     return foodRepository
-        .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
-            name, EPOCH_THRESHOLD)
+        .findTop20ByNameContainingWithExactMatchFirst(name, EPOCH_THRESHOLD)
         .stream()
         .filter(f -> f.getCarbsG() != null)
         .findFirst();

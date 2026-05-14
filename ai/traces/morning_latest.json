@@ -1,7 +1,7 @@
 {
   "agent": "morning",
-  "triggered_at": "2026-05-08 16:29:07",
-  "message": "어젯밤 잠이 평소보다 적었네요. 오늘 아침은 가볍게 움직이며 시작해볼까요?",
+  "triggered_at": "2026-05-14 10:45:01",
+  "message": "하원님, 어젯밤 수면이 짧았어요. 오늘 아침은 평소보다 가볍게 드셔볼까요?",
   "display_trace": {
     "title": "키키가 확인한 내용",
     "summary": "어젯밤 수면, 혈당 흐름, 전날 식사 기록을 함께 확인해 오늘 아침 전략을 정했어요.",
@@ -15,13 +15,13 @@
       {
         "type": "glucose",
         "title": "혈당 흐름",
-        "description": "전날 밤~기상 전 최고 220mg/dL, 최저 75mg/dL로 변화폭이 145mg/dL였어요.",
+        "description": "전날 밤~기상 전 최고 200mg/dL, 최저 75mg/dL로 변화폭이 125mg/dL였어요.",
         "severity": "caution"
       },
       {
         "type": "meal",
         "title": "식사 기록",
-        "description": "전날 마지막 식사는 비빔밥 + 콜라였어요. 탄수화물은 95g으로 기록됐어요.",
+        "description": "전날 마지막 식사는 식사 기록였어요.",
         "severity": "info"
       }
     ],
@@ -35,20 +35,20 @@
       "reason": "여러 신호 중 사용자가 가장 부담 없이 이해할 수 있는 수면 부족을 중심으로 메시지를 구성했어요.",
       "message_rule": "수치와 경고 표현은 줄이고, 오늘 아침 행동 제안 1개만 담았어요."
     },
-    "notification_message": "어젯밤 잠이 평소보다 적었네요. 오늘 아침은 가볍게 움직이며 시작해볼까요?"
+    "notification_message": "하원님, 어젯밤 수면이 짧았어요. 오늘 아침은 평소보다 가볍게 드셔볼까요?"
   },
-  "turns": 4,
+  "turns": 3,
   "tool_calls": [
     {
       "name": "get_sleep",
       "input": {
-        "date": "2026-05-03"
+        "date": "2026-05-13"
       },
       "result": {
-        "date": "2026-05-03",
+        "date": "2026-05-13",
         "sleep": {
-          "sleep_start": "2026-05-04 02:00",
-          "sleep_end": "2026-05-04 07:00",
+          "sleep_start": "2026-05-14 02:00",
+          "sleep_end": "2026-05-14 07:00",
           "duration_hours": 5.0
         },
         "average_7d": {
@@ -57,97 +57,75 @@
       }
     },
     {
-      "name": "get_meals",
-      "input": {
-        "date": "2026-05-03"
-      },
-      "result": {
-        "date": "2026-05-03",
-        "meals": [
-          {
-            "meal_id": "meal_001",
-            "type": "dinner",
-            "time": "2026-05-03 19:30",
-            "foods": [
-              "비빔밥",
-              "콜라"
-            ],
-            "carbs_g": 95,
-            "calories": 720
-          }
-        ]
-      }
-    },
-    {
       "name": "get_glucose",
       "input": {
-        "start_time": "2026-05-03T18:00:00",
-        "end_time": "2026-05-04T10:00:00"
+        "start_time": "2026-05-13T18:00:00",
+        "end_time": "2026-05-14T10:44:00"
       },
       "result": {
         "readings": [
           {
-            "time": "2026-05-03 18:00",
+            "time": "2026-05-13 18:00",
             "glucose_mg_dl": 130
           },
           {
-            "time": "2026-05-03 19:00",
+            "time": "2026-05-13 19:00",
             "glucose_mg_dl": 158
           },
           {
-            "time": "2026-05-03 19:30",
+            "time": "2026-05-13 19:30",
             "glucose_mg_dl": 195
           },
           {
-            "time": "2026-05-03 20:00",
-            "glucose_mg_dl": 220
+            "time": "2026-05-13 20:00",
+            "glucose_mg_dl": 200
           },
           {
-            "time": "2026-05-03 21:00",
+            "time": "2026-05-13 21:00",
             "glucose_mg_dl": 198
           },
           {
-            "time": "2026-05-03 22:00",
+            "time": "2026-05-13 22:00",
             "glucose_mg_dl": 175
           },
           {
-            "time": "2026-05-03 23:00",
+            "time": "2026-05-13 23:00",
             "glucose_mg_dl": 160
           },
           {
-            "time": "2026-05-04 00:00",
+            "time": "2026-05-14 00:00",
             "glucose_mg_dl": 145
           },
           {
-            "time": "2026-05-04 01:00",
+            "time": "2026-05-14 01:00",
             "glucose_mg_dl": 118
           },
           {
-            "time": "2026-05-04 02:00",
+            "time": "2026-05-14 02:00",
             "glucose_mg_dl": 95
           },
           {
-            "time": "2026-05-04 03:00",
+            "time": "2026-05-14 03:00",
             "glucose_mg_dl": 75
           },
           {
-            "time": "2026-05-04 04:00",
+            "time": "2026-05-14 04:00",
             "glucose_mg_dl": 78
           },
           {
-            "time": "2026-05-04 05:00",
+            "time": "2026-05-14 05:00",
             "glucose_mg_dl": 98
           },
           {
-            "time": "2026-05-04 06:00",
+            "time": "2026-05-14 06:00",
             "glucose_mg_dl": 108
           },
           {
-            "time": "2026-05-04 07:00",
+            "time": "2026-05-14 07:00",
             "glucose_mg_dl": 112
           },
           {
-            "time": "2026-05-04 08:00",
+            "time": "2026-05-14 08:00",
             "glucose_mg_dl": 118
           }
         ],
@@ -159,17 +137,39 @@
       }
     },
     {
+      "name": "get_meals",
+      "input": {
+        "date": "2026-05-13"
+      },
+      "result": {
+        "date": "2026-05-13",
+        "meals": [
+          {
+            "meal_id": "meal_001",
+            "type": "dinner",
+            "time": "2026-05-13 19:30",
+            "foods": [
+              "비빔밥",
+              "콜라"
+            ],
+            "carbs_g": 95,
+            "calories": 720
+          }
+        ]
+      }
+    },
+    {
       "name": "get_notification_history",
       "input": {
         "hours": 24
       },
       "result": {
         "hours": 24,
-        "today": "2026-05-04",
+        "today": "2026-05-14",
         "notifications": [
           {
             "id": "notif_002",
-            "sent_at": "2026-05-03 14:00",
+            "sent_at": "2026-05-13 14:00",
             "type": "식후 활동 유도",
             "message": "10분만 걸어볼까요?",
             "user_action": "ignored"
@@ -180,23 +180,23 @@
     {
       "name": "send_notification",
       "input": {
-        "message": "어젯밤 잠이 평소보다 적었네요. 오늘 아침은 가볍게 움직이며 시작해볼까요?",
+        "message": "하원님, 어젯밤 수면이 짧았어요. 오늘 아침은 평소보다 가볍게 드셔볼까요?",
         "options": [
           {
-            "id": "morning_walk",
-            "label": "산책할게요"
+            "id": "ack",
+            "label": "알겠어요"
           },
           {
-            "id": "later_30",
+            "id": "remind_30",
             "label": "30분 뒤"
           },
           {
             "id": "skip",
-            "label": "패스"
+            "label": "괜찮아요"
           }
         ],
         "display_trace": {
-          "summary": "어젯밤 수면 2시간 부족, 혈당 변화폭 큼",
+          "summary": "수면 짧고, 혈당 변화폭 큼",
           "cards": [
             {
               "type": "sleep",
@@ -206,31 +206,49 @@
             {
               "type": "glucose",
               "title": "혈당",
-              "description": "어젯밤 최고 220mg/dL, 최저 75mg/dL로 변화폭이 컸어요."
+              "description": "어젯밤 최고 200mg/dL에서 새벽 최저 75mg/dL까지 변화폭이 컸어요."
             }
           ],
           "decision": {
-            "reason": "수면이 부족하면 오늘 혈당 조절이 평소보다 어려울 수 있어요. 아침부터 가볍게 움직이면 몸 상태를 안정적으로 만드는 데 도움이 돼요."
+            "reason": "수면이 부족하고 혈당 변화폭이 큰 상태에서는 오늘 몸의 회복을 돕기 위해 아침 식사를 가볍게 시작하는 것이 좋아요."
           }
         }
       },
       "result": {
         "status": "sent",
-        "message": "어젯밤 잠이 평소보다 적었네요. 오늘 아침은 가볍게 움직이며 시작해볼까요?",
+        "message": "하원님, 어젯밤 수면이 짧았어요. 오늘 아침은 평소보다 가볍게 드셔볼까요?",
         "options": [
           {
-            "id": "morning_walk",
-            "label": "산책할게요"
+            "id": "ack",
+            "label": "알겠어요"
           },
           {
-            "id": "later_30",
+            "id": "remind_30",
             "label": "30분 뒤"
           },
           {
             "id": "skip",
-            "label": "패스"
+            "label": "괜찮아요"
           }
-        ]
+        ],
+        "display_trace": {
+          "summary": "수면 짧고, 혈당 변화폭 큼",
+          "cards": [
+            {
+              "type": "sleep",
+              "title": "수면",
+              "description": "어젯밤 수면은 5시간으로, 평소보다 2시간 부족했어요."
+            },
+            {
+              "type": "glucose",
+              "title": "혈당",
+              "description": "어젯밤 최고 200mg/dL에서 새벽 최저 75mg/dL까지 변화폭이 컸어요."
+            }
+          ],
+          "decision": {
+            "reason": "수면이 부족하고 혈당 변화폭이 큰 상태에서는 오늘 몸의 회복을 돕기 위해 아침 식사를 가볍게 시작하는 것이 좋아요."
+          }
+        }
       }
     }
   ]

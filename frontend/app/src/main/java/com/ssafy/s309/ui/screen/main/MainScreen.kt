@@ -634,18 +634,21 @@ private fun resolveBannerText(
         isNewUser -> "반가워요. 키키와 함께해요"
         unread.isEmpty() -> "키키가 오늘 컨디션을 보고 있어요"
         unread.size >= 2 -> "키키가 기다리고 있어요"
-        else ->
-            when (unread.first().alertType) {
-                "HIGH" -> "혈당이 높아요"
-                "LOW" -> "저혈당 주의가 필요해요"
-                "SOS" -> "SOS 긴급 요청이 발생했어요"
-                "AGENT_WAKE_UP" -> "키키가 오늘의 혈당 전략을 알려줬어요!"
-                "AGENT_MEAL_FOLLOWUP" -> "키키가 식후 활동을 제안했어요!"
-                "AGENT_MEAL_REPLY" -> "키키가 답변을 보냈어요!"
-                "AGENT_MEAL_RETRY" -> "키키가 다시 확인하고 있어요!"
-                "WEEKLY_REPORT" -> "이번 주 건강 리포트가 도착했어요!"
+        else -> {
+            // 백엔드가 AGENT_* 타입에 timestamp suffix를 붙이는 경우가 있어 prefix 매칭 사용
+            val type = unread.first().alertType
+            when {
+                type == "HIGH" -> "혈당이 높아요"
+                type == "LOW" -> "저혈당 주의가 필요해요"
+                type == "SOS" -> "SOS 긴급 요청이 발생했어요"
+                type.startsWith("AGENT_WAKE_UP") -> "키키가 오늘의 혈당 전략을 알려줬어요!"
+                type.startsWith("AGENT_MEAL_FOLLOWUP") -> "키키가 식후 활동을 제안했어요!"
+                type.startsWith("AGENT_MEAL_REPLY") -> "키키가 답변을 보냈어요!"
+                type.startsWith("AGENT_MEAL_RETRY") -> "키키가 다시 확인하고 있어요!"
+                type == "WEEKLY_REPORT" -> "이번 주 건강 리포트가 도착했어요!"
                 else -> "키키가 오늘 컨디션을 보고 있어요"
             }
+        }
     }
 
 @Composable
