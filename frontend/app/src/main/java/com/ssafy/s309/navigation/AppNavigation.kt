@@ -48,7 +48,6 @@ import com.ssafy.s309.ui.screen.onboarding.BasicHealthInfoScreen
 import com.ssafy.s309.ui.screen.onboarding.BloodSugarRangeScreen
 import com.ssafy.s309.ui.screen.onboarding.DiabetesTypeSelectionScreen
 import com.ssafy.s309.ui.screen.onboarding.SignupDoneScreen
-import com.ssafy.s309.ui.screen.projector.ProjectorScreen
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.viewmodel.AuthUiState
 import com.ssafy.s309.ui.viewmodel.AuthViewModel
@@ -81,8 +80,6 @@ sealed class Screen(val route: String) {
     object Settings : Screen("settings")
 
     object Guardian : Screen("guardian")
-
-    object Projector : Screen("projector")
 
     object MyAccount : Screen("my_account")
 
@@ -404,14 +401,6 @@ fun AppNavigation(
         composable(Screen.Settings.route) {
             SubScreenWithBottomNav(navController = navController) {
                 SettingsScreen(
-                    onBack = { navController.popBackStack() },
-                    onProjectorClick = { navController.navigate(Screen.Projector.route) },
-                )
-            }
-        }
-        composable(Screen.Projector.route) {
-            SubScreenWithBottomNav(navController = navController) {
-                ProjectorScreen(
                     onBack = { navController.popBackStack() },
                 )
             }

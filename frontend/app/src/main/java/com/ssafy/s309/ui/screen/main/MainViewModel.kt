@@ -62,7 +62,7 @@ class MainViewModel
 
                 userRepository.getSettings()
                     .onSuccess { settings ->
-                        val diabetesType = settings.diabetesType ?: "NONE"
+                        val diabetesType = settings.diabetesType ?: "NORMAL"
                         _uiState.update { s ->
                             s.copy(diabetesType = diabetesType)
                         }

@@ -22,8 +22,8 @@ object GlucoseSimulator {
 
     private fun assetFile(diabetesType: String) =
         when (diabetesType) {
-            "TYPE1" -> "glucose_sim/t1d.csv"
-            "TYPE2" -> "glucose_sim/t2d.csv"
+            "T1D" -> "glucose_sim/t1d.csv"
+            "T2D" -> "glucose_sim/t2d.csv"
             else -> "glucose_sim/none.csv"
         }
 
@@ -43,7 +43,7 @@ object GlucoseSimulator {
 
     fun start(
         context: Context,
-        diabetesType: String = "NONE",
+        diabetesType: String = "NORMAL",
     ) {
         if (job?.isActive == true) return
         val values = loadValues(context, diabetesType)
@@ -79,13 +79,13 @@ object GlucoseSimulator {
 
     private val PROFILES =
         mapOf(
-            "NONE" to Profile(95.0, 65.0, 140.0, 2.0),
-            "TYPE1" to Profile(120.0, 50.0, 300.0, 12.0),
-            "TYPE2" to Profile(150.0, 100.0, 250.0, 4.0),
+            "NORMAL" to Profile(95.0, 65.0, 140.0, 2.0),
+            "T1D" to Profile(120.0, 50.0, 300.0, 12.0),
+            "T2D" to Profile(150.0, 100.0, 250.0, 4.0),
         )
 
     private suspend fun randomLoop(diabetesType: String) {
-        val profile = PROFILES[diabetesType] ?: PROFILES.getValue("NONE")
+        val profile = PROFILES[diabetesType] ?: PROFILES.getValue("NORMAL")
         var current = profile.initial
         while (true) {
             current =
