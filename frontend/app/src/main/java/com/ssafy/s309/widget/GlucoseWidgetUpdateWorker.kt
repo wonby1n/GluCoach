@@ -3,8 +3,8 @@ package com.ssafy.s309.widget
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.glance.appwidget.GlanceAppWidgetManager
+import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.appwidget.updateAll
-import androidx.glance.state.updateAppWidgetState
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -13,15 +13,17 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.ssafy.s309.data.api.HealthApi
 import com.ssafy.s309.data.local.TokenManager
+import com.ssafy.s309.data.model.CgmRecordResponse
+import com.ssafy.s309.data.repository.HealthRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.io.File
 import java.io.FileOutputStream
 import java.time.Duration
-import java.time.LocalDate
+import java.time.Instant
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
@@ -37,7 +39,7 @@ class GlucoseWidgetUpdateWorker
     constructor(
         @Assisted appContext: Context,
         @Assisted params: WorkerParameters,
-        private val healthApi: HealthApi,
+        private val healthRepository: HealthRepository,
         private val tokenManager: TokenManager,
     ) : CoroutineWorker(appContext, params) {
         override suspend fun doWork(): Result {
@@ -48,17 +50,26 @@ class GlucoseWidgetUpdateWorker
                 return Result.success()
             }
 
-            val today = LocalDate.now()
-            val from = today.atStartOfDay().format(ISO)
-            val to = LocalDateTime.now().format(ISO)
-
+            // HealthRepository 경유 — BE 결과가 비면 Samsung/HealthConnect → mock 순으로 자동 fallback.
+            // 차트 렌더러가 CgmRecordResponse 를 요구해서 GlucoseReading → CgmRecordResponse 로 한 번 변환.
             val records =
-                runCatching { healthApi.getGlucoseRecords(from, to) }
-                    .getOrElse {
-                        writeState(GlucoseWidgetState(errorMessage = "데이터 조회 실패"))
-                        refreshGlance()
-                        return Result.retry()
+                runCatching {
+                    healthRepository.getRecentGlucose(hours = 24).map { r ->
+                        CgmRecordResponse(
+                            id = 0L,
+                            value = r.valueMgDl.toDouble(),
+                            measuredAt =
+                                Instant.ofEpochMilli(r.timestampMillis)
+                                    .atZone(ZoneId.systemDefault())
+                                    .toLocalDateTime()
+                                    .format(ISO),
+                        )
                     }
+                }.getOrElse {
+                    writeState(GlucoseWidgetState(errorMessage = "데이터 조회 실패"))
+                    refreshGlance()
+                    return Result.retry()
+                }
 
             if (records.isEmpty()) {
                 writeState(GlucoseWidgetState(updatedAtText = nowText()))

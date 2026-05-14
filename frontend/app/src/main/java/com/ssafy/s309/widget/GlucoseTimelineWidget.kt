@@ -81,7 +81,7 @@ class GlucoseTimelineWidget : GlanceAppWidget() {
                 text = "● 오늘 혈당 추이",
                 style =
                     TextStyle(
-                        color = androidx.glance.color.ColorProvider(Color(0xFF475569)),
+                        color = androidx.glance.unit.ColorProvider(Color(0xFF475569)),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                     ),
@@ -91,7 +91,7 @@ class GlucoseTimelineWidget : GlanceAppWidget() {
                 text = state.updatedAtText,
                 style =
                     TextStyle(
-                        color = androidx.glance.color.ColorProvider(Color(0xFF94A3B8)),
+                        color = androidx.glance.unit.ColorProvider(Color(0xFF94A3B8)),
                         fontSize = 10.sp,
                     ),
                 modifier = GlanceModifier.defaultWeight(),
@@ -100,7 +100,7 @@ class GlucoseTimelineWidget : GlanceAppWidget() {
                 text = "↻",
                 style =
                     TextStyle(
-                        color = androidx.glance.color.ColorProvider(Color(0xFF0EA5E9)),
+                        color = androidx.glance.unit.ColorProvider(Color(0xFF0EA5E9)),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                     ),
@@ -119,7 +119,7 @@ class GlucoseTimelineWidget : GlanceAppWidget() {
                 text = state.currentValue?.toString() ?: "--",
                 style =
                     TextStyle(
-                        color = androidx.glance.color.ColorProvider(Color(0xFF0F172A)),
+                        color = androidx.glance.unit.ColorProvider(Color(0xFF0F172A)),
                         fontSize = 34.sp,
                         fontWeight = FontWeight.Bold,
                     ),
@@ -129,7 +129,7 @@ class GlucoseTimelineWidget : GlanceAppWidget() {
                 text = "mg/dL",
                 style =
                     TextStyle(
-                        color = androidx.glance.color.ColorProvider(Color(0xFF64748B)),
+                        color = androidx.glance.unit.ColorProvider(Color(0xFF64748B)),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                     ),
@@ -143,7 +143,7 @@ class GlucoseTimelineWidget : GlanceAppWidget() {
                     text = "$arrow $sign$delta",
                     style =
                         TextStyle(
-                            color = androidx.glance.color.ColorProvider(Color(0xFF92400E)),
+                            color = androidx.glance.unit.ColorProvider(Color(0xFF92400E)),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                         ),
@@ -194,7 +194,7 @@ class GlucoseTimelineWidget : GlanceAppWidget() {
                         },
                     style =
                         TextStyle(
-                            color = androidx.glance.color.ColorProvider(Color(0xFF94A3B8)),
+                            color = androidx.glance.unit.ColorProvider(Color(0xFF94A3B8)),
                             fontSize = 11.sp,
                         ),
                 )
@@ -234,7 +234,7 @@ class GlucoseTimelineWidget : GlanceAppWidget() {
                 text = value?.let { "$it$suffix" } ?: "--",
                 style =
                     TextStyle(
-                        color = androidx.glance.color.ColorProvider(accent),
+                        color = androidx.glance.unit.ColorProvider(accent),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                     ),
@@ -243,7 +243,7 @@ class GlucoseTimelineWidget : GlanceAppWidget() {
                 text = label,
                 style =
                     TextStyle(
-                        color = androidx.glance.color.ColorProvider(Color(0xFF64748B)),
+                        color = androidx.glance.unit.ColorProvider(Color(0xFF64748B)),
                         fontSize = 9.sp,
                     ),
             )
