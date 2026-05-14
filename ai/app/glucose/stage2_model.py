@@ -99,7 +99,7 @@ class Stage2Predictor:
         with open(meta_path, encoding="utf-8") as f:
             meta = json.load(f)
         self._feature_names = meta["feature_names"]
-        for name in ("peak_delta", "time_to_peak", "decay_rate", "iauc"):
+        for name in ("peak_delta", "time_to_peak", "decay_rate"):
             pkl = self._dir / f"{name}.pkl"
             if not pkl.exists():
                 raise FileNotFoundError(f"Stage2 model not found: {pkl}")
@@ -141,7 +141,7 @@ class Stage2Predictor:
 
     def predict(self, inp: dict[str, Any]) -> dict[str, float]:
         """
-        입력 dict → {peak_delta, time_to_peak, decay_rate, iauc} (보정 후).
+        입력 dict → {peak_delta, time_to_peak, decay_rate} (보정 후).
 
         inp 키:
             carbs_g, protein_g, fat_g, fiber_g, kcal (optional),
@@ -161,7 +161,6 @@ class Stage2Predictor:
         xgb_peak  = float(self._models["peak_delta"].predict(X)[0])
         xgb_ttp   = float(self._models["time_to_peak"].predict(X)[0])
         xgb_decay = float(self._models["decay_rate"].predict(X)[0])
-        xgb_iauc  = float(self._models["iauc"].predict(X)[0])
 
         lin_peak = _linear_peak_prior(carbs, protein, fat, fiber)
         lin_ttp  = _linear_ttp_prior(carbs, fat, fiber, protein)
@@ -179,7 +178,6 @@ class Stage2Predictor:
             "peak_delta":   round(peak_delta, 2),
             "time_to_peak": round(time_to_peak, 1),
             "decay_rate":   round(decay_rate, 3),
-            "iauc":         round(max(0.0, xgb_iauc) * scale, 1),
         }
 
 

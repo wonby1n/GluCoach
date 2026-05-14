@@ -2,7 +2,7 @@
 Step 2: Stage 2 XGBoost 훈련
 
 입력: data/processed/shanghai_stage2.csv
-출력: models/stage2_meal/{peak.pkl, ttp.pkl, decay.pkl, iauc.pkl}
+출력: models/stage2_meal/{peak.pkl, ttp.pkl, decay.pkl}
 
 타겟 4개를 BG 곡선에서 추출 후 독립적으로 XGBoost 회귀 학습.
 사용자 기준 train/val/test split (data leakage 방지).
@@ -35,7 +35,7 @@ RANDOM_SEED = 42
 
 BG_COLS = [f"BG_{t}min" for t in range(5, 125, 5)]  # 24개
 MACRO_FEATURES = ["carbs_g", "protein_g", "fat_g", "fiber_g", "kcal"]
-TARGET_NAMES = ["peak_delta", "time_to_peak", "decay_rate", "iauc"]
+TARGET_NAMES = ["peak_delta", "time_to_peak", "decay_rate"]
 
 # 전처리 시 이상치 제거 기준
 PRE_GLUCOSE_MIN, PRE_GLUCOSE_MAX = 50.0, 400.0
@@ -78,14 +78,10 @@ def extract_targets(row: pd.Series) -> dict | None:
     else:
         decay_rate = 0.0
 
-    # iAUC_2h: 기저치 이상의 면적 (trapezoid, 0 이하는 0으로 클리핑)
-    iauc = float(np.trapezoid(np.clip(delta, 0, None)) * 5)  # ×5분 = 시간 단위
-
     return {
         "peak_delta": peak_delta,
         "time_to_peak": time_to_peak,
         "decay_rate": decay_rate,
-        "iauc": iauc,
     }
 
 
@@ -182,7 +178,7 @@ def evaluate(models: dict, X_test: pd.DataFrame, targets_test: pd.DataFrame) -> 
 
     # Pairwise ranking accuracy (핵심 지표)
     print("\n[Pairwise Ranking Accuracy]")
-    for name in ["peak_delta", "iauc"]:
+    for name in ["peak_delta"]:
         y_true = targets_test[name].values
         y_pred = models[name].predict(X_test)
 
