@@ -252,10 +252,6 @@ class MealLogViewModel
                     foodRepository.getFoodGrades()
                         .onSuccess { grades ->
                             _foodGradeMap.value = grades.associate { it.foodId to it.grade }
-                            Log.d("MealLogVM", "등급 ${grades.size}건 로드: ${_foodGradeMap.value}")
-                        }
-                        .onFailure { e ->
-                            Log.w("MealLogVM", "등급 조회 실패", e)
                         }
                 }
         }
@@ -1102,6 +1098,7 @@ private fun MealDetailContent(
                     ) {
                         Text(
                             text = meal.name,
+                            modifier = Modifier.weight(1f, fill = false),
                             color = GlucoachColors.TextPrimary,
                             fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
@@ -1172,21 +1169,52 @@ private fun MealDetailContent(
                 }
             }
 
-            androidx.compose.material3.Button(
-                onClick = onNavigateToFoodReport,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp)
-                        .height(48.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors =
-                    androidx.compose.material3.ButtonDefaults.buttonColors(
-                        containerColor = GlucoachColors.Primary,
-                        contentColor = Color.White,
-                    ),
-            ) {
-                Text("음식 성적표로 가기", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            val isPending =
+                meal.grade == null &&
+                    runCatching {
+                        val elapsed =
+                            java.time.Duration.between(
+                                LocalDateTime.parse(meal.recordedAt),
+                                LocalDateTime.now(),
+                            )
+                        elapsed.toHours() < 2
+                    }.getOrDefault(false)
+
+            if (isPending) {
+                androidx.compose.material3.Button(
+                    onClick = {},
+                    enabled = false,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                            .height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors =
+                        androidx.compose.material3.ButtonDefaults.buttonColors(
+                            disabledContainerColor = GlucoachColors.Border,
+                            disabledContentColor = Color.White,
+                        ),
+                ) {
+                    Text("지금은 성적표 생성 중이에요", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+            } else {
+                androidx.compose.material3.Button(
+                    onClick = onNavigateToFoodReport,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                            .height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors =
+                        androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = GlucoachColors.Primary,
+                            contentColor = Color.White,
+                        ),
+                ) {
+                    Text("음식 성적표로 가기", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
         }
 
