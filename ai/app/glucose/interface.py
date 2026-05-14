@@ -114,25 +114,29 @@ def _build_stage2_input(request: dict[str, Any], baseline: float) -> dict[str, A
 def predict_meal_response(request: dict[str, Any]) -> PredictResponse:
     """Model 1: 식사 시점 → 식후 120분 BG.
 
-    macro(protein_g/fat_g/fiber_g) 제공 시 Stage 2 XGBoost+linear prior 경로 사용.
-    macro 미제공 시 기존 LSTM/MLP 경로 → 실패 시 dummy 폴백.
-    recent_values 없으면 400 (ValueError).
+    우선순위:
+      1. ShanghaiLSTM (개인화 모델 있으면 자동 사용)
+      2. Stage2 XGBoost (LSTM 모델 파일 없을 때 폴백)
+      3. dummy (둘 다 없을 때)
     """
     recent: list[float] = request.get("recent_values") or []
     if not recent:
         raise ValueError("recent_values is required (>=1)")
 
-    baseline = float(recent[-1])
-    user_id: str | None = request.get("user_id")
-    meal = request.get("meal", {})
-    predicted: list[float]
-    model_type = "base"
+    baseline  = float(recent[-1])
+    meal      = request.get("meal", {})
+    user_id   = request.get("user_id")
     used_dummy = False
+    model_type = "base"
 
-    has_macros = meal.get("protein_g") is not None
-
-    if has_macros:
-        # ── Stage 2: XGBoost + linear prior blending → skewed Gaussian curve ──
+    # 1차: ShanghaiLSTM
+    try:
+        predictor = predict.get_meal_predictor(user_id=user_id)
+        predicted = predictor.predict(request)
+        model_type = predictor.mode  # "base" or "personalized"
+    except (RuntimeError, FileNotFoundError) as e:
+        logger.warning(f"ShanghaiLSTM not available → Stage2 fallback: {e}")
+        # 2차: Stage2 XGBoost
         try:
             stage2_input = _build_stage2_input(request, baseline)
             scalars = get_stage2_predictor().predict(stage2_input)
@@ -143,18 +147,8 @@ def predict_meal_response(request: dict[str, Any]) -> PredictResponse:
                 baseline_glucose=baseline,
             )
             model_type = "stage2"
-        except (RuntimeError, FileNotFoundError, Exception) as e:
-            logger.warning(f"stage2 model not loaded → dummy fallback: {e}")
-            used_dummy = True
-            predicted = _dummy_curve_from_meal(float(meal.get("carbs", 0.0)), baseline)
-    else:
-        # ── Legacy LSTM/MLP path ──
-        try:
-            predictor = predict.get_meal_predictor(model_type=config.MEAL_MODEL_TYPE, user_id=user_id)
-            predicted = predictor.predict(request)
-            model_type = predictor.mode
-        except (RuntimeError, FileNotFoundError) as e:
-            logger.warning(f"meal model not loaded → dummy fallback: {e}")
+        except Exception as e2:
+            logger.warning(f"Stage2 also failed → dummy fallback: {e2}")
             used_dummy = True
             predicted = _dummy_curve_from_meal(float(meal.get("carbs", 0.0)), baseline)
 
@@ -196,26 +190,20 @@ def predict_now(request: dict[str, Any]) -> PredictResponse:
 def health_check() -> HealthResponse:
     """모델/scaler 파일 존재 여부 + GPU 가용성."""
     models_dir = Path(config.MODELS_DIR)
-    meal_loaded = (models_dir / "lstm_meal.pt").exists()
-    now_loaded = (models_dir / "lstm_now.pt").exists()
-    scaler_loaded = Path(config.SCALER_PATH).exists()
+    meal_loaded   = (models_dir / "lstm_meal_t2dm_coef15.pt").exists()
+    scaler_loaded = (models_dir / "lstm_t2dm_scaler_coef15.pkl").exists()
+    now_loaded    = (models_dir / "lstm_now.pt").exists()
 
-    stage2_dir = models_dir / "stage2_meal"
-    stage2_loaded = (stage2_dir / "meta.json").exists() and all(
-        (stage2_dir / f"{name}.pkl").exists()
-        for name in ("peak_delta", "time_to_peak", "decay_rate")
-    )
-
-    if (meal_loaded or stage2_loaded) and now_loaded and scaler_loaded:
+    if meal_loaded and scaler_loaded and now_loaded:
         status = "UP"
-    elif meal_loaded or stage2_loaded or now_loaded or scaler_loaded:
+    elif meal_loaded or scaler_loaded or now_loaded:
         status = "DEGRADED"
     else:
         status = "DOWN"
 
     return HealthResponse(
         status=status,
-        meal_model_loaded=meal_loaded or stage2_loaded,
+        meal_model_loaded=meal_loaded and scaler_loaded,
         now_model_loaded=now_loaded,
         scaler_loaded=scaler_loaded,
         cuda_available=torch.cuda.is_available(),
