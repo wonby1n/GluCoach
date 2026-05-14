@@ -55,6 +55,8 @@ models/*
 !models/scaler.pkl
 !models/lstm_meal.pt
 !models/lstm_now.pt
+!models/lstm_meal_t2dm_coef15.pt
+!models/lstm_t2dm_scaler_coef15.pkl
 !models/stage2_meal/
 models/stage2_meal/*
 !models/stage2_meal/*.pkl
