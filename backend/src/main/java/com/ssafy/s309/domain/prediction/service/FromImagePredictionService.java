@@ -29,8 +29,8 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class FromImagePredictionService {
 
-  /** AI 측 confidence 가 이 값 미만이면 사용자 확인 UI 로 폴백 (스펙 상 0.6). */
-  static final double CONFIDENCE_THRESHOLD = 0.6;
+  /** AI 측 confidence 가 이 값 미만이면 사용자 확인 UI 로 폴백 (스펙 상 0.5). */
+  static final double CONFIDENCE_THRESHOLD = 0.5;
 
   private final FoodDetectClient foodDetectClient;
   private final FoodResolutionService foodResolutionService;
