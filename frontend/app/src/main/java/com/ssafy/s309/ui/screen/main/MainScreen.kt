@@ -16,6 +16,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -660,24 +661,76 @@ private fun SummaryRow(
     steps: Int,
     sleepMinutes: Int,
 ) {
+    val sleepHours = sleepMinutes / 60
+    val sleepMins = sleepMinutes % 60
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
         horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.lg),
     ) {
         SummaryStatCard(
             title = "걸음 수",
             periodLabel = "오늘",
-            primaryValue = "%,d".format(steps),
-            unitOrSuffix = "걸음",
-            modifier = Modifier.weight(1f),
-        )
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+        ) {
+            Text(
+                text = "%,d".format(steps),
+                color = GlucoachColors.PrimaryDark,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "걸음",
+                color = GlucoachColors.PrimaryDark,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+        }
         SummaryStatCard(
             title = "수면",
             periodLabel = "오늘",
-            primaryValue = "${sleepMinutes / 60}:",
-            unitOrSuffix = String.format("%02d", sleepMinutes % 60),
-            modifier = Modifier.weight(1f),
-        )
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+        ) {
+            Text(
+                text = "$sleepHours",
+                color = GlucoachColors.PrimaryDark,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.width(3.dp))
+            Text(
+                text = "시간",
+                color = GlucoachColors.PrimaryDark,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "$sleepMins",
+                color = GlucoachColors.PrimaryDark,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.width(3.dp))
+            Text(
+                text = "분",
+                color = GlucoachColors.PrimaryDark,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+        }
     }
 }
 

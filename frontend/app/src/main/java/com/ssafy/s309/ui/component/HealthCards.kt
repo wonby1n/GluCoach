@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -126,20 +127,15 @@ internal fun glucoseZoneColor(
 }
 
 /**
- * 2x1 배치되는 하단 정보 카드 (걸음수 / 수면).
- *
- * @param title "걸음수", "수면" 등 타이틀
- * @param periodLabel 타이틀 아래 기간 라벨 (예: "오늘")
- * @param primaryValue 크게 표시될 값 (예: "6,230", "7:")
- * @param unitOrSuffix primaryValue 오른쪽 단위 / 후행 값 (예: "걸음", "15")
+ * 2x1 배치되는 하단 정보 카드 (걸음수 / 수면). 값 영역은 슬롯으로 받아
+ * 단일 (값+단위) 또는 (값+단위)×N 같은 구성을 호출자가 자유롭게 조립한다.
  */
 @Composable
 fun SummaryStatCard(
     title: String,
     periodLabel: String,
-    primaryValue: String,
-    unitOrSuffix: String,
     modifier: Modifier = Modifier,
+    value: @Composable RowScope.() -> Unit,
 ) {
     Column(
         modifier =
@@ -161,21 +157,9 @@ fun SummaryStatCard(
             fontSize = 10.sp,
         )
         Spacer(modifier = Modifier.height(2.dp))
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                text = primaryValue,
-                color = GlucoachColors.PrimaryDark,
-                fontSize = 42.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = unitOrSuffix,
-                color = GlucoachColors.PrimaryDark,
-                fontSize = 21.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 6.dp),
-            )
-        }
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            content = value,
+        )
     }
 }
