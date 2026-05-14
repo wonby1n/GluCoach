@@ -38,10 +38,10 @@ class SamsungHealthDataSource
             return try {
                 val steps = mgr.getTodaySteps().toInt()
                 val sleep = mgr.getLastSleepDurationMinutes()
-                if (steps == 0L && sleep == 0) {
+                if (steps == 0 && sleep == 0) {
                     null
                 } else {
-                    DailyHealthSummary(steps = steps.toInt(), sleepMinutes = sleep)
+                    DailyHealthSummary(steps = steps, sleepMinutes = sleep)
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "Samsung Health summary fetch 실패", t)
