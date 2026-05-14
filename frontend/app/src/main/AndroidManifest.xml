@@ -25,6 +25,13 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
+    <!-- Android 11(API 30)+ 패키지 가시성: TextToSpeech 엔진 조회 허용 -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <application
         android:name=".S309Application"
         android:allowBackup="true"
