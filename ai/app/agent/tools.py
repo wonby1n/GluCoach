@@ -25,7 +25,6 @@ from app.agent.mock_data import (
     STEPS_DATA,
     NOTIFICATION_HISTORY,
 )
-from app.agent.projection_client import send_command as _send_projection
 
 
 # ── Agent 컨텍스트 (runner가 실행 전에 set) ─────────────────
@@ -220,18 +219,6 @@ def schedule_followup(delay_minutes: int, reason: str) -> dict:
         return {"status": "error", "delay_minutes": delay_minutes, "reason": reason, "error": str(e)}
 
 
-def trigger_projection(command: str, sleep_score: str = "", glucose: str = "") -> dict:
-    """라즈베리파이 프로젝션 서버에 명령을 전송한다.
-    command: SHOW | HIDE | BRIEFING | ALERT
-    BRIEFING 사용 시 sleep_score와 glucose 값을 함께 전달한다.
-    """
-    if command == "BRIEFING":
-        cmd = f"BRIEFING:{sleep_score}:{glucose}"
-    else:
-        cmd = command
-    return _send_projection(cmd)
-
-
 # ── tool schema (LLM tools 파라미터용) ─────────────────────
 
 
@@ -418,29 +405,6 @@ TOOL_SCHEMAS = [
             "required": ["delay_minutes", "reason"],
         },
     },
-    {
-        "name": "trigger_projection",
-        "description": "라즈베리파이 프로젝터에 영상 명령을 전송한다. send_notification 직전에 호출하여 알림 내용에 맞는 영상을 프로젝터에 표시한다. BRIEFING: 아침 브리핑 영상 1회 재생. ALERT: 고혈당 경고 영상 루프. SHOW: 대기 영상 루프. HIDE: 영상 종료.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "command": {
-                    "type": "string",
-                    "enum": ["SHOW", "HIDE", "BRIEFING", "ALERT"],
-                    "description": "프로젝션 명령. BRIEFING은 sleep_score와 glucose도 함께 전달한다.",
-                },
-                "sleep_score": {
-                    "type": "string",
-                    "description": "BRIEFING 시 수면 점수 (예: '85'). BRIEFING 외에는 생략 가능.",
-                },
-                "glucose": {
-                    "type": "string",
-                    "description": "BRIEFING 시 현재 혈당값 (예: '112'). BRIEFING 외에는 생략 가능.",
-                },
-            },
-            "required": ["command"],
-        },
-    },
 ]
 
 # ── tool name → 함수 매핑 (dispatcher용) ───────────────────
@@ -453,7 +417,6 @@ TOOL_MAP = {
     "get_notification_history": get_notification_history,
     "send_notification": send_notification,
     "schedule_followup": schedule_followup,
-    "trigger_projection": trigger_projection,
 }
 
 

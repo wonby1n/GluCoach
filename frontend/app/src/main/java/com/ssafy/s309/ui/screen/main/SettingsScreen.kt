@@ -59,7 +59,6 @@ import com.ssafy.s309.ui.theme.TextSecondary
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
     onBack: () -> Unit = {},
-    onProjectorClick: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -111,7 +110,6 @@ fun SettingsScreen(
                     isSaving = uiState.isSaving,
                     error = uiState.error,
                     onSave = viewModel::saveSettings,
-                    onProjectorClick = onProjectorClick,
                 )
             }
             else -> {
@@ -142,7 +140,6 @@ private fun SettingsForm(
     isSaving: Boolean,
     error: String?,
     onSave: (UserSettingsUpdateRequest) -> Unit,
-    onProjectorClick: () -> Unit = {},
 ) {
     var height by remember(settings) { mutableStateOf(settings.height?.toString() ?: "") }
     var weight by remember(settings) { mutableStateOf(settings.weight?.toString() ?: "") }
@@ -185,7 +182,7 @@ private fun SettingsForm(
             Text(text = "당뇨 유형", fontSize = 13.sp, color = TextLabel, fontWeight = FontWeight.Medium)
             Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
             Row(horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.sm)) {
-                listOf("NONE" to "없음", "TYPE1" to "1형", "TYPE2" to "2형").forEach { (key, label) ->
+                listOf("NORMAL" to "없음", "T1D" to "1형", "T2D" to "2형").forEach { (key, label) ->
                     DiabetesTypeChip(
                         label = label,
                         selected = diabetesType == key,
@@ -283,17 +280,6 @@ private fun SettingsForm(
         }
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
-
-        Button(
-            onClick = onProjectorClick,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.ui.graphics.Color(0xFF5C6BC0)),
-        ) {
-            Text(text = "프로젝터 제어", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        }
-
-        Spacer(modifier = Modifier.height(GlucoachSpacing.md))
 
         Button(
             onClick = {
