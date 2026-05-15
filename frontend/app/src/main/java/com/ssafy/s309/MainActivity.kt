@@ -275,6 +275,7 @@ class MainActivity : ComponentActivity() {
         const val NAV_KIKI_ALARM_DETAIL = "kiki_alarm_detail"
         const val NAV_FOOD_REPORT = "food_report"
         const val NAV_FOOD_SCAN = "food_scan"
+        const val NAV_GLUCOSE_PREDICT = "glucose_predict"
         private const val POLL_TAG = "SHPoller"
     }
 }
