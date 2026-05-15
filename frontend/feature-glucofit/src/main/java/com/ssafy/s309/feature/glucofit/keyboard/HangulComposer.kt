@@ -1,8 +1,16 @@
 package com.ssafy.s309.feature.glucofit.keyboard
 
 /**
- * 두벌식 한글 조합 엔진
- * Unicode Hangul: 가 = 0xAC00 + 초성*21*28 + 중성*28 + 종성
+ * 두벌식 한글 조합 엔진 — history-stack 기반.
+ *
+ * 각 자모 입력 단계를 State로 history에 push하고,
+ * backspace 시 pop하여 복합 종성(ㄳ ㄵ ㄺ 등)의 역분해를 정확하게 처리한다.
+ *
+ * 기존 구현의 문제:
+ *   - jong > 0 → jong = 0 단순 초기화 → "닭"에서 backspace 시 "달"이 아닌 "다"로 점프
+ * 해결:
+ *   - 종성 조합 전 State(jong=ㄹ)를 먼저 push, 조합 후 State(jong=ㄺ, pair=(ㄹ,ㄱ)) push
+ *   - backspace = removeAt(last) → 자연스럽게 이전 State로 복원
  */
 class HangulComposer {
     companion object {
@@ -23,18 +31,47 @@ class HangulComposer {
                 'ㅁ' to 6, 'ㅂ' to 7, 'ㅅ' to 9, 'ㅆ' to 10, 'ㅇ' to 11,
                 'ㅈ' to 12, 'ㅊ' to 14, 'ㅋ' to 15, 'ㅌ' to 16, 'ㅍ' to 17, 'ㅎ' to 18,
             )
+
+        // 복합 종성 조합표: (첫 자음, 둘째 자음) → 복합 종성 코드
+        val JONG_COMBINE: Map<Pair<Char, Char>, Char> =
+            mapOf(
+                ('ㄱ' to 'ㅅ') to 'ㄳ',
+                ('ㄴ' to 'ㅈ') to 'ㄵ',
+                ('ㄴ' to 'ㅎ') to 'ㄶ',
+                ('ㄹ' to 'ㄱ') to 'ㄺ',
+                ('ㄹ' to 'ㅁ') to 'ㄻ',
+                ('ㄹ' to 'ㅂ') to 'ㄼ',
+                ('ㄹ' to 'ㅅ') to 'ㄽ',
+                ('ㄹ' to 'ㅌ') to 'ㄾ',
+                ('ㄹ' to 'ㅍ') to 'ㄿ',
+                ('ㄹ' to 'ㅎ') to 'ㅀ',
+                ('ㅂ' to 'ㅅ') to 'ㅄ',
+            )
     }
 
-    private var cho = -1
-    private var jung = -1
-    private var jong = 0
+    /**
+     * 음절 조합 상태 스냅샷. history에 push/pop하며 조합 상태를 추적한다.
+     * jongPair: 복합 종성일 경우 구성 쌍 (첫째, 둘째). 역분해 및 연음에 활용.
+     */
+    private data class State(
+        val cho: Int = -1,
+        val jung: Int = -1,
+        val jong: Int = 0,
+        val jongPair: Pair<Char, Char>? = null,
+    )
 
-    val composing: String get() {
-        if (cho < 0 && jung < 0) return ""
-        if (cho >= 0 && jung < 0) return CHO[cho].toString()
-        if (cho < 0 && jung >= 0) return JUNG[jung].toString()
-        return (0xAC00 + cho * 21 * 28 + jung * 28 + jong).toChar().toString()
-    }
+    private val history = mutableListOf<State>()
+    private val current: State get() = history.lastOrNull() ?: State()
+
+    val composing: String get() = stateToString(current)
+
+    private fun stateToString(s: State): String =
+        when {
+            s.cho < 0 && s.jung < 0 -> ""
+            s.cho >= 0 && s.jung < 0 -> CHO[s.cho].toString()
+            s.cho < 0 -> JUNG[s.jung].toString()
+            else -> (0xAC00 + s.cho * 21 * 28 + s.jung * 28 + s.jong).toChar().toString()
+        }
 
     sealed class Result {
         data class Compose(val commit: String, val composing: String) : Result()
@@ -47,87 +84,108 @@ class HangulComposer {
     fun input(jamo: Char): Result {
         val isV = jamo in JUNG
         val isC = jamo in CHO
+        val c = current
 
         return when {
-            isV && cho >= 0 && jung < 0 -> {
-                jung = JUNG.indexOf(jamo)
-                jong = 0
+            // 비어있음 + 자음 → 초성
+            isC && c.cho < 0 && c.jung < 0 -> {
+                push(State(cho = CHO.indexOf(jamo)))
                 Result.Compose("", composing)
             }
-            isC && cho >= 0 && jung >= 0 && jong == 0 -> {
+            // 비어있음 or 초성 없음 + 모음 → 중성 단독
+            isV && c.cho < 0 -> {
+                push(State(jung = JUNG.indexOf(jamo)))
+                Result.Compose("", composing)
+            }
+            // 초성만 + 모음 → 초중 조합
+            isV && c.cho >= 0 && c.jung < 0 -> {
+                push(State(cho = c.cho, jung = JUNG.indexOf(jamo)))
+                Result.Compose("", composing)
+            }
+            // 초중 + 종성 없음 + 자음 → 종성 후보
+            isC && c.cho >= 0 && c.jung >= 0 && c.jong == 0 -> {
                 val ji = CONS_TO_JONG[jamo]
                 if (ji != null) {
-                    jong = ji
+                    push(State(c.cho, c.jung, ji))
                     Result.Compose("", composing)
                 } else {
                     startNew(jamo)
                 }
             }
-            isV && jong > 0 -> {
-                val jongChar = JONG[jong]
-                val newCho = JONG_TO_CHO[jongChar]
-                if (newCho != null) {
-                    jong = 0
-                    val committed = composing
-                    cho = newCho
-                    jung = JUNG.indexOf(jamo)
-                    jong = 0
-                    Result.Compose(committed, composing)
+            // 단일 종성 + 자음 → 복합 종성 시도 or 새 음절
+            isC && c.jong > 0 && c.jongPair == null -> {
+                val jongChar = JONG[c.jong]
+                val combined = JONG_COMBINE[jongChar to jamo]
+                val combinedIdx = combined?.let { JONG.indexOf(it) }?.takeIf { it > 0 }
+                if (combinedIdx != null) {
+                    push(State(c.cho, c.jung, combinedIdx, jongPair = jongChar to jamo))
+                    Result.Compose("", composing)
                 } else {
                     startNew(jamo)
                 }
             }
-            isC && jong > 0 -> startNew(jamo)
-            isC && cho < 0 -> {
-                cho = CHO.indexOf(jamo)
-                jung = -1
-                jong = 0
-                Result.Compose("", composing)
+            // 복합 종성 + 자음 → 무조건 새 음절
+            isC && c.jong > 0 && c.jongPair != null -> startNew(jamo)
+            // 단일 종성 + 모음 → 연음: 종성이 다음 초성으로 이동
+            isV && c.jong > 0 && c.jongPair == null -> {
+                val jongChar = JONG[c.jong]
+                val newChoIdx = JONG_TO_CHO[jongChar] ?: return startNew(jamo)
+                val committed = stateToString(State(c.cho, c.jung, 0))
+                history.clear()
+                push(State(cho = newChoIdx))
+                push(State(cho = newChoIdx, jung = JUNG.indexOf(jamo)))
+                Result.Compose(committed, composing)
             }
-            isV && cho < 0 -> {
-                jung = JUNG.indexOf(jamo)
-                Result.Compose("", composing)
+            // 복합 종성 + 모음 → 연음: 첫 자음 종성 유지, 둘째 자음이 다음 초성으로
+            isV && c.jong > 0 && c.jongPair != null -> {
+                val (first, second) = c.jongPair!!
+                val remainIdx = CONS_TO_JONG[first] ?: return startNew(jamo)
+                val newChoIdx = JONG_TO_CHO[second] ?: return startNew(jamo)
+                val committed = stateToString(State(c.cho, c.jung, remainIdx))
+                history.clear()
+                push(State(cho = newChoIdx))
+                push(State(cho = newChoIdx, jung = JUNG.indexOf(jamo)))
+                Result.Compose(committed, composing)
             }
             else -> startNew(jamo)
         }
     }
 
-    private fun startNew(jamo: Char): Result {
-        val committed = composing
-        reset()
-        input(jamo)
-        return Result.Compose(committed, composing)
-    }
-
-    fun backspace(): Result {
-        return when {
-            jong > 0 -> {
-                jong = 0
+    fun backspace(): Result =
+        when (history.size) {
+            0 -> Result.DeleteChar
+            1 -> {
+                history.clear()
+                Result.DeleteChar
+            } // GlucoseKeyboard에서 hadComposing=true로 처리
+            else -> {
+                history.removeAt(history.lastIndex)
                 Result.Backspace(composing)
             }
-            jung >= 0 -> {
-                jung = -1
-                Result.Backspace(if (cho >= 0) CHO[cho].toString() else "")
-            }
-            cho >= 0 -> {
-                reset()
-                Result.DeleteChar
-            }
-            else -> Result.DeleteChar
         }
-    }
 
     fun flush(): String {
         val text = composing
-        reset()
+        history.clear()
         return text
     }
 
-    fun isEmpty() = cho < 0 && jung < 0
+    fun isEmpty(): Boolean = history.isEmpty()
 
-    fun reset() {
-        cho = -1
-        jung = -1
-        jong = 0
+    fun reset() = history.clear()
+
+    private fun push(state: State) {
+        history.add(state)
+        if (history.size > 20) history.removeAt(0) // 안전 한계
+    }
+
+    private fun startNew(jamo: Char): Result {
+        val committed = composing
+        history.clear()
+        when {
+            jamo in CHO -> push(State(cho = CHO.indexOf(jamo)))
+            jamo in JUNG -> push(State(jung = JUNG.indexOf(jamo)))
+        }
+        return Result.Compose(committed, composing)
     }
 }
