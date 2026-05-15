@@ -330,6 +330,10 @@ fun AppNavigation(
                     backStackEntry.savedStateHandle["requestedTab"] = "food-report"
                     onNavTargetConsumed()
                 }
+                if (pendingNavTarget == com.ssafy.s309.MainActivity.NAV_GLUCOSE_PREDICT) {
+                    backStackEntry.savedStateHandle["requestedTab"] = "glucose-predict"
+                    onNavTargetConsumed()
+                }
                 if (pendingFoodName != null) {
                     backStackEntry.savedStateHandle["targetFoodName"] = pendingFoodName
                     onFoodNameConsumed()
