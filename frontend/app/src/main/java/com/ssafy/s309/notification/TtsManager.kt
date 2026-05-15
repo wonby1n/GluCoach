@@ -61,6 +61,8 @@ class TtsManager
                 Log.w(TAG, "TTS 미준비 — 발화 무시: $text")
                 return
             }
+            val spoken = sanitizeForTts(text)
+            if (spoken.isBlank()) return
             val mode = if (urgent) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
             val utteranceId = "kiki-${utteranceCounter.incrementAndGet()}"
             val params =
@@ -68,9 +70,9 @@ class TtsManager
                     putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_NOTIFICATION)
                 }
             try {
-                tts.speak(text, mode, params, utteranceId)
+                tts.speak(spoken, mode, params, utteranceId)
             } catch (e: Exception) {
-                Log.e(TAG, "TTS speak 실패: $text", e)
+                Log.e(TAG, "TTS speak 실패: $spoken", e)
             }
         }
 
