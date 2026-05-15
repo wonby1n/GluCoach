@@ -66,7 +66,6 @@ import androidx.lifecycle.viewModelScope
 import com.ssafy.s309.R
 import com.ssafy.s309.data.model.NotificationItem
 import com.ssafy.s309.data.repository.HealthRepository
-import com.ssafy.s309.notification.KikiVoice
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
 import com.ssafy.s309.voice.VoiceQueryManager
@@ -110,7 +109,6 @@ class KikiChatViewModel
     constructor(
         private val healthRepository: HealthRepository,
         private val voiceQueryManager: VoiceQueryManager,
-        private val kikiVoice: KikiVoice,
     ) : ViewModel() {
         private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
         val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
@@ -130,12 +128,6 @@ class KikiChatViewModel
         // 음성 입력 상태 그대로 노출 (Composable이 마이크 버튼 외형 결정에 사용)
         val voiceState: StateFlow<VoiceQueryManager.State> = voiceQueryManager.state
         val voicePartial: StateFlow<String> = voiceQueryManager.partial
-
-        /**
-         * STT로 보낸 직전 질문이 응답 대기 중인지. true 면 다음 도착하는 키키 메시지를 TTS로 읽는다.
-         * 텍스트 "음식 추천" 버튼으로 보낸 응답은 음성 출력 안 함.
-         */
-        @Volatile private var pendingVoiceResponse: Boolean = false
 
         private var timeoutJob: Job? = null
         private var currentPage = -1
@@ -157,8 +149,6 @@ class KikiChatViewModel
                     onFcmReceived()
                 }
             }
-            // TTS 엔진은 첫 음성 응답 직전에 준비되면 늦으므로 ViewModel 생성 시 미리 준비.
-            kikiVoice.ensureInitialized()
         }
 
         fun loadNextPage() {
@@ -293,17 +283,7 @@ class KikiChatViewModel
                         if (newMessages.isNotEmpty()) {
                             val raw = _messages.value.filterNot { it is ChatMessage.DateSeparator }
                             _messages.value = withDateSeparators(newMessages + raw)
-
-                            // STT로 보낸 질문에 대한 응답이면 키키 음성으로 읽어준다.
-                            // 새로 도착한 메시지들 중 가장 최신 KikiMessage 1개만 발화 (연속 멀티-메시지 방지).
-                            if (pendingVoiceResponse) {
-                                val latestKiki =
-                                    newMessages.firstOrNull { it is ChatMessage.KikiMessage } as? ChatMessage.KikiMessage
-                                if (latestKiki != null) {
-                                    pendingVoiceResponse = false
-                                    kikiVoice.speakMessage(latestKiki.item.message)
-                                }
-                            }
+                            // 음성 응답 자동 발화는 제거 — FcmService 가 푸시 도착 시 TTS 로 본문을 읽어준다 (중복 방지).
                         }
                     }
                     .onFailure { Log.w(TAG, "FCM 후 메시지 재조회 실패", it) }
@@ -311,8 +291,6 @@ class KikiChatViewModel
         }
 
         fun sendFoodRecommendCommand() {
-            // 텍스트 버튼 경로 — 음성 응답 출력 안 함.
-            pendingVoiceResponse = false
             dispatchRecommendCommand(userQuery = null)
         }
 
@@ -322,12 +300,11 @@ class KikiChatViewModel
          *
          * user 말풍선은 BE 저장 후 onFcmReceived 의 page=0 재조회에서 함께 가져온다 (로컬 prepend
          * 하면 클라이언트/BE createdAt 차이로 dedupe가 깨져 중복 표시됨).
-         * 응답 도착 시 pendingVoiceResponse 플래그가 true 이면 TTS 출력.
+         * 음성 응답 TTS 는 FcmService 가 푸시 도착 시 본문을 읽어주므로 여기서는 별도 처리하지 않는다.
          */
         fun sendVoiceQuery(transcript: String) {
             val trimmed = transcript.trim()
             if (trimmed.isEmpty()) return
-            pendingVoiceResponse = true
             dispatchRecommendCommand(userQuery = trimmed)
         }
 
