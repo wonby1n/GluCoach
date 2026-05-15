@@ -1,20 +1,25 @@
 package com.ssafy.s309.notification
 
 import android.content.Context
-import android.media.MediaPlayer
+import android.media.AudioManager
+import android.os.Bundle
+import android.speech.tts.TextToSpeech
 import android.util.Log
-import androidx.annotation.RawRes
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 앱 전역 사운드 재생 싱글톤.
+ * 키키(AI agent) 알림용 한국어 TTS 매니저.
  *
- * - [playSound] 호출 시 res/raw 의 MP3 파일을 재생.
- * - [isEnabled] 를 false 로 설정하면 전역 음소거.
- * - urgent = true 이면 현재 재생 중인 사운드를 끊고 즉시 재생 (저혈당 긴급 알림용).
- * - urgent = false 이면 이미 재생 중일 때 무시 (중복 알림 방지).
+ * - 앱 시작 시 S309Application에서 @Inject 로 사전 인스턴스화되어 TTS 엔진을 비동기 초기화한다.
+ *   첫 알림이 도착할 때는 보통 isReady=true.
+ * - 한국어 데이터 미설치 기기에서는 영어로 폴백, 둘 다 미지원이면 발화를 시도하지 않고 로그만 남긴다.
+ * - 알림 오디오 스트림을 사용해 무음/방해금지 모드를 존중.
+ * - urgent=true: 진행 중인 발화를 끊고 즉시 발화 / urgent=false: 큐에 누적.
  */
 @Singleton
 class TtsManager
@@ -24,45 +29,61 @@ class TtsManager
     ) {
         @Volatile var isEnabled: Boolean = true
 
-        private var mediaPlayer: MediaPlayer? = null
-        private val lock = Any()
+        private val isReady = AtomicBoolean(false)
+        private val utteranceCounter = AtomicLong(0)
 
-        fun playSound(
-            @RawRes resId: Int,
+        private val tts: TextToSpeech =
+            TextToSpeech(context) { status ->
+                if (status != TextToSpeech.SUCCESS) {
+                    Log.e(TAG, "TTS 엔진 초기화 실패: status=$status")
+                    return@TextToSpeech
+                }
+                val ok = setLocale(Locale.KOREAN) || setLocale(Locale.US)
+                if (ok) {
+                    isReady.set(true)
+                } else {
+                    Log.e(TAG, "TTS 로케일 미지원 (한/영 모두 실패)")
+                }
+            }
+
+        private fun setLocale(locale: Locale): Boolean {
+            val result = tts.setLanguage(locale)
+            return result != TextToSpeech.LANG_MISSING_DATA &&
+                result != TextToSpeech.LANG_NOT_SUPPORTED
+        }
+
+        fun speak(
+            text: String,
             urgent: Boolean = false,
         ) {
-            if (!isEnabled) return
-            synchronized(lock) {
-                if (urgent) {
-                    mediaPlayer?.stop()
-                    mediaPlayer?.release()
-                    mediaPlayer = null
-                } else if (mediaPlayer?.isPlaying == true) {
-                    return
+            if (!isEnabled || text.isBlank()) return
+            if (!isReady.get()) {
+                Log.w(TAG, "TTS 미준비 — 발화 무시: $text")
+                return
+            }
+            val mode = if (urgent) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+            val utteranceId = "kiki-${utteranceCounter.incrementAndGet()}"
+            val params =
+                Bundle().apply {
+                    putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_NOTIFICATION)
                 }
-                try {
-                    mediaPlayer =
-                        MediaPlayer.create(context, resId)?.apply {
-                            setOnCompletionListener { mp ->
-                                mp.release()
-                                synchronized(lock) {
-                                    if (mediaPlayer == mp) mediaPlayer = null
-                                }
-                            }
-                            start()
-                        }
-                } catch (e: Exception) {
-                    Log.e(TAG, "MP3 재생 실패: resId=$resId", e)
-                }
+            try {
+                tts.speak(text, mode, params, utteranceId)
+            } catch (e: Exception) {
+                Log.e(TAG, "TTS speak 실패: $text", e)
             }
         }
 
         fun stop() {
-            synchronized(lock) {
-                mediaPlayer?.stop()
-                mediaPlayer?.release()
-                mediaPlayer = null
-            }
+            runCatching { tts.stop() }.onFailure { Log.e(TAG, "TTS stop 실패", it) }
+        }
+
+        fun shutdown() {
+            isReady.set(false)
+            runCatching {
+                tts.stop()
+                tts.shutdown()
+            }.onFailure { Log.e(TAG, "TTS shutdown 실패", it) }
         }
 
         private companion object {

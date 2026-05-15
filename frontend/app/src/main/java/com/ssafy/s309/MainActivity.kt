@@ -29,6 +29,7 @@ import com.ssafy.s309.data.repository.UserRepository
 import com.ssafy.s309.data.repository.source.SamsungHealthHolder
 import com.ssafy.s309.navigation.AppNavigation
 import com.ssafy.s309.ui.theme.S309Theme
+import com.ssafy.s309.voice.WakeWordManager
 import com.ssafy.s309.wear.WearDataSender
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -59,6 +60,8 @@ class MainActivity : ComponentActivity() {
         fun tokenManager(): TokenManager
 
         fun userRepository(): UserRepository
+
+        fun wakeWordManager(): WakeWordManager
     }
 
     private val samsungHealthHolder: SamsungHealthHolder by lazy {
@@ -85,6 +88,12 @@ class MainActivity : ComponentActivity() {
             .userRepository()
     }
 
+    private val wakeWordManager: WakeWordManager by lazy {
+        EntryPointAccessors
+            .fromApplication(applicationContext, MainActivityEntryPoint::class.java)
+            .wakeWordManager()
+    }
+
     // Samsung Health 권한 자동 요청은 Activity 라이프타임당 1회만. onResume 마다 다시 띄우면
     // 사용자가 한 번 거부 후 짜증나므로 가드. SDK 표준 동작상 이미 부여된 권한이면 다이얼로그
     // 자체가 안 뜨므로 추가 체크 불필요.
@@ -103,11 +112,20 @@ class MainActivity : ComponentActivity() {
             Log.d("FCM", "알림 권한: $granted")
         }
 
+    private val recordAudioPermissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { granted ->
+            Log.d("WakeWord", "RECORD_AUDIO 권한: $granted")
+            if (granted) wakeWordManager.start()
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         samsungHealthHolder.attach(this)
         startSamsungHealthPolling()
         requestNotificationPermission()
+        requestRecordAudioPermission()
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (!task.isSuccessful) {
                 Log.w("FCM", "토큰 발급 실패", task.exception)
@@ -161,6 +179,22 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         maybeRequestSamsungHealthAtLaunch()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // wake word 듣기는 앱이 사용자에게 보이는 동안에만. onStart 가 권한이 이미 있을 때
+        // 호출되는 진입점이고, 권한 미부여 상태이면 launcher 콜백에서 start 가 호출된다.
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            == PackageManager.PERMISSION_GRANTED
+        ) {
+            wakeWordManager.start()
+        }
+    }
+
+    override fun onStop() {
+        wakeWordManager.stop()
+        super.onStop()
     }
 
     override fun onDestroy() {
@@ -266,6 +300,14 @@ class MainActivity : ComponentActivity() {
             != PackageManager.PERMISSION_GRANTED
         ) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    private fun requestRecordAudioPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 

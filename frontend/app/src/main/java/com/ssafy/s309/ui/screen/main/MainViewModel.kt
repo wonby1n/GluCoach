@@ -62,14 +62,14 @@ class MainViewModel
 
                 userRepository.getSettings()
                     .onSuccess { settings ->
-                        val diabetesType = settings.diabetesType ?: "NONE"
+                        val diabetesType = settings.diabetesType ?: "NORMAL"
                         _uiState.update { s ->
                             s.copy(diabetesType = diabetesType)
                         }
                         GlucoseSimulator.stop()
                         GlucoseSimulator.start(context, diabetesType)
-                        val low = settings.targetLow ?: return@onSuccess
-                        val high = settings.targetHigh ?: return@onSuccess
+                        val low = settings.targetLow?.toInt() ?: return@onSuccess
+                        val high = settings.targetHigh?.toInt() ?: return@onSuccess
                         healthRepository.updateAlertThresholds(low, high)
                     }
             }

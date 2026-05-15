@@ -17,7 +17,6 @@ import matplotlib.font_manager as fm
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from jinja2 import Template
-from weasyprint import HTML
 
 from app.schemas.report import WeeklyReportRequest
 
@@ -851,4 +850,5 @@ def generate_pdf(req: WeeklyReportRequest, ai_summary: str, ai_suggest: str) -> 
     }
 
     html_str = Template(_REPORT_HTML).render(**ctx)
+    from weasyprint import HTML  # GTK 라이브러리 필요 — 실제 PDF 생성 시에만 로드
     return HTML(string=html_str).write_pdf()

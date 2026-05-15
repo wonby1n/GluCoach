@@ -59,7 +59,6 @@ import com.ssafy.s309.ui.theme.TextSecondary
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
     onBack: () -> Unit = {},
-    onProjectorClick: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -111,7 +110,6 @@ fun SettingsScreen(
                     isSaving = uiState.isSaving,
                     error = uiState.error,
                     onSave = viewModel::saveSettings,
-                    onProjectorClick = onProjectorClick,
                 )
             }
             else -> {
@@ -142,14 +140,13 @@ private fun SettingsForm(
     isSaving: Boolean,
     error: String?,
     onSave: (UserSettingsUpdateRequest) -> Unit,
-    onProjectorClick: () -> Unit = {},
 ) {
     var height by remember(settings) { mutableStateOf(settings.height?.toString() ?: "") }
     var weight by remember(settings) { mutableStateOf(settings.weight?.toString() ?: "") }
     var diabetesType by remember(settings) { mutableStateOf(settings.diabetesType ?: "") }
     var isMedicated by remember(settings) { mutableStateOf(settings.isMedicated ?: false) }
-    var targetLow by remember(settings) { mutableStateOf(settings.targetLow?.toString() ?: "") }
-    var targetHigh by remember(settings) { mutableStateOf(settings.targetHigh?.toString() ?: "") }
+    var targetLow by remember(settings) { mutableStateOf(settings.targetLow?.toInt()?.toString() ?: "") }
+    var targetHigh by remember(settings) { mutableStateOf(settings.targetHigh?.toInt()?.toString() ?: "") }
     var alertLow by remember(settings) { mutableStateOf(settings.alertLow?.toString() ?: "") }
     var alertHigh by remember(settings) { mutableStateOf(settings.alertHigh?.toString() ?: "") }
     var nightWatch by remember(settings) { mutableStateOf(settings.nightWatch ?: false) }
@@ -185,7 +182,7 @@ private fun SettingsForm(
             Text(text = "당뇨 유형", fontSize = 13.sp, color = TextLabel, fontWeight = FontWeight.Medium)
             Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
             Row(horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.sm)) {
-                listOf("NONE" to "없음", "TYPE1" to "1형", "TYPE2" to "2형").forEach { (key, label) ->
+                listOf("NORMAL" to "없음", "T1D" to "1형", "T2D" to "2형").forEach { (key, label) ->
                     DiabetesTypeChip(
                         label = label,
                         selected = diabetesType == key,
@@ -285,17 +282,6 @@ private fun SettingsForm(
         Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
 
         Button(
-            onClick = onProjectorClick,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.ui.graphics.Color(0xFF5C6BC0)),
-        ) {
-            Text(text = "프로젝터 제어", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        }
-
-        Spacer(modifier = Modifier.height(GlucoachSpacing.md))
-
-        Button(
             onClick = {
                 onSave(
                     UserSettingsUpdateRequest(
@@ -303,8 +289,8 @@ private fun SettingsForm(
                         weight = weight.toFloatOrNull(),
                         diabetesType = diabetesType,
                         isMedicated = isMedicated,
-                        targetLow = targetLow.toIntOrNull(),
-                        targetHigh = targetHigh.toIntOrNull(),
+                        targetLow = targetLow.toDoubleOrNull(),
+                        targetHigh = targetHigh.toDoubleOrNull(),
                         alertLow = alertLow.toIntOrNull(),
                         alertHigh = alertHigh.toIntOrNull(),
                         nightWatch = nightWatch,

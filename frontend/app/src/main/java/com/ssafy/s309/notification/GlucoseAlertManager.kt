@@ -11,7 +11,6 @@ import com.ssafy.s309.R
 import com.ssafy.s309.data.ble.BleManager
 import com.ssafy.s309.data.model.GlucoseReading
 import com.ssafy.s309.data.model.NotificationItem
-import com.ssafy.s309.projector.ProjectorSocketClient
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,7 +36,7 @@ class GlucoseAlertManager
     constructor(
         @ApplicationContext private val context: Context,
         private val bleManager: BleManager,
-        private val projectorClient: ProjectorSocketClient,
+        private val ttsManager: TtsManager,
     ) {
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -73,13 +72,21 @@ class GlucoseAlertManager
         }
 
         private fun createChannels() {
+            // 사운드는 TtsManager 본문 발화로 대체 → silent 채널.
             notificationManager.createNotificationChannel(
                 NotificationChannel(CHANNEL_ALERT, "혈당 긴급 알림", NotificationManager.IMPORTANCE_HIGH)
-                    .apply { description = "저혈당·고혈당 긴급 경보" },
+                    .apply {
+                        description = "저혈당·고혈당 긴급 경보"
+                        setSound(null, null)
+                        enableVibration(true)
+                    },
             )
             notificationManager.createNotificationChannel(
                 NotificationChannel(CHANNEL_COACH, "AI 코치 메시지", NotificationManager.IMPORTANCE_DEFAULT)
-                    .apply { description = "GluCoach AI의 맞춤 건강 조언" },
+                    .apply {
+                        description = "GluCoach AI의 맞춤 건강 조언"
+                        setSound(null, null)
+                    },
             )
         }
 
@@ -153,10 +160,6 @@ class GlucoseAlertManager
             lastAlertMs[type] = now
             val id = notifIdCounter.incrementAndGet()
 
-            if (type == AlertType.HIGH || type == AlertType.LOW) {
-                scope.launch { projectorClient.alert() }
-            }
-
             val pendingIntent =
                 PendingIntent.getActivity(
                     context,
@@ -176,6 +179,9 @@ class GlucoseAlertManager
                     .setContentIntent(pendingIntent)
                     .build(),
             )
+
+            // 저혈당은 진행 중인 발화를 끊고 즉시 읽도록 urgent=true.
+            ttsManager.speak(message, urgent = type == AlertType.LOW)
 
             _alertStream.tryEmit(
                 NotificationItem(

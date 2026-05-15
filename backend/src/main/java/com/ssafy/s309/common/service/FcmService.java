@@ -19,8 +19,8 @@ public class FcmService {
   }
 
   /**
-   * Android NotificationChannel ID 분기 (plan D7): glucose_critical / glucose_coaching /
-   * report_notification. channelId가 null이면 기본 채널로 전송.
+   * Android NotificationChannel ID 분기. channelId는 AlertChannelResolver.resolveChannelId()로 결정하며
+   * Android FcmService.kt 의 kiki_*_v3 채널과 일치해야 한다.
    */
   public void sendToTokens(List<String> tokens, String title, String body, String channelId) {
     sendToTokens(tokens, title, body, channelId, null);
