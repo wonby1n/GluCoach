@@ -59,12 +59,19 @@ class FoodResolutionTxHelper {
   }
 
   private Optional<Food> findCachedWithNutrition(String name) {
-    Optional<Food> exact =
+    Optional<Food> exactByName =
         foodRepository.findByNameIgnoreCaseOrderBySearchCountDesc(name).stream()
             .filter(f -> f.getCarbsG() != null)
             .findFirst();
-    if (exact.isPresent()) {
-      return exact;
+    if (exactByName.isPresent()) {
+      return exactByName;
+    }
+    Optional<Food> exactByDisplayName =
+        foodRepository.findByDisplayNameIgnoreCaseOrderBySearchCountDesc(name).stream()
+            .filter(f -> f.getCarbsG() != null)
+            .findFirst();
+    if (exactByDisplayName.isPresent()) {
+      return exactByDisplayName;
     }
     return foodRepository
         .findTop20ByNameContainingWithExactMatchFirst(name, EPOCH_THRESHOLD)
@@ -99,12 +106,21 @@ class FoodResolutionTxHelper {
    * 필터에서 reject 되어 매 업로드마다 새 row 가 쌓이는 현상을 차단한다.
    */
   private Food saveCustomized(String name) {
-    Optional<Food> existing =
+    Optional<Food> existingByName =
         foodRepository.findByNameIgnoreCaseOrderBySearchCountDesc(name).stream()
             .filter(Food::isCustomized)
             .findFirst();
-    if (existing.isPresent()) {
-      Food food = existing.get();
+    if (existingByName.isPresent()) {
+      Food food = existingByName.get();
+      food.incrementSearchCount();
+      return food;
+    }
+    Optional<Food> existingByDisplayName =
+        foodRepository.findByDisplayNameIgnoreCaseOrderBySearchCountDesc(name).stream()
+            .filter(Food::isCustomized)
+            .findFirst();
+    if (existingByDisplayName.isPresent()) {
+      Food food = existingByDisplayName.get();
       food.incrementSearchCount();
       return food;
     }

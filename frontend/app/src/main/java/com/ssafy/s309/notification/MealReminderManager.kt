@@ -17,6 +17,7 @@ class MealReminderManager
     @Inject
     constructor(
         @ApplicationContext private val context: Context,
+        private val ttsManager: TtsManager,
     ) {
         private val notificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -26,6 +27,7 @@ class MealReminderManager
         }
 
         private fun createChannel() {
+            // 사운드는 TtsManager 본문 발화로 대체했으므로 silent 채널로 생성한다.
             notificationManager.createNotificationChannel(
                 NotificationChannel(
                     CHANNEL_MEAL,
@@ -33,6 +35,7 @@ class MealReminderManager
                     NotificationManager.IMPORTANCE_DEFAULT,
                 ).apply {
                     description = "아침·점심·저녁 식사 기록 리마인더"
+                    setSound(null, null)
                 },
             )
         }
@@ -67,6 +70,8 @@ class MealReminderManager
                     )
                     .build(),
             )
+
+            ttsManager.speak(slot.body)
         }
 
         enum class MealSlot(

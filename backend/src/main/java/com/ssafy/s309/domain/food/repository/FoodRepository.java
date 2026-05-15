@@ -48,6 +48,14 @@ public interface FoodRepository extends JpaRepository<Food, Integer> {
   List<Food> findByNameIgnoreCaseOrderBySearchCountDesc(String name);
 
   /**
+   * displayName 정확 일치 (대소문자 무시) — 식약처 raw name 과 사용자 노출명이 다른 경우 대비.
+   *
+   * <p>예: name="비빔밥_혼합곡류", displayName="비빔밥". CV 가 "비빔밥"으로 인식했을 때 name 매칭 실패해도 displayName 으로 잡아 빈
+   * customized row 누적 방지.
+   */
+  List<Food> findByDisplayNameIgnoreCaseOrderBySearchCountDesc(String displayName);
+
+  /**
    * Agent 음식 추천용 — 사용자가 등급(user_food_grades) 또는 최근 식사(meal_records 7일)에 없는 foods 후보. search_count
    * desc 정렬, Pageable로 limit 제어.
    */

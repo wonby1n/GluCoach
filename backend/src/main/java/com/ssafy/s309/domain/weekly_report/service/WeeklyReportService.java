@@ -2,6 +2,7 @@ package com.ssafy.s309.domain.weekly_report.service;
 
 import com.ssafy.s309.common.service.FcmService;
 import com.ssafy.s309.common.service.S3Service;
+import com.ssafy.s309.domain.alert.service.AlertChannelResolver;
 import com.ssafy.s309.domain.meal.repository.MealRecordRepository;
 import com.ssafy.s309.domain.notification.repository.NotificationTokenRepository;
 import com.ssafy.s309.domain.user.entity.User;
@@ -34,7 +35,7 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class WeeklyReportService {
 
-  private static final String REPORT_FCM_CHANNEL = "report_notification";
+  private static final String REPORT_FCM_CHANNEL = AlertChannelResolver.CH_DEFAULT;
   private static final String REPORT_ALERT_TYPE = "WEEKLY_REPORT";
 
   private final WeeklyReportQueryService queryService;
