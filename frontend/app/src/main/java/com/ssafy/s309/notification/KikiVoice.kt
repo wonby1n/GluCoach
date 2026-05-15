@@ -30,7 +30,7 @@ class KikiVoice
 
         @Volatile private var tts: TextToSpeech? = null
 
-        /** TTS 엔진을 lazy 하게 초기화한다. WakeWordManager.start() 에서 호출. */
+        /** TTS 엔진을 lazy 하게 초기화한다. 음성 응답이 필요한 호출 지점에서 호출. */
         fun ensureInitialized() {
             if (tts != null) return
             tts =
@@ -62,6 +62,16 @@ class KikiVoice
             speak("네, ${name}님!")
         }
 
+        /**
+         * 임의의 메시지 음성 출력. STT 자유 발화 응답을 키키 목소리로 읽어줄 때 호출.
+         * KikiChatScreen 이 음성 입력으로 보낸 query 에 대한 응답에만 사용 (텍스트 입력은 음성 출력 안 함).
+         */
+        fun speakMessage(text: String) {
+            if (text.isBlank()) return
+            ensureInitialized()
+            speak(text)
+        }
+
         private fun speak(text: String) {
             val engine = tts
             if (engine == null) {
@@ -72,15 +82,17 @@ class KikiVoice
                 Log.w(TAG, "TTS 미준비 — 발화 무시: $text")
                 return
             }
+            val spoken = sanitizeForTts(text)
+            if (spoken.isBlank()) return
             val utteranceId = "kiki-${utteranceCounter.incrementAndGet()}"
             val params =
                 Bundle().apply {
                     putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_NOTIFICATION)
                 }
             try {
-                engine.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+                engine.speak(spoken, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
             } catch (e: Exception) {
-                Log.e(TAG, "TTS speak 실패: $text", e)
+                Log.e(TAG, "TTS speak 실패: $spoken", e)
             }
         }
 
