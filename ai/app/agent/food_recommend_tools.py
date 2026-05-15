@@ -162,6 +162,56 @@ def get_glucose_recent() -> dict:
     }
 
 
+def search_food_by_name(query: str, limit: int = 5) -> dict:
+    """사용자 발화에서 추출한 음식명으로 food_id 후보를 검색한다.
+
+    자유 발화 모드 전용. "짬뽕 먹어도 돼?" → search_food_by_name("짬뽕") → 첫 후보의 food_id 를
+    predict_glucose_for_food 에 전달. 정확 일치 우선, 없으면 부분 일치 fallback.
+    """
+    if not query or not query.strip():
+        return {"candidates": []}
+    raw = _be_get("/api/agent/foods/search", params={"query": query.strip(), "limit": limit})
+    if raw is None:
+        return {"candidates": [], "error": "be_unavailable"}
+    return {
+        "candidates": [
+            {
+                "food_id": c.get("foodId"),
+                "name": c.get("displayName") or c.get("name"),
+                "category": c.get("category"),
+                "kcal": c.get("kcal"),
+                "carbs_g": c.get("carbsG"),
+            }
+            for c in raw
+        ]
+    }
+
+
+def predict_glucose_for_food(food_id: int) -> dict:
+    """food_id 로 혈당 예측을 받아온다 (peak_mgdl / peak_minute / delta / risk_level).
+
+    자유 발화 모드에서 사용자가 특정 음식을 먹어도 되는지 물을 때 호출한다. 응답 톤 결정에 쓴다:
+    - risk_level == "high" (peak ≥ 200): 권유 X, "다른 거 어때요" 톤
+    - risk_level == "elevated" (180 ≤ peak < 200): 양 조절 / 한 시간 뒤 권고
+    - risk_level == "normal" (peak < 180): "괜찮아요" 톤, 양만 짚어줌
+    """
+    user_id = _context.get("user_id")
+    if user_id is None or food_id is None:
+        return {"error": "missing_user_or_food"}
+    raw = _be_get(f"/api/agent/foods/{food_id}/predict-glucose", params={"userId": user_id})
+    if raw is None:
+        return {"error": "be_unavailable"}
+    return {
+        "food_id": raw.get("foodId"),
+        "food_name": raw.get("foodName"),
+        "current_mg_dl": raw.get("currentMgdl"),
+        "peak_mg_dl": raw.get("peakMgdl"),
+        "peak_minute": raw.get("peakMinute"),
+        "delta_mg_dl": raw.get("deltaMgdl"),
+        "risk_level": raw.get("riskLevel"),
+    }
+
+
 # ── 행동 도구 ─────────────────────────────────────────────
 
 
@@ -257,6 +307,39 @@ FOOD_RECOMMEND_TOOL_SCHEMAS = [
         },
     },
     {
+        "name": "search_food_by_name",
+        "description": (
+            "자유 발화 모드 전용 — 사용자가 발화한 음식명(예: '짬뽕')으로 food_id 후보 검색. "
+            "정확 일치 우선, 없으면 부분 일치 fallback. candidates[0].food_id 를 predict_glucose_for_food 에 넘긴다."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "음식 이름. 사용자 발화에서 추출."},
+                "limit": {"type": "integer", "default": 5, "description": "최대 후보 수 (1~10)"},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "predict_glucose_for_food",
+        "description": (
+            "자유 발화 모드 전용 — food_id 로 혈당 예측. 응답에 peak_mg_dl / peak_minute / delta_mg_dl / risk_level 포함. "
+            "risk_level: 'high'(>=200), 'elevated'(>=180), 'normal'(<180), 'unknown'. "
+            "이 결과로 응답 톤 결정: high→권유 X / elevated→양 조절·시간 권고 / normal→가볍게 OK."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "food_id": {
+                    "type": "integer",
+                    "description": "search_food_by_name 결과의 food_id 또는 user_food_grades 의 foodId.",
+                }
+            },
+            "required": ["food_id"],
+        },
+    },
+    {
         "name": "send_command_response",
         "description": (
             "사용자 command에 대한 agent 응답을 발송한다. parent_id로 user 메시지를 참조하므로 채팅 thread가 형성된다. "
@@ -309,5 +392,7 @@ FOOD_RECOMMEND_TOOL_MAP = {
     "get_user_profile": get_user_profile,
     "get_glucose_recent": get_glucose_recent,
     "get_unseen_food_candidates": get_unseen_food_candidates,
+    "search_food_by_name": search_food_by_name,
+    "predict_glucose_for_food": predict_glucose_for_food,
     "send_command_response": send_command_response,
 }

@@ -1,7 +1,12 @@
 
 package com.ssafy.s309.ui.screen.main
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.util.Log
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,7 +30,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBackIosNew
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Restaurant
+import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -43,10 +50,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -57,8 +66,10 @@ import androidx.lifecycle.viewModelScope
 import com.ssafy.s309.R
 import com.ssafy.s309.data.model.NotificationItem
 import com.ssafy.s309.data.repository.HealthRepository
+import com.ssafy.s309.notification.KikiVoice
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
+import com.ssafy.s309.voice.VoiceQueryManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -98,6 +109,8 @@ class KikiChatViewModel
     @Inject
     constructor(
         private val healthRepository: HealthRepository,
+        private val voiceQueryManager: VoiceQueryManager,
+        private val kikiVoice: KikiVoice,
     ) : ViewModel() {
         private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
         val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
@@ -113,6 +126,16 @@ class KikiChatViewModel
 
         private val _isWaitingForAgent = MutableStateFlow(false)
         val isWaitingForAgent: StateFlow<Boolean> = _isWaitingForAgent.asStateFlow()
+
+        // 음성 입력 상태 그대로 노출 (Composable이 마이크 버튼 외형 결정에 사용)
+        val voiceState: StateFlow<VoiceQueryManager.State> = voiceQueryManager.state
+        val voicePartial: StateFlow<String> = voiceQueryManager.partial
+
+        /**
+         * STT로 보낸 직전 질문이 응답 대기 중인지. true 면 다음 도착하는 키키 메시지를 TTS로 읽는다.
+         * 텍스트 "음식 추천" 버튼으로 보낸 응답은 음성 출력 안 함.
+         */
+        @Volatile private var pendingVoiceResponse: Boolean = false
 
         private var timeoutJob: Job? = null
         private var currentPage = -1
@@ -134,6 +157,8 @@ class KikiChatViewModel
                     onFcmReceived()
                 }
             }
+            // TTS 엔진은 첫 음성 응답 직전에 준비되면 늦으므로 ViewModel 생성 시 미리 준비.
+            kikiVoice.ensureInitialized()
         }
 
         fun loadNextPage() {
@@ -268,6 +293,17 @@ class KikiChatViewModel
                         if (newMessages.isNotEmpty()) {
                             val raw = _messages.value.filterNot { it is ChatMessage.DateSeparator }
                             _messages.value = withDateSeparators(newMessages + raw)
+
+                            // STT로 보낸 질문에 대한 응답이면 키키 음성으로 읽어준다.
+                            // 새로 도착한 메시지들 중 가장 최신 KikiMessage 1개만 발화 (연속 멀티-메시지 방지).
+                            if (pendingVoiceResponse) {
+                                val latestKiki =
+                                    newMessages.firstOrNull { it is ChatMessage.KikiMessage } as? ChatMessage.KikiMessage
+                                if (latestKiki != null) {
+                                    pendingVoiceResponse = false
+                                    kikiVoice.speakMessage(latestKiki.item.message)
+                                }
+                            }
                         }
                     }
                     .onFailure { Log.w(TAG, "FCM 후 메시지 재조회 실패", it) }
@@ -275,9 +311,45 @@ class KikiChatViewModel
         }
 
         fun sendFoodRecommendCommand() {
+            // 텍스트 버튼 경로 — 음성 응답 출력 안 함.
+            pendingVoiceResponse = false
+            dispatchRecommendCommand(userQuery = null)
+        }
+
+        /**
+         * 마이크 STT 결과를 그대로 recommend_food 경로로 흘려보낸다.
+         * AI 프롬프트가 payload["query"] 존재 시 [자유 발화 모드] 로 분기한다.
+         *
+         * user 말풍선은 BE 저장 후 onFcmReceived 의 page=0 재조회에서 함께 가져온다 (로컬 prepend
+         * 하면 클라이언트/BE createdAt 차이로 dedupe가 깨져 중복 표시됨).
+         * 응답 도착 시 pendingVoiceResponse 플래그가 true 이면 TTS 출력.
+         */
+        fun sendVoiceQuery(transcript: String) {
+            val trimmed = transcript.trim()
+            if (trimmed.isEmpty()) return
+            pendingVoiceResponse = true
+            dispatchRecommendCommand(userQuery = trimmed)
+        }
+
+        /**
+         * 마이크 버튼 탭. STT 한 세션 시작. 권한/엔진 미비 또는 발화 미감지 시 [onError] 호출.
+         * 결과 확보 시 자동으로 [sendVoiceQuery] 로 흘려보낸다.
+         */
+        fun startVoiceQuery(onError: (VoiceQueryManager.FailureReason) -> Unit) {
+            voiceQueryManager.startOnce(
+                onResult = { transcript -> sendVoiceQuery(transcript) },
+                onError = onError,
+            )
+        }
+
+        fun cancelVoiceQuery() {
+            voiceQueryManager.cancel()
+        }
+
+        private fun dispatchRecommendCommand(userQuery: String?) {
             if (_isWaitingForAgent.value) return
             viewModelScope.launch {
-                runCatching { healthRepository.sendFoodRecommendCommand() }
+                runCatching { healthRepository.sendFoodRecommendCommand(userQuery) }
                     .onSuccess {
                         _isWaitingForAgent.value = true
                         timeoutJob?.cancel()
@@ -425,7 +497,41 @@ fun KikiChatScreen(
     val hasMore by viewModel.hasMore.collectAsStateWithLifecycle()
     val fontSize by viewModel.fontSize.collectAsStateWithLifecycle()
     val isWaitingForAgent by viewModel.isWaitingForAgent.collectAsStateWithLifecycle()
+    val voiceState by viewModel.voiceState.collectAsStateWithLifecycle()
+    val voicePartial by viewModel.voicePartial.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+    val context = LocalContext.current
+
+    // STT 트리거 — 권한 있으면 즉시 시작, 없으면 launcher 로 요청.
+    val recordAudioLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                viewModel.startVoiceQuery { reason ->
+                    Toast.makeText(context, voiceErrorMessage(reason), Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                Toast.makeText(context, "마이크 권한이 필요해요", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+    val onMicClick: () -> Unit = {
+        when (voiceState) {
+            VoiceQueryManager.State.LISTENING, VoiceQueryManager.State.PROCESSING ->
+                viewModel.cancelVoiceQuery()
+            VoiceQueryManager.State.IDLE -> {
+                val hasPermission =
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                        PackageManager.PERMISSION_GRANTED
+                if (hasPermission) {
+                    viewModel.startVoiceQuery { reason ->
+                        Toast.makeText(context, voiceErrorMessage(reason), Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    recordAudioLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }
+            }
+        }
+    }
 
     // 화면 진입/포그라운드 복귀 시 page=0 재조회 — FCM 미수신 단말에서도 최신 메시지 보장
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -583,65 +689,191 @@ fun KikiChatScreen(
                 }
             }
 
-            // ── 음식 추천 버튼 / 대기 인디케이터 (floating) ──────────
-            if (isWaitingForAgent) {
-                Row(
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = GlucoachSpacing.lg),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        color = GlucoachColors.PrimaryDark,
-                        strokeWidth = 2.dp,
-                    )
-                    Spacer(modifier = Modifier.width(GlucoachSpacing.sm))
-                    Text(
-                        text = "키키가 분석 중...",
-                        color = GlucoachColors.TextSecondary,
-                        fontSize = 14.sp,
-                    )
-                }
-            } else {
-                Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = GlucoachSpacing.lg)
-                            .shadow(
-                                elevation = 6.dp,
-                                shape = RoundedCornerShape(20.dp),
-                            )
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(GlucoachColors.Surface)
-                            .border(1.5.dp, GlucoachColors.PrimaryDark, RoundedCornerShape(20.dp))
-                            .clickable { viewModel.sendFoodRecommendCommand() }
-                            .padding(horizontal = GlucoachSpacing.lg, vertical = GlucoachSpacing.sm),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Restaurant,
-                            contentDescription = null,
-                            tint = GlucoachColors.PrimaryDark,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Text(
-                            text = "음식 추천",
-                            color = GlucoachColors.PrimaryDark,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
-                }
+            // ── 음식 추천 / 마이크 / STT 상태 (floating) ──────────
+            FloatingChatControls(
+                modifier = Modifier.align(Alignment.BottomCenter),
+                isWaitingForAgent = isWaitingForAgent,
+                voiceState = voiceState,
+                voicePartial = voicePartial,
+                onMicClick = onMicClick,
+                onRecommendClick = { viewModel.sendFoodRecommendCommand() },
+            )
+        }
+    }
+}
+
+@Composable
+private fun FloatingChatControls(
+    modifier: Modifier,
+    isWaitingForAgent: Boolean,
+    voiceState: VoiceQueryManager.State,
+    voicePartial: String,
+    onMicClick: () -> Unit,
+    onRecommendClick: () -> Unit,
+) {
+    val isListening = voiceState == VoiceQueryManager.State.LISTENING
+    val isProcessingStt = voiceState == VoiceQueryManager.State.PROCESSING
+
+    Column(
+        modifier = modifier.padding(bottom = GlucoachSpacing.lg),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        // 음성 발화 partial transcript 미니 표시
+        if (isListening && voicePartial.isNotBlank()) {
+            Box(
+                modifier =
+                    Modifier
+                        .padding(bottom = GlucoachSpacing.sm)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(GlucoachColors.Surface)
+                        .border(1.dp, GlucoachColors.Border, RoundedCornerShape(14.dp))
+                        .padding(horizontal = GlucoachSpacing.md, vertical = 6.dp),
+            ) {
+                Text(
+                    text = voicePartial,
+                    color = GlucoachColors.TextPrimary,
+                    fontSize = 13.sp,
+                )
+            }
+        }
+
+        if (isWaitingForAgent) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    color = GlucoachColors.PrimaryDark,
+                    strokeWidth = 2.dp,
+                )
+                Spacer(modifier = Modifier.width(GlucoachSpacing.sm))
+                Text(
+                    text = "키키가 분석 중...",
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 14.sp,
+                )
+            }
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.sm),
+            ) {
+                MicButton(
+                    isListening = isListening,
+                    isProcessing = isProcessingStt,
+                    onClick = onMicClick,
+                )
+                RecommendChip(onClick = onRecommendClick)
             }
         }
     }
 }
+
+@Composable
+private fun MicButton(
+    isListening: Boolean,
+    isProcessing: Boolean,
+    onClick: () -> Unit,
+) {
+    val (bgColor, iconTint, icon, label) =
+        when {
+            isListening ->
+                MicVisual(
+                    bg = GlucoachColors.PrimaryDark,
+                    tint = Color.White,
+                    icon = Icons.Outlined.Stop,
+                    label = "듣고 있어요",
+                )
+            isProcessing ->
+                MicVisual(
+                    bg = GlucoachColors.PrimaryLight,
+                    tint = GlucoachColors.PrimaryDark,
+                    icon = Icons.Outlined.Mic,
+                    label = "인식 중",
+                )
+            else ->
+                MicVisual(
+                    bg = GlucoachColors.Surface,
+                    tint = GlucoachColors.PrimaryDark,
+                    icon = Icons.Outlined.Mic,
+                    label = "음성으로 물어보기",
+                )
+        }
+    Box(
+        modifier =
+            Modifier
+                .shadow(elevation = 6.dp, shape = RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(20.dp))
+                .background(bgColor)
+                .border(1.5.dp, GlucoachColors.PrimaryDark, RoundedCornerShape(20.dp))
+                .clickable(onClick = onClick)
+                .padding(horizontal = GlucoachSpacing.lg, vertical = GlucoachSpacing.sm),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = iconTint,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                text = label,
+                color = iconTint,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
+}
+
+private data class MicVisual(
+    val bg: Color,
+    val tint: Color,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val label: String,
+)
+
+@Composable
+private fun RecommendChip(onClick: () -> Unit) {
+    Box(
+        modifier =
+            Modifier
+                .shadow(elevation = 6.dp, shape = RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(20.dp))
+                .background(GlucoachColors.Surface)
+                .border(1.5.dp, GlucoachColors.PrimaryDark, RoundedCornerShape(20.dp))
+                .clickable(onClick = onClick)
+                .padding(horizontal = GlucoachSpacing.lg, vertical = GlucoachSpacing.sm),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Restaurant,
+                contentDescription = null,
+                tint = GlucoachColors.PrimaryDark,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                text = "음식 추천",
+                color = GlucoachColors.PrimaryDark,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
+}
+
+private fun voiceErrorMessage(reason: VoiceQueryManager.FailureReason): String =
+    when (reason) {
+        VoiceQueryManager.FailureReason.NO_PERMISSION -> "마이크 권한이 필요해요"
+        VoiceQueryManager.FailureReason.NO_ENGINE -> "음성 인식을 사용할 수 없어요"
+        VoiceQueryManager.FailureReason.NO_SPEECH -> "잘 못 들었어요, 다시 한 번 말씀해주세요"
+        VoiceQueryManager.FailureReason.START_FAILED -> "마이크를 시작할 수 없어요"
+        VoiceQueryManager.FailureReason.RECOGNIZER_ERROR -> "음성 인식 중 오류가 났어요"
+    }
 
 // ── TopBar ───────────────────────────────────────────────────────────
 

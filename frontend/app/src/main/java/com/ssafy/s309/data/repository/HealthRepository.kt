@@ -264,13 +264,21 @@ class HealthRepository
                 .onFailure { Log.w(TAG, "전체 읽음 처리 실패", it) }
         }
 
-        /** 음식 추천 명령 발화. commandType/message/payload 고정값. */
-        suspend fun sendFoodRecommendCommand() =
+        /**
+         * 음식 추천 명령 발화. userQuery 가 비어있지 않으면 자유 발화 질문으로 간주하고
+         * payload["query"] 에 실어 보낸다 (AI 프롬프트가 [자유 발화 모드] 로 분기).
+         * 마이크 STT 입력("마라탕 먹어도 돼?" 등)을 그대로 흘려 보내기 위한 통로.
+         */
+        suspend fun sendFoodRecommendCommand(userQuery: String? = null) =
             healthApi.sendChatCommand(
                 ChatCommandRequest(
                     commandType = "recommend_food",
-                    message = "음식 추천해줘",
-                    payload = emptyMap(),
+                    message = userQuery?.takeIf { it.isNotBlank() } ?: "음식 추천해줘",
+                    payload =
+                        userQuery
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { mapOf("query" to it) }
+                            ?: emptyMap(),
                 ),
             )
 

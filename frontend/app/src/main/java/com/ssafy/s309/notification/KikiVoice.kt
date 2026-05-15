@@ -62,6 +62,16 @@ class KikiVoice
             speak("네, ${name}님!")
         }
 
+        /**
+         * 임의의 메시지 음성 출력. STT 자유 발화 응답을 키키 목소리로 읽어줄 때 호출.
+         * KikiChatScreen 이 음성 입력으로 보낸 query 에 대한 응답에만 사용 (텍스트 입력은 음성 출력 안 함).
+         */
+        fun speakMessage(text: String) {
+            if (text.isBlank()) return
+            ensureInitialized()
+            speak(text)
+        }
+
         private fun speak(text: String) {
             val engine = tts
             if (engine == null) {
