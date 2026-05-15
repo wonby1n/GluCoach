@@ -1696,3 +1696,158 @@ private fun FoodManualSearchScreen(
         }
     }
 }
+
+// ── 키보드 → 혈당 예측 바로가기 ─────────────────────────────
+
+@Composable
+fun KeyboardPredictionContent(
+    foodName: String,
+    onClose: () -> Unit,
+    viewModel: FoodScanViewModel = hiltViewModel(),
+) {
+    var candidate by remember { mutableStateOf<FoodScanCandidate?>(null) }
+    var prediction by remember { mutableStateOf<com.ssafy.s309.data.model.GlucosePrediction?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var notFound by remember { mutableStateOf(false) }
+
+    LaunchedEffect(foodName) {
+        isLoading = true
+        notFound = false
+        candidate = null
+        prediction = null
+
+        val results = viewModel.searchFoodsDirect(foodName)
+        if (results.isEmpty()) {
+            isLoading = false
+            notFound = true
+            return@LaunchedEffect
+        }
+        val item = results.first()
+        candidate =
+            FoodScanCandidate(
+                rank = 1,
+                foodId = item.id,
+                name = item.displayName ?: item.name,
+                kcal = item.kcal,
+                carbsG = item.carbsG,
+                proteinG = item.proteinG,
+                fatG = item.fatG,
+                confidence = 1.0f,
+            )
+        isLoading = false
+        prediction = viewModel.predictByFoodDirect(item)
+    }
+
+    BackHandler { onClose() }
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(GlucoachColors.Background)
+                .verticalScroll(rememberScrollState()),
+    ) {
+        Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+        ) {
+            IconButton(onClick = onClose, modifier = Modifier.align(Alignment.CenterStart)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                    contentDescription = "뒤로",
+                    tint = GlucoachColors.TextPrimary,
+                )
+            }
+            Text(
+                text = "혈당 예측",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+        Column(modifier = Modifier.padding(horizontal = 22.dp)) {
+            when {
+                isLoading -> {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(color = GlucoachColors.Primary)
+                    }
+                }
+
+                notFound -> {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
+                                .clip(RoundedCornerShape(GlucoachCorner.card))
+                                .background(GlucoachColors.Surface)
+                                .padding(GlucoachSpacing.xl),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "해당 음식의 정보를 찾을 수 없어요",
+                            color = GlucoachColors.TextSecondary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+
+                candidate != null -> {
+                    val food = candidate!!
+                    if (prediction != null) {
+                        GlucoseSpikeCard(food = food, prediction = prediction!!)
+                        Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+                        GlucosePredictionChart(prediction = prediction!!)
+                    } else {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
+                                    .clip(RoundedCornerShape(GlucoachCorner.card))
+                                    .background(GlucoachColors.Surface)
+                                    .padding(GlucoachSpacing.xl),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                androidx.compose.foundation.Image(
+                                    painter = painterResource(id = R.drawable.kiki_main),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(120.dp),
+                                    contentScale = ContentScale.Fit,
+                                )
+                                Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+                                Text(
+                                    text = "혈당 예측 데이터를 불러오는 중...",
+                                    color = GlucoachColors.TextSecondary,
+                                    fontSize = 14.sp,
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+                    NutritionCard(food = food)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
+        }
+    }
+}

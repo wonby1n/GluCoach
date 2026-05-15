@@ -41,6 +41,7 @@ class GlucoseKeyboard : InputMethodService() {
     private lateinit var inlineBanner: View
     private lateinit var inlineBannerDot: View
     private lateinit var inlineBannerText: TextView
+    private lateinit var inlinePredictButton: View
     private val bannerManager by lazy { OverlayBannerManager(applicationContext) }
     private val hangul = HangulComposer()
 
@@ -237,6 +238,43 @@ class GlucoseKeyboard : InputMethodService() {
             startActivity(intent)
         }
         outer.addView(container)
+
+        val predictButton =
+            TextView(this).apply {
+                text = "혈당 예측을 확인해보시겠어요? ›"
+                textSize = 13f
+                setTextColor(Color.parseColor("#4EA8BC"))
+                typeface = Typeface.DEFAULT_BOLD
+                gravity = Gravity.CENTER
+                setPadding(dp(14), dp(8), dp(14), dp(8))
+                background =
+                    GradientDrawable().apply {
+                        setColor(Color.WHITE)
+                        cornerRadius = dp(12).toFloat()
+                        setStroke(dp(1), Color.parseColor("#4EA8BC"))
+                    }
+                layoutParams =
+                    LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+                        setMargins(0, dp(6), 0, 0)
+                    }
+                setOnClickListener {
+                    val intent =
+                        Intent().apply {
+                            setClassName("com.ssafy.s309", "com.ssafy.s309.MainActivity")
+                            putExtra("navigate_to", "glucose_predict")
+                            currentMatchedFood?.let {
+                                putExtra("food_name", it.displayName ?: it.name)
+                            }
+                            flags =
+                                Intent.FLAG_ACTIVITY_NEW_TASK or
+                                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                                Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        }
+                    startActivity(intent)
+                }
+            }.also { inlinePredictButton = it }
+        outer.addView(predictButton)
+
         return outer
     }
 
@@ -248,6 +286,9 @@ class GlucoseKeyboard : InputMethodService() {
         inlineBannerText.setTextColor(Color.BLACK)
         (inlineBannerDot.background as? GradientDrawable)?.setColor(color)
         inlineBanner.visibility = View.VISIBLE
+        if (::inlinePredictButton.isInitialized) {
+            inlinePredictButton.visibility = View.VISIBLE
+        }
     }
 
     private fun hideInlineBanner() {
@@ -788,7 +829,7 @@ class GlucoseKeyboard : InputMethodService() {
 
     private fun triggerBanner(text: String) {
         Log.d(TAG, "triggerBanner called: text='$text'")
-        val food = KeyboardFoodCache.findExact(text) ?: KeyboardFoodCache.findContained(text)
+        val food = KeyboardFoodCache.findBest(text)
         Log.d(TAG, "triggerBanner matched: ${food?.name ?: "NONE"} (grade=${food?.grade ?: "-"})")
         currentMatchedFood = food
         if (food == null) {

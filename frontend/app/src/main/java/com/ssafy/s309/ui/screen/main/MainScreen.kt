@@ -180,6 +180,7 @@ fun MainScreenContent(
     var showReportSheet by remember { mutableStateOf(false) }
     var showCameraPanel by remember { mutableStateOf(false) }
     var isAbMode by remember { mutableStateOf(false) }
+    var keyboardPredictFoodName by remember { mutableStateOf<String?>(null) }
     var cumulativeDrag by remember { mutableFloatStateOf(0f) }
 
     androidx.compose.runtime.LaunchedEffect(requestedTab) {
@@ -193,6 +194,10 @@ fun MainScreenContent(
                 "food-comparison" -> {
                     showCameraPanel = true
                     isAbMode = true
+                }
+                "glucose-predict" -> {
+                    keyboardPredictFoodName = targetFoodName
+                    onTargetFoodHandled()
                 }
                 else -> selectedTab = requestedTab
             }
@@ -442,6 +447,20 @@ fun MainScreenContent(
                     selectedTab = if (isAbMode) "meallog" else "home"
                 },
             )
+        }
+
+        AnimatedVisibility(
+            visible = keyboardPredictFoodName != null,
+            enter = slideInHorizontally(animationSpec = tween(300)) { -it },
+            exit = slideOutHorizontally(animationSpec = tween(300)) { -it },
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            keyboardPredictFoodName?.let { foodName ->
+                KeyboardPredictionContent(
+                    foodName = foodName,
+                    onClose = { keyboardPredictFoodName = null },
+                )
+            }
         }
 
         AnimatedVisibility(

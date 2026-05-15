@@ -224,4 +224,8 @@ class FoodScanViewModel
             _state.value = FoodScanState.Idle
             _manualPrediction.value = null
         }
+
+        suspend fun searchFoodsDirect(query: String): List<FoodSearchItem> = foodRepository.searchFoods(query).getOrNull().orEmpty()
+
+        suspend fun predictByFoodDirect(item: FoodSearchItem): GlucosePrediction? = foodRepository.predictByFood(item).getOrNull()
     }

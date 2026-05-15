@@ -1,5 +1,6 @@
 package com.ssafy.s309.navigation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -92,6 +93,7 @@ sealed class Screen(val route: String) {
 private fun SubScreenWithBottomNav(
     navController: NavHostController,
     selectedId: String = "profile",
+    onKikiReselect: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     var showReportSheet by remember { mutableStateOf(false) }
@@ -157,8 +159,13 @@ private fun SubScreenWithBottomNav(
             onItemClick = { item ->
                 when (item.id) {
                     "kiki" -> {
-                        navController.navigate(Screen.KikiChat.route) {
-                            launchSingleTop = true
+                        // KikiChat 자기 자신에서 누르면 뒤로가기 (콜백으로 위임 — markAllRead + popBackStack)
+                        if (onKikiReselect != null) {
+                            onKikiReselect()
+                        } else {
+                            navController.navigate(Screen.KikiChat.route) {
+                                launchSingleTop = true
+                            }
                         }
                     }
                     "report" -> {
@@ -330,6 +337,10 @@ fun AppNavigation(
                     backStackEntry.savedStateHandle["requestedTab"] = "food-report"
                     onNavTargetConsumed()
                 }
+                if (pendingNavTarget == com.ssafy.s309.MainActivity.NAV_GLUCOSE_PREDICT) {
+                    backStackEntry.savedStateHandle["requestedTab"] = "glucose-predict"
+                    onNavTargetConsumed()
+                }
                 if (pendingFoodName != null) {
                     backStackEntry.savedStateHandle["targetFoodName"] = pendingFoodName
                     onFoodNameConsumed()
@@ -427,12 +438,18 @@ fun AppNavigation(
             val mainViewModel: MainViewModel = hiltViewModel(mainEntry)
             val chatViewModel: KikiChatViewModel = hiltViewModel(mainEntry)
             LaunchedEffect(Unit) { mainViewModel.markAllNotificationsRead() }
-            SubScreenWithBottomNav(navController = navController, selectedId = "home") {
+            val onBack = {
+                mainViewModel.markAllNotificationsRead()
+                navController.popBackStack()
+                Unit
+            }
+            SubScreenWithBottomNav(
+                navController = navController,
+                selectedId = "home",
+                onKikiReselect = onBack,
+            ) {
                 KikiChatScreen(
-                    onBack = {
-                        mainViewModel.markAllNotificationsRead()
-                        navController.popBackStack()
-                    },
+                    onBack = onBack,
                     onItemClick = { item ->
                         // 채팅 목록에서 열리는 알림은 이미 읽은 것으로 처리
                         mainViewModel.selectNotification(item.copy(isUnread = false))
@@ -451,14 +468,41 @@ fun AppNavigation(
             val mainViewModel: MainViewModel = hiltViewModel(mainEntry)
             val chatViewModel: KikiChatViewModel = hiltViewModel(mainEntry)
             val mainUiState by mainViewModel.uiState.collectAsState()
+            // 진입 시점에 캡처해 stabilize — pop 직전 selectedNotification 클리어 시 exit 애니메이션 중
+            // notification 이 null로 바뀌어 화면이 깜빡이는 것을 막음.
             val notification =
-                mainUiState.selectedNotification
-                    ?: mainUiState.notifications.firstOrNull { it.isUnread }
-            SubScreenWithBottomNav(navController = navController, selectedId = "home") {
+                remember {
+                    mainUiState.selectedNotification
+                        ?: mainUiState.notifications.firstOrNull { it.isUnread }
+                }
+            // AlarmDetail를 벗어날 때 pop 직전에 selectedNotification 동기적 클리어 — Main RESUMED 시점에
+            // 이미 null이라야 NotificationDetailOverlay 모달이 한 프레임도 깜빡이지 않음.
+            // DisposableEffect 만으로는 Main 첫 컴포지션과 race 발생 (모달 깜빡임).
+            val dismissAndPopOne = {
+                mainViewModel.dismissNotificationDetail()
+                navController.popBackStack()
+                Unit
+            }
+            val dismissAndPopHome = {
+                mainViewModel.dismissNotificationDetail()
+                navController.popBackStack(Screen.Main.route, inclusive = false)
+                Unit
+            }
+            // 시스템 백 키도 동일 경로로 강제
+            BackHandler { dismissAndPopOne() }
+            // 콜백 미경유 disposal 케이스(예: 앱 종료/프로세스 복원) safety net
+            androidx.compose.runtime.DisposableEffect(Unit) {
+                onDispose { mainViewModel.dismissNotificationDetail() }
+            }
+            SubScreenWithBottomNav(
+                navController = navController,
+                selectedId = "home",
+                onKikiReselect = dismissAndPopHome,
+            ) {
                 KikiAlarmDetailScreen(
                     notification = notification,
                     isNewUser = mainUiState.isNewUser,
-                    onBack = { navController.popBackStack() },
+                    onBack = dismissAndPopOne,
                     onChatClick = { navController.navigate(Screen.KikiChat.route) },
                     onMealReply = { replyText, displayLabel ->
                         mainViewModel.sendMealReply(replyText, displayLabel)
