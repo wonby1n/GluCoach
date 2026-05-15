@@ -1,19 +1,31 @@
 package com.ssafy.s309.feature.glucofit.keyboard
 
+import android.annotation.SuppressLint
 import android.content.Intent
+import android.content.SharedPreferences
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.inputmethodservice.InputMethodService
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
+import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.inputmethod.EditorInfo
 import android.widget.LinearLayout
 import android.widget.LinearLayout.LayoutParams.MATCH_PARENT
 import android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+import android.widget.PopupWindow
 import android.widget.TextView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.ssafy.s309.feature.glucofit.data.KeyboardFoodCache
 import com.ssafy.s309.feature.glucofit.glucose.GlucoseSimulator
 import com.ssafy.s309.feature.glucofit.overlay.OverlayBannerManager
@@ -25,27 +37,81 @@ class GlucoseKeyboard : InputMethodService() {
     private var lastEditorText: String = ""
     private lateinit var keyContainer: LinearLayout
     private lateinit var btnLang: TextView
+    private lateinit var btnSym: TextView
     private lateinit var inlineBanner: View
     private lateinit var inlineBannerDot: View
     private lateinit var inlineBannerText: TextView
     private val bannerManager by lazy { OverlayBannerManager(applicationContext) }
     private val hangul = HangulComposer()
 
+    /** 기호 모드 진입 전 언어 모드 — ← 키로 복귀할 때 사용. */
+    private var prevLangMode = KeyboardMode.KOREAN
+
+    /** 백스페이스 롱프레스 반복 삭제 (50 → 30 → 20ms 가속). */
+    private val backspaceHandler = Handler(Looper.getMainLooper())
+    private var backspaceStartTime = 0L
+    private val backspaceRepeat =
+        object : Runnable {
+            override fun run() {
+                handleBackspace()
+                val elapsed = System.currentTimeMillis() - backspaceStartTime
+                val delay =
+                    when {
+                        elapsed > 2000L -> 20L
+                        elapsed > 1000L -> 30L
+                        else -> 50L
+                    }
+                backspaceHandler.postDelayed(this, delay)
+            }
+        }
+
+    /**
+     * 배너 업데이트 디바운스 핸들러 (150ms).
+     * 매 키 입력마다 음식 검색을 실행하지 않고 입력이 잠시 멈출 때만 실행.
+     */
+    private val bannerHandler = Handler(Looper.getMainLooper())
+
     /** 배너에 현재 표시 중인 매칭 음식. 배너 클릭 시 앱으로 전달. null이면 매칭 없음. */
     private var currentMatchedFood: com.ssafy.s309.feature.glucofit.data.KeyboardFoodItem? = null
 
+    // ── Caps Lock & 더블-탭 Shift ──────────────────────────────────────────
+    private var isCapsLock = false
+    private val doubleTapHandler = Handler(Looper.getMainLooper())
+    private var doubleTapPending = false
+
+    // ── 키 미리보기 팝업 ────────────────────────────────────────────────────
+    private var keyPreviewPopup: PopupWindow? = null
+
+    // ── 세션 영속화 ─────────────────────────────────────────────────────────
+    private lateinit var prefs: SharedPreferences
+
+    // ── 스페이스 롱프레스 커서 이동 ─────────────────────────────────────────
+    private val spaceHandler = Handler(Looper.getMainLooper())
+    private var spaceCursorMode = false
+    private var spaceTouchDownX = 0f
+    private var spaceStepsAccum = 0
+
     override fun onCreate() {
         super.onCreate()
+        prefs = getSharedPreferences("glucose_keyboard_prefs", MODE_PRIVATE)
+        mode =
+            when (prefs.getString("mode", "KOREAN")) {
+                "ENGLISH" -> KeyboardMode.ENGLISH
+                "SYMBOLS" -> KeyboardMode.SYMBOLS
+                else -> KeyboardMode.KOREAN
+            }
+        prevLangMode =
+            when (prefs.getString("prevLangMode", "KOREAN")) {
+                "ENGLISH" -> KeyboardMode.ENGLISH
+                else -> KeyboardMode.KOREAN
+            }
         KeyboardFoodCache.load(applicationContext)
-        // 메인 앱 미진입 상태에서도 IME 단독으로 혈당 시뮬레이터 가동.
-        // 이미 실행 중이면 start() 내부 가드로 no-op.
         GlucoseSimulator.start(applicationContext)
     }
 
     /**
      * 입력 세션 시작마다 캐시 mtime 체크. KeyboardFoodSyncManager가 로그인 후 파일을 새로 쓰면
      * 그 다음 입력창 탭 시점에 자동 재로딩되어 stale grade=null 트랩을 회피한다.
-     * 파일 unchanged면 mtime 비교만 하고 즉시 return이라 비용 없음.
      */
     override fun onStartInput(
         attribute: EditorInfo?,
@@ -74,12 +140,29 @@ class GlucoseKeyboard : InputMethodService() {
     private var isShift = false
 
     override fun onCreateInputView(): View {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#D1D3D8"))
-            addView(buildInlineBanner().also { inlineBanner = it })
-            addView(buildKeyboard().also { keyContainer = it })
-        }
+        val root =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundColor(Color.parseColor("#D1D5DB"))
+                addView(buildInlineBanner().also { inlineBanner = it })
+                addView(buildKeyboard().also { keyContainer = it })
+            }
+        // 내비게이션 바 높이에 맞게 하단 패딩을 동적으로 조정.
+        root.addOnAttachStateChangeListener(
+            object : View.OnAttachStateChangeListener {
+                override fun onViewAttachedToWindow(v: View) {
+                    ViewCompat.setOnApplyWindowInsetsListener(keyContainer) { _, insets ->
+                        val navBottom = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+                        keyContainer.setPadding(dp(4), dp(8), dp(4), navBottom.coerceAtLeast(dp(8)))
+                        insets
+                    }
+                    ViewCompat.requestApplyInsets(root)
+                }
+
+                override fun onViewDetachedFromWindow(v: View) {}
+            },
+        )
+        return root
     }
 
     private fun buildInlineBanner(): View {
@@ -123,8 +206,7 @@ class GlucoseKeyboard : InputMethodService() {
                 textSize = 14f
                 typeface = Typeface.DEFAULT_BOLD
                 setTextColor(Color.parseColor("#1A1A1A"))
-                layoutParams =
-                    LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f)
+                layoutParams = LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f)
             }.also { inlineBannerText = it }
 
         val chevron =
@@ -147,9 +229,6 @@ class GlucoseKeyboard : InputMethodService() {
                     currentMatchedFood?.let {
                         putExtra("food_name", it.displayName ?: it.name)
                     }
-                    // NEW_TASK: Service에서 Activity 시작에 필수.
-                    // CLEAR_TOP + SINGLE_TOP: 기존 MainActivity 인스턴스를 재사용하면서 onNewIntent로 새 extras 전달,
-                    // 백그라운드에 있던 앱을 foreground로 끌어올림. (Samsung One UI 등 OEM에서 누락되는 케이스 방지)
                     flags =
                         Intent.FLAG_ACTIVITY_NEW_TASK or
                         Intent.FLAG_ACTIVITY_CLEAR_TOP or
@@ -172,15 +251,13 @@ class GlucoseKeyboard : InputMethodService() {
     }
 
     private fun hideInlineBanner() {
-        if (::inlineBanner.isInitialized) {
-            inlineBanner.visibility = View.GONE
-        }
+        if (::inlineBanner.isInitialized) inlineBanner.visibility = View.GONE
     }
 
     private fun buildKeyboard(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(3), dp(8), dp(3), dp(64))
+            setPadding(dp(4), dp(8), dp(4), dp(8)) // 하단: onCreateInputView WindowInsets 콜백이 덮어씀
             addView(buildLetterRows())
             addView(buildBottomRow())
         }
@@ -229,27 +306,106 @@ class GlucoseKeyboard : InputMethodService() {
         }
     }
 
+    /**
+     * 하단 행: [한/EN] [123/←] [SPACE] [확인]
+     *
+     * btnLang: KOREAN↔ENGLISH 토글. SYMBOLS에서 누르면 KOREAN.
+     * btnSym : SYMBOLS 전용 토글. SYMBOLS 진입/복귀.
+     */
     private fun buildBottomRow(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             layoutParams =
-                LinearLayout.LayoutParams(MATCH_PARENT, dp(50)).apply {
-                    setMargins(0, 0, 0, dp(5))
+                LinearLayout.LayoutParams(MATCH_PARENT, dp(52)).apply {
+                    setMargins(0, 0, 0, dp(4))
                 }
-            addView(buildKey(nextModeLabel(), 1.5f, KeyType.SPECIAL).also { btnLang = it as TextView })
-            addView(buildKey("SPACE", 5f, KeyType.NORMAL))
+            addView(
+                buildKey(langLabel(), 1.2f, KeyType.SPECIAL).also { v ->
+                    // buildKey가 설정한 터치 리스너를 lang 전용으로 덮어씀
+                    v.setOnTouchListener { view, event ->
+                        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                            toggleLang()
+                        }
+                        true
+                    }
+                    btnLang = v as TextView
+                },
+            )
+            addView(
+                buildKey(symLabel(), 1.2f, KeyType.SPECIAL).also { v ->
+                    v.setOnTouchListener { view, event ->
+                        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                            toggleSym()
+                        }
+                        true
+                    }
+                    btnSym = v as TextView
+                },
+            )
+            addView(buildSpaceKey())
             addView(buildKey("확인", 1.5f, KeyType.CONFIRM))
         }
     }
 
-    /** 현재 모드에서 토글 키 라벨 — 다음에 전환될 모드를 표시한다. */
-    private fun nextModeLabel(): String =
-        when (mode) {
-            KeyboardMode.KOREAN -> "EN"
-            KeyboardMode.ENGLISH -> "123"
-            KeyboardMode.SYMBOLS -> "한"
+    /** 언어 토글 버튼 레이블 — 누르면 전환될 방향을 표시. */
+    private fun langLabel(): String = if (mode == KeyboardMode.KOREAN) "EN" else "한"
+
+    /** 기호 토글 버튼 레이블 — SYMBOLS일 때 ← (이전 언어 복귀), 아니면 123. */
+    private fun symLabel(): String = if (mode == KeyboardMode.SYMBOLS) "←" else "123"
+
+    /**
+     * 스페이스 키: 일반 탭→공백, 롱프레스+드래그→커서 이동 (30dp = 1칸).
+     * 자체 터치 핸들러로 처리하므로 setOnClickListener 불필요.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun buildSpaceKey(): View {
+        return buildKey("SPACE", 4f, KeyType.NORMAL).apply {
+            setOnTouchListener { v, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        spaceTouchDownX = event.rawX
+                        spaceStepsAccum = 0
+                        spaceCursorMode = false
+                        spaceHandler.postDelayed({
+                            spaceCursorMode = true
+                            v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        }, ViewConfiguration.getLongPressTimeout().toLong())
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        if (spaceCursorMode) {
+                            val deltaX = event.rawX - spaceTouchDownX
+                            val stepPx = dp(30).toFloat()
+                            val newSteps = (deltaX / stepPx).toInt()
+                            val diff = newSteps - spaceStepsAccum
+                            if (diff != 0) {
+                                val keyCode = if (diff > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
+                                repeat(kotlin.math.abs(diff)) {
+                                    currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+                                    currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+                                }
+                                spaceStepsAccum = newSteps
+                                v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                            }
+                        }
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        spaceHandler.removeCallbacksAndMessages(null)
+                        val wasCursorMode = spaceCursorMode
+                        spaceCursorMode = false
+                        if (!wasCursorMode) {
+                            v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                            handleSpace()
+                        }
+                    }
+                    else -> {}
+                }
+                true
+            }
         }
+    }
 
     private fun buildRow(
         keys: List<Pair<String, Float>>,
@@ -259,8 +415,8 @@ class GlucoseKeyboard : InputMethodService() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             layoutParams =
-                LinearLayout.LayoutParams(MATCH_PARENT, dp(50)).apply {
-                    setMargins(sidePad, 0, sidePad, dp(5))
+                LinearLayout.LayoutParams(MATCH_PARENT, dp(52)).apply {
+                    setMargins(sidePad, 0, sidePad, dp(4))
                 }
             keys.forEach { (label, weight) ->
                 val type =
@@ -276,18 +432,34 @@ class GlucoseKeyboard : InputMethodService() {
 
     private enum class KeyType { NORMAL, SPECIAL, CONFIRM }
 
+    @SuppressLint("ClickableViewAccessibility")
     private fun buildKey(
         label: String,
         weight: Float,
         type: KeyType,
     ): View {
+        // 기호 모드에서 ⇧는 동작하지 않으므로 시각적으로 비활성 표시.
+        val shiftDisabled = label == "⇧" && mode == KeyboardMode.SYMBOLS
+        val shiftOn = label == "⇧" && isShift && !shiftDisabled
         val bgColor =
             when (type) {
                 KeyType.CONFIRM -> Color.parseColor("#4A90D9")
-                KeyType.SPECIAL -> Color.parseColor("#AEB2BA")
+                KeyType.SPECIAL ->
+                    when {
+                        shiftDisabled -> Color.parseColor("#C2C5CC")
+                        label == "⇧" && isCapsLock -> Color.parseColor("#1E5BA8")
+                        label == "⇧" && isShift -> Color.parseColor("#4A90D9")
+                        else -> Color.parseColor("#9DA3AC")
+                    }
                 KeyType.NORMAL -> Color.WHITE
             }
-        val txtColor = if (type == KeyType.CONFIRM) Color.WHITE else Color.BLACK
+        val txtColor =
+            when {
+                type == KeyType.CONFIRM -> Color.WHITE
+                shiftDisabled -> Color.parseColor("#B8BBC2")
+                shiftOn -> Color.WHITE
+                else -> Color.parseColor("#1A1A1A")
+            }
         val display =
             when (label) {
                 "SPACE" -> ""
@@ -297,7 +469,7 @@ class GlucoseKeyboard : InputMethodService() {
             when {
                 label == "SPACE" -> 0f
                 label.length == 1 -> 18f
-                else -> 12f
+                else -> 13f
             }
 
         return TextView(this).apply {
@@ -309,24 +481,98 @@ class GlucoseKeyboard : InputMethodService() {
             background =
                 GradientDrawable().apply {
                     setColor(bgColor)
-                    cornerRadius = dp(5).toFloat()
+                    cornerRadius = dp(8).toFloat()
                 }
-            elevation = dp(2).toFloat()
+            elevation = dp(1).toFloat()
             layoutParams =
                 LinearLayout.LayoutParams(0, MATCH_PARENT, weight).apply {
-                    setMargins(dp(3), dp(3), dp(3), dp(3))
+                    setMargins(dp(4), dp(4), dp(4), dp(4))
                 }
-            setOnClickListener { onKey(label) }
+
+            if (label == "⌫") {
+                // ACTION_DOWN 즉시 1회 삭제 + LongPressTimeout 후 반복 시작.
+                // setOnLongClickListener 대신 Handler로 직접 구현해 ACTION_DOWN 즉시 발화.
+                setOnTouchListener { v, event ->
+                    when (event.actionMasked) {
+                        MotionEvent.ACTION_DOWN -> {
+                            v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                            backspaceStartTime = System.currentTimeMillis()
+                            handleBackspace()
+                            backspaceHandler.postDelayed(
+                                backspaceRepeat,
+                                ViewConfiguration.getLongPressTimeout().toLong(),
+                            )
+                        }
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                            backspaceHandler.removeCallbacksAndMessages(null)
+                        }
+                    }
+                    true
+                }
+            } else {
+                val showPreview = type == KeyType.NORMAL && label != "SPACE" && mode != KeyboardMode.SYMBOLS
+                setOnTouchListener { v, event ->
+                    when (event.actionMasked) {
+                        MotionEvent.ACTION_DOWN -> {
+                            if (!shiftDisabled) {
+                                v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                                if (showPreview) showKeyPreview(v, display)
+                                onKey(label)
+                            }
+                        }
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                            if (showPreview) dismissKeyPreview()
+                        }
+                    }
+                    true
+                }
+            }
         }
+    }
+
+    private fun showKeyPreview(
+        anchorView: View,
+        text: String,
+    ) {
+        dismissKeyPreview()
+        if (text.isEmpty()) return
+        val size = dp(56)
+        val tv =
+            TextView(this).apply {
+                this.text = text
+                textSize = 22f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(Color.parseColor("#1A1A1A"))
+                gravity = Gravity.CENTER
+                background =
+                    GradientDrawable().apply {
+                        setColor(Color.WHITE)
+                        cornerRadius = dp(8).toFloat()
+                        setStroke(dp(1), Color.parseColor("#CCCCCC"))
+                    }
+            }
+        keyPreviewPopup =
+            PopupWindow(tv, size, size, false).apply {
+                isOutsideTouchable = false
+                isTouchable = false
+                setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+                val xOff = (anchorView.width - size) / 2
+                val yOff = -(anchorView.height + size + dp(4))
+                showAsDropDown(anchorView, xOff, yOff)
+            }
+    }
+
+    private fun dismissKeyPreview() {
+        keyPreviewPopup?.dismiss()
+        keyPreviewPopup = null
     }
 
     private fun onKey(label: String) {
         when (label) {
             "⌫" -> handleBackspace()
             "⇧" -> toggleShift()
-            "SPACE" -> handleSpace()
+            "SPACE" -> handleSpace() // buildSpaceKey 터치 핸들러가 우선. 여기는 fallback.
             "확인" -> confirm()
-            "한", "EN", "123" -> cycleMode()
             else -> handleChar(label)
         }
     }
@@ -343,49 +589,69 @@ class GlucoseKeyboard : InputMethodService() {
                             currentText.append(result.commit)
                         }
                         currentInputConnection?.setComposingText(result.composing, 1)
-                        refreshDisplay(result.composing)
+                        scheduleBanner(currentText.toString() + result.composing)
                     }
                     else -> {}
+                }
+                // 일반 Shift: 자모 하나 입력 후 자동 해제. Caps Lock: 해제하지 않음.
+                if (isShift && !isCapsLock) {
+                    isShift = false
+                    doubleTapPending = false
+                    doubleTapHandler.removeCallbacksAndMessages(null)
+                    rebuildLetterRows()
                 }
             }
             KeyboardMode.ENGLISH -> {
                 val ch = if (isShift) label.uppercase() else label.lowercase()
                 currentInputConnection?.commitText(ch, 1)
                 currentText.append(ch)
-                refreshDisplay()
-                if (isShift) {
+                scheduleBanner(currentText.toString())
+                // 일반 Shift: 한 글자 입력 후 자동 해제. Caps Lock: 해제하지 않음.
+                if (isShift && !isCapsLock) {
                     isShift = false
-                    rebuildKeys()
+                    doubleTapPending = false
+                    doubleTapHandler.removeCallbacksAndMessages(null)
+                    rebuildLetterRows()
                 }
             }
             KeyboardMode.SYMBOLS -> {
-                // 기호 모드: 한글 composer 거치지 않고 입력 즉시 commit.
                 currentInputConnection?.commitText(label, 1)
                 currentText.append(label)
-                refreshDisplay()
+                scheduleBanner(currentText.toString())
             }
         }
     }
 
     private fun handleBackspace() {
         if (mode == KeyboardMode.KOREAN) {
+            // 백스페이스 전에 composing 상태를 기록.
+            // HangulComposer.backspace()가 DeleteChar를 반환하는 경우 두 가지:
+            //   (A) hadComposing=true  → 자음 단독(예: "ㄱ") composing을 지우는 것 → setComposingText("")로 지움
+            //   (B) hadComposing=false → composer가 이미 비어있음 → committed 글자를 deleteSurroundingText로 지움
+            val hadComposing = !hangul.isEmpty()
             val result = hangul.backspace()
             when (result) {
                 is HangulComposer.Result.Backspace -> {
                     currentInputConnection?.setComposingText(result.composing, 1)
-                    refreshDisplay(result.composing)
+                    scheduleBanner(currentText.toString() + result.composing)
                 }
                 is HangulComposer.Result.DeleteChar -> {
-                    currentInputConnection?.deleteSurroundingText(1, 0)
-                    if (currentText.isNotEmpty()) currentText.deleteCharAt(currentText.length - 1)
-                    refreshDisplay()
+                    if (hadComposing) {
+                        // (A) composing 자음을 editor에서 제거. committed 글자는 건드리지 않음.
+                        currentInputConnection?.setComposingText("", 1)
+                    } else {
+                        // (B) committed 글자 삭제.
+                        currentInputConnection?.deleteSurroundingText(1, 0)
+                        if (currentText.isNotEmpty()) currentText.deleteCharAt(currentText.length - 1)
+                    }
+                    scheduleBanner(currentText.toString())
                 }
                 else -> {}
             }
         } else {
             currentInputConnection?.deleteSurroundingText(1, 0)
             if (currentText.isNotEmpty()) currentText.deleteCharAt(currentText.length - 1)
-            refreshDisplay()
+            scheduleBanner(currentText.toString())
         }
     }
 
@@ -397,7 +663,7 @@ class GlucoseKeyboard : InputMethodService() {
         }
         currentInputConnection?.commitText(" ", 1)
         currentText.append(" ")
-        refreshDisplay()
+        scheduleBanner(currentText.toString())
     }
 
     private fun confirm() {
@@ -410,22 +676,54 @@ class GlucoseKeyboard : InputMethodService() {
         }
         val text = currentText.toString().trim()
         Log.d(TAG, "confirm: final text='$text' (length=${text.length})")
-        if (text.isNotEmpty()) triggerBanner(text)
+        if (text.isNotEmpty()) triggerBanner(text) // confirm은 즉시 트리거 (디바운스 없이)
+        bannerHandler.removeCallbacksAndMessages(null) // 예약된 업데이트 취소
         currentText.clear()
         hangul.reset()
-        refreshDisplay()
         sendDefaultEditorAction(true)
     }
 
+    /**
+     * Shift 상태 머신:
+     *   Off → 탭 → Shift (더블탭 대기)
+     *   Shift(대기중) → 탭 → Caps Lock
+     *   Shift(대기 만료) → 탭 → Off
+     *   Caps Lock → 탭 → Off
+     */
     private fun toggleShift() {
-        // 기호 모드에선 shift 무시. 보조 기호 레이아웃은 향후 작업.
         if (mode == KeyboardMode.SYMBOLS) return
-        isShift = !isShift
-        rebuildKeys()
+        when {
+            isCapsLock -> {
+                isCapsLock = false
+                isShift = false
+                doubleTapHandler.removeCallbacksAndMessages(null)
+                doubleTapPending = false
+            }
+            doubleTapPending -> {
+                doubleTapHandler.removeCallbacksAndMessages(null)
+                doubleTapPending = false
+                isCapsLock = true
+                isShift = true
+            }
+            isShift -> {
+                isShift = false
+                isCapsLock = false
+            }
+            else -> {
+                isShift = true
+                doubleTapPending = true
+                doubleTapHandler.postDelayed({
+                    doubleTapPending = false
+                }, ViewConfiguration.getDoubleTapTimeout().toLong())
+            }
+        }
+        rebuildLetterRows()
     }
 
-    /** 한 → EN → 123 → 한 순환. 모드 전환 시 한글 composer flush + shift 초기화. */
-    private fun cycleMode() {
+    /**
+     * 언어 토글: KOREAN↔ENGLISH 2-way. SYMBOLS에서 누르면 KOREAN으로.
+     */
+    private fun toggleLang() {
         if (mode == KeyboardMode.KOREAN && !hangul.isEmpty()) {
             val last = hangul.flush()
             currentInputConnection?.commitText(last, 1)
@@ -434,18 +732,58 @@ class GlucoseKeyboard : InputMethodService() {
         mode =
             when (mode) {
                 KeyboardMode.KOREAN -> KeyboardMode.ENGLISH
-                KeyboardMode.ENGLISH -> KeyboardMode.SYMBOLS
+                KeyboardMode.ENGLISH -> KeyboardMode.KOREAN
                 KeyboardMode.SYMBOLS -> KeyboardMode.KOREAN
             }
         hangul.reset()
         isShift = false
+        isCapsLock = false
         rebuildKeys()
     }
 
+    /**
+     * 기호 모드 토글: SYMBOLS 진입 또는 이전 언어 모드로 복귀.
+     * prevLangMode에 진입 전 언어를 저장해 ← 로 정확히 돌아감.
+     */
+    private fun toggleSym() {
+        if (mode == KeyboardMode.KOREAN && !hangul.isEmpty()) {
+            val last = hangul.flush()
+            currentInputConnection?.commitText(last, 1)
+            currentText.append(last)
+        }
+        if (mode == KeyboardMode.SYMBOLS) {
+            mode = prevLangMode
+        } else {
+            prevLangMode = mode
+            mode = KeyboardMode.SYMBOLS
+        }
+        hangul.reset()
+        isShift = false
+        isCapsLock = false
+        rebuildKeys()
+    }
+
+    /** shift 전용 — 글자 행만 교체. 하단 행(btnLang, btnSym)은 보존. */
+    private fun rebuildLetterRows() {
+        if (keyContainer.childCount > 0) keyContainer.removeViewAt(0)
+        keyContainer.addView(buildLetterRows(), 0)
+    }
+
+    /** 모드 전환 — 전체 재빌드 (하단 행 레이블도 변경됨). */
     private fun rebuildKeys() {
         keyContainer.removeAllViews()
         keyContainer.addView(buildLetterRows())
         keyContainer.addView(buildBottomRow())
+    }
+
+    /**
+     * 배너 갱신을 150ms 뒤로 미룸.
+     * 연속 입력 중에는 검색을 건너뛰고 입력이 잠시 멈출 때만 실행해 성능 개선.
+     * confirm()은 이 함수를 거치지 않고 triggerBanner()를 직접 호출.
+     */
+    private fun scheduleBanner(display: String) {
+        bannerHandler.removeCallbacksAndMessages(null)
+        bannerHandler.postDelayed({ triggerBanner(display.trim()) }, 150L)
     }
 
     private fun triggerBanner(text: String) {
@@ -488,16 +826,17 @@ class GlucoseKeyboard : InputMethodService() {
         private const val TAG = "GlucoseKeyboard"
     }
 
-    private fun refreshDisplay(composing: String = "") {
-        val display = currentText.toString() + composing
-        triggerBanner(display)
-    }
-
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
+        prefs.edit()
+            .putString("mode", mode.name)
+            .putString("prevLangMode", prevLangMode.name)
+            .apply()
+        dismissKeyPreview()
+        bannerHandler.removeCallbacksAndMessages(null)
         currentText.clear()
         hangul.reset()
-        refreshDisplay()
+        hideInlineBanner()
     }
 
     override fun onUpdateSelection(
@@ -518,27 +857,31 @@ class GlucoseKeyboard : InputMethodService() {
         )
         val ic = currentInputConnection ?: return
         // 필드 클리어(=send) 감지: 새 selection이 (0,0)이고 직전엔 내용 있었음.
-        if (newSelStart == 0 && newSelEnd == 0 && oldSelEnd > 0) {
+        // candidatesStart < 0 조건 추가: 한글 composing 삭제 시 selection이 (0,0)으로 돌아가는
+        // 경우를 오탐하지 않도록 방어. (composing "ㄱ" → setComposingText("") 시 발생)
+        if (newSelStart == 0 && newSelEnd == 0 && oldSelEnd > 0 && candidatesStart < 0) {
             val pending = lastEditorText.trim()
             Log.d(TAG, "onUpdateSelection: send detected, lastEditorText='$pending'")
             if (pending.length >= 2) triggerBanner(pending)
             lastEditorText = ""
             currentText.clear()
             hangul.reset()
-            refreshDisplay()
+            bannerHandler.removeCallbacksAndMessages(null)
             return
         }
-        // 그 외엔 실제 EditText 스냅샷 갱신. send 시점에 사용.
         val before = ic.getTextBeforeCursor(256, 0)?.toString().orEmpty()
         val after = ic.getTextAfterCursor(256, 0)?.toString().orEmpty()
         val snapshot = (before + after).trim()
-        if (snapshot.isNotEmpty()) {
-            lastEditorText = snapshot
-        }
+        if (snapshot.isNotEmpty()) lastEditorText = snapshot
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        backspaceHandler.removeCallbacks(backspaceRepeat)
+        spaceHandler.removeCallbacksAndMessages(null)
+        doubleTapHandler.removeCallbacksAndMessages(null)
+        dismissKeyPreview()
+        bannerHandler.removeCallbacksAndMessages(null)
         bannerManager.dismiss()
     }
 
