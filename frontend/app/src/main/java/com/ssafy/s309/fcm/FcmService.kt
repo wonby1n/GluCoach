@@ -90,16 +90,20 @@ class FcmService : FirebaseMessagingService() {
     /**
      * alertType 별 silent 채널을 (없으면) 생성하고 채널 ID를 반환.
      * 채널 사운드는 [TtsManager] 의 본문 발화로 대체했으므로 [NotificationChannel.setSound] 를 사용하지 않는다.
-     * 과거 mp3 사운드가 등록된 *_v2 채널이 디바이스에 남아 있을 수 있으므로 *_v3 로 채널 ID 를 승격해
-     * fresh 한 silent 채널이 생성되도록 한다.
+     *
+     * 채널 ID 승격 히스토리:
+     *  v2 — mp3 가 setSound 로 박혀 있던 구버전
+     *  v3 — silent 로 전환했으나 BE 가 notification payload 를 함께 보내 onMessageReceived 가 스킵돼
+     *       단말 캐시 채널이 그대로 살아있는 사례가 발견됨
+     *  v4 — BE 를 data-only payload 로 전환한 시점에 fresh 채널을 강제 생성하기 위한 승격
      */
     private fun ensureChannelForAlertType(alertType: String?): String {
         val channelId = channelIdForAlertType(alertType)
         val channelName = channelNameForAlertType(alertType)
 
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        // 잔존하는 v2 (mp3 사운드 등록된) 채널을 정리한다.
-        LEGACY_V2_CHANNEL_IDS.forEach { manager.deleteNotificationChannel(it) }
+        // 잔존하는 legacy (v2: mp3 사운드 / v3: silent지만 onMessageReceived 미경유) 채널 정리.
+        LEGACY_CHANNEL_IDS.forEach { manager.deleteNotificationChannel(it) }
 
         if (manager.getNotificationChannel(channelId) == null) {
             val channel =
@@ -227,16 +231,16 @@ class FcmService : FirebaseMessagingService() {
     companion object {
         private const val TAG = "FcmService"
 
-        // 채널 사운드는 TTS 본문 발화로 대체했으므로 *_v3 (silent) 로 승격.
-        private const val CHANNEL_DEFAULT = "kiki_default_v3"
-        private const val CHANNEL_WAKE_UP = "kiki_wake_up_v3"
-        private const val CHANNEL_MEAL_FOLLOWUP = "kiki_meal_followup_v3"
-        private const val CHANNEL_MEAL_REPLY = "kiki_meal_reply_v3"
-        private const val CHANNEL_MEAL_RETRY = "kiki_meal_retry_v3"
-        private const val CHANNEL_SLEEP_INSIGHT = "kiki_sleep_insight_v3"
+        // BE 를 data-only payload 로 전환하면서 *_v4 (silent) 로 한 단계 더 승격.
+        private const val CHANNEL_DEFAULT = "kiki_default_v4"
+        private const val CHANNEL_WAKE_UP = "kiki_wake_up_v4"
+        private const val CHANNEL_MEAL_FOLLOWUP = "kiki_meal_followup_v4"
+        private const val CHANNEL_MEAL_REPLY = "kiki_meal_reply_v4"
+        private const val CHANNEL_MEAL_RETRY = "kiki_meal_retry_v4"
+        private const val CHANNEL_SLEEP_INSIGHT = "kiki_sleep_insight_v4"
 
-        // 과거 mp3 사운드가 박혀 있는 v2 채널들 — 기기 잔존 가능성이 있어 정리 대상.
-        private val LEGACY_V2_CHANNEL_IDS =
+        // v2 (mp3 사운드) / v3 (silent 였지만 BE notification payload 경유로 단말 캐시가 살아남은 케이스) — 모두 정리.
+        private val LEGACY_CHANNEL_IDS =
             listOf(
                 "kiki_default_v2",
                 "kiki_wake_up_v2",
@@ -244,6 +248,12 @@ class FcmService : FirebaseMessagingService() {
                 "kiki_meal_reply_v2",
                 "kiki_meal_retry_v2",
                 "kiki_sleep_insight_v2",
+                "kiki_default_v3",
+                "kiki_wake_up_v3",
+                "kiki_meal_followup_v3",
+                "kiki_meal_reply_v3",
+                "kiki_meal_retry_v3",
+                "kiki_sleep_insight_v3",
             )
 
         private const val ALERT_TYPE_MEAL_FOLLOWUP = "AGENT_MEAL_FOLLOWUP"
