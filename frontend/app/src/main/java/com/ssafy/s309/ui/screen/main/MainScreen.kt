@@ -678,19 +678,28 @@ private fun SummaryRow(
                     .weight(1f)
                     .fillMaxHeight(),
         ) {
+            val stepsFontSize =
+                when {
+                    steps >= 100_000 -> 22.sp
+                    steps >= 10_000 -> 26.sp
+                    else -> 32.sp
+                }
             Text(
                 text = "%,d".format(steps),
                 color = GlucoachColors.PrimaryDark,
-                fontSize = 32.sp,
+                fontSize = stepsFontSize,
                 fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                modifier = Modifier.weight(1f, fill = false),
             )
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = "걸음",
                 color = GlucoachColors.PrimaryDark,
-                fontSize = 16.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 4.dp),
+                maxLines = 1,
+                modifier = Modifier.padding(bottom = 2.dp),
             )
         }
         SummaryStatCard(

@@ -158,6 +158,7 @@ fun SummaryStatCard(
         )
         Spacer(modifier = Modifier.height(2.dp))
         Row(
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Bottom,
             content = value,
         )
