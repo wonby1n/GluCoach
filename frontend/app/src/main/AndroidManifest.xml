@@ -22,8 +22,18 @@
         android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
+    <!-- Wake word 감지 (WakeWordManager) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
+
+    <!-- Android 11(API 30)+ 패키지 가시성: TextToSpeech 엔진 조회 허용 -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
 
     <application
         android:name=".S309Application"
@@ -34,6 +44,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.S309"
         android:usesCleartextTraffic="true">
+        <!-- 백그라운드 FCM 알림의 기본 채널 (앱 종료 시 OS가 직접 사용) -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="kiki_default_v3" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

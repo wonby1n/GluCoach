@@ -91,7 +91,7 @@ public class SosService {
         tokens,
         AlertChannelResolver.resolveTitle("SOS"),
         "피보호자의 SOS 긴급 요청이 발생했습니다.",
-        AlertChannelResolver.CH_CRITICAL,
+        AlertChannelResolver.CH_DEFAULT,
         "SOS");
   }
 }
