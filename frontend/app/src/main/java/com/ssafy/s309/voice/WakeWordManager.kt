@@ -195,7 +195,6 @@ class WakeWordManager
                 if (matchesWakeWord(t)) {
                     lastWakeAt = now
                     Log.i(TAG, "Wake word 감지: \"$t\"")
-                    kikiVoice.respondToWake(cachedName.get())
                     pauseDuringResponse()
                     return true
                 }

@@ -24,10 +24,8 @@ import javax.inject.Singleton
 /**
  * KikiChatScreen 마이크 버튼용 — 사용자가 명시적으로 트리거하는 1회성 STT.
  *
- * [WakeWordManager] 와 구분되는 점:
  *  - wake 패턴 매칭이 아니라 전체 발화 transcript 가 필요 (자유 질문)
  *  - 사용자 버튼 탭 → 한 세션만 listen → 결과 콜백 → 자동 종료
- *  - 시작 시 wake 루프를 stop()해 마이크 충돌 회피, 종료 시 start() 로 복귀
  *
  * 권한 없거나 STT 엔진이 없으면 onError 로 즉시 실패 통보.
  */
@@ -36,7 +34,6 @@ class VoiceQueryManager
     @Inject
     constructor(
         @ApplicationContext private val context: Context,
-        private val wakeWordManager: WakeWordManager,
     ) {
         private val mainHandler = Handler(Looper.getMainLooper())
         private val listening = AtomicBoolean(false)
@@ -72,10 +69,8 @@ class VoiceQueryManager
                 return
             }
 
-            // wake 루프와 마이크 충돌 방지 — 일시 중단. 시스템 STT 서비스는 destroy 후 즉시
-            // 정리되지 않아 곧바로 새 SR을 만들면 ERROR_SERVER_DISCONNECTED(11) 가 떨어진다.
-            // → 잠깐 지연한 뒤 createSpeechRecognizer 호출.
-            wakeWordManager.stop()
+            // 시스템 STT 서비스는 destroy 후 즉시 정리되지 않아 곧바로 새 SR을 만들면
+            // ERROR_SERVER_DISCONNECTED(11) 가 떨어질 수 있어 짧게 지연 후 createSpeechRecognizer 호출.
             _partial.value = ""
             _state.value = State.LISTENING
 
@@ -204,8 +199,6 @@ class VoiceQueryManager
             listening.set(false)
             _state.value = State.IDLE
             _partial.value = ""
-            // wake 루프 복귀 — 권한이 그대로면 즉시 재시작, 없으면 no-op.
-            wakeWordManager.start()
         }
 
         private fun hasRecordAudioPermission(): Boolean =

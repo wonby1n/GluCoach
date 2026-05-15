@@ -9,6 +9,7 @@ Glucocoach 음식 추천 Agent — 전용 도구
 - get_recent_meals       → GET  /api/agent/users/{id}/recent-meals?days=N
 - get_user_profile       → GET  /api/agent/users/{id}/profile
 - get_glucose_recent     → GET  /api/agent/users/{id}/glucose-recent
+- get_today_activity     → GET  /api/agent/steps + /api/agent/sleep  (오늘 걸음수 + 어젯밤 수면)
 
 행동:
 - send_command_response  → POST /api/agent/notifications  (parentChatMessageId 포함)
@@ -18,6 +19,9 @@ BACKEND_API_URL 미설정 시 fallback dict 반환 (로컬 테스트용).
 """
 
 import os
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 import requests as _requests
 
 
@@ -162,6 +166,42 @@ def get_glucose_recent() -> dict:
     }
 
 
+def get_today_activity() -> dict:
+    """오늘 누적 걸음수 + 어젯밤 수면 분 + 7일 평균 수면 분.
+
+    삼성헬스/HealthConnect → daily_health_summaries / step_records 에 적재된 값을 조회.
+    음식 가부 판단 시 "오늘 활동량/컨디션" 보정 신호로 사용한다 (룰은 프롬프트 참조).
+    """
+    user_id = _context.get("user_id")
+    if user_id is None:
+        return {"error": "missing_user"}
+    kst_now = datetime.now(ZoneInfo("Asia/Seoul"))
+    today_local = kst_now.date()
+    start_local = datetime.combine(today_local, datetime.min.time())
+    # 백엔드는 @DateTimeFormat ISO.DATE_TIME (LocalDateTime) — zone offset 없는 ISO 문자열 전달.
+    steps_raw = _be_get(
+        "/api/agent/steps",
+        params={
+            "user_id": user_id,
+            "start": start_local.isoformat(timespec="seconds"),
+            "end": kst_now.replace(tzinfo=None).isoformat(timespec="seconds"),
+        },
+    )
+    sleep_raw = _be_get(
+        "/api/agent/sleep",
+        params={"user_id": user_id, "date": today_local.isoformat()},
+    )
+    steps_today = (steps_raw or {}).get("windowSteps") or 0
+    sleep_minutes = (sleep_raw or {}).get("sleepMinutes") or 0
+    avg_sleep = (sleep_raw or {}).get("averageSleepMinutes") or 0.0
+    return {
+        "steps_today": int(steps_today),
+        "sleep_minutes_last_night": int(sleep_minutes),
+        "avg_sleep_minutes_7d": float(avg_sleep),
+        "as_of_kst": kst_now.strftime("%Y-%m-%d %H:%M"),
+    }
+
+
 def search_food_by_name(query: str, limit: int = 5) -> dict:
     """사용자 발화에서 추출한 음식명으로 food_id 후보를 검색한다.
 
@@ -297,6 +337,15 @@ FOOD_RECOMMEND_TOOL_SCHEMAS = [
         "input_schema": {"type": "object", "properties": {}},
     },
     {
+        "name": "get_today_activity",
+        "description": (
+            "오늘 누적 걸음수 + 어젯밤 수면(분) + 최근 7일 평균 수면(분). 삼성헬스 동기화 값. "
+            "데이터 없으면 0 반환. 음식 가부/대안 판단의 보정 신호로 사용 — "
+            "걸음수 많거나 수면 충분하면 조건부 허용(식후 산책 조건), 둘 다 부족하면 양 축소/대안 권고."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
         "name": "get_unseen_food_candidates",
         "description": "사용자가 안 먹어본 음식 후보를 foods 테이블에서 가져온다. search_count 인기순. 신규 음식 추천에만 사용 (items[].food_id를 채우기 위해 필수).",
         "input_schema": {
@@ -352,11 +401,44 @@ FOOD_RECOMMEND_TOOL_SCHEMAS = [
                 "message": {"type": "string", "description": "사용자에게 보여줄 응답 메시지 본문"},
                 "display_trace": {
                     "type": "object",
-                    "description": "추론 메타. 지금은 summary 1줄만 필수.",
+                    "description": (
+                        "추론 메타. summary 1줄 + cards 배열 + decision.reason. "
+                        "FE의 '키키가 확인한 내용 보기' 카드가 cards[] 와 decision.reason 을 펼쳐 보여준다."
+                    ),
                     "properties": {
                         "summary": {"type": "string", "description": "어떤 기준으로 골랐는지 1줄"},
+                        "cards": {
+                            "type": "array",
+                            "description": (
+                                "확인한 신호 카드 (사용자 노출). 호출한 도구 결과 중 의미 있는 것만 1~4개. "
+                                "수치 데이터가 0이거나 도구 호출 실패면 해당 카드 생략."
+                            ),
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "description": "신호 종류. FE 아이콘 매핑: glucose/meal/activity/sleep 중 하나 권장. 그 외는 일반 아이콘.",
+                                    },
+                                    "title": {"type": "string", "description": "카드 제목 (예: '최근 혈당', '오늘 걸음수')"},
+                                    "description": {
+                                        "type": "string",
+                                        "description": "카드 본문. 구체적인 수치 포함 (예: '125 mg/dL, 30분 전 식사 후', '오늘 8,200보 — 활동량 충분')",
+                                    },
+                                },
+                                "required": ["type", "title", "description"],
+                            },
+                        },
+                        "decision": {
+                            "type": "object",
+                            "description": "이 응답을 고른 최종 근거 1~2줄. 사용자 노출 가능 톤.",
+                            "properties": {
+                                "reason": {"type": "string"},
+                            },
+                            "required": ["reason"],
+                        },
                     },
-                    "required": ["summary"],
+                    "required": ["summary", "cards", "decision"],
                 },
                 "payload": {
                     "type": "object",
@@ -391,6 +473,7 @@ FOOD_RECOMMEND_TOOL_MAP = {
     "get_recent_meals": get_recent_meals,
     "get_user_profile": get_user_profile,
     "get_glucose_recent": get_glucose_recent,
+    "get_today_activity": get_today_activity,
     "get_unseen_food_candidates": get_unseen_food_candidates,
     "search_food_by_name": search_food_by_name,
     "predict_glucose_for_food": predict_glucose_for_food,
