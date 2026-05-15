@@ -33,7 +33,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 # GMS 프록시 주소
 BASE_URL = "https://api.anthropic.com"
-MODEL = "claude-sonnet-4-5-20250929"
+MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 4096
 MAX_TURNS = 10
 
@@ -89,6 +89,7 @@ def run_agent(user_id: int = None):
         if response is None:
             fallback_msg = get_fallback_message("morning")
             print(f"\n[fallback] LLM 호출 실패 → 폴백 메시지: {fallback_msg}")
+            execute_tool("send_notification", {"message": fallback_msg, "options": [], "display_trace": {}})
             return {
                 "message":          fallback_msg,
                 "turns":            turn,
