@@ -18,6 +18,7 @@ from app.agent.food_recommend_tools import (
 )
 from app.agent.food_recommend_prompts import build_food_recommend_prompt
 from app.agent.fallback import call_llm_with_retry, get_fallback_message
+from app.agent.trace_writer import save_trace
 
 load_dotenv()
 
@@ -78,12 +79,17 @@ def run_food_recommend_agent(
         )
 
         if response is None:
-            return {
-                "message": get_fallback_message("postmeal"),
+            result = {
+                "message": get_fallback_message("food_recommend"),
                 "turns": turn,
                 "tool_call_details": tool_call_details,
                 "error": "llm_call_failed",
             }
+            try:
+                save_trace(result, agent_type="food_recommend")
+            except Exception as e:
+                print(f"[FoodRecommend] trace 저장 실패 (무시): {e}")
+            return result
 
         tool_use_blocks = []
         for block in response.content:
@@ -110,11 +116,17 @@ def run_food_recommend_agent(
             )
         messages.append({"role": "user", "content": tool_results})
 
-    return {
+    result = {
         "message": sent_message,
         "turns": turn,
         "tool_call_details": tool_call_details,
     }
+    # 디버깅용 trace 저장 — ai/traces/food_recommend_latest.json. 실패해도 응답 흐름은 중단하지 않음.
+    try:
+        save_trace(result, agent_type="food_recommend")
+    except Exception as e:
+        print(f"[FoodRecommend] trace 저장 실패 (무시): {e}")
+    return result
 
 
 if __name__ == "__main__":

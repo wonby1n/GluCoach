@@ -251,6 +251,13 @@ def save_trace(agent_result: dict, agent_type: str = "morning") -> str:
         display_trace = build_morning_display_trace(tool_calls, message)
     elif agent_type in ("postmeal", "postmeal_reply", "postmeal_followup"):
         display_trace = build_postmeal_display_trace(tool_calls, message)
+    elif agent_type == "food_recommend":
+        # food_recommend agent 는 send_command_response 호출에 display_trace 를 직접 채워 보낸다.
+        # tool_call_details 에서 해당 호출의 input.display_trace 를 그대로 가져오면 FE 가 본 것과 동일.
+        for call in tool_calls:
+            if call.get("name") == "send_command_response":
+                display_trace = (call.get("input") or {}).get("display_trace")
+                break
 
     trace = {
         "agent":        agent_type,
