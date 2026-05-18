@@ -45,6 +45,14 @@ android {
         compose = true
         buildConfig = true
     }
+
+    // Vosk 가 JNA 를 통해 native 라이브러리를 로드한다.
+    // useLegacyPackaging=true 가 없으면 APK 내 압축된 .so 를 dlopen 못해 런타임 크래시.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 kotlin {
@@ -139,6 +147,12 @@ dependencies {
     // Wear OS — 폰 → 워치(:wear) 혈당 송신용 (WearDataSender)
     implementation(libs.play.services.wearable)
     implementation(libs.kotlinx.coroutines.play.services)
+
+    // Vosk — 오프라인 한국어 STT. "하이 키키" wake word 감지 + 자유 발화 명령 인식을
+    // 단일 AudioRecord 로 처리해 SpeechRecognizer 의 띠롱 시스템 사운드를 회피한다.
+    // 모델은 assets/model-ko/ 에 동봉 (82MB). Apache 2.0, 가입/액세스키 불필요.
+    implementation("net.java.dev.jna:jna:5.13.0@aar")
+    implementation("com.alphacephei:vosk-android:0.3.47@aar")
 
     // 테스트
     testImplementation(libs.junit)
