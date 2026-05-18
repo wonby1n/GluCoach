@@ -32,20 +32,36 @@ sys.stdout.reconfigure(encoding="utf-8")
 # GMS 프록시 주소
 BASE_URL = "https://api.anthropic.com"
 MODEL = "claude-sonnet-4-6"
-# 1024 로 줄여 LLM 응답 시간 단축. 음성/푸시 알림 본문은 짧음.
-MAX_TOKENS = 1024
+# 푸시 본문은 짧지만 tool_use JSON 자체(display_trace 의 cards 등)가 한도에 잡혀
+# 끝부분 필드가 절단되는 사례가 있어 2048 로 상향. 응답 시간 영향은 미미.
+MAX_TOKENS = 2048
 MAX_TURNS = 10
 
 
 # ── 도구 실행 ─────────────────────────────────────────────
 
 def execute_tool(name: str, tool_input: dict) -> str:
-    """TOOL_MAP에서 함수를 찾아 실행하고 JSON 문자열로 반환한다."""
+    """TOOL_MAP에서 함수를 찾아 실행하고 JSON 문자열로 반환한다.
+
+    LLM 이 required 인자를 빠뜨려도 background task 가 죽지 않도록
+    TypeError / 일반 예외를 tool_result 로 돌려보내 LLM 이 재시도할 수 있게 한다.
+    """
     func = TOOL_MAP.get(name)
     if not func:
         return json.dumps({"error": f"Unknown tool: {name}"}, ensure_ascii=False)
 
-    result = func(**tool_input)
+    try:
+        result = func(**tool_input)
+    except TypeError as e:
+        return json.dumps(
+            {"status": "error", "error": f"invalid_arguments: {e}", "tool": name},
+            ensure_ascii=False,
+        )
+    except Exception as e:
+        return json.dumps(
+            {"status": "error", "error": f"{type(e).__name__}: {e}", "tool": name},
+            ensure_ascii=False,
+        )
     return json.dumps(result, ensure_ascii=False)
 
 

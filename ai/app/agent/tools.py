@@ -139,11 +139,14 @@ def get_notification_history(hours: int) -> dict:
 # ── 행동 함수 2개 ──────────────────────────────────────────
 
 
-def send_notification(message: str, options: list, display_trace: dict) -> dict:
+def send_notification(message: str, options: list = None, display_trace: dict = None) -> dict:
     """사용자에게 알림 메시지 + 응답 선택지 3개 + AI 추론 카드를 발송한다.
 
     options: [{"id": str, "label": str}, ...] 정확히 3개
     display_trace: {"summary": str, "cards": [...], "decision": {"reason": str}}
+
+    NOTE: options/display_trace 는 스키마상 required 지만 LLM 이 가끔 빠뜨려
+    TypeError 로 background task 가 죽는 사고가 있어 default=None 으로 방어.
     """
     user_id = _agent_context.get("user_id")
     alert_type = _agent_context.get("alert_type", "AGENT_GENERIC")
@@ -151,6 +154,10 @@ def send_notification(message: str, options: list, display_trace: dict) -> dict:
     agent_api_key = os.getenv("AGENT_API_KEY", "dev-agent-key-change-in-prod")
 
     # ── 입력 검증 ──────────────────────────────────────
+    if options is None:
+        options = []
+    if display_trace is None:
+        display_trace = {}
     if not isinstance(options, list):
         options = []
     if len(options) > 0 and len(options) != 3:
