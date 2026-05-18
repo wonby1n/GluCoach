@@ -165,7 +165,15 @@ class MainActivity : ComponentActivity() {
                         onFoodNameConsumed = { pendingFoodName = null },
                     )
                     // 빅스비 스타일 음성 오버레이 — wake 감지/명령 수집 동안 화면 하단에 floating
-                    KikiVoiceOverlay(wakeWordManager = wakeWordManager)
+                    KikiVoiceOverlay(
+                        wakeWordManager = wakeWordManager,
+                        onResponseTapped = {
+                            // 응답 카드 본문 탭 시 채팅 화면으로 이동 + 모달 dismiss.
+                            // pendingNavTarget 으로 AppNavigation 의 LaunchedEffect 가 라우팅 처리.
+                            pendingNavTarget = NAV_KIKI_CHAT
+                            wakeWordManager.dismissResponse()
+                        },
+                    )
                 }
             }
         }
@@ -312,6 +320,7 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_NAVIGATE_TO = "navigate_to"
         const val EXTRA_FOOD_NAME = "food_name"
         const val NAV_KIKI_ALARM_DETAIL = "kiki_alarm_detail"
+        const val NAV_KIKI_CHAT = "kiki_chat"
         const val NAV_FOOD_REPORT = "food_report"
         const val NAV_FOOD_SCAN = "food_scan"
         const val NAV_GLUCOSE_PREDICT = "glucose_predict"

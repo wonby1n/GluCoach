@@ -20,7 +20,9 @@ import javax.inject.Singleton
  * 키키 음성 응답용 TTS. wake word ("Hi Kiki") 감지 후 "네 ㅇㅇ님!" 같은 짧은 응답을 발화한다.
  *
  * - 한국어 로케일 우선, 미지원 시 영어 폴백
- * - 알림 오디오 스트림으로 출력해 무음/방해금지 모드 존중
+ * - 미디어 오디오 스트림(STREAM_MUSIC) 으로 출력 — 알림 볼륨이 0/무음 모드여도 들리도록.
+ *   Google Assistant / Siri 와 동일한 패턴. 과거 STREAM_NOTIFICATION 사용 시 시연장에서
+ *   알림 볼륨 낮춰져 있어 키키 응답이 무음으로 재생되는 문제 있었음.
  * - TextToSpeech 엔진 초기화는 비동기. ensureInitialized() 호출 후 isReady=true 가 될 때까지 발화 무시
  */
 @Singleton
@@ -141,7 +143,7 @@ class KikiVoice
             if (onDone != null) pendingCallbacks[utteranceId] = onDone
             val params =
                 Bundle().apply {
-                    putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_NOTIFICATION)
+                    putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
                 }
             try {
                 engine.speak(spoken, TextToSpeech.QUEUE_FLUSH, params, utteranceId)

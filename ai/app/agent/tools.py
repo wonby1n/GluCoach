@@ -193,7 +193,9 @@ def send_notification(message: str, options: list, display_trace: dict) -> dict:
 
 def schedule_followup(delay_minutes: int, reason: str) -> dict:
     """지정한 시간 후에 agent를 다시 호출하도록 예약한다. BACKEND_API_URL 설정 시 실제 BE API 호출."""
-    delay_minutes = 1  # 시연 모드: 항상 1분 후 재호출
+    # 시연 모드: LLM 인자(30분 등)를 무시하고 1분 뒤 재호출.
+    # prompts.py 의 ack/retry 톤도 이 짧은 간격에 모순되지 않도록 timing-neutral 하게 정렬돼 있음.
+    delay_minutes = 1
     user_id = _agent_context.get("user_id")
     backend_url = os.getenv("BACKEND_API_URL", "")
     agent_api_key = os.getenv("AGENT_API_KEY", "dev-agent-key-change-in-prod")
