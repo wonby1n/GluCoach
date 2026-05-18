@@ -79,6 +79,12 @@ class WakeWordManager
         private val shouldKeepListening = AtomicBoolean(false)
         private val isTtsSpeaking = AtomicBoolean(false)
 
+        // 외부(예: [com.ssafy.s309.notification.TtsManager] 의 AI 응답 발화) TTS 가 스피커로
+        // 흘러나오는 동안 Vosk 가 자기 음향을 wake 로 잘못 잡지 않도록 차단하는 플래그.
+        // [setExternalTtsActive] 로 토글. 종료 시 [EXTERNAL_TTS_TAIL_GUARD_MS] 잔향 보호.
+        private val externalTtsActive = AtomicBoolean(false)
+        private var clearExternalTtsRunnable: Runnable? = null
+
         // VoiceQueryManager.partial → _partialTranscript 미러링 job.
         // LISTENING 진입 시 launch, 결과/에러/teardown 시 cancel.
         @Volatile private var partialCollectJob: Job? = null
@@ -142,6 +148,35 @@ class WakeWordManager
         }
 
         /**
+         * 외부 컴포넌트 ([com.ssafy.s309.notification.TtsManager] 등) 가 스피커로 TTS 를
+         * 재생할 때 호출. 재생 중에는 Vosk wake 매칭을 차단해 자기 음향이 트리거되는 false
+         * positive 를 막는다.
+         *
+         * @param active true: TTS 시작 (즉시 차단), false: TTS 종료
+         *                (잔향/버퍼 보호용 [EXTERNAL_TTS_TAIL_GUARD_MS] 후 차단 해제)
+         */
+        fun setExternalTtsActive(active: Boolean) {
+            mainHandler.post {
+                if (active) {
+                    externalTtsActive.set(true)
+                    clearExternalTtsRunnable?.let { mainHandler.removeCallbacks(it) }
+                    clearExternalTtsRunnable = null
+                } else {
+                    // tail guard: 스피커 잔향 + 마이크 버퍼에 남은 자기 음향이 wake 로 잡히는
+                    // race 회피. 큐로 여러 발화가 이어지는 경우 다음 onStart 가 미리 cancel 함.
+                    clearExternalTtsRunnable?.let { mainHandler.removeCallbacks(it) }
+                    val r =
+                        Runnable {
+                            externalTtsActive.set(false)
+                            clearExternalTtsRunnable = null
+                        }
+                    clearExternalTtsRunnable = r
+                    mainHandler.postDelayed(r, EXTERNAL_TTS_TAIL_GUARD_MS)
+                }
+            }
+        }
+
+        /**
          * Vosk 모델을 internal storage 로 unpack 한 뒤 [SpeechService] 한 개를 띄워서
          * 끝까지 유지. 모델 로드 비용은 첫 실행 시 한 번만.
          */
@@ -200,6 +235,9 @@ class WakeWordManager
             partialCollectJob?.cancel()
             partialCollectJob = null
             cancelResponseTimers()
+            clearExternalTtsRunnable?.let { mainHandler.removeCallbacks(it) }
+            clearExternalTtsRunnable = null
+            externalTtsActive.set(false)
 
             pauseVoskKeepingModel()
             isTtsSpeaking.set(false)
@@ -252,7 +290,7 @@ class WakeWordManager
         private fun buildListener(): RecognitionListener =
             object : RecognitionListener {
                 override fun onPartialResult(hypothesis: String?) {
-                    if (isTtsSpeaking.get()) return
+                    if (isTtsSpeaking.get() || externalTtsActive.get()) return
                     val text = parseVoskJson(hypothesis, KEY_PARTIAL)
                     if (text.isBlank()) return
                     Log.d(TAG, "[partial] \"$text\"")
@@ -267,7 +305,7 @@ class WakeWordManager
                 }
 
                 override fun onResult(hypothesis: String?) {
-                    if (isTtsSpeaking.get()) return
+                    if (isTtsSpeaking.get() || externalTtsActive.get()) return
                     val text = parseVoskJson(hypothesis, KEY_TEXT)
                     if (text.isBlank()) return
                     Log.d(TAG, "[final] \"$text\"")
@@ -544,6 +582,11 @@ class WakeWordManager
             // 시스템 서비스 unbind 가 끝나기 전에 AudioRecord 를 다시 잡으면 일부 단말에서
             // 마이크가 안 잡힘. VoiceQueryManager.WAKE_RELEASE_DELAY_MS(300) 와 대칭으로 둠.
             const val VOSK_RESUME_DELAY_MS = 300L
+
+            // 외부 TTS 종료 후 wake 게이트 해제까지의 잔향 보호 시간. AI 응답이 길면 스피커
+            // 잔향 + 마이크 버퍼 residual 이 이 정도 남음. KikiVoice 자기 TTS 의 300ms 보다
+            // 약간 길게 — 외부 TTS 는 보통 더 큰 볼륨/긴 길이.
+            const val EXTERNAL_TTS_TAIL_GUARD_MS = 400L
 
             // wake 감지 → TTS "네, 부르셨어요?" 사이 앞 딜레이. 즉답하면 자동응답기 느낌이라
             // 인간이 반응하는 텀을 살짝 둠.
