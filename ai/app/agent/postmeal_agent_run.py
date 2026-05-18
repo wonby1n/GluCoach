@@ -32,7 +32,8 @@ sys.stdout.reconfigure(encoding="utf-8")
 # GMS 프록시 주소
 BASE_URL = "https://api.anthropic.com"
 MODEL = "claude-sonnet-4-6"
-MAX_TOKENS = 4096
+# 1024 로 줄여 LLM 응답 시간 단축. 음성/푸시 알림 본문은 짧음.
+MAX_TOKENS = 1024
 MAX_TURNS = 10
 
 

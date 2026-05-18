@@ -333,6 +333,10 @@ fun AppNavigation(
                     navController.navigate(Screen.KikiAlarmDetail.route) { launchSingleTop = true }
                     onNavTargetConsumed()
                 }
+                if (pendingNavTarget == com.ssafy.s309.MainActivity.NAV_KIKI_CHAT) {
+                    navController.navigate(Screen.KikiChat.route) { launchSingleTop = true }
+                    onNavTargetConsumed()
+                }
                 if (pendingNavTarget == com.ssafy.s309.MainActivity.NAV_FOOD_REPORT) {
                     backStackEntry.savedStateHandle["requestedTab"] = "food-report"
                     onNavTargetConsumed()

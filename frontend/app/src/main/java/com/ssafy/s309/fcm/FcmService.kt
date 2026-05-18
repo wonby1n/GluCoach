@@ -15,6 +15,7 @@ import com.ssafy.s309.data.repository.HealthRepository
 import com.ssafy.s309.data.repository.UserRepository
 import com.ssafy.s309.notification.GlucoseAlertManager
 import com.ssafy.s309.notification.TtsManager
+import com.ssafy.s309.voice.WakeWordManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +34,8 @@ class FcmService : FirebaseMessagingService() {
     @Inject lateinit var glucoseAlertManager: GlucoseAlertManager
 
     @Inject lateinit var healthRepository: HealthRepository
+
+    @Inject lateinit var wakeWordManager: WakeWordManager
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -85,6 +88,11 @@ class FcmService : FirebaseMessagingService() {
         if (message.data["chatMessageId"] != null) {
             healthRepository.emitChatFcmEvent()
         }
+
+        // wake-activated flow 진행 중이면 Siri/Bixby 스타일 모달에 응답 띄움.
+        // WakeWordManager.showResponse 내부에서 state==THINKING/SHOWING_RESPONSE 일 때만
+        // 실제로 띄우므로, 일반 채팅/알림 흐름은 그대로 (모달 띄움 skip).
+        wakeWordManager.showResponse(body)
     }
 
     /**

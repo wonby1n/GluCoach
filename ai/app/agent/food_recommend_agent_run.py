@@ -30,7 +30,8 @@ if sys.platform == "win32":
 
 BASE_URL = "https://api.anthropic.com"
 MODEL = "claude-haiku-4-5-20251001"
-MAX_TOKENS = 4096
+# 음성 모달 응답은 짧으므로 1024 면 충분. 4096 대비 LLM 응답 시간 단축.
+MAX_TOKENS = 1024
 MAX_TURNS = 10
 
 
