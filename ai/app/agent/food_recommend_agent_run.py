@@ -39,7 +39,18 @@ def _execute(name: str, tool_input: dict) -> str:
     func = FOOD_RECOMMEND_TOOL_MAP.get(name)
     if not func:
         return json.dumps({"error": f"Unknown tool: {name}"}, ensure_ascii=False)
-    result = func(**tool_input)
+    try:
+        result = func(**tool_input)
+    except TypeError as e:
+        return json.dumps(
+            {"status": "error", "error": f"invalid_arguments: {e}", "tool": name},
+            ensure_ascii=False,
+        )
+    except Exception as e:
+        return json.dumps(
+            {"status": "error", "error": f"{type(e).__name__}: {e}", "tool": name},
+            ensure_ascii=False,
+        )
     return json.dumps(result, ensure_ascii=False)
 
 

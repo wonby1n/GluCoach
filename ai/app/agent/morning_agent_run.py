@@ -42,12 +42,27 @@ MAX_TURNS = 10
 # ── 도구 실행 ─────────────────────────────────────────────
 
 def execute_tool(name: str, tool_input: dict) -> str:
-    """TOOL_MAP에서 함수를 찾아 실행하고 JSON 문자열로 반환한다."""
+    """TOOL_MAP에서 함수를 찾아 실행하고 JSON 문자열로 반환한다.
+
+    LLM 이 required 인자를 빠뜨려도 background task 가 죽지 않도록
+    TypeError / 일반 예외를 tool_result 로 돌려보내 LLM 이 재시도할 수 있게 한다.
+    """
     func = TOOL_MAP.get(name)
     if not func:
         return json.dumps({"error": f"Unknown tool: {name}"}, ensure_ascii=False)
 
-    result = func(**tool_input)
+    try:
+        result = func(**tool_input)
+    except TypeError as e:
+        return json.dumps(
+            {"status": "error", "error": f"invalid_arguments: {e}", "tool": name},
+            ensure_ascii=False,
+        )
+    except Exception as e:
+        return json.dumps(
+            {"status": "error", "error": f"{type(e).__name__}: {e}", "tool": name},
+            ensure_ascii=False,
+        )
     return json.dumps(result, ensure_ascii=False)
 
 
