@@ -17,7 +17,15 @@ import time
 from dotenv import load_dotenv
 import anthropic
 
-from app.agent.tools import TOOL_SCHEMAS, TOOL_MAP, set_agent_context
+from app.agent.tools import (
+    TOOL_SCHEMAS,
+    TOOL_MAP,
+    set_agent_context,
+    get_meals,
+    get_glucose,
+    get_steps,
+    get_notification_history,
+)
 from app.agent.prompts import build_postmeal_prompt
 from app.agent.trace_writer import save_trace
 from app.agent.fallback import call_llm_with_retry, get_fallback_message
@@ -65,6 +73,44 @@ def execute_tool(name: str, tool_input: dict) -> str:
     return json.dumps(result, ensure_ascii=False)
 
 
+# ── 사전 조회 ─────────────────────────────────────────────
+
+def _prefetch_postmeal_context(reason: str) -> dict:
+    """meal_recorded / schedule_followup 경로에서 LLM 이 어차피 부를 데이터 4개를
+    Python 에서 미리 호출해 prompt 에 박아넣는다. turn 수를 줄여 응답 시간 단축.
+
+    user_response 경로는 LLM 이 사용자 응답 텍스트만 보면 되므로 prefetch 안 함."""
+    if reason == "user_response":
+        return {}
+
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    now = datetime.now(ZoneInfo("Asia/Seoul"))
+    today = now.strftime("%Y-%m-%d")
+    two_hours_ago = (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S")
+    now_iso = now.strftime("%Y-%m-%dT%H:%M:%S")
+
+    prefetched = {}
+    try:
+        prefetched["meals"] = get_meals(today)
+    except Exception as e:
+        print(f"[prefetch] get_meals 실패: {e}")
+    try:
+        prefetched["glucose"] = get_glucose(two_hours_ago, now_iso)
+    except Exception as e:
+        print(f"[prefetch] get_glucose 실패: {e}")
+    try:
+        prefetched["steps"] = get_steps(two_hours_ago, now_iso)
+    except Exception as e:
+        print(f"[prefetch] get_steps 실패: {e}")
+    try:
+        prefetched["notification_history"] = get_notification_history(hours=24)
+    except Exception as e:
+        print(f"[prefetch] get_notification_history 실패: {e}")
+    return prefetched
+
+
 # ── Agentic Loop ──────────────────────────────────────────
 
 def run_postmeal_agent(trigger: dict, user_id: int = None, alert_type: str = "AGENT_MEAL_FOLLOWUP"):
@@ -82,6 +128,9 @@ def run_postmeal_agent(trigger: dict, user_id: int = None, alert_type: str = "AG
         api_key=os.getenv("ANTHROPIC_API_KEY"),
         base_url=BASE_URL,
     )
+
+    # 데이터 조회 도구를 미리 호출해 prompt 에 박아 turn 절약
+    prefetched = _prefetch_postmeal_context(trigger.get("reason", "meal_recorded"))
 
     messages = [
         {"role": "user", "content": "식후 활동 체크해줘."}
@@ -102,7 +151,7 @@ def run_postmeal_agent(trigger: dict, user_id: int = None, alert_type: str = "AG
             client,
             model=MODEL,
             max_tokens=MAX_TOKENS,
-            system=build_postmeal_prompt(trigger),
+            system=build_postmeal_prompt(trigger, prefetched=prefetched),
             tools=TOOL_SCHEMAS,
             messages=messages,
         )
