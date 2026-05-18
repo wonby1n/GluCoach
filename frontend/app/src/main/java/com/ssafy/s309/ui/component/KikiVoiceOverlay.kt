@@ -227,7 +227,8 @@ private fun ResponseCard(
                 .padding(horizontal = 18.dp, vertical = 14.dp),
     ) {
         Column(
-            modifier = Modifier.padding(end = 32.dp), // X 버튼 자리 확보
+            // X 버튼 자리 확보
+            modifier = Modifier.padding(end = 32.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(
