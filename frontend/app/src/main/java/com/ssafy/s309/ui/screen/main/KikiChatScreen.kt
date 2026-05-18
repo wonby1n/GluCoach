@@ -324,7 +324,26 @@ class KikiChatViewModel
                                     }
                                 }
                         if (newMessages.isNotEmpty()) {
-                            val raw = _messages.value.filterNot { it is ChatMessage.DateSeparator }
+                            // 옵티미스틱 user 메시지의 createdAt 은 FE clock 으로 생성돼 서버 DB clock 과
+                            // 미세하게 어긋난다. 위 createdAt 기반 dedup 으로는 잡히지 않아 같은 user
+                            // 메시지가 [local optimistic + server] 둘 다 화면에 남는 버그가 있었다.
+                            // 서버 응답에 동일 텍스트 user 메시지가 있고 local 의 createdAt 이 서버에 없으면
+                            // 그 local 은 옵티미스틱이라고 판정하고 제거한다.
+                            val serverCreatedAts = response.content.map { it.createdAt }.toSet()
+                            val fetchedUserTexts =
+                                response.content
+                                    .asSequence()
+                                    .filter { it.sender == "user" }
+                                    .mapNotNull { it.message }
+                                    .toSet()
+                            val raw =
+                                _messages.value
+                                    .filterNot { it is ChatMessage.DateSeparator }
+                                    .filterNot { msg ->
+                                        msg is ChatMessage.UserMessage &&
+                                            msg.text in fetchedUserTexts &&
+                                            msg.createdAt !in serverCreatedAts
+                                    }
                             _messages.value = withDateSeparators(newMessages + raw)
                             // 음성 응답 자동 발화는 제거 — FcmService 가 푸시 도착 시 TTS 로 본문을 읽어준다 (중복 방지).
                         }
