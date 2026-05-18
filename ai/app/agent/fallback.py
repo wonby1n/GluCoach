@@ -24,6 +24,7 @@ RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 529}
 FALLBACK_MESSAGES = {
     "morning":  "좋은 아침이에요! 오늘 첫 식사는 가볍게 확인하고 시작해볼까요? 🍃",
     "postmeal": "식사 후 가볍게 움직여볼까요? :)",
+    "food_recommend": "잠시 후 다시 음식 추천을 도와드릴게요. 이번엔 답변을 정리하기 어려웠어요.",
 }
 
 

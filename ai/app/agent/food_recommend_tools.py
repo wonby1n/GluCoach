@@ -2,7 +2,7 @@
 Glucocoach 음식 추천 Agent — 전용 도구
 =======================================
 사용자 command(`recommend_food`) 발화 시 호출되는 추천 agent의 tool 셋.
-기존 tools.py와 분리. 컨텍스트도 별도(_context).
+기존 tools.py와 분리. 컨텍스트도 별도 (ContextVar 사용 — 동시 요청 isolation).
 
 데이터 소스 (BE 실데이터):
 - get_user_food_grades   → GET  /api/agent/users/{id}/food-grades
@@ -18,35 +18,69 @@ Glucocoach 음식 추천 Agent — 전용 도구
 BACKEND_API_URL 미설정 시 fallback dict 반환 (로컬 테스트용).
 """
 
+import logging
 import os
+from contextvars import ContextVar
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import requests as _requests
 
+log = logging.getLogger(__name__)
+
 
 # ── 컨텍스트 (runner가 set) ──────────────────────────────────
+# ContextVar 로 분리해 fastapi run_in_threadpool 동시 요청 시 user_id 가 서로 덮어쓰이는 race 차단.
+# anyio.to_thread.run_sync 가 호출 시점의 Context 를 워커 스레드로 그대로 복사하므로, 각 요청 핸들러
+# 내부에서 set_food_agent_context() → run_food_recommend_agent() 호출 흐름이 isolation 된다.
 
-_context: dict = {
-    "user_id": None,
-    "alert_type": "AGENT_FOOD_RECOMMEND",
-    "parent_chat_message_id": None,
-}
+_user_id_var: ContextVar[int | None] = ContextVar("food_user_id", default=None)
+_parent_chat_message_id_var: ContextVar[int | None] = ContextVar(
+    "food_parent_chat_message_id", default=None
+)
+_alert_type_var: ContextVar[str] = ContextVar(
+    "food_alert_type", default="AGENT_FOOD_RECOMMEND"
+)
 
 
 def set_food_agent_context(
     user_id: int, parent_chat_message_id: int, alert_type: str = "AGENT_FOOD_RECOMMEND"
 ) -> None:
-    _context["user_id"] = user_id
-    _context["parent_chat_message_id"] = parent_chat_message_id
-    _context["alert_type"] = alert_type
+    _user_id_var.set(user_id)
+    _parent_chat_message_id_var.set(parent_chat_message_id)
+    _alert_type_var.set(alert_type)
+
+
+def _ctx_user_id() -> int | None:
+    return _user_id_var.get()
+
+
+def _ctx_parent_chat_message_id() -> int | None:
+    return _parent_chat_message_id_var.get()
+
+
+def _ctx_alert_type() -> str:
+    return _alert_type_var.get()
+
+
+_BE_URL_WARNED = False
 
 
 def _be_get(path: str, params: dict | None = None) -> dict | list | None:
-    """BE GET 호출 헬퍼. 실패 시 None 반환."""
+    """BE GET 호출 헬퍼. 실패 시 None 반환 + 로그.
+
+    BACKEND_API_URL 미설정 시 첫 호출에서 한 번만 경고 (로컬 테스트 fallback 모드).
+    HTTP 실패는 path/status/body 를 묶어 warning 으로 노출 — 운영에서 silent 흡수 방지.
+    """
+    global _BE_URL_WARNED
     backend_url = os.getenv("BACKEND_API_URL", "")
     agent_api_key = os.getenv("AGENT_API_KEY", "dev-agent-key-change-in-prod")
     if not backend_url:
+        if not _BE_URL_WARNED:
+            log.warning(
+                "[FoodRecommend] BACKEND_API_URL 미설정 — BE 호출 모두 None 반환 (로컬 fallback 모드)"
+            )
+            _BE_URL_WARNED = True
         return None
     try:
         resp = _requests.get(
@@ -57,8 +91,22 @@ def _be_get(path: str, params: dict | None = None) -> dict | list | None:
         )
         resp.raise_for_status()
         return resp.json()
+    except _requests.HTTPError as e:
+        status = getattr(e.response, "status_code", "?")
+        body = getattr(e.response, "text", "")[:200]
+        log.warning(
+            "[FoodRecommend BE GET HTTP %s] path=%s params=%s body=%s",
+            status,
+            path,
+            params,
+            body,
+        )
+        return None
+    except _requests.RequestException as e:
+        log.warning("[FoodRecommend BE GET 네트워크 실패] path=%s err=%s", path, e)
+        return None
     except Exception as e:
-        print(f"[FoodRecommend BE GET 실패] {path} err={e}")
+        log.exception("[FoodRecommend BE GET 예상치 못한 오류] path=%s err=%s", path, e)
         return None
 
 
@@ -67,7 +115,7 @@ def _be_get(path: str, params: dict | None = None) -> dict | list | None:
 
 def get_user_food_grades(min_meal_count: int = 2) -> dict:
     """사용자 음식 등급(S/A/B/C/D) 조회. min_meal_count 이상의 기록만."""
-    user_id = _context.get("user_id")
+    user_id = _ctx_user_id()
     raw = _be_get(f"/api/agent/users/{user_id}/food-grades")
     if raw is None:
         return {"total": 0, "by_grade": {"S": [], "A": [], "B": [], "C": [], "D": []}, "is_cold_start": True, "error": "be_unavailable"}
@@ -95,7 +143,7 @@ def get_user_food_grades(min_meal_count: int = 2) -> dict:
 
 def get_recent_meals(days: int = 2) -> dict:
     """최근 N일 식사 기록."""
-    user_id = _context.get("user_id")
+    user_id = _ctx_user_id()
     raw = _be_get(f"/api/agent/users/{user_id}/recent-meals", params={"days": days})
     if raw is None:
         return {"days": days, "meals": [], "error": "be_unavailable"}
@@ -115,7 +163,7 @@ def get_recent_meals(days: int = 2) -> dict:
 
 def get_user_profile() -> dict:
     """사용자 프로필 (당뇨 타입/타겟 범위)."""
-    user_id = _context.get("user_id")
+    user_id = _ctx_user_id()
     raw = _be_get(f"/api/agent/users/{user_id}/profile")
     if raw is None:
         return {"error": "be_unavailable"}
@@ -135,7 +183,7 @@ def get_unseen_food_candidates(limit: int = 20) -> dict:
 
     신규 음식 추천에만 사용. items[].food_id를 채우기 위해 반드시 이 도구의 결과에서만 신규 음식을 고른다.
     """
-    user_id = _context.get("user_id")
+    user_id = _ctx_user_id()
     raw = _be_get(f"/api/agent/users/{user_id}/unseen-foods", params={"limit": limit})
     if raw is None:
         return {"candidates": [], "error": "be_unavailable"}
@@ -155,7 +203,7 @@ def get_unseen_food_candidates(limit: int = 20) -> dict:
 
 def get_glucose_recent() -> dict:
     """최근 혈당 + 마지막 식사 경과 분."""
-    user_id = _context.get("user_id")
+    user_id = _ctx_user_id()
     raw = _be_get(f"/api/agent/users/{user_id}/glucose-recent")
     if raw is None:
         return {"error": "be_unavailable"}
@@ -172,7 +220,7 @@ def get_today_activity() -> dict:
     삼성헬스/HealthConnect → daily_health_summaries / step_records 에 적재된 값을 조회.
     음식 가부 판단 시 "오늘 활동량/컨디션" 보정 신호로 사용한다 (룰은 프롬프트 참조).
     """
-    user_id = _context.get("user_id")
+    user_id = _ctx_user_id()
     if user_id is None:
         return {"error": "missing_user"}
     kst_now = datetime.now(ZoneInfo("Asia/Seoul"))
@@ -235,7 +283,7 @@ def predict_glucose_for_food(food_id: int) -> dict:
     - risk_level == "elevated" (180 ≤ peak < 200): 양 조절 / 한 시간 뒤 권고
     - risk_level == "normal" (peak < 180): "괜찮아요" 톤, 양만 짚어줌
     """
-    user_id = _context.get("user_id")
+    user_id = _ctx_user_id()
     if user_id is None or food_id is None:
         return {"error": "missing_user_or_food"}
     raw = _be_get(f"/api/agent/foods/{food_id}/predict-glucose", params={"userId": user_id})
@@ -263,9 +311,9 @@ def send_command_response(
     options는 사용하지 않는다 (텍스트 응답 + 선택적 payload 구조화 카드만).
     BE POST /api/agent/notifications with parentChatMessageId.
     """
-    user_id = _context.get("user_id")
-    parent_id = _context.get("parent_chat_message_id")
-    alert_type = _context.get("alert_type", "AGENT_FOOD_RECOMMEND")
+    user_id = _ctx_user_id()
+    parent_id = _ctx_parent_chat_message_id()
+    alert_type = _ctx_alert_type()
     backend_url = os.getenv("BACKEND_API_URL", "")
     agent_api_key = os.getenv("AGENT_API_KEY", "dev-agent-key-change-in-prod")
 
@@ -298,7 +346,11 @@ def send_command_response(
             },
             timeout=5,
         )
-        print(f"[FoodRecommend API] status={resp.status_code}, body={resp.text}")
+        log.info(
+            "[FoodRecommend send_command_response] status=%s body=%s",
+            resp.status_code,
+            resp.text[:300],
+        )
         resp.raise_for_status()
         return {"status": "sent", "message": message}
     except Exception as e:

@@ -69,6 +69,7 @@ import com.ssafy.s309.data.repository.HealthRepository
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
 import com.ssafy.s309.voice.VoiceQueryManager
+import com.ssafy.s309.voice.WakeWordManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -109,6 +110,7 @@ class KikiChatViewModel
     constructor(
         private val healthRepository: HealthRepository,
         private val voiceQueryManager: VoiceQueryManager,
+        private val wakeWordManager: WakeWordManager,
     ) : ViewModel() {
         private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
         val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
@@ -149,6 +151,47 @@ class KikiChatViewModel
                     onFcmReceived()
                 }
             }
+            // "하이 키키" 음성 호출 이벤트 — 채팅 화면이 살아있을 때만 로컬 말풍선 prepend.
+            // 백엔드 거치지 않으므로 refresh()/페이지 재조회 시엔 사라짐 (의도된 동작).
+            viewModelScope.launch {
+                wakeWordManager.wakeCallEvents.collect { timestamp ->
+                    prependWakeCallMessages(timestamp)
+                }
+            }
+        }
+
+        /**
+         * Wake 감지 시 채팅에 두 줄을 즉시 추가한다:
+         *  1. "하이 키키" — 사용자 말풍선
+         *  2. "네, 부르셨어요?" — 키키 말풍선
+         *
+         * 백엔드에 저장되지 않으므로, 채팅 새로고침/페이지 재조회 시엔 사라진다.
+         * 데모 시 wake 호출이 화면에 바로 보이게 하기 위한 로컬 UI 트릭.
+         */
+        private fun prependWakeCallMessages(timestamp: Long) {
+            val nowIso = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+            val userMsg =
+                ChatMessage.UserMessage(
+                    text = "하이 키키",
+                    timestamp = timestamp,
+                    createdAt = nowIso,
+                )
+            val kikiMsg =
+                ChatMessage.KikiMessage(
+                    NotificationItem(
+                        // 백엔드 ID 와 충돌하지 않도록 음수 + ms 타임스탬프 사용
+                        id = -timestamp,
+                        title = "키키",
+                        message = "네, 부르셨어요?",
+                        timeAgoText = "방금",
+                        isUnread = false,
+                        alertType = "LOCAL_WAKE_CALL",
+                        createdAt = nowIso,
+                        displayTrace = null,
+                    ),
+                )
+            val raw = _messages.value.filterNot { it is ChatMessage.DateSeparator }
+            _messages.value = withDateSeparators(listOf(kikiMsg, userMsg) + raw)
         }
 
         fun loadNextPage() {

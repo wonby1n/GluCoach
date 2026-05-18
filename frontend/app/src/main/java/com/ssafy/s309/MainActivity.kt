@@ -28,7 +28,9 @@ import com.ssafy.s309.data.repository.HealthRepository
 import com.ssafy.s309.data.repository.UserRepository
 import com.ssafy.s309.data.repository.source.SamsungHealthHolder
 import com.ssafy.s309.navigation.AppNavigation
+import com.ssafy.s309.ui.component.KikiVoiceOverlay
 import com.ssafy.s309.ui.theme.S309Theme
+import com.ssafy.s309.voice.WakeWordManager
 import com.ssafy.s309.wear.WearDataSender
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -59,6 +61,8 @@ class MainActivity : ComponentActivity() {
         fun tokenManager(): TokenManager
 
         fun userRepository(): UserRepository
+
+        fun wakeWordManager(): WakeWordManager
     }
 
     private val samsungHealthHolder: SamsungHealthHolder by lazy {
@@ -83,6 +87,12 @@ class MainActivity : ComponentActivity() {
         EntryPointAccessors
             .fromApplication(applicationContext, MainActivityEntryPoint::class.java)
             .userRepository()
+    }
+
+    private val wakeWordManager: WakeWordManager by lazy {
+        EntryPointAccessors
+            .fromApplication(applicationContext, MainActivityEntryPoint::class.java)
+            .wakeWordManager()
     }
 
     // Samsung Health 권한 자동 요청은 Activity 라이프타임당 1회만. onResume 마다 다시 띄우면
@@ -154,6 +164,8 @@ class MainActivity : ComponentActivity() {
                         pendingFoodName = pendingFoodName,
                         onFoodNameConsumed = { pendingFoodName = null },
                     )
+                    // 빅스비 스타일 음성 오버레이 — wake 감지/명령 수집 동안 화면 하단에 floating
+                    KikiVoiceOverlay(wakeWordManager = wakeWordManager)
                 }
             }
         }
@@ -169,6 +181,17 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         maybeRequestSamsungHealthAtLaunch()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // "하이 키키" wake word 듣기 시작. 권한/엔진 미비 시 내부에서 no-op.
+        wakeWordManager.start()
+    }
+
+    override fun onStop() {
+        wakeWordManager.stop()
+        super.onStop()
     }
 
     override fun onDestroy() {
