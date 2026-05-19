@@ -86,7 +86,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -112,8 +111,6 @@ data class MealRecord(
     val ingredients: List<String> = emptyList(),
     val recordedAt: String = "",
     val maxGlucose: Int? = null,
-    val glucose1h: Int? = null,
-    val glucose2h: Int? = null,
     val grade: String? = null,
 )
 
@@ -123,12 +120,6 @@ enum class MealType(val label: String) {
     DINNER("저녁"),
     SNACK("간식"),
 }
-
-data class GlucoseDetail(
-    val max: Int,
-    val at1h: Int? = null,
-    val at2h: Int? = null,
-)
 
 private fun mealTypeDisplayName(type: MealType): String =
     when (type) {
@@ -154,9 +145,6 @@ class MealLogViewModel
 
         private val _error = MutableStateFlow<String?>(null)
         val error: StateFlow<String?> = _error.asStateFlow()
-
-        private val _maxGlucoseMap = MutableStateFlow<Map<Int, GlucoseDetail>>(emptyMap())
-        val maxGlucoseMap: StateFlow<Map<Int, GlucoseDetail>> = _maxGlucoseMap.asStateFlow()
 
         private val _foodGradeMap = MutableStateFlow<Map<Int, String>>(emptyMap())
         val foodGradeMap: StateFlow<Map<Int, String>> = _foodGradeMap.asStateFlow()
@@ -192,9 +180,6 @@ class MealLogViewModel
                                 val day = LocalDate.parse(date).dayOfMonth
                                 _beDaysWithMeals.value = _beDaysWithMeals.value + day
                             }
-                            meals.forEach { meal ->
-                                launch { lookupMaxGlucose(meal.mealId, meal.recordedAt) }
-                            }
                             loadFoodGrades()
                         }
                         .onFailure {
@@ -203,34 +188,6 @@ class MealLogViewModel
                             _error.value = "식사 기록을 불러올 수 없습니다"
                         }
                 }
-        }
-
-        private suspend fun lookupMaxGlucose(
-            mealId: Int,
-            recordedAt: String,
-        ) {
-            if (mealId in _maxGlucoseMap.value) return
-            runCatching {
-                val mealTime = LocalDateTime.parse(recordedAt)
-                val to = mealTime.plusHours(2).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                val records = healthRepository.getGlucoseRecords(recordedAt, to)
-                if (records.isNotEmpty()) {
-                    val maxVal = records.maxOf { it.value.toInt() }
-                    val target1h = mealTime.plusHours(1)
-                    val target2h = mealTime.plusHours(2)
-                    val at1h =
-                        records.minByOrNull {
-                            kotlin.math.abs(Duration.between(LocalDateTime.parse(it.measuredAt), target1h).toMinutes())
-                        }?.value?.toInt()
-                    val at2h =
-                        records.minByOrNull {
-                            kotlin.math.abs(Duration.between(LocalDateTime.parse(it.measuredAt), target2h).toMinutes())
-                        }?.value?.toInt()
-                    _maxGlucoseMap.value = _maxGlucoseMap.value + (mealId to GlucoseDetail(maxVal, at1h, at2h))
-                }
-            }.onFailure {
-                Log.w("MealLogVM", "혈당 조회 실패 mealId=$mealId", it)
-            }
         }
 
         private fun loadFoodGrades() {
@@ -419,11 +376,10 @@ private fun MealLogCalendarContent(
         }
     }
 
-    val glucoseMap by mealLogViewModel.maxGlucoseMap.collectAsState()
     val foodGradeMap by mealLogViewModel.foodGradeMap.collectAsState()
 
     val selectedDateMeals =
-        remember(beMeals, selectedYear, selectedMonth, selectedDay, glucoseMap, foodGradeMap) {
+        remember(beMeals, selectedYear, selectedMonth, selectedDay, foodGradeMap) {
             beMeals.map { m ->
                 MealRecord(
                     id = m.mealId,
@@ -439,9 +395,7 @@ private fun MealLogCalendarContent(
                     fat = m.fatG?.toFloat() ?: 0f,
                     imageUrl = m.imageUrl,
                     recordedAt = m.recordedAt,
-                    maxGlucose = glucoseMap[m.mealId]?.max,
-                    glucose1h = glucoseMap[m.mealId]?.at1h,
-                    glucose2h = glucoseMap[m.mealId]?.at2h,
+                    maxGlucose = m.peakGlucose?.toInt(),
                     grade = m.foodId?.let { foodGradeMap[it] },
                 )
             }
@@ -1418,7 +1372,7 @@ private fun MemoTabContent(description: String) {
 
 @Composable
 private fun GlucoseTabContent(meal: MealRecord) {
-    if (meal.maxGlucose == null && meal.glucose1h == null && meal.glucose2h == null) {
+    if (meal.maxGlucose == null) {
         Text(
             text = "혈당 기록이 없습니다",
             color = GlucoachColors.TextSecondary.copy(alpha = 0.5f),
@@ -1427,9 +1381,7 @@ private fun GlucoseTabContent(meal: MealRecord) {
         return
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        meal.maxGlucose?.let { GlucoseRow("최고 혈당", "${it}mg/dL") }
-        meal.glucose1h?.let { GlucoseRow("식후 1시간", "${it}mg/dL") }
-        meal.glucose2h?.let { GlucoseRow("식후 2시간", "${it}mg/dL") }
+        GlucoseRow("최고 혈당", "${meal.maxGlucose}mg/dL")
     }
 }
 
