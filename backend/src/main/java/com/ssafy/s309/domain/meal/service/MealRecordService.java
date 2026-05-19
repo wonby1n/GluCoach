@@ -11,6 +11,7 @@ import com.ssafy.s309.domain.meal.repository.MealRecordRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -63,6 +64,15 @@ public class MealRecordService {
             .build());
 
     return new MealRecordCreateResponse(meal.getId());
+  }
+
+  /** 캘린더 점 표시용 — 해당 월에 식사 기록이 있는 day-of-month 목록. */
+  @Transactional(readOnly = true)
+  public List<Integer> getDaysWithMealsInMonth(Integer userId, int year, int month) {
+    YearMonth ym = YearMonth.of(year, month);
+    LocalDateTime from = ym.atDay(1).atStartOfDay();
+    LocalDateTime to = ym.plusMonths(1).atDay(1).atStartOfDay();
+    return mealRecordRepository.findDistinctDaysInRange(userId, from, to);
   }
 
   @Transactional(readOnly = true)

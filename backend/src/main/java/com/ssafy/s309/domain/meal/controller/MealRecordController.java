@@ -49,4 +49,15 @@ public class MealRecordController {
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
     return ResponseEntity.ok(service.getByDate(principal.userId(), date));
   }
+
+  @Operation(
+      summary = "캘린더 dot 표시용 — 월별 식사 있는 날짜",
+      description = "지정한 년/월에 식사 기록이 존재하는 day-of-month 목록을 반환한다.")
+  @GetMapping("/calendar")
+  public ResponseEntity<List<Integer>> getCalendarDays(
+      @AuthenticationPrincipal CustomUserPrincipal principal,
+      @RequestParam int year,
+      @RequestParam int month) {
+    return ResponseEntity.ok(service.getDaysWithMealsInMonth(principal.userId(), year, month));
+  }
 }
