@@ -204,6 +204,12 @@ class HealthRepository
         /** 날짜별 식사 기록 조회 */
         suspend fun getMealsByDate(date: String): Result<List<MealRecordResponse>> = runCatching { healthApi.getMeals(date = date) }
 
+        /** 월별 식사 기록 있는 날짜 (캘린더 dot 표시용) */
+        suspend fun getMealCalendarDays(
+            year: Int,
+            month: Int,
+        ): Result<List<Int>> = runCatching { healthApi.getMealCalendar(year = year, month = month) }
+
         /** 기간별 CGM 혈당 기록 조회 */
         suspend fun getGlucoseRecords(
             from: String,

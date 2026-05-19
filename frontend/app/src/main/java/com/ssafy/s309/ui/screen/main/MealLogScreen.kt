@@ -81,8 +81,6 @@ import com.ssafy.s309.ui.theme.GlucoachSpacing
 import com.ssafy.s309.ui.viewmodel.FoodSearchViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -91,7 +89,6 @@ import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import javax.inject.Inject
@@ -261,19 +258,9 @@ class MealLogViewModel
             monthScanJob?.cancel()
             monthScanJob =
                 viewModelScope.launch {
-                    val yearMonth = YearMonth.of(year, month)
-                    val days = yearMonth.lengthOfMonth()
-                    val found = mutableSetOf<Int>()
-                    for (chunk in (1..days).chunked(5)) {
-                        chunk.map { day ->
-                            async {
-                                val date = yearMonth.atDay(day).format(DateTimeFormatter.ISO_LOCAL_DATE)
-                                val meals = runCatching { healthRepository.getMealsByDate(date).getOrNull() }.getOrNull()
-                                if (!meals.isNullOrEmpty()) day else null
-                            }
-                        }.awaitAll().filterNotNull().let { found.addAll(it) }
-                        _beDaysWithMeals.value = found.toSet()
-                    }
+                    healthRepository.getMealCalendarDays(year, month)
+                        .onSuccess { _beDaysWithMeals.value = it.toSet() }
+                        .onFailure { Log.w("MealLogVM", "캘린더 조회 실패 year=$year month=$month", it) }
                 }
         }
 
