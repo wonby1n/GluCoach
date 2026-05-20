@@ -7,6 +7,7 @@
 import json
 import os
 import sys
+import time
 
 from dotenv import load_dotenv
 import anthropic
@@ -78,9 +79,11 @@ def run_food_recommend_agent(
     sent_message = None
     tool_call_details: list = []
     response = None
+    agent_start = time.perf_counter()
 
     while turn < MAX_TURNS:
         turn += 1
+        llm_start = time.perf_counter()
         response = call_llm_with_retry(
             client,
             model=MODEL,
@@ -89,6 +92,7 @@ def run_food_recommend_agent(
             tools=FOOD_RECOMMEND_TOOL_SCHEMAS,
             messages=messages,
         )
+        print(f"[FoodRecommend] Turn {turn} Claude 호출 → {time.perf_counter() - llm_start:.2f}s")
 
         if response is None:
             result = {
@@ -117,7 +121,9 @@ def run_food_recommend_agent(
         messages.append({"role": "assistant", "content": response.content})
         tool_results = []
         for block in tool_use_blocks:
+            tool_start = time.perf_counter()
             result = _execute(block.name, block.input)
+            print(f"[FoodRecommend tool] {block.name} → {time.perf_counter() - tool_start:.2f}s")
             tool_call_details.append(
                 {"name": block.name, "input": block.input, "result": json.loads(result)}
             )
@@ -128,6 +134,7 @@ def run_food_recommend_agent(
             )
         messages.append({"role": "user", "content": tool_results})
 
+    print(f"[FoodRecommend] 전체 소요 → {time.perf_counter() - agent_start:.2f}s (turn={turn})")
     result = {
         "message": sent_message,
         "turns": turn,
