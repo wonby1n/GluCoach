@@ -32,7 +32,7 @@ if sys.platform == "win32":
 BASE_URL = "https://api.anthropic.com"
 MODEL = "claude-haiku-4-5-20251001"
 # 음성 모달 응답은 짧으므로 1024 면 충분. 4096 대비 LLM 응답 시간 단축.
-MAX_TOKENS = 1024
+MAX_TOKENS = 2048
 MAX_TURNS = 10
 
 
@@ -135,7 +135,9 @@ def run_food_recommend_agent(
             tool_results.append(
                 {"type": "tool_result", "tool_use_id": block.id, "content": result}
             )
-        messages.append({"role": "user", "content": tool_results})
+        messages.append({"role": "user", "content": tool_results + [
+            {"type": "text", "text": "데이터 수집 완료. 분석 텍스트 없이 send_command_response를 즉시 호출하세요."}
+        ]})
         if should_exit:
             break
 
