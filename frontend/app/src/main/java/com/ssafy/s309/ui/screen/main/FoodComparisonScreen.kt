@@ -132,7 +132,7 @@ private fun FoodSearchItem.toFoodItem() =
         id = id.toLong(),
         name = displayName ?: name,
         category = category.orEmpty(),
-        imageResId = FoodCategoryImageMapper.getImageRes(category, name),
+        imageResId = FoodCategoryImageMapper.getImageRes(category, displayName ?: name),
         calories = kcal?.toInt() ?: 0,
         carbs = carbsG?.toInt() ?: 0,
         sugar = sugarG?.toInt() ?: 0,
@@ -2158,9 +2158,9 @@ private fun ConfettiAnimation(modifier: Modifier = Modifier) {
             particles.forEach { p ->
                 val x = centerX + p.velocityX * elapsed
                 val y = centerY + p.velocityY * elapsed + 0.5f * gravity * elapsed * elapsed
-                val alpha = (1f - t * 0.7f).coerceIn(0f, 1f)
+                val alpha = ((1f - t) * 1.5f).coerceIn(0f, 1f)
 
-                if (x in -20f..size.width + 20f && y in -20f..size.height + 20f) {
+                if (alpha > 0f && x in -20f..size.width + 20f && y in -20f..size.height + 20f) {
                     drawRect(
                         color = p.color.copy(alpha = alpha),
                         topLeft = Offset(x - p.width / 2f, y - p.height / 2f),
