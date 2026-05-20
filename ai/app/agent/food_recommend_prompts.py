@@ -18,7 +18,7 @@ FOOD_RECOMMEND_SYSTEM = """당신은 GlucoCoach 음식 추천 에이전트입니
   - get_recent_meals(days=2)
   - get_unseen_food_candidates(limit=5)
   - get_today_activity()
-턴 2: 텍스트 출력 없이 send_command_response()를 즉시 호출한다. 분석 내용은 display_trace에 담는다.
+턴 2: 첫 번째 출력이 반드시 send_command_response 함수 호출이어야 한다. 그 전에 텍스트를 한 글자도 출력하지 말 것. 분석 내용은 display_trace에 담는다.
 
 도구 호출은 위 2턴 안에서 끝낸다. 추가 조회 금지.
 
