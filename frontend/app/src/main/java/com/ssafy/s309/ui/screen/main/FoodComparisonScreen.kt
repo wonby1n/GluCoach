@@ -1000,10 +1000,6 @@ private fun FoodComparisonResultContent(
                 glucoseRange = glucoseRange,
             )
 
-            Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
-
-            TipCard()
-
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
             Row(
@@ -1825,40 +1821,6 @@ private fun LegendDot(
             text = label,
             color = GlucoachColors.TextSecondary,
             fontSize = 11.sp,
-        )
-    }
-}
-
-@Composable
-private fun TipCard() {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(GlucoachCorner.card))
-                .background(GlucoachColors.TipBg)
-                .padding(GlucoachSpacing.lg),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(GlucoachColors.TipAccent)
-                    .padding(horizontal = GlucoachSpacing.sm, vertical = GlucoachSpacing.xs),
-        ) {
-            Text(
-                text = "TIP",
-                color = Color.White,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-            )
-        }
-        Spacer(modifier = Modifier.width(GlucoachSpacing.md))
-        Text(
-            text = "면을 절반 덜어내면 혈당 지수를 30% 낮출 수 있어요!",
-            color = GlucoachColors.TextPrimary,
-            fontSize = 13.sp,
         )
     }
 }
