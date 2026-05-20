@@ -178,7 +178,7 @@ def get_user_profile() -> dict:
     }
 
 
-def get_unseen_food_candidates(limit: int = 20) -> dict:
+def get_unseen_food_candidates(limit: int = 5) -> dict:
     """사용자가 아직 안 먹어본 음식 후보 (foods 테이블, search_count desc).
 
     신규 음식 추천에만 사용. items[].food_id를 채우기 위해 반드시 이 도구의 결과에서만 신규 음식을 고른다.
@@ -304,7 +304,7 @@ def predict_glucose_for_food(food_id: int) -> dict:
 
 
 def send_command_response(
-    message: str, display_trace: dict, payload: dict | None = None
+    message: str, display_trace: dict | None = None, payload: dict | None = None
 ) -> dict:
     """사용자 command에 대한 agent 응답 발송. parent_id로 user 메시지를 참조한다.
 
@@ -317,8 +317,14 @@ def send_command_response(
     backend_url = os.getenv("BACKEND_API_URL", "")
     agent_api_key = os.getenv("AGENT_API_KEY", "dev-agent-key-change-in-prod")
 
-    if not isinstance(display_trace, dict):
-        return {"status": "error", "error": "display_trace must be an object"}
+    if display_trace is None:
+        display_trace = {}
+    elif not isinstance(display_trace, dict):
+        display_trace = {}
+
+    display_trace.setdefault("summary", "")
+    display_trace.setdefault("cards", [])
+    display_trace.setdefault("decision", {"reason": ""})
     if payload is not None and not isinstance(payload, dict):
         return {"status": "error", "error": "payload must be an object or null"}
 
@@ -403,7 +409,7 @@ FOOD_RECOMMEND_TOOL_SCHEMAS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "limit": {"type": "integer", "default": 20, "description": "최대 N개 (1~50)"}
+                "limit": {"type": "integer", "default": 5, "description": "최대 N개 (1~50)"}
             },
         },
     },
@@ -514,7 +520,7 @@ FOOD_RECOMMEND_TOOL_SCHEMAS = [
                     },
                 },
             },
-            "required": ["message", "display_trace"],
+            "required": ["message"],
         },
     },
 ]

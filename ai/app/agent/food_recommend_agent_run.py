@@ -7,6 +7,7 @@
 import json
 import os
 import sys
+import time
 
 from dotenv import load_dotenv
 import anthropic
@@ -31,7 +32,7 @@ if sys.platform == "win32":
 BASE_URL = "https://api.anthropic.com"
 MODEL = "claude-haiku-4-5-20251001"
 # 음성 모달 응답은 짧으므로 1024 면 충분. 4096 대비 LLM 응답 시간 단축.
-MAX_TOKENS = 1024
+MAX_TOKENS = 2048
 MAX_TURNS = 10
 
 
@@ -78,9 +79,11 @@ def run_food_recommend_agent(
     sent_message = None
     tool_call_details: list = []
     response = None
+    agent_start = time.perf_counter()
 
     while turn < MAX_TURNS:
         turn += 1
+        llm_start = time.perf_counter()
         response = call_llm_with_retry(
             client,
             model=MODEL,
@@ -89,6 +92,7 @@ def run_food_recommend_agent(
             tools=FOOD_RECOMMEND_TOOL_SCHEMAS,
             messages=messages,
         )
+        print(f"[FoodRecommend] Turn {turn} Claude 호출 → {time.perf_counter() - llm_start:.2f}s")
 
         if response is None:
             result = {
@@ -116,18 +120,28 @@ def run_food_recommend_agent(
 
         messages.append({"role": "assistant", "content": response.content})
         tool_results = []
+        should_exit = False
         for block in tool_use_blocks:
+            tool_start = time.perf_counter()
             result = _execute(block.name, block.input)
+            print(f"[FoodRecommend tool] {block.name} → {time.perf_counter() - tool_start:.2f}s")
+            result_dict = json.loads(result)
             tool_call_details.append(
-                {"name": block.name, "input": block.input, "result": json.loads(result)}
+                {"name": block.name, "input": block.input, "result": result_dict}
             )
-            if block.name == "send_command_response":
+            if block.name == "send_command_response" and result_dict.get("status") == "sent":
                 sent_message = block.input.get("message")
+                should_exit = True
             tool_results.append(
                 {"type": "tool_result", "tool_use_id": block.id, "content": result}
             )
-        messages.append({"role": "user", "content": tool_results})
+        messages.append({"role": "user", "content": tool_results + [
+            {"type": "text", "text": "데이터 수집 완료. 분석 텍스트 없이 send_command_response를 즉시 호출하세요."}
+        ]})
+        if should_exit:
+            break
 
+    print(f"[FoodRecommend] 전체 소요 → {time.perf_counter() - agent_start:.2f}s (turn={turn})")
     result = {
         "message": sent_message,
         "turns": turn,

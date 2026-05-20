@@ -110,9 +110,6 @@ internal data class FoodItem(
     val name: String,
     val category: String = "",
     @DrawableRes val imageResId: Int = R.drawable.kiki_main,
-    val isStable: Boolean = true,
-    val maxGlucose: Int = 0,
-    val recoveryTimeText: String = "",
     val calories: Int = 0,
     val gi: Int = 0,
     val carbs: Int = 0,
@@ -121,7 +118,6 @@ internal data class FoodItem(
     val fat: Int = 0,
     val fiber: Int = 0,
     val servingSize: Int = 0,
-    val glucoseCurve: List<Float> = emptyList(),
 )
 
 private fun FoodSearchItem.toFoodItem() =
@@ -137,114 +133,6 @@ private fun FoodSearchItem.toFoodItem() =
         fat = fatG?.toInt() ?: 0,
         fiber = fiberG?.toInt() ?: 0,
         servingSize = servingSize?.toInt() ?: 0,
-    )
-
-private val allFoods =
-    listOf(
-        FoodItem(
-            name = "짜장면",
-            imageResId = R.drawable.jjajangmyeon,
-            isStable = false,
-            maxGlucose = 185,
-            recoveryTimeText = "2시간 15분",
-            calories = 700,
-            gi = 80,
-            carbs = 150,
-            protein = 20,
-            fat = 25,
-            glucoseCurve = listOf(90f, 155f, 175f, 185f, 178f, 165f, 145f, 130f, 120f),
-        ),
-        FoodItem(
-            name = "짬뽕",
-            imageResId = R.drawable.jjambbong,
-            isStable = true,
-            maxGlucose = 140,
-            recoveryTimeText = "1시간 10분",
-            calories = 630,
-            gi = 70,
-            carbs = 130,
-            protein = 30,
-            fat = 20,
-            glucoseCurve = listOf(90f, 125f, 140f, 138f, 128f, 115f, 105f, 98f, 95f),
-        ),
-        FoodItem(
-            name = "연어샐러드",
-            imageResId = R.drawable.jjajangmyeon,
-            isStable = true,
-            maxGlucose = 125,
-            recoveryTimeText = "1시간",
-            calories = 350,
-            gi = 40,
-            carbs = 20,
-            protein = 35,
-            fat = 15,
-            glucoseCurve = listOf(90f, 110f, 125f, 120f, 112f, 105f, 98f, 93f, 90f),
-        ),
-        FoodItem(
-            name = "연어(조리전)",
-            imageResId = R.drawable.jjajangmyeon,
-            isStable = true,
-            maxGlucose = 110,
-            recoveryTimeText = "50분",
-            calories = 208,
-            gi = 0,
-            carbs = 0,
-            protein = 40,
-            fat = 6,
-            glucoseCurve = listOf(90f, 100f, 110f, 108f, 102f, 97f, 93f, 91f, 90f),
-        ),
-        FoodItem(
-            name = "연어회",
-            imageResId = R.drawable.jjajangmyeon,
-            isStable = true,
-            maxGlucose = 105,
-            recoveryTimeText = "45분",
-            calories = 180,
-            gi = 0,
-            carbs = 2,
-            protein = 38,
-            fat = 5,
-            glucoseCurve = listOf(90f, 98f, 105f, 103f, 99f, 95f, 92f, 91f, 90f),
-        ),
-        FoodItem(
-            name = "연어구이",
-            imageResId = R.drawable.jjajangmyeon,
-            isStable = true,
-            maxGlucose = 115,
-            recoveryTimeText = "55분",
-            calories = 250,
-            gi = 5,
-            carbs = 5,
-            protein = 42,
-            fat = 8,
-            glucoseCurve = listOf(90f, 105f, 115f, 112f, 106f, 100f, 95f, 92f, 90f),
-        ),
-        FoodItem(
-            name = "훈제연어",
-            imageResId = R.drawable.jjajangmyeon,
-            isStable = true,
-            maxGlucose = 108,
-            recoveryTimeText = "50분",
-            calories = 190,
-            gi = 0,
-            carbs = 1,
-            protein = 36,
-            fat = 7,
-            glucoseCurve = listOf(90f, 100f, 108f, 105f, 100f, 96f, 93f, 91f, 90f),
-        ),
-        FoodItem(
-            name = "고등어구이",
-            imageResId = R.drawable.jjambbong,
-            isStable = true,
-            maxGlucose = 118,
-            recoveryTimeText = "55분",
-            calories = 305,
-            gi = 0,
-            carbs = 0,
-            protein = 38,
-            fat = 18,
-            glucoseCurve = listOf(90f, 106f, 118f, 115f, 108f, 101f, 96f, 92f, 90f),
-        ),
     )
 
 // ── 진입점: 선택 ↔ 결과 상태 관리 ────────────────────────
@@ -602,37 +490,6 @@ private fun SelectedFoodSlot(
                     fontWeight = FontWeight.SemiBold,
                 )
             }
-        }
-
-        Spacer(modifier = Modifier.height(GlucoachSpacing.md))
-
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Min)
-                    .clip(RoundedCornerShape(8.dp))
-                    .border(1.dp, GlucoachColors.Border, RoundedCornerShape(8.dp)),
-        ) {
-            StatCell(
-                label = "최고 혈당",
-                value = "${food.maxGlucose}",
-                unit = "mg/dL",
-                modifier = Modifier.weight(1f),
-            )
-            Box(
-                modifier =
-                    Modifier
-                        .width(1.dp)
-                        .fillMaxHeight()
-                        .background(GlucoachColors.Border),
-            )
-            StatCell(
-                label = "정상 복귀",
-                value = food.recoveryTimeText,
-                unit = "",
-                modifier = Modifier.weight(1f),
-            )
         }
     }
 }
@@ -1142,10 +999,6 @@ private fun FoodComparisonResultContent(
                 predictionB = compareResult.foodB,
                 glucoseRange = glucoseRange,
             )
-
-            Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
-
-            TipCard()
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
 
@@ -1968,40 +1821,6 @@ private fun LegendDot(
             text = label,
             color = GlucoachColors.TextSecondary,
             fontSize = 11.sp,
-        )
-    }
-}
-
-@Composable
-private fun TipCard() {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(GlucoachCorner.card))
-                .background(GlucoachColors.TipBg)
-                .padding(GlucoachSpacing.lg),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(GlucoachColors.TipAccent)
-                    .padding(horizontal = GlucoachSpacing.sm, vertical = GlucoachSpacing.xs),
-        ) {
-            Text(
-                text = "TIP",
-                color = Color.White,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-            )
-        }
-        Spacer(modifier = Modifier.width(GlucoachSpacing.md))
-        Text(
-            text = "면을 절반 덜어내면 혈당 지수를 30% 낮출 수 있어요!",
-            color = GlucoachColors.TextPrimary,
-            fontSize = 13.sp,
         )
     }
 }
