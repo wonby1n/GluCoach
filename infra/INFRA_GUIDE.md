@@ -1,5 +1,8 @@
 # S309 인프라 배포 가이드
 
+> ⚠️ **이 문서는 Blue-Green 도입 이전(단일 컨테이너 구성, `docker-compose.yml`) 기준의 초기 가이드입니다.**
+> 현재 운영 중인 신규 서버 세팅·배포 절차는 [`../exec/PORTING_MANUAL.md`](../exec/PORTING_MANUAL.md)을 참고하세요. SSL 인증서 마운트 경로(`/home/ubuntu/ssl`), nginx upstream include 경로(`/etc/nginx-live/upstream.conf`) 등 일부 항목이 본 문서와 다릅니다. **충돌 시 `PORTING_MANUAL.md`이 단일 진실 출처(SoT)입니다.**
+
 EC2 서버 배포 환경 기준 단계별 가이드입니다.
 
 - **서버 도메인**: `k14s309.p.ssafy.io`
