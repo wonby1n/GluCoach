@@ -36,7 +36,7 @@ class MealRecordResponseTest {
             .recordedAt(LocalDateTime.now())
             .build();
 
-    MealRecordResponse result = MealRecordResponse.from(meal, "https://img");
+    MealRecordResponse result = MealRecordResponse.from(meal, "https://img", null);
 
     assertThat(result.foodName()).isEqualTo("김밥_소고기");
     assertThat(result.foodDisplayName()).isEqualTo("소고기김밥");
@@ -53,7 +53,7 @@ class MealRecordResponseTest {
             .recordedAt(LocalDateTime.now())
             .build();
 
-    MealRecordResponse result = MealRecordResponse.from(meal, null);
+    MealRecordResponse result = MealRecordResponse.from(meal, null, null);
 
     assertThat(result.foodName()).isNull();
     assertThat(result.foodDisplayName()).isNull();

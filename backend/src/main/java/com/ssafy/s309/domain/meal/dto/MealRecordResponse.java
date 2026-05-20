@@ -16,9 +16,11 @@ public record MealRecordResponse(
     BigDecimal kcal,
     BigDecimal carbsG,
     BigDecimal proteinG,
-    BigDecimal fatG) {
+    BigDecimal fatG,
+    // 스케줄러가 계산한 식후 최고 혈당. is_processed=false 또는 데이터 부족이면 null.
+    BigDecimal peakGlucose) {
 
-  public static MealRecordResponse from(MealRecord meal, String imageUrl) {
+  public static MealRecordResponse from(MealRecord meal, String imageUrl, BigDecimal peakGlucose) {
     Food food = meal.getFood();
     return new MealRecordResponse(
         meal.getId(),
@@ -31,6 +33,7 @@ public record MealRecordResponse(
         food != null ? food.getKcal() : null,
         food != null ? food.getCarbsG() : null,
         food != null ? food.getProteinG() : null,
-        food != null ? food.getFatG() : null);
+        food != null ? food.getFatG() : null,
+        peakGlucose);
   }
 }

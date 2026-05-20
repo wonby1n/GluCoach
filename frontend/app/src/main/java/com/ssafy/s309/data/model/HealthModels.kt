@@ -106,6 +106,8 @@ data class MealRecordResponse(
     val carbsG: Double? = null,
     val proteinG: Double? = null,
     val fatG: Double? = null,
+    // 스케줄러가 계산한 식후 최고 혈당. 데이터 부족이면 null.
+    val peakGlucose: Double? = null,
 )
 
 /** POST /api/meals 요청 (multipart "request" 파트) */
