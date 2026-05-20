@@ -21,6 +21,7 @@ import numpy as np
 import torch
 
 from app.glucose.shanghai_lstm import ShanghaiLSTM, compute_prior_delta_row
+from app.glucose.stage2_model import _glycemic_scale_factor
 
 from app.glucose import config as _cfg
 from app.glucose.constants import (
@@ -257,7 +258,8 @@ class MealPredictor:
 
         y_residual  = self._bg_scaler.inverse_transform(y_norm.reshape(-1, 1)).flatten()
         prior_delta = compute_prior_delta_row(carbs, protein, fat, fiber, pre_glucose, self._carb_coef)
-        y_abs       = y_residual + prior_delta + pre_glucose
+        carb_scale  = _glycemic_scale_factor(carbs, protein)
+        y_abs       = y_residual * carb_scale + prior_delta + pre_glucose
         return [round(float(v), 2) for v in y_abs]
 
 
