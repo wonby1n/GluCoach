@@ -458,6 +458,10 @@ fun MainScreenContent(
                             .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
                     selectedTab = "meallog"
                 },
+                onNavigateHome = {
+                    showCameraPanel = false
+                    selectedTab = "home"
+                },
             )
         }
 
@@ -876,6 +880,7 @@ private fun InstagramCameraPanel(
     onModeChange: (Boolean) -> Unit,
     onClose: () -> Unit,
     onMealSaved: () -> Unit,
+    onNavigateHome: () -> Unit,
 ) {
     var capturedFile by remember { mutableStateOf<File?>(null) }
     var sessionId by remember { mutableIntStateOf(0) }
@@ -905,7 +910,10 @@ private fun InstagramCameraPanel(
                             .statusBarsPadding()
                             .padding(bottom = 72.dp),
                 ) {
-                    FoodComparisonContent(onMealSaved = onMealSaved)
+                    FoodComparisonContent(
+                        onMealSaved = onMealSaved,
+                        onNavigateHome = onNavigateHome,
+                    )
                 }
                 Box(
                     modifier =
