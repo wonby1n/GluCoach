@@ -120,19 +120,24 @@ def run_food_recommend_agent(
 
         messages.append({"role": "assistant", "content": response.content})
         tool_results = []
+        should_exit = False
         for block in tool_use_blocks:
             tool_start = time.perf_counter()
             result = _execute(block.name, block.input)
             print(f"[FoodRecommend tool] {block.name} → {time.perf_counter() - tool_start:.2f}s")
+            result_dict = json.loads(result)
             tool_call_details.append(
-                {"name": block.name, "input": block.input, "result": json.loads(result)}
+                {"name": block.name, "input": block.input, "result": result_dict}
             )
-            if block.name == "send_command_response":
+            if block.name == "send_command_response" and result_dict.get("status") == "sent":
                 sent_message = block.input.get("message")
+                should_exit = True
             tool_results.append(
                 {"type": "tool_result", "tool_use_id": block.id, "content": result}
             )
         messages.append({"role": "user", "content": tool_results})
+        if should_exit:
+            break
 
     print(f"[FoodRecommend] 전체 소요 → {time.perf_counter() - agent_start:.2f}s (turn={turn})")
     result = {
