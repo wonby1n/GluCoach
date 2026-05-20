@@ -5,6 +5,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -66,6 +69,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -102,6 +106,9 @@ import com.ssafy.s309.ui.viewmodel.FoodSearchViewModel
 import kotlinx.coroutines.delay
 import java.io.File
 import java.time.LocalDateTime
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.random.Random
 
 // ── 데이터 ──────────────────────────────────────────────
 
@@ -125,7 +132,7 @@ private fun FoodSearchItem.toFoodItem() =
         id = id.toLong(),
         name = displayName ?: name,
         category = category.orEmpty(),
-        imageResId = FoodCategoryImageMapper.getImageRes(category, name),
+        imageResId = FoodCategoryImageMapper.getImageRes(category, displayName ?: name),
         calories = kcal?.toInt() ?: 0,
         carbs = carbsG?.toInt() ?: 0,
         sugar = sugarG?.toInt() ?: 0,
@@ -140,6 +147,7 @@ private fun FoodSearchItem.toFoodItem() =
 @Composable
 fun FoodComparisonContent(
     onMealSaved: () -> Unit = {},
+    onNavigateHome: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val foodSearchViewModel: FoodSearchViewModel = hiltViewModel()
@@ -176,6 +184,7 @@ fun FoodComparisonContent(
                 viewModel.resetResult()
             },
             onSelectMeal = { food, dateTime, memo, imageFile -> viewModel.selectMeal(food, dateTime, memo, imageFile) },
+            onNavigateHome = onNavigateHome,
             modifier = modifier,
         )
     } else {
@@ -927,6 +936,7 @@ private fun FoodComparisonResultContent(
     onFoodARemoved: () -> Unit,
     onFoodBRemoved: () -> Unit,
     onSelectMeal: (FoodItem, LocalDateTime, String, File?) -> Unit,
+    onNavigateHome: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val stableIndex = if (compareResult.foodA.peakMgdl <= compareResult.foodB.peakMgdl) 0 else 1
@@ -936,6 +946,7 @@ private fun FoodComparisonResultContent(
     var showMealTimeDialog by remember { mutableStateOf(false) }
     var showMealInput by remember { mutableStateOf(false) }
     var initialMealHour by remember { mutableIntStateOf(12) }
+    var showChoiceResult by remember { mutableStateOf<Boolean?>(null) }
     val foods = listOf(foodA, foodB)
     val predictions = listOf(compareResult.foodA, compareResult.foodB)
 
@@ -1027,7 +1038,7 @@ private fun FoodComparisonResultContent(
                 }
 
                 Button(
-                    onClick = { showMealTimeDialog = true },
+                    onClick = { showChoiceResult = selectedFoodIndex == stableIndex },
                     modifier =
                         Modifier
                             .weight(1f)
@@ -1065,6 +1076,14 @@ private fun FoodComparisonResultContent(
                     showMealInput = true
                 },
                 onDismiss = { showMealTimeDialog = false },
+            )
+        }
+
+        showChoiceResult?.let { isGoodChoice ->
+            ChoiceResultDialog(
+                isGoodChoice = isGoodChoice,
+                onDismiss = { showChoiceResult = null },
+                onNavigateHome = onNavigateHome,
             )
         }
     }
@@ -1938,5 +1957,220 @@ private fun NutritionRow(
             color = GlucoachColors.TextPrimary,
             fontSize = 14.sp,
         )
+    }
+}
+
+// ── 선택 결과 다이얼로그 ─────────────────────────────────
+
+private data class ConfettiParticle(
+    val velocityX: Float,
+    val velocityY: Float,
+    val color: Color,
+    val width: Float,
+    val height: Float,
+)
+
+@Composable
+private fun ChoiceResultDialog(
+    isGoodChoice: Boolean,
+    onDismiss: () -> Unit,
+    onNavigateHome: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp),
+        ) {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(GlucoachCorner.card))
+                        .background(GlucoachColors.Surface)
+                        .padding(GlucoachSpacing.xxl),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .size(28.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "닫기",
+                            tint = GlucoachColors.TextSecondary,
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+
+                Text(
+                    text = if (isGoodChoice) "탁월한 선택이에요!" else "조금 아쉬워요",
+                    color = GlucoachColors.TextPrimary,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+
+                Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+
+                Text(
+                    text =
+                        if (isGoodChoice) "다음에도 혈당에 좋은 음식을 골라보아요!" else "다음에는 더 좋은 음식을 골라주실 거죠?",
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 14.sp,
+                )
+
+                Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+                Image(
+                    painter =
+                        painterResource(
+                            id = if (isGoodChoice) R.drawable.kiki_smile else R.drawable.kiki_sad,
+                        ),
+                    contentDescription = null,
+                    modifier = Modifier.size(150.dp),
+                    contentScale = ContentScale.Fit,
+                )
+
+                Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+
+                Button(
+                    onClick = onNavigateHome,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = GlucoachColors.Primary,
+                            contentColor = Color.White,
+                        ),
+                ) {
+                    Text(
+                        text = "홈으로 돌아가기",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+
+            if (isGoodChoice) {
+                ConfettiAnimation(
+                    modifier =
+                        Modifier
+                            .matchParentSize()
+                            .clip(RoundedCornerShape(GlucoachCorner.card)),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConfettiAnimation(modifier: Modifier = Modifier) {
+    val confettiColors =
+        remember {
+            listOf(
+                Color(0xFFFF6B6B),
+                Color(0xFF4ECDC4),
+                Color(0xFFFFE66D),
+                Color(0xFFFF9FF3),
+                Color(0xFF54A0FF),
+                Color(0xFF5F27CD),
+                Color(0xFFFF9F43),
+                Color(0xFF01CBC6),
+                Color(0xFFFC427B),
+                Color(0xFF0ABDE3),
+            )
+        }
+
+    val burst1 =
+        remember {
+            List(150) {
+                val angle = Random.nextFloat() * 2f * Math.PI.toFloat()
+                val speed = Random.nextFloat() * 700f + 200f
+                ConfettiParticle(
+                    velocityX = cos(angle) * speed,
+                    velocityY = sin(angle) * speed - 400f,
+                    color = confettiColors[Random.nextInt(confettiColors.size)],
+                    width = Random.nextFloat() * 12f + 5f,
+                    height = Random.nextFloat() * 8f + 4f,
+                )
+            }
+        }
+
+    val burst2 =
+        remember {
+            List(100) {
+                val angle = Random.nextFloat() * 2f * Math.PI.toFloat()
+                val speed = Random.nextFloat() * 500f + 100f
+                ConfettiParticle(
+                    velocityX = cos(angle) * speed,
+                    velocityY = sin(angle) * speed - 350f,
+                    color = confettiColors[Random.nextInt(confettiColors.size)],
+                    width = Random.nextFloat() * 10f + 3f,
+                    height = Random.nextFloat() * 14f + 5f,
+                )
+            }
+        }
+
+    val progress1 = remember { Animatable(0f) }
+    val progress2 = remember { Animatable(0f) }
+
+    LaunchedEffect(Unit) {
+        progress1.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 3500, easing = LinearEasing),
+        )
+    }
+
+    LaunchedEffect(Unit) {
+        delay(400)
+        progress2.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 3000, easing = LinearEasing),
+        )
+    }
+
+    Canvas(modifier = modifier) {
+        fun drawBurst(
+            particles: List<ConfettiParticle>,
+            t: Float,
+            duration: Float,
+            originY: Float,
+        ) {
+            if (t <= 0f) return
+            val elapsed = t * duration
+            val centerX = size.width / 2f
+            val centerY = size.height * originY
+            val gravity = 450f
+
+            particles.forEach { p ->
+                val x = centerX + p.velocityX * elapsed
+                val y = centerY + p.velocityY * elapsed + 0.5f * gravity * elapsed * elapsed
+                val alpha = ((1f - t) * 1.5f).coerceIn(0f, 1f)
+
+                if (alpha > 0f && x in -20f..size.width + 20f && y in -20f..size.height + 20f) {
+                    drawRect(
+                        color = p.color.copy(alpha = alpha),
+                        topLeft = Offset(x - p.width / 2f, y - p.height / 2f),
+                        size = Size(p.width, p.height),
+                    )
+                }
+            }
+        }
+
+        drawBurst(burst1, progress1.value, 3.5f, 0.25f)
+        drawBurst(burst2, progress2.value, 3.0f, 0.35f)
     }
 }

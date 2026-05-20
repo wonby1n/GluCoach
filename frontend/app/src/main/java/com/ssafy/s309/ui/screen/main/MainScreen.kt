@@ -181,6 +181,7 @@ fun MainScreenContent(
     var selectedTab by rememberSaveable { mutableStateOf("home") }
     var mealLogTargetDate by remember { mutableStateOf<String?>(null) }
     var showReportSheet by remember { mutableStateOf(false) }
+    var showAddMenuSheet by remember { mutableStateOf(false) }
     var showCameraPanel by remember { mutableStateOf(false) }
     var isAbMode by remember { mutableStateOf(false) }
     var keyboardPredictFoodName by remember { mutableStateOf<String?>(null) }
@@ -298,8 +299,8 @@ fun MainScreenContent(
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
                                 TodayConditionHeader(
                                     onAddClick = {
-                                        showCameraPanel = true
-                                        isAbMode = false
+                                        showReportSheet = false
+                                        showAddMenuSheet = !showAddMenuSheet
                                     },
                                     onBellClick = onBellClick,
                                     hasUnread = state.notifications.any { it.isUnread },
@@ -417,6 +418,49 @@ fun MainScreenContent(
                         onClose = { showReportSheet = false },
                     )
                 }
+
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showAddMenuSheet,
+                    enter = fadeIn(animationSpec = tween(durationMillis = 280)),
+                    exit = fadeOut(animationSpec = tween(durationMillis = 240)),
+                ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.3f))
+                                .clickable { showAddMenuSheet = false },
+                    )
+                }
+
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showAddMenuSheet,
+                    enter =
+                        expandVertically(
+                            expandFrom = Alignment.Bottom,
+                            animationSpec = tween(durationMillis = 280),
+                        ),
+                    exit =
+                        shrinkVertically(
+                            shrinkTowards = Alignment.Bottom,
+                            animationSpec = tween(durationMillis = 240),
+                        ),
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                ) {
+                    AddMenuSheet(
+                        onFoodScan = {
+                            showAddMenuSheet = false
+                            showCameraPanel = true
+                            isAbMode = false
+                        },
+                        onFoodComparison = {
+                            showAddMenuSheet = false
+                            showCameraPanel = true
+                            isAbMode = true
+                        },
+                        onClose = { showAddMenuSheet = false },
+                    )
+                }
             }
 
             val hasUnreadKiki = state.notifications.any { it.isUnread }
@@ -427,13 +471,16 @@ fun MainScreenContent(
                     when (item.id) {
                         "kiki" -> {
                             showReportSheet = false
+                            showAddMenuSheet = false
                             onKikiChatClick()
                         }
                         "report" -> {
+                            showAddMenuSheet = false
                             showReportSheet = !showReportSheet
                         }
                         else -> {
                             showReportSheet = false
+                            showAddMenuSheet = false
                             selectedTab = item.id
                         }
                     }
@@ -457,6 +504,10 @@ fun MainScreenContent(
                         java.time.LocalDate.now()
                             .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
                     selectedTab = "meallog"
+                },
+                onNavigateHome = {
+                    showCameraPanel = false
+                    selectedTab = "home"
                 },
             )
         }
@@ -871,11 +922,99 @@ internal fun ReportMenuSheet(
 }
 
 @Composable
+internal fun AddMenuSheet(
+    onFoodScan: () -> Unit,
+    onFoodComparison: () -> Unit,
+    onClose: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .shadow(8.dp, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .background(GlucoachColors.Surface)
+                .padding(horizontal = 22.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+        ) {
+            IconButton(
+                onClick = onClose,
+                modifier =
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .size(32.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "닫기",
+                    tint = GlucoachColors.TextSecondary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onFoodScan() }
+                    .padding(vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Search,
+                contentDescription = null,
+                tint = GlucoachColors.TextPrimary,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "음식 인식",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 16.sp,
+            )
+        }
+
+        HorizontalDivider(color = GlucoachColors.Border)
+
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onFoodComparison() }
+                    .padding(vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Description,
+                contentDescription = null,
+                tint = GlucoachColors.TextPrimary,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "A/B 비교",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 16.sp,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+    }
+}
+
+@Composable
 private fun InstagramCameraPanel(
     isAbMode: Boolean,
     onModeChange: (Boolean) -> Unit,
     onClose: () -> Unit,
     onMealSaved: () -> Unit,
+    onNavigateHome: () -> Unit,
 ) {
     var capturedFile by remember { mutableStateOf<File?>(null) }
     var sessionId by remember { mutableIntStateOf(0) }
@@ -905,7 +1044,10 @@ private fun InstagramCameraPanel(
                             .statusBarsPadding()
                             .padding(bottom = 72.dp),
                 ) {
-                    FoodComparisonContent(onMealSaved = onMealSaved)
+                    FoodComparisonContent(
+                        onMealSaved = onMealSaved,
+                        onNavigateHome = onNavigateHome,
+                    )
                 }
                 Box(
                     modifier =
