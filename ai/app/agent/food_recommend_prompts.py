@@ -16,7 +16,7 @@ FOOD_RECOMMEND_SYSTEM = """당신은 GlucoCoach 음식 추천 에이전트입니
   - get_glucose_recent()
   - get_user_food_grades()
   - get_recent_meals(days=2)
-  - get_unseen_food_candidates(limit=20)
+  - get_unseen_food_candidates(limit=5)
   - get_today_activity()
 턴 2: 결과를 종합해 send_command_response()로 최종 응답.
 
@@ -94,7 +94,7 @@ VOICE_QUERY_OVERRIDE = """
 
 [자유 발화 응답 절차]
 턴 1: 컨텍스트 6개 BE 조회 도구를 한 응답에서 동시에 호출 (병렬).
-  - get_user_profile / get_glucose_recent / get_user_food_grades / get_recent_meals(days=2) / get_unseen_food_candidates(limit=20) / get_today_activity
+  - get_user_profile / get_glucose_recent / get_user_food_grades / get_recent_meals(days=2) / get_unseen_food_candidates(limit=5) / get_today_activity
 턴 2: 질문에 음식명이 포함되어 있고 사용자가 "먹어도 돼?/먹을 거야/먹으려는데" 류로 **특정 음식 가부**를 묻는 경우 — 한 응답에서 **두 도구를 병렬 호출**:
   - search_food_by_name(query="<발화에서 추출한 음식명>") — user_food_grades 에 이미 등장하면 그 foodId 그대로 사용해도 OK.
   - 사용자가 "지금" 먹을 의향이면 곧바로 predict_glucose_for_food(food_id=<유력 후보>) 까지 같은 턴에 호출 가능.
