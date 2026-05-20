@@ -20,10 +20,18 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
+import java.util.concurrent.TimeUnit
 import javax.inject.Named
 import javax.inject.Singleton
 
 private val BASE_URL = BuildConfig.BASE_URL
+
+// 식사 사진 업로드(multipart 2~5MB) + S3 PUT 가 동기 직렬화돼 6~13초 걸리는 경우가 있어
+// okhttp 기본 10초 timeout 으로는 응답 받기 전에 connection 이 끊겨 499 가 발생함.
+// presigned URL 패턴으로 옮기기 전까지 read/write 만 60초로 늘림.
+private const val CONNECT_TIMEOUT_SECONDS = 15L
+private const val READ_TIMEOUT_SECONDS = 60L
+private const val WRITE_TIMEOUT_SECONDS = 60L
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -40,6 +48,9 @@ object AppModule {
     @Singleton
     fun provideOkHttpClient(): OkHttpClient =
         OkHttpClient.Builder()
+            .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .writeTimeout(WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .addInterceptor(
                 HttpLoggingInterceptor().apply {
                     level = HttpLoggingInterceptor.Level.BODY
@@ -71,6 +82,9 @@ object AppModule {
         tokenAuthenticator: TokenAuthenticator,
     ): OkHttpClient =
         OkHttpClient.Builder()
+            .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .writeTimeout(WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .addInterceptor(authInterceptor)
             .authenticator(tokenAuthenticator)
             .addInterceptor(
@@ -131,6 +145,9 @@ object AppModule {
         tokenAuthenticator: TokenAuthenticator,
     ): OkHttpClient =
         OkHttpClient.Builder()
+            .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .writeTimeout(WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .addInterceptor(authInterceptor)
             .authenticator(tokenAuthenticator)
             .addInterceptor(

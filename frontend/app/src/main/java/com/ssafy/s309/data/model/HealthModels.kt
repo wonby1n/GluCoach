@@ -101,6 +101,13 @@ data class MealRecordResponse(
     val imageUrl: String? = null,
     // BE 가 채워주면 사용자 노출용. 없으면 foodName fallback.
     val foodDisplayName: String? = null,
+    // foods 테이블 join 결과. 호환성 위해 nullable.
+    val kcal: Double? = null,
+    val carbsG: Double? = null,
+    val proteinG: Double? = null,
+    val fatG: Double? = null,
+    // 스케줄러가 계산한 식후 최고 혈당. 데이터 부족이면 null.
+    val peakGlucose: Double? = null,
 )
 
 /** POST /api/meals 요청 (multipart "request" 파트) */

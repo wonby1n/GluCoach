@@ -65,9 +65,11 @@ class TtsManager
             if (spoken.isBlank()) return
             val mode = if (urgent) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
             val utteranceId = "kiki-${utteranceCounter.incrementAndGet()}"
+            // STREAM_MUSIC: 알림 스트림 볼륨이 0/낮게 설정된 단말에서도 미디어 볼륨으로 들리도록
+            // 강제. Google Assistant / Siri 와 동일.
             val params =
                 Bundle().apply {
-                    putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_NOTIFICATION)
+                    putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
                 }
             try {
                 tts.speak(spoken, mode, params, utteranceId)

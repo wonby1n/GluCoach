@@ -64,6 +64,26 @@ public interface MealRecordRepository extends JpaRepository<MealRecord, Integer>
   List<MealRecord> findUnprocessedBetween(
       @Param("expiry") LocalDateTime expiry, @Param("cutoff") LocalDateTime cutoff);
 
+  /**
+   * 캘린더 화면용 — 해당 월에 식사 기록이 존재하는 day-of-month 집합. FE 가 식사 있는 날짜에 점을 찍기 위해 사용. 기존엔 30일치를 매일 1번씩 burst
+   * 조회해 nginx api_limit 에 걸렸음. native SQL 로 한 번에 distinct day 만 가져온다.
+   */
+  @Query(
+      value =
+          """
+          SELECT DISTINCT EXTRACT(DAY FROM recorded_at)::int AS day
+          FROM meal_records
+          WHERE user_id = :userId
+            AND recorded_at >= :from
+            AND recorded_at < :to
+          ORDER BY day
+          """,
+      nativeQuery = true)
+  List<Integer> findDistinctDaysInRange(
+      @Param("userId") Integer userId,
+      @Param("from") LocalDateTime from,
+      @Param("to") LocalDateTime to);
+
   java.util.Optional<MealRecord> findFirstByUserIdOrderByRecordedAtDesc(Integer userId);
 
   @Query(

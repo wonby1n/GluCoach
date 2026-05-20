@@ -48,6 +48,9 @@ class GlucoseKeyboard : InputMethodService() {
     /** 기호 모드 진입 전 언어 모드 — ← 키로 복귀할 때 사용. */
     private var prevLangMode = KeyboardMode.KOREAN
 
+    /** 현재 입력 필드의 EditorInfo. 확인 키가 SEND/GO/DONE 액션을 보낼지 Enter를 보낼지 결정에 사용. */
+    private var currentEditorInfo: EditorInfo? = null
+
     /** 백스페이스 롱프레스 반복 삭제 (50 → 30 → 20ms 가속). */
     private val backspaceHandler = Handler(Looper.getMainLooper())
     private var backspaceStartTime = 0L
@@ -119,6 +122,7 @@ class GlucoseKeyboard : InputMethodService() {
         restarting: Boolean,
     ) {
         super.onStartInput(attribute, restarting)
+        currentEditorInfo = attribute
         KeyboardFoodCache.load(applicationContext)
     }
 
@@ -717,11 +721,30 @@ class GlucoseKeyboard : InputMethodService() {
         }
         val text = currentText.toString().trim()
         Log.d(TAG, "confirm: final text='$text' (length=${text.length})")
-        if (text.isNotEmpty()) triggerBanner(text) // confirm은 즉시 트리거 (디바운스 없이)
         bannerHandler.removeCallbacksAndMessages(null) // 예약된 업데이트 취소
+        currentMatchedFood = null
+        hideInlineBanner()
         currentText.clear()
         hangul.reset()
-        sendDefaultEditorAction(true)
+        performSendAction()
+    }
+
+    /**
+     * 입력 필드의 IME 액션(SEND/GO/DONE/SEARCH 등)이 설정돼 있으면 그걸 발행.
+     * 그렇지 않은 경우(KakaoTalk 등 채팅창)는 ENTER 키 이벤트로 폴백.
+     */
+    private fun performSendAction() {
+        val ei = currentEditorInfo
+        val action = (ei?.imeOptions ?: 0) and EditorInfo.IME_MASK_ACTION
+        val hasAction =
+            action != EditorInfo.IME_ACTION_NONE &&
+                action != EditorInfo.IME_ACTION_UNSPECIFIED
+        if (hasAction) {
+            val handled = sendDefaultEditorAction(true)
+            if (handled) return
+        }
+        currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
+        currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
     }
 
     /**
@@ -901,13 +924,13 @@ class GlucoseKeyboard : InputMethodService() {
         // candidatesStart < 0 조건 추가: 한글 composing 삭제 시 selection이 (0,0)으로 돌아가는
         // 경우를 오탐하지 않도록 방어. (composing "ㄱ" → setComposingText("") 시 발생)
         if (newSelStart == 0 && newSelEnd == 0 && oldSelEnd > 0 && candidatesStart < 0) {
-            val pending = lastEditorText.trim()
-            Log.d(TAG, "onUpdateSelection: send detected, lastEditorText='$pending'")
-            if (pending.length >= 2) triggerBanner(pending)
+            Log.d(TAG, "onUpdateSelection: send detected — hiding banner")
             lastEditorText = ""
             currentText.clear()
             hangul.reset()
             bannerHandler.removeCallbacksAndMessages(null)
+            currentMatchedFood = null
+            hideInlineBanner()
             return
         }
         val before = ic.getTextBeforeCursor(256, 0)?.toString().orEmpty()

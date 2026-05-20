@@ -92,11 +92,13 @@ object KeyboardFoodCache {
     }
 
     /**
-     * 4단계 검색:
+     * 6단계 검색:
      *   1. name 정확 일치
      *   2. displayName 정확 일치
-     *   3. name LIKE '%input%' (등급 우선)
-     *   4. displayName LIKE '%input%' (등급 우선)
+     *   3. input.contains(name)   — 문장 안에 음식명 포함 (가장 긴 매칭 우선)
+     *   4. input.contains(displayName)
+     *   5. name.contains(input)   — 타이핑 중 prefix 매칭 (fallback, 짧은 쪽 우선)
+     *   6. displayName.contains(input)
      */
     fun findBest(text: String): KeyboardFoodItem? {
         val trimmed = text.trim()
@@ -107,11 +109,36 @@ object KeyboardFoodCache {
 
         if (trimmed.length < 2) return null
 
-        findContainedIn(trimmed, useDisplayName = false)?.let { return it }
-        return findContainedIn(trimmed, useDisplayName = true)
+        findFoodInInput(trimmed, useDisplayName = false)?.let { return it }
+        findFoodInInput(trimmed, useDisplayName = true)?.let { return it }
+
+        findInputInFood(trimmed, useDisplayName = false)?.let { return it }
+        return findInputInFood(trimmed, useDisplayName = true)
     }
 
-    private fun findContainedIn(
+    /** 입력 문장이 음식명을 포함 — 가장 긴 매칭 우선. 단일 글자 음식명은 오탐 방지로 제외. */
+    private fun findFoodInInput(
+        input: String,
+        useDisplayName: Boolean,
+    ): KeyboardFoodItem? {
+        var best: KeyboardFoodItem? = null
+        var bestLen = 0
+        for (item in allItems) {
+            val field = (if (useDisplayName) item.displayName else item.name) ?: continue
+            if (field.length < 2) continue
+            if (!input.contains(field)) continue
+            if (field.length > bestLen ||
+                (field.length == bestLen && (best == null || isBetter(item, best)))
+            ) {
+                best = item
+                bestLen = field.length
+            }
+        }
+        return best
+    }
+
+    /** 음식명이 입력을 포함 — 타이핑 중 prefix 매칭. 짧은 이름 우선(완성도 높은 후보). */
+    private fun findInputInFood(
         input: String,
         useDisplayName: Boolean,
     ): KeyboardFoodItem? {

@@ -30,7 +30,8 @@ if sys.platform == "win32":
 
 BASE_URL = "https://api.anthropic.com"
 MODEL = "claude-haiku-4-5-20251001"
-MAX_TOKENS = 4096
+# 음성 모달 응답은 짧으므로 1024 면 충분. 4096 대비 LLM 응답 시간 단축.
+MAX_TOKENS = 1024
 MAX_TURNS = 10
 
 
@@ -38,7 +39,18 @@ def _execute(name: str, tool_input: dict) -> str:
     func = FOOD_RECOMMEND_TOOL_MAP.get(name)
     if not func:
         return json.dumps({"error": f"Unknown tool: {name}"}, ensure_ascii=False)
-    result = func(**tool_input)
+    try:
+        result = func(**tool_input)
+    except TypeError as e:
+        return json.dumps(
+            {"status": "error", "error": f"invalid_arguments: {e}", "tool": name},
+            ensure_ascii=False,
+        )
+    except Exception as e:
+        return json.dumps(
+            {"status": "error", "error": f"{type(e).__name__}: {e}", "tool": name},
+            ensure_ascii=False,
+        )
     return json.dumps(result, ensure_ascii=False)
 
 
