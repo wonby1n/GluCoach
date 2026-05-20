@@ -48,10 +48,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -83,6 +85,7 @@ import com.ssafy.s309.ui.component.SummaryStatCard
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
+import kotlinx.coroutines.delay
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -310,6 +313,17 @@ fun MainScreenContent(
                                         trendRateMgDlPerMin = state.trendRateMgDlPerMin,
                                         diabetesType = state.diabetesType,
                                     )
+                                var displayedKiki by remember { mutableIntStateOf(kikiDrawable) }
+                                var kikiSwitchTime by remember { mutableLongStateOf(0L) }
+                                LaunchedEffect(kikiDrawable) {
+                                    if (displayedKiki == kikiDrawable) return@LaunchedEffect
+                                    val elapsed = System.currentTimeMillis() - kikiSwitchTime
+                                    val remaining = kikiCycleDuration(displayedKiki) - elapsed
+                                    if (remaining > 0) delay(remaining)
+                                    displayedKiki = kikiDrawable
+                                    kikiSwitchTime = System.currentTimeMillis()
+                                }
+
                                 KikiSuggestionCard(
                                     notifications = state.notifications,
                                     isNewUser = state.isNewUser,
@@ -324,7 +338,7 @@ fun MainScreenContent(
                                     glucoseRange = state.glucoseRange,
                                     mascotSlot = {
                                         KikiImage(
-                                            drawableRes = kikiDrawable,
+                                            drawableRes = displayedKiki,
                                             modifier = Modifier.fillMaxSize(),
                                         )
                                     },
@@ -994,3 +1008,11 @@ private fun CameraModeChip(
         )
     }
 }
+
+private fun kikiCycleDuration(drawableRes: Int): Long =
+    when (drawableRes) {
+        R.drawable.kiki_hello -> 5_760L
+        R.drawable.kiki_fell_off -> 15_500L
+        R.drawable.kiki_dehydrated_high -> 3_300L
+        else -> 3_000L
+    }

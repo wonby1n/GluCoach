@@ -64,7 +64,7 @@ fun CurrentGlucoseCard(
             modifier =
                 Modifier
                     .padding(start = GlucoachSpacing.xxl, top = 18.dp)
-                    .width(140.dp),
+                    .width(160.dp),
             verticalArrangement = Arrangement.spacedBy(13.dp),
         ) {
             Text(
@@ -102,7 +102,7 @@ fun CurrentGlucoseCard(
             modifier =
                 Modifier
                     .align(Alignment.BottomEnd)
-                    .size(width = 220.dp, height = 290.dp),
+                    .size(width = 200.dp, height = 290.dp),
             contentAlignment = Alignment.BottomEnd,
         ) {
             mascotSlot?.invoke()
