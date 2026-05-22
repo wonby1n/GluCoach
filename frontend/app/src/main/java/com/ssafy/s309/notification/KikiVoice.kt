@@ -154,6 +154,12 @@ class KikiVoice
             }
         }
 
+        /** 현재 재생 중인 TTS를 즉시 중단. 엔진은 유지해 이후 발화에 재사용 가능. */
+        fun stop() {
+            pendingCallbacks.clear()
+            runCatching { tts?.stop() }.onFailure { Log.w(TAG, "TTS stop 실패", it) }
+        }
+
         fun shutdown() {
             isReady.set(false)
             runCatching {

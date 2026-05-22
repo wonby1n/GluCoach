@@ -430,6 +430,24 @@ class WakeWordManager
             }
         }
 
+        /**
+         * 뒤로가기 등 외부에서 진행 중인 wake flow 전체를 즉시 중단.
+         * TTS·SR 모두 멈추고 IDLE 로 복귀. Vosk wake 대기는 그대로 유지.
+         */
+        fun abort() {
+            mainHandler.post {
+                cancelResponseTimers()
+                kikiVoice.stop()
+                runCatching { voiceQueryManager.cancel() }
+                partialCollectJob?.cancel()
+                partialCollectJob = null
+                isTtsSpeaking.set(false)
+                _partialTranscript.value = ""
+                _responseText.value = ""
+                _uiState.value = UiState.IDLE
+            }
+        }
+
         /** 사용자가 모달 탭해서 닫는 경우. */
         fun dismissResponse() {
             mainHandler.post {
