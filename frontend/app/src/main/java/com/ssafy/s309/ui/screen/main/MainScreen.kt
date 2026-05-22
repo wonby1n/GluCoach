@@ -113,6 +113,9 @@ fun MainScreen(
     onTabHandled: () -> Unit = {},
     targetFoodName: String? = null,
     onTargetFoodHandled: () -> Unit = {},
+    targetFoodA: String? = null,
+    targetFoodB: String? = null,
+    onTargetFoodABHandled: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -146,6 +149,9 @@ fun MainScreen(
         onTabHandled = onTabHandled,
         targetFoodName = targetFoodName,
         onTargetFoodHandled = onTargetFoodHandled,
+        targetFoodA = targetFoodA,
+        targetFoodB = targetFoodB,
+        onTargetFoodABHandled = onTargetFoodABHandled,
         // [DEBUG_KIKI_TEST]
     )
 }
@@ -177,6 +183,9 @@ fun MainScreenContent(
     onTabHandled: () -> Unit = {},
     targetFoodName: String? = null,
     onTargetFoodHandled: () -> Unit = {},
+    targetFoodA: String? = null,
+    targetFoodB: String? = null,
+    onTargetFoodABHandled: () -> Unit = {},
 ) {
     var selectedTab by rememberSaveable { mutableStateOf("home") }
     var mealLogTargetDate by remember { mutableStateOf<String?>(null) }
@@ -184,6 +193,8 @@ fun MainScreenContent(
     var showAddMenuSheet by remember { mutableStateOf(false) }
     var showCameraPanel by remember { mutableStateOf(false) }
     var isAbMode by remember { mutableStateOf(false) }
+    var initialFoodA by remember { mutableStateOf<String?>(null) }
+    var initialFoodB by remember { mutableStateOf<String?>(null) }
     var keyboardPredictFoodName by remember { mutableStateOf<String?>(null) }
     var cumulativeDrag by remember { mutableFloatStateOf(0f) }
 
@@ -196,6 +207,9 @@ fun MainScreenContent(
                     isAbMode = false
                 }
                 "food-comparison" -> {
+                    initialFoodA = targetFoodA
+                    initialFoodB = targetFoodB
+                    onTargetFoodABHandled()
                     showCameraPanel = true
                     isAbMode = true
                 }
@@ -497,9 +511,15 @@ fun MainScreenContent(
             InstagramCameraPanel(
                 isAbMode = isAbMode,
                 onModeChange = { isAbMode = it },
-                onClose = { showCameraPanel = false },
+                onClose = {
+                    showCameraPanel = false
+                    initialFoodA = null
+                    initialFoodB = null
+                },
                 onMealSaved = {
                     showCameraPanel = false
+                    initialFoodA = null
+                    initialFoodB = null
                     mealLogTargetDate =
                         java.time.LocalDate.now()
                             .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
@@ -507,8 +527,12 @@ fun MainScreenContent(
                 },
                 onNavigateHome = {
                     showCameraPanel = false
+                    initialFoodA = null
+                    initialFoodB = null
                     selectedTab = "home"
                 },
+                initialFoodA = initialFoodA,
+                initialFoodB = initialFoodB,
             )
         }
 
@@ -1015,6 +1039,8 @@ private fun InstagramCameraPanel(
     onClose: () -> Unit,
     onMealSaved: () -> Unit,
     onNavigateHome: () -> Unit,
+    initialFoodA: String? = null,
+    initialFoodB: String? = null,
 ) {
     var capturedFile by remember { mutableStateOf<File?>(null) }
     var sessionId by remember { mutableIntStateOf(0) }
@@ -1047,6 +1073,8 @@ private fun InstagramCameraPanel(
                     FoodComparisonContent(
                         onMealSaved = onMealSaved,
                         onNavigateHome = onNavigateHome,
+                        initialFoodAName = initialFoodA,
+                        initialFoodBName = initialFoodB,
                     )
                 }
                 Box(
