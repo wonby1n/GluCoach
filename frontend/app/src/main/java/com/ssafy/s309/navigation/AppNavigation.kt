@@ -148,6 +148,12 @@ private fun SubScreenWithBottomNav(
                         mainEntry.savedStateHandle["requestedTab"] = "food-report"
                         navController.popBackStack(Screen.Main.route, inclusive = false)
                     },
+                    onFoodComparison = {
+                        showReportSheet = false
+                        val mainEntry = navController.getBackStackEntry(Screen.Main.route)
+                        mainEntry.savedStateHandle["requestedTab"] = "food-comparison"
+                        navController.popBackStack(Screen.Main.route, inclusive = false)
+                    },
                     onClose = { showReportSheet = false },
                 )
             }

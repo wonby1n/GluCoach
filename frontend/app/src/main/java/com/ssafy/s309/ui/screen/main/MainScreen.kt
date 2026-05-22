@@ -429,6 +429,11 @@ fun MainScreenContent(
                             showReportSheet = false
                             selectedTab = "food-report"
                         },
+                        onFoodComparison = {
+                            showReportSheet = false
+                            showCameraPanel = true
+                            isAbMode = true
+                        },
                         onClose = { showReportSheet = false },
                     )
                 }
@@ -466,11 +471,6 @@ fun MainScreenContent(
                             showAddMenuSheet = false
                             showCameraPanel = true
                             isAbMode = false
-                        },
-                        onFoodComparison = {
-                            showAddMenuSheet = false
-                            showCameraPanel = true
-                            isAbMode = true
                         },
                         onClose = { showAddMenuSheet = false },
                     )
@@ -862,6 +862,7 @@ internal fun defaultBottomNavItems(hasUnreadKiki: Boolean = false): List<BottomN
 internal fun ReportMenuSheet(
     onAIReport: () -> Unit,
     onFoodReport: () -> Unit,
+    onFoodComparison: () -> Unit,
     onClose: () -> Unit,
 ) {
     Column(
@@ -941,6 +942,30 @@ internal fun ReportMenuSheet(
             )
         }
 
+        HorizontalDivider(color = GlucoachColors.Border)
+
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onFoodComparison() }
+                    .padding(vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Description,
+                contentDescription = null,
+                tint = GlucoachColors.TextPrimary,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "A/B 비교",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 16.sp,
+            )
+        }
+
         Spacer(modifier = Modifier.height(8.dp))
     }
 }
@@ -948,7 +973,6 @@ internal fun ReportMenuSheet(
 @Composable
 internal fun AddMenuSheet(
     onFoodScan: () -> Unit,
-    onFoodComparison: () -> Unit,
     onClose: () -> Unit,
 ) {
     Column(
@@ -999,30 +1023,6 @@ internal fun AddMenuSheet(
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = "음식 인식",
-                color = GlucoachColors.TextPrimary,
-                fontSize = 16.sp,
-            )
-        }
-
-        HorizontalDivider(color = GlucoachColors.Border)
-
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { onFoodComparison() }
-                    .padding(vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Description,
-                contentDescription = null,
-                tint = GlucoachColors.TextPrimary,
-                modifier = Modifier.size(24.dp),
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = "A/B 비교",
                 color = GlucoachColors.TextPrimary,
                 fontSize = 16.sp,
             )
