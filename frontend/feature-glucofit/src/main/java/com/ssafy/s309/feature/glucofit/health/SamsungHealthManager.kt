@@ -46,7 +46,11 @@ class SamsungHealthManager(private val activity: Activity) {
 
     suspend fun requestPermissions() {
         try {
-            store.requestPermissions(permissions, activity)
+            val granted = runCatching { store.getGrantedPermissions(permissions) }.getOrNull()
+            val missing = if (granted != null) permissions - granted else permissions
+            Log.d(tag, "granted=${granted?.size ?: "?"} / requested=${permissions.size} / missing=${missing.size}")
+            if (missing.isEmpty()) return
+            store.requestPermissions(missing, activity)
         } catch (e: Exception) {
             Log.e(tag, "권한 요청 실패", e)
         }
