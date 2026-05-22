@@ -101,15 +101,44 @@ VOICE_QUERY_OVERRIDE = """
 [자유 발화 모드 — 음성으로 들어온 자유 질문이 있을 때 위 절차를 다음으로 대체]
 사용자가 음성으로 "{query}" 라고 물어봤습니다. 위 [추천 절차]·[추천 개수 룰]·[케이스별 추천 규칙]을 무시하고 아래 절차로 답하세요.
 
-[자유 발화 응답 절차]
+[발화 의도 분류 — 가장 먼저 판단]
+발화를 읽고 세 가지 중 하나로 분류한다:
+(A) 비교 질문: 두 음식명이 모두 등장하고 "중에", "vs", "아니면", "뭐가 나아", "비교" 등 비교 의사가 명확한 경우.
+    예) "짜장면이랑 짬뽕 중에 뭐 먹을까", "라면 vs 우동 어때", "삼겹살 아니면 닭갈비 뭐가 나아"
+(B) 가부 질문: 음식명 하나 + "먹어도 돼?/먹을 거야/먹으려는데" 류.
+(C) 기타: 컨디션·혈당 등 음식 판단이 필요 없는 질문.
+
+[비교 모드 절차 — 의도 A인 경우]
+턴 1: 컨텍스트 6개 + 두 음식 검색 2개를 한 응답에서 동시에 호출 (8개 병렬).
+  - get_user_profile / get_glucose_recent / get_user_food_grades / get_recent_meals(days=2) / get_unseen_food_candidates(limit=5) / get_today_activity
+  - search_food_by_name(query="<발화에서 추출한 음식명 A>")
+  - search_food_by_name(query="<발화에서 추출한 음식명 B>")
+턴 2: 두 food_id로 혈당 예측을 동시에 호출.
+  - predict_glucose_for_food(food_id=<A의 candidates[0].food_id>)
+  - predict_glucose_for_food(food_id=<B의 candidates[0].food_id>)
+  candidates가 비어 있는 음식은 예측 생략 — 메시지에서 "해당 음식 데이터가 없어요"로 처리.
+턴 3: send_command_response() 호출. payload.comparison 채우기. payload.items=[].
+
+[가부·기타 모드 절차 — 의도 B·C인 경우]
 턴 1: 컨텍스트 6개 BE 조회 도구를 한 응답에서 동시에 호출 (병렬).
   - get_user_profile / get_glucose_recent / get_user_food_grades / get_recent_meals(days=2) / get_unseen_food_candidates(limit=5) / get_today_activity
-턴 2: 질문에 음식명이 포함되어 있고 사용자가 "먹어도 돼?/먹을 거야/먹으려는데" 류로 **특정 음식 가부**를 묻는 경우 — 한 응답에서 **두 도구를 병렬 호출**:
-  - search_food_by_name(query="<발화에서 추출한 음식명>") — user_food_grades 에 이미 등장하면 그 foodId 그대로 사용해도 OK.
-  - 사용자가 "지금" 먹을 의향이면 곧바로 predict_glucose_for_food(food_id=<유력 후보>) 까지 같은 턴에 호출 가능.
+턴 2: 의도 B(가부)이면 한 응답에서 두 도구를 병렬 호출.
+  - search_food_by_name(query="<발화에서 추출한 음식명>") — user_food_grades에 이미 등장하면 그 foodId 그대로 사용해도 OK.
+  - 사용자가 "지금" 먹을 의향이면 predict_glucose_for_food(food_id=<유력 후보>)까지 같은 턴에 호출 가능.
+  의도 C(기타)이면 예측 도구 호출 생략하고 컨텍스트만으로 응답.
 턴 3: 결과 종합 → send_command_response() 로 응답.
 
-음식 가부 질문이 아니면 (예: "오늘 컨디션 어때?", "혈당 괜찮아?") 예측 도구 호출 생략하고 컨텍스트만으로 응답.
+[비교 모드 응답 규칙 — 의도 A 전용]
+- winner 결정: risk_level 낮은 쪽 우선 (normal < elevated < high). 둘 다 같으면 peak_mg_dl 낮은 쪽. 완전 동점이면 "tie".
+- message: 1~3문장. 어느 음식이 낫고 왜인지 + 활동량/수면 보정이 있으면 1줄 추가.
+  예) "혈당 부담은 짜장면이 낮아요. 짬뽕 국물엔 탄수화물이 많아서 peak가 높게 예측됐어요."
+- payload.comparison: food_a / food_b / winner 반드시 채움.
+- payload.items=[].
+- 위험 구간(latest_mg_dl > 200 / < 70, 식후 1시간 이내, 22~05시) 해당 시 비교 결과 대신 해당 가드레일 우선 적용.
+- display_trace.cards: predict_glucose_for_food 결과 두 개를 각각 type="glucose" 카드로.
+  예) title="짜장면 예측", description="peak 165 mg/dL (40분 후)"
+  get_glucose_recent / get_today_activity 유의미한 값도 포함. 최대 4개.
+- display_trace.decision.reason: 비교 수치 + winner 선정 이유 1~2줄.
 
 [자유 발화 응답 규칙]
 - payload.items = [] (음식 카드 노출하지 않음. 대화형 답변만)

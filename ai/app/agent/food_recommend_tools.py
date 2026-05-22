@@ -500,8 +500,37 @@ FOOD_RECOMMEND_TOOL_SCHEMAS = [
                 },
                 "payload": {
                     "type": "object",
-                    "description": "구조화된 응답 콘텐츠. items 배열만 사용.",
+                    "description": "구조화된 응답 콘텐츠. 일반 추천 시 items, A/B 비교 시 comparison 사용.",
                     "properties": {
+                        "comparison": {
+                            "type": "object",
+                            "description": "A/B 음식 비교 결과. 비교 질문 응답 시에만 채운다. 일반 추천 시 생략.",
+                            "properties": {
+                                "food_a": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "peak_mg_dl": {"type": "number", "description": "예측 최고 혈당 (mg/dL)"},
+                                        "risk_level": {"type": "string", "description": "normal / elevated / high / unknown"},
+                                    },
+                                    "required": ["name", "peak_mg_dl", "risk_level"],
+                                },
+                                "food_b": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "peak_mg_dl": {"type": "number"},
+                                        "risk_level": {"type": "string"},
+                                    },
+                                    "required": ["name", "peak_mg_dl", "risk_level"],
+                                },
+                                "winner": {
+                                    "type": "string",
+                                    "description": "'food_a', 'food_b', 'tie' 중 하나.",
+                                },
+                            },
+                            "required": ["food_a", "food_b", "winner"],
+                        },
                         "items": {
                             "type": "array",
                             "description": "추천 음식 카드. 목표 3개 (데이터 부족 시 1~2개 허용, 위험 영역이면 0개).",
