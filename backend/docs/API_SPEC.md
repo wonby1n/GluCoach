@@ -399,4 +399,42 @@ FE                     PredictionController         FromImagePredictionService
 | `sodiumMg` | `nat` |
 | `category` | `foodLv3Nm` (식품 대분류) |
 
-영양성분은 모두 100g(또는 100ml) 기준 (`nutConSrtrQua` 100 고정).
+### 영양성분 1인분 기준 환산 정책
+
+식약처 API 원본값은 **100g(또는 100ml) 기준** (`nutConSrtrQua` 100 고정)이지만, API 응답(`FoodSearchResult.from()`)에서 `servingSize` 기준으로 환산해 **1인분 기준**으로 반환한다.
+
+**환산 수식**
+
+```
+반환값 = DB 저장값(100g 기준) × (servingSize / 100)
+```
+
+- `servingSize`가 null이면 100을 기본값으로 사용 → 비율 1.0, 값 변화 없음
+- 결과값은 소수점 2자리 반올림 (`RoundingMode.HALF_UP`)
+
+**servingSize 출처**
+
+| 데이터 유형 | servingSize 값 |
+|---|---|
+| 식약처 API 캐시 | API `SERVING_SIZE` 필드 파싱. 파싱 실패 시 100 기본값 |
+| 사용자 커스텀 음식 | 사용자 입력값 |
+
+**환산 예시**
+
+| 음식 | DB 저장값(100g) | servingSize | 반환값(1인분) |
+|---|---|---|---|
+| 현미밥 | kcal=143, carbs=31.5g | 210g | kcal=300.3, carbs=66.15g |
+| 닭가슴살 | kcal=110, protein=23g | 100g | kcal=110, protein=23g (동일) |
+| 아메리카노 | kcal=8, carbs=1.5g | 350ml | kcal=28, carbs=5.25g |
+
+**DB 저장 방식은 그대로**
+
+`foods` 테이블의 영양값 컬럼은 계속 **100g 기준**으로 저장. 환산은 응답 레이어(`FoodSearchResult.from()`)에서만 수행하므로 DB 스키마 변경 없음.
+
+**하위 흐름 영향 범위**
+
+| 흐름 | 영향 |
+|---|---|
+| `POST /api/predict/glucose` (`PredictRequest`) | food search 결과를 그대로 채워 전송하면 1인분 기준 예측 |
+| `POST /api/meals` | 식사 기록 시 food search 결과의 영양값이 1인분 기준으로 저장 |
+| Agent 음식 검색 (`AgentFoodSearchItem`) | `kcal`, `carbsG`만 포함하므로 동일하게 1인분 기준 |
