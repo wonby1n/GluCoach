@@ -141,8 +141,17 @@ def run_food_recommend_agent(
             tool_results.append(
                 {"type": "tool_result", "tool_use_id": block.id, "content": result}
             )
+        # 이번 턴에 predict_glucose_for_food 를 호출했는지 확인.
+        # 비교 모드(comparison)는 반드시 predict → send_command_response 순서가 필요하므로
+        # predict 호출이 있었던 턴에는 "즉시 호출" 대신 다음 단계 안내로 교체.
+        called_predict = any(b.name == "predict_glucose_for_food" for b in tool_use_blocks)
+        next_hint = (
+            "혈당 예측 완료. payload.comparison을 반드시 채워서 send_command_response를 호출하세요."
+            if called_predict
+            else "데이터 수집 완료. 분석 텍스트 없이 send_command_response를 즉시 호출하세요."
+        )
         messages.append({"role": "user", "content": tool_results + [
-            {"type": "text", "text": "데이터 수집 완료. 분석 텍스트 없이 send_command_response를 즉시 호출하세요."}
+            {"type": "text", "text": next_hint}
         ]})
         if should_exit:
             break
