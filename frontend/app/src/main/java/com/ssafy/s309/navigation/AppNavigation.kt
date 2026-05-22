@@ -326,6 +326,8 @@ fun AppNavigation(
         composable(Screen.Main.route) { backStackEntry ->
             val requestedTab = backStackEntry.savedStateHandle.get<String>("requestedTab")
             val targetFoodName = backStackEntry.savedStateHandle.get<String>("targetFoodName")
+            val targetFoodA = backStackEntry.savedStateHandle.get<String>("targetFoodA")
+            val targetFoodB = backStackEntry.savedStateHandle.get<String>("targetFoodB")
 
             // FCM 알림 탭 → KikiAlarmDetail 딥링크 처리
             LaunchedEffect(pendingNavTarget, pendingFoodName) {
@@ -378,6 +380,12 @@ fun AppNavigation(
                 onTabHandled = { backStackEntry.savedStateHandle.remove<String>("requestedTab") },
                 targetFoodName = targetFoodName,
                 onTargetFoodHandled = { backStackEntry.savedStateHandle.remove<String>("targetFoodName") },
+                targetFoodA = targetFoodA,
+                targetFoodB = targetFoodB,
+                onTargetFoodABHandled = {
+                    backStackEntry.savedStateHandle.remove<String>("targetFoodA")
+                    backStackEntry.savedStateHandle.remove<String>("targetFoodB")
+                },
             )
         }
         composable(Screen.MyAccount.route) {
@@ -460,6 +468,12 @@ fun AppNavigation(
                         navController.navigate(Screen.KikiAlarmDetail.route)
                     },
                     onReplySent = mainViewModel::markAllNotificationsRead,
+                    onCompareClick = { foodAName, foodBName ->
+                        mainEntry.savedStateHandle["targetFoodA"] = foodAName
+                        mainEntry.savedStateHandle["targetFoodB"] = foodBName
+                        mainEntry.savedStateHandle["requestedTab"] = "food-comparison"
+                        navController.popBackStack(Screen.Main.route, inclusive = false)
+                    },
                     viewModel = chatViewModel,
                 )
             }

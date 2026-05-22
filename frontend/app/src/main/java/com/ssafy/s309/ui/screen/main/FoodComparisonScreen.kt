@@ -112,7 +112,7 @@ import kotlin.random.Random
 
 // ── 데이터 ──────────────────────────────────────────────
 
-internal data class FoodItem(
+data class FoodItem(
     val id: Long = 0,
     val name: String,
     val category: String = "",
@@ -127,7 +127,7 @@ internal data class FoodItem(
     val servingSize: Int = 0,
 )
 
-private fun FoodSearchItem.toFoodItem() =
+internal fun FoodSearchItem.toFoodItem() =
     FoodItem(
         id = id.toLong(),
         name = displayName ?: name,
@@ -148,6 +148,8 @@ private fun FoodSearchItem.toFoodItem() =
 fun FoodComparisonContent(
     onMealSaved: () -> Unit = {},
     onNavigateHome: () -> Unit = {},
+    initialFoodAName: String? = null,
+    initialFoodBName: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val foodSearchViewModel: FoodSearchViewModel = hiltViewModel()
@@ -155,6 +157,17 @@ fun FoodComparisonContent(
     var foodA by remember { mutableStateOf<FoodItem?>(null) }
     var foodB by remember { mutableStateOf<FoodItem?>(null) }
     val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(initialFoodAName, initialFoodBName) {
+        if (initialFoodAName != null && initialFoodBName != null) {
+            viewModel.autoSearchAndCompare(initialFoodAName, initialFoodBName)
+        }
+    }
+
+    LaunchedEffect(uiState.autoFoodA, uiState.autoFoodB) {
+        uiState.autoFoodA?.let { foodA = it }
+        uiState.autoFoodB?.let { foodB = it }
+    }
 
     LaunchedEffect(uiState.mealRecorded) {
         if (uiState.mealRecorded) {
