@@ -222,6 +222,7 @@ class KikiChatViewModel
                                             alertType = m.messageType ?: "",
                                             createdAt = m.createdAt,
                                             displayTrace = m.displayTrace,
+                                            payload = m.payload,
                                         ),
                                     )
                                 }
@@ -267,6 +268,7 @@ class KikiChatViewModel
                                                 alertType = m.messageType ?: "",
                                                 createdAt = m.createdAt,
                                                 displayTrace = m.displayTrace,
+                                                payload = m.payload,
                                             ),
                                         )
                                     }
@@ -319,6 +321,7 @@ class KikiChatViewModel
                                                 alertType = m.messageType ?: "",
                                                 createdAt = m.createdAt,
                                                 displayTrace = m.displayTrace,
+                                                payload = m.payload,
                                             ),
                                         )
                                     }
@@ -529,6 +532,7 @@ fun KikiChatScreen(
     onBack: () -> Unit,
     onItemClick: (NotificationItem) -> Unit = {},
     onReplySent: () -> Unit = {},
+    onCompareClick: (String, String) -> Unit = { _, _ -> },
     viewModel: KikiChatViewModel = hiltViewModel(),
 ) {
     val messages by viewModel.messages.collectAsStateWithLifecycle()
@@ -697,6 +701,7 @@ fun KikiChatScreen(
                                         if (replyText != null) onReplySent()
                                     },
                                     onClick = { onItemClick(message.item) },
+                                    onCompareClick = onCompareClick,
                                 )
                             is ChatMessage.UserMessage ->
                                 UserChatBubble(message = message, fontSize = fontSize)
@@ -1018,6 +1023,7 @@ private fun KikiChatBubble(
     showReplyButtons: Boolean = false,
     onReply: (replyText: String?, displayLabel: String) -> Unit = { _, _ -> },
     onClick: () -> Unit = {},
+    onCompareClick: (String, String) -> Unit = { _, _ -> },
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
@@ -1061,6 +1067,15 @@ private fun KikiChatBubble(
             if (showReplyButtons) {
                 Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
                 ChatReplyButtons(onReply = onReply)
+            }
+            // A/B 비교 결과가 있으면 비교 화면으로 이동하는 버튼 표시
+            item.payload?.comparison?.let { comparison ->
+                Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+                CompareButton(
+                    foodAName = comparison.foodA.name,
+                    foodBName = comparison.foodB.name,
+                    onClick = { onCompareClick(comparison.foodA.name, comparison.foodB.name) },
+                )
             }
         }
     }
@@ -1107,6 +1122,30 @@ private fun ChatReplyButton(
             color = Color.White,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+private fun CompareButton(
+    foodAName: String,
+    foodBName: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(GlucoachColors.PrimaryLight)
+                .border(1.5.dp, GlucoachColors.PrimaryDark, RoundedCornerShape(20.dp))
+                .clickable(onClick = onClick)
+                .padding(horizontal = GlucoachSpacing.md, vertical = 8.dp),
+    ) {
+        Text(
+            text = "A/B 비교: $foodAName vs $foodBName →",
+            color = GlucoachColors.PrimaryDark,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
         )
     }
 }
