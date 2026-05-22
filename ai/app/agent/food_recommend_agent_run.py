@@ -74,7 +74,13 @@ def run_food_recommend_agent(
         base_url=BASE_URL,
     )
 
-    messages = [{"role": "user", "content": "사용자가 음식 추천을 요청했어. 절차대로 데이터 확인하고 응답해."}]
+    query = (payload or {}).get("query", "").strip()
+    user_content = (
+        f"사용자가 음성으로 '{query}'라고 물어봤어. 자유 발화 모드로 답해."
+        if query
+        else "사용자가 음식 추천을 요청했어. 절차대로 데이터 확인하고 응답해."
+    )
+    messages = [{"role": "user", "content": user_content}]
     turn = 0
     sent_message = None
     tool_call_details: list = []
