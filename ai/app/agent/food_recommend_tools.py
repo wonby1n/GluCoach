@@ -295,7 +295,6 @@ def predict_glucose_for_food(food_id: int) -> dict:
         "current_mg_dl": raw.get("currentMgdl"),
         "peak_mg_dl": raw.get("peakMgdl"),
         "peak_minute": raw.get("peakMinute"),
-        "delta_mg_dl": raw.get("deltaMgdl"),
         "risk_level": raw.get("riskLevel"),
     }
 
@@ -431,7 +430,7 @@ FOOD_RECOMMEND_TOOL_SCHEMAS = [
     {
         "name": "predict_glucose_for_food",
         "description": (
-            "자유 발화 모드 전용 — food_id 로 혈당 예측. 응답에 peak_mg_dl / peak_minute / delta_mg_dl / risk_level 포함. "
+            "자유 발화 모드 전용 — food_id 로 혈당 예측. 응답에 peak_mg_dl / peak_minute / risk_level 포함. "
             "risk_level: 'high'(>=200), 'elevated'(>=180), 'normal'(<180), 'unknown'. "
             "이 결과로 응답 톤 결정: high→권유 X / elevated→양 조절·시간 권고 / normal→가볍게 OK."
         ),
