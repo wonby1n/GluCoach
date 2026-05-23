@@ -4,6 +4,7 @@
 사용자 command 발화 → BE webhook → 이 agent 실행 → BE INSERT(parent_id 채워서) → FCM
 """
 
+import contextvars
 import json
 import os
 import sys
@@ -132,9 +133,11 @@ def run_food_recommend_agent(
         tool_results_map: dict[str, str] = {}
         should_exit = False
 
+        _tool_ctx = contextvars.copy_context()
+
         def _run_block(b):
             t = time.perf_counter()
-            res = _execute(b.name, b.input)
+            res = _tool_ctx.run(_execute, b.name, b.input)
             print(f"[FoodRecommend tool] {b.name} → {time.perf_counter() - t:.2f}s")
             return b.id, res
 
