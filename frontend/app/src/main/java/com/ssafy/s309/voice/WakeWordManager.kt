@@ -431,6 +431,54 @@ class WakeWordManager
         }
 
         /**
+         * 채팅 화면 마이크 버튼 — STT 시작 전 호출.
+         * Vosk 마이크 해제 + 오버레이 LISTENING 전환 + partial 미러링 시작.
+         */
+        fun enterListeningStateForExternalStt() {
+            mainHandler.post {
+                cancelResponseTimers()
+                pauseVoskKeepingModel()
+                _partialTranscript.value = ""
+                _uiState.value = UiState.LISTENING
+                partialCollectJob?.cancel()
+                partialCollectJob =
+                    scope.launch {
+                        voiceQueryManager.partial.collect { p -> _partialTranscript.value = p }
+                    }
+            }
+        }
+
+        /**
+         * STT 결과 확보 시 호출 — 오버레이 THINKING 전환 + 힌트 cycling + Vosk 재개.
+         */
+        fun enterThinkingStateForExternalStt(finalTranscript: String) {
+            mainHandler.post {
+                partialCollectJob?.cancel()
+                partialCollectJob = null
+                _partialTranscript.value = finalTranscript
+                _uiState.value = UiState.THINKING
+                scheduleThinkingTimeout()
+                startThinkingHints()
+                mainHandler.postDelayed({ _partialTranscript.value = "" }, SHOW_FINAL_TRANSCRIPT_MS)
+                mainHandler.postDelayed({ if (shouldKeepListening.get()) resumeVosk() }, VOSK_RESUME_DELAY_MS)
+            }
+        }
+
+        /**
+         * STT 실패/취소 시 호출 — 오버레이 IDLE 복귀 + Vosk 재개.
+         */
+        fun enterIdleStateForExternalStt() {
+            mainHandler.post {
+                partialCollectJob?.cancel()
+                partialCollectJob = null
+                cancelResponseTimers()
+                _partialTranscript.value = ""
+                _uiState.value = UiState.IDLE
+                mainHandler.postDelayed({ if (shouldKeepListening.get()) resumeVosk() }, VOSK_RESUME_DELAY_MS)
+            }
+        }
+
+        /**
          * 뒤로가기 등 외부에서 진행 중인 wake flow 전체를 즉시 중단.
          * TTS·SR 모두 멈추고 IDLE 로 복귀. Vosk wake 대기는 그대로 유지.
          */
