@@ -378,14 +378,22 @@ class KikiChatViewModel
          * 결과 확보 시 자동으로 [sendVoiceQuery] 로 흘려보낸다.
          */
         fun startVoiceQuery(onError: (VoiceQueryManager.FailureReason) -> Unit) {
+            wakeWordManager.enterListeningStateForExternalStt()
             voiceQueryManager.startOnce(
-                onResult = { transcript -> sendVoiceQuery(transcript) },
-                onError = onError,
+                onResult = { transcript ->
+                    wakeWordManager.enterThinkingStateForExternalStt(transcript)
+                    sendVoiceQuery(transcript)
+                },
+                onError = { reason ->
+                    wakeWordManager.enterIdleStateForExternalStt()
+                    onError(reason)
+                },
             )
         }
 
         fun cancelVoiceQuery() {
             voiceQueryManager.cancel()
+            wakeWordManager.enterIdleStateForExternalStt()
         }
 
         private fun dispatchRecommendCommand(userQuery: String?) {

@@ -19,6 +19,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.inputmethod.EditorInfo
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.LinearLayout.LayoutParams.MATCH_PARENT
 import android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
@@ -156,7 +157,7 @@ class GlucoseKeyboard : InputMethodService() {
         val root =
             LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                setBackgroundColor(Color.parseColor("#D1D5DB"))
+                setBackgroundColor(Color.parseColor("#E8F7FA"))
                 addView(buildInlineBanner().also { inlineBanner = it })
                 addView(buildKeyboard().also { keyContainer = it })
             }
@@ -231,6 +232,21 @@ class GlucoseKeyboard : InputMethodService() {
                 setPadding(dp(8), 0, dp(4), 0)
             }
 
+        val kikiResId = resources.getIdentifier("kiki_smile", "drawable", "com.ssafy.s309")
+        if (kikiResId != 0) {
+            container.addView(
+                ImageView(this).apply {
+                    setImageResource(kikiResId)
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    isClickable = false
+                    isFocusable = false
+                    layoutParams =
+                        LinearLayout.LayoutParams(dp(32), dp(32)).apply {
+                            setMargins(0, 0, dp(8), 0)
+                        }
+                },
+            )
+        }
         container.addView(colorDot)
         container.addView(message)
         container.addView(chevron)
@@ -496,13 +512,13 @@ class GlucoseKeyboard : InputMethodService() {
         val shiftOn = label == "⇧" && isShift && !shiftDisabled
         val bgColor =
             when (type) {
-                KeyType.CONFIRM -> Color.parseColor("#4A90D9")
+                KeyType.CONFIRM -> Color.parseColor("#4EA8BC")
                 KeyType.SPECIAL ->
                     when {
-                        shiftDisabled -> Color.parseColor("#C2C5CC")
-                        label == "⇧" && isCapsLock -> Color.parseColor("#1E5BA8")
-                        label == "⇧" && isShift -> Color.parseColor("#4A90D9")
-                        else -> Color.parseColor("#9DA3AC")
+                        shiftDisabled -> Color.parseColor("#D5EDF3")
+                        label == "⇧" && isCapsLock -> Color.parseColor("#0D7A94")
+                        label == "⇧" && isShift -> Color.parseColor("#4EA8BC")
+                        else -> Color.parseColor("#B8DDE8")
                     }
                 KeyType.NORMAL -> Color.WHITE
             }
@@ -904,9 +920,9 @@ class GlucoseKeyboard : InputMethodService() {
     private fun updateShiftKeyView(tv: TextView) {
         val bgColor =
             when {
-                isCapsLock -> Color.parseColor("#1E5BA8")
-                isShift -> Color.parseColor("#4A90D9")
-                else -> Color.parseColor("#9DA3AC")
+                isCapsLock -> Color.parseColor("#0D7A94")
+                isShift -> Color.parseColor("#4EA8BC")
+                else -> Color.parseColor("#B8DDE8")
             }
         val txtColor = if (isShift) Color.WHITE else Color.parseColor("#1A1A1A")
         (tv.background as? GradientDrawable)?.setColor(bgColor)

@@ -18,6 +18,11 @@ Desktop.ini
 .env.local
 .env.*.local
 
+# 자격증명 / 키 — 절대 커밋 금지
+*.pem
+*.key
+test_*.json
+
 # 로그
 *.log
 logs/
