@@ -122,4 +122,5 @@ def run_calendar_reminder_agent(user_id: int, parent_chat_message_id: int, paylo
         parent_chat_message_id=parent_chat_message_id,
         payload={"query": f"오늘 '{event_text}' 일정이 있어. 이 외식 자리에 맞는 음식을 추천해줘."},
         alert_type="AGENT_CALENDAR_REMINDER",
+        message_prefix=f"일정 : {event_text}\n\n",
     )
