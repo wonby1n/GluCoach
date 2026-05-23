@@ -8,6 +8,7 @@ import json
 import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from dotenv import load_dotenv
 import anthropic
@@ -128,12 +129,22 @@ def run_food_recommend_agent(
             break
 
         messages.append({"role": "assistant", "content": response.content})
-        tool_results = []
+        tool_results_map: dict[str, str] = {}
         should_exit = False
+
+        def _run_block(b):
+            t = time.perf_counter()
+            res = _execute(b.name, b.input)
+            print(f"[FoodRecommend tool] {b.name} → {time.perf_counter() - t:.2f}s")
+            return b.id, res
+
+        with ThreadPoolExecutor(max_workers=len(tool_use_blocks) or 1) as ex:
+            for bid, res in ex.map(_run_block, tool_use_blocks):
+                tool_results_map[bid] = res
+
+        tool_results = []
         for block in tool_use_blocks:
-            tool_start = time.perf_counter()
-            result = _execute(block.name, block.input)
-            print(f"[FoodRecommend tool] {block.name} → {time.perf_counter() - tool_start:.2f}s")
+            result = tool_results_map[block.id]
             result_dict = json.loads(result)
             tool_call_details.append(
                 {"name": block.name, "input": block.input, "result": result_dict}
