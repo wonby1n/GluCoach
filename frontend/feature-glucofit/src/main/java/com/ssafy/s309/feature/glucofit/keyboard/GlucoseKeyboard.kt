@@ -19,6 +19,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.inputmethod.EditorInfo
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.LinearLayout.LayoutParams.MATCH_PARENT
 import android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
@@ -47,6 +48,9 @@ class GlucoseKeyboard : InputMethodService() {
 
     /** 기호 모드 진입 전 언어 모드 — ← 키로 복귀할 때 사용. */
     private var prevLangMode = KeyboardMode.KOREAN
+
+    /** 현재 입력 필드의 EditorInfo. 확인 키가 SEND/GO/DONE 액션을 보낼지 Enter를 보낼지 결정에 사용. */
+    private var currentEditorInfo: EditorInfo? = null
 
     /** 백스페이스 롱프레스 반복 삭제 (50 → 30 → 20ms 가속). */
     private val backspaceHandler = Handler(Looper.getMainLooper())
@@ -80,8 +84,12 @@ class GlucoseKeyboard : InputMethodService() {
     private val doubleTapHandler = Handler(Looper.getMainLooper())
     private var doubleTapPending = false
 
-    // ── 키 미리보기 팝업 ────────────────────────────────────────────────────
+    // ── 키 미리보기 팝업 (재사용) ──────────────────────────────────────────
     private var keyPreviewPopup: PopupWindow? = null
+    private var keyPreviewText: TextView? = null
+
+    // ── Shift 토글 시 레이아웃 in-place 업데이트용 ──────────────────────────
+    private var letterRowsContainer: LinearLayout? = null
 
     // ── 세션 영속화 ─────────────────────────────────────────────────────────
     private lateinit var prefs: SharedPreferences
@@ -119,6 +127,7 @@ class GlucoseKeyboard : InputMethodService() {
         restarting: Boolean,
     ) {
         super.onStartInput(attribute, restarting)
+        currentEditorInfo = attribute
         KeyboardFoodCache.load(applicationContext)
     }
 
@@ -141,10 +150,14 @@ class GlucoseKeyboard : InputMethodService() {
     private var isShift = false
 
     override fun onCreateInputView(): View {
+        keyPreviewPopup?.dismiss()
+        keyPreviewPopup = null
+        keyPreviewText = null
+        letterRowsContainer = null
         val root =
             LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                setBackgroundColor(Color.parseColor("#D1D5DB"))
+                setBackgroundColor(Color.parseColor("#E8F7FA"))
                 addView(buildInlineBanner().also { inlineBanner = it })
                 addView(buildKeyboard().also { keyContainer = it })
             }
@@ -219,6 +232,21 @@ class GlucoseKeyboard : InputMethodService() {
                 setPadding(dp(8), 0, dp(4), 0)
             }
 
+        val kikiResId = resources.getIdentifier("kiki_smile", "drawable", "com.ssafy.s309")
+        if (kikiResId != 0) {
+            container.addView(
+                ImageView(this).apply {
+                    setImageResource(kikiResId)
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    isClickable = false
+                    isFocusable = false
+                    layoutParams =
+                        LinearLayout.LayoutParams(dp(32), dp(32)).apply {
+                            setMargins(0, 0, dp(8), 0)
+                        }
+                },
+            )
+        }
         container.addView(colorDot)
         container.addView(message)
         container.addView(chevron)
@@ -344,7 +372,7 @@ class GlucoseKeyboard : InputMethodService() {
                     )
                 }
             }
-        }
+        }.also { letterRowsContainer = it }
     }
 
     /**
@@ -484,13 +512,13 @@ class GlucoseKeyboard : InputMethodService() {
         val shiftOn = label == "⇧" && isShift && !shiftDisabled
         val bgColor =
             when (type) {
-                KeyType.CONFIRM -> Color.parseColor("#4A90D9")
+                KeyType.CONFIRM -> Color.parseColor("#4EA8BC")
                 KeyType.SPECIAL ->
                     when {
-                        shiftDisabled -> Color.parseColor("#C2C5CC")
-                        label == "⇧" && isCapsLock -> Color.parseColor("#1E5BA8")
-                        label == "⇧" && isShift -> Color.parseColor("#4A90D9")
-                        else -> Color.parseColor("#9DA3AC")
+                        shiftDisabled -> Color.parseColor("#D5EDF3")
+                        label == "⇧" && isCapsLock -> Color.parseColor("#0D7A94")
+                        label == "⇧" && isShift -> Color.parseColor("#4EA8BC")
+                        else -> Color.parseColor("#B8DDE8")
                     }
                 KeyType.NORMAL -> Color.WHITE
             }
@@ -551,14 +579,17 @@ class GlucoseKeyboard : InputMethodService() {
                     true
                 }
             } else {
+                tag = label
                 val showPreview = type == KeyType.NORMAL && label != "SPACE" && mode != KeyboardMode.SYMBOLS
                 setOnTouchListener { v, event ->
                     when (event.actionMasked) {
                         MotionEvent.ACTION_DOWN -> {
                             if (!shiftDisabled) {
                                 v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                                if (showPreview) showKeyPreview(v, display)
-                                onKey(label)
+                                val currentLabel = v.tag as? String ?: label
+                                val currentDisplay = if (currentLabel == "SPACE") "" else currentLabel
+                                if (showPreview) showKeyPreview(v, currentDisplay)
+                                onKey(currentLabel)
                             }
                         }
                         MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
@@ -571,16 +602,11 @@ class GlucoseKeyboard : InputMethodService() {
         }
     }
 
-    private fun showKeyPreview(
-        anchorView: View,
-        text: String,
-    ) {
-        dismissKeyPreview()
-        if (text.isEmpty()) return
+    private fun ensureKeyPreviewPopup() {
+        if (keyPreviewText != null) return
         val size = dp(56)
-        val tv =
+        keyPreviewText =
             TextView(this).apply {
-                this.text = text
                 textSize = 22f
                 typeface = Typeface.DEFAULT_BOLD
                 setTextColor(Color.parseColor("#1A1A1A"))
@@ -593,19 +619,34 @@ class GlucoseKeyboard : InputMethodService() {
                     }
             }
         keyPreviewPopup =
-            PopupWindow(tv, size, size, false).apply {
+            PopupWindow(keyPreviewText, size, size, false).apply {
                 isOutsideTouchable = false
                 isTouchable = false
                 setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-                val xOff = (anchorView.width - size) / 2
-                val yOff = -(anchorView.height + size + dp(4))
-                showAsDropDown(anchorView, xOff, yOff)
             }
+    }
+
+    private fun showKeyPreview(
+        anchorView: View,
+        text: String,
+    ) {
+        if (text.isEmpty()) return
+        ensureKeyPreviewPopup()
+        val popup = keyPreviewPopup ?: return
+        val tv = keyPreviewText ?: return
+        tv.text = text
+        val size = dp(56)
+        val xOff = (anchorView.width - size) / 2
+        val yOff = -(anchorView.height + size + dp(4))
+        if (popup.isShowing) {
+            popup.update(anchorView, xOff, yOff, size, size)
+        } else {
+            popup.showAsDropDown(anchorView, xOff, yOff)
+        }
     }
 
     private fun dismissKeyPreview() {
         keyPreviewPopup?.dismiss()
-        keyPreviewPopup = null
     }
 
     private fun onKey(label: String) {
@@ -717,11 +758,30 @@ class GlucoseKeyboard : InputMethodService() {
         }
         val text = currentText.toString().trim()
         Log.d(TAG, "confirm: final text='$text' (length=${text.length})")
-        if (text.isNotEmpty()) triggerBanner(text) // confirm은 즉시 트리거 (디바운스 없이)
         bannerHandler.removeCallbacksAndMessages(null) // 예약된 업데이트 취소
+        currentMatchedFood = null
+        hideInlineBanner()
         currentText.clear()
         hangul.reset()
-        sendDefaultEditorAction(true)
+        performSendAction()
+    }
+
+    /**
+     * 입력 필드의 IME 액션(SEND/GO/DONE/SEARCH 등)이 설정돼 있으면 그걸 발행.
+     * 그렇지 않은 경우(KakaoTalk 등 채팅창)는 ENTER 키 이벤트로 폴백.
+     */
+    private fun performSendAction() {
+        val ei = currentEditorInfo
+        val action = (ei?.imeOptions ?: 0) and EditorInfo.IME_MASK_ACTION
+        val hasAction =
+            action != EditorInfo.IME_ACTION_NONE &&
+                action != EditorInfo.IME_ACTION_UNSPECIFIED
+        if (hasAction) {
+            val handled = sendDefaultEditorAction(true)
+            if (handled) return
+        }
+        currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
+        currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
     }
 
     /**
@@ -804,10 +864,69 @@ class GlucoseKeyboard : InputMethodService() {
         rebuildKeys()
     }
 
-    /** shift 전용 — 글자 행만 교체. 하단 행(btnLang, btnSym)은 보존. */
+    /** shift 전용 — 기존 View를 재활용해 텍스트·색상만 업데이트. */
     private fun rebuildLetterRows() {
-        if (keyContainer.childCount > 0) keyContainer.removeViewAt(0)
-        keyContainer.addView(buildLetterRows(), 0)
+        if (letterRowsContainer != null && keyContainer.getChildAt(0) === letterRowsContainer) {
+            updateLetterRowsInPlace()
+        } else {
+            if (keyContainer.childCount > 0) keyContainer.removeViewAt(0)
+            keyContainer.addView(buildLetterRows(), 0)
+        }
+    }
+
+    private fun updateLetterRowsInPlace() {
+        val container = letterRowsContainer ?: return
+        when (mode) {
+            KeyboardMode.KOREAN -> {
+                val row1Labels = if (isShift) KO_ROW1S else KO_ROW1
+                val row1 = container.getChildAt(0) as? LinearLayout ?: return
+                for (i in row1Labels.indices) {
+                    val tv = row1.getChildAt(i) as? TextView ?: continue
+                    tv.text = row1Labels[i]
+                    tv.tag = row1Labels[i]
+                }
+                val row3 = container.getChildAt(2) as? LinearLayout ?: return
+                (row3.getChildAt(0) as? TextView)?.let { updateShiftKeyView(it) }
+            }
+            KeyboardMode.ENGLISH -> {
+                val transform: (String) -> String = if (isShift) String::uppercase else String::lowercase
+                val row1 = container.getChildAt(0) as? LinearLayout ?: return
+                for (i in EN_ROW1.indices) {
+                    val tv = row1.getChildAt(i) as? TextView ?: continue
+                    val label = transform(EN_ROW1[i])
+                    tv.text = label
+                    tv.tag = label
+                }
+                val row2 = container.getChildAt(1) as? LinearLayout ?: return
+                for (i in EN_ROW2.indices) {
+                    val tv = row2.getChildAt(i) as? TextView ?: continue
+                    val label = transform(EN_ROW2[i])
+                    tv.text = label
+                    tv.tag = label
+                }
+                val row3 = container.getChildAt(2) as? LinearLayout ?: return
+                for (i in EN_ROW3.indices) {
+                    val tv = row3.getChildAt(i + 1) as? TextView ?: continue
+                    val label = transform(EN_ROW3[i])
+                    tv.text = label
+                    tv.tag = label
+                }
+                (row3.getChildAt(0) as? TextView)?.let { updateShiftKeyView(it) }
+            }
+            KeyboardMode.SYMBOLS -> {}
+        }
+    }
+
+    private fun updateShiftKeyView(tv: TextView) {
+        val bgColor =
+            when {
+                isCapsLock -> Color.parseColor("#0D7A94")
+                isShift -> Color.parseColor("#4EA8BC")
+                else -> Color.parseColor("#B8DDE8")
+            }
+        val txtColor = if (isShift) Color.WHITE else Color.parseColor("#1A1A1A")
+        (tv.background as? GradientDrawable)?.setColor(bgColor)
+        tv.setTextColor(txtColor)
     }
 
     /** 모드 전환 — 전체 재빌드 (하단 행 레이블도 변경됨). */
@@ -901,13 +1020,13 @@ class GlucoseKeyboard : InputMethodService() {
         // candidatesStart < 0 조건 추가: 한글 composing 삭제 시 selection이 (0,0)으로 돌아가는
         // 경우를 오탐하지 않도록 방어. (composing "ㄱ" → setComposingText("") 시 발생)
         if (newSelStart == 0 && newSelEnd == 0 && oldSelEnd > 0 && candidatesStart < 0) {
-            val pending = lastEditorText.trim()
-            Log.d(TAG, "onUpdateSelection: send detected, lastEditorText='$pending'")
-            if (pending.length >= 2) triggerBanner(pending)
+            Log.d(TAG, "onUpdateSelection: send detected — hiding banner")
             lastEditorText = ""
             currentText.clear()
             hangul.reset()
             bannerHandler.removeCallbacksAndMessages(null)
+            currentMatchedFood = null
+            hideInlineBanner()
             return
         }
         val before = ic.getTextBeforeCursor(256, 0)?.toString().orEmpty()
@@ -922,6 +1041,9 @@ class GlucoseKeyboard : InputMethodService() {
         spaceHandler.removeCallbacksAndMessages(null)
         doubleTapHandler.removeCallbacksAndMessages(null)
         dismissKeyPreview()
+        keyPreviewPopup = null
+        keyPreviewText = null
+        letterRowsContainer = null
         bannerHandler.removeCallbacksAndMessages(null)
         bannerManager.dismiss()
     }

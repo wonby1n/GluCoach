@@ -44,6 +44,13 @@ interface HealthApi {
         @Query("date") date: String,
     ): List<MealRecordResponse>
 
+    /** 캘린더 점 표시용 — 해당 월에 식사 기록이 있는 day-of-month 목록. */
+    @GET("api/meals/calendar")
+    suspend fun getMealCalendar(
+        @Query("year") year: Int,
+        @Query("month") month: Int,
+    ): List<Int>
+
     /** 식사 기록 생성. request = JSON, image = 선택적 사진 */
     @Multipart
     @POST("api/meals")

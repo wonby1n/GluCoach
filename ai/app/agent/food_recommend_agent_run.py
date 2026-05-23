@@ -7,6 +7,7 @@
 import json
 import os
 import sys
+import time
 
 from dotenv import load_dotenv
 import anthropic
@@ -31,7 +32,7 @@ if sys.platform == "win32":
 BASE_URL = "https://api.anthropic.com"
 MODEL = "claude-haiku-4-5-20251001"
 # 음성 모달 응답은 짧으므로 1024 면 충분. 4096 대비 LLM 응답 시간 단축.
-MAX_TOKENS = 1024
+MAX_TOKENS = 2048
 MAX_TURNS = 10
 
 
@@ -73,14 +74,22 @@ def run_food_recommend_agent(
         base_url=BASE_URL,
     )
 
-    messages = [{"role": "user", "content": "사용자가 음식 추천을 요청했어. 절차대로 데이터 확인하고 응답해."}]
+    query = (payload or {}).get("query", "").strip()
+    user_content = (
+        f"사용자가 음성으로 '{query}'라고 물어봤어. 자유 발화 모드로 답해."
+        if query
+        else "사용자가 음식 추천을 요청했어. 절차대로 데이터 확인하고 응답해."
+    )
+    messages = [{"role": "user", "content": user_content}]
     turn = 0
     sent_message = None
     tool_call_details: list = []
     response = None
+    agent_start = time.perf_counter()
 
     while turn < MAX_TURNS:
         turn += 1
+        llm_start = time.perf_counter()
         response = call_llm_with_retry(
             client,
             model=MODEL,
@@ -89,6 +98,7 @@ def run_food_recommend_agent(
             tools=FOOD_RECOMMEND_TOOL_SCHEMAS,
             messages=messages,
         )
+        print(f"[FoodRecommend] Turn {turn} Claude 호출 → {time.perf_counter() - llm_start:.2f}s")
 
         if response is None:
             result = {
@@ -116,18 +126,37 @@ def run_food_recommend_agent(
 
         messages.append({"role": "assistant", "content": response.content})
         tool_results = []
+        should_exit = False
         for block in tool_use_blocks:
+            tool_start = time.perf_counter()
             result = _execute(block.name, block.input)
+            print(f"[FoodRecommend tool] {block.name} → {time.perf_counter() - tool_start:.2f}s")
+            result_dict = json.loads(result)
             tool_call_details.append(
-                {"name": block.name, "input": block.input, "result": json.loads(result)}
+                {"name": block.name, "input": block.input, "result": result_dict}
             )
-            if block.name == "send_command_response":
+            if block.name == "send_command_response" and result_dict.get("status") == "sent":
                 sent_message = block.input.get("message")
+                should_exit = True
             tool_results.append(
                 {"type": "tool_result", "tool_use_id": block.id, "content": result}
             )
-        messages.append({"role": "user", "content": tool_results})
+        # 이번 턴에 predict_glucose_for_food 를 호출했는지 확인.
+        # 비교 모드(comparison)는 반드시 predict → send_command_response 순서가 필요하므로
+        # predict 호출이 있었던 턴에는 "즉시 호출" 대신 다음 단계 안내로 교체.
+        called_predict = any(b.name == "predict_glucose_for_food" for b in tool_use_blocks)
+        next_hint = (
+            "혈당 예측 완료. payload.comparison을 반드시 채워서 send_command_response를 호출하세요."
+            if called_predict
+            else "데이터 수집 완료. 분석 텍스트 없이 send_command_response를 즉시 호출하세요."
+        )
+        messages.append({"role": "user", "content": tool_results + [
+            {"type": "text", "text": next_hint}
+        ]})
+        if should_exit:
+            break
 
+    print(f"[FoodRecommend] 전체 소요 → {time.perf_counter() - agent_start:.2f}s (turn={turn})")
     result = {
         "message": sent_message,
         "turns": turn,

@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -178,6 +179,10 @@ fun FoodScanContent(
                                 carbsG = item.carbsG,
                                 proteinG = item.proteinG,
                                 fatG = item.fatG,
+                                sugarG = item.sugarG,
+                                fiberG = item.fiberG,
+                                saturatedFatG = item.saturatedFatG,
+                                sodiumMg = item.sodiumMg,
                                 confidence = 1.0f,
                             )
                         viewModel.fetchManualPrediction(item)
@@ -227,6 +232,10 @@ fun FoodScanContent(
                                 carbsG = item.carbsG,
                                 proteinG = item.proteinG,
                                 fatG = item.fatG,
+                                sugarG = item.sugarG,
+                                fiberG = item.fiberG,
+                                saturatedFatG = item.saturatedFatG,
+                                sodiumMg = item.sodiumMg,
                                 confidence = 1.0f,
                             )
                         viewModel.fetchManualPrediction(item)
@@ -1196,6 +1205,34 @@ private fun NutritionCard(food: FoodScanCandidate) {
                 value = food.fatG?.let { "${it.toInt()}g" } ?: "-",
             )
         }
+
+        val hasSecondary = listOf(food.sugarG, food.fiberG, food.saturatedFatG, food.sodiumMg).any { it != null }
+        if (hasSecondary) {
+            Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
+            HorizontalDivider(color = GlucoachColors.Border)
+            Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+            Column(verticalArrangement = Arrangement.spacedBy(GlucoachSpacing.sm)) {
+                NutritionSecondaryRow("당류", food.sugarG?.let { "${it.toInt()}g" })
+                NutritionSecondaryRow("식이섬유", food.fiberG?.let { "${it.toInt()}g" })
+                NutritionSecondaryRow("포화지방", food.saturatedFatG?.let { "${it.toInt()}g" })
+                NutritionSecondaryRow("나트륨", food.sodiumMg?.let { "${it.toInt()}mg" })
+            }
+        }
+    }
+}
+
+@Composable
+private fun NutritionSecondaryRow(
+    label: String,
+    value: String?,
+) {
+    if (value == null) return
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(text = label, color = GlucoachColors.TextSecondary, fontSize = 13.sp)
+        Text(text = value, color = GlucoachColors.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -1732,6 +1769,10 @@ fun KeyboardPredictionContent(
                 carbsG = item.carbsG,
                 proteinG = item.proteinG,
                 fatG = item.fatG,
+                sugarG = item.sugarG,
+                fiberG = item.fiberG,
+                saturatedFatG = item.saturatedFatG,
+                sodiumMg = item.sodiumMg,
                 confidence = 1.0f,
             )
         isLoading = false

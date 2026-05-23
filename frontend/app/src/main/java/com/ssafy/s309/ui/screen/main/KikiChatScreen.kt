@@ -222,6 +222,7 @@ class KikiChatViewModel
                                             alertType = m.messageType ?: "",
                                             createdAt = m.createdAt,
                                             displayTrace = m.displayTrace,
+                                            payload = m.payload,
                                         ),
                                     )
                                 }
@@ -267,6 +268,7 @@ class KikiChatViewModel
                                                 alertType = m.messageType ?: "",
                                                 createdAt = m.createdAt,
                                                 displayTrace = m.displayTrace,
+                                                payload = m.payload,
                                             ),
                                         )
                                     }
@@ -319,12 +321,32 @@ class KikiChatViewModel
                                                 alertType = m.messageType ?: "",
                                                 createdAt = m.createdAt,
                                                 displayTrace = m.displayTrace,
+                                                payload = m.payload,
                                             ),
                                         )
                                     }
                                 }
                         if (newMessages.isNotEmpty()) {
-                            val raw = _messages.value.filterNot { it is ChatMessage.DateSeparator }
+                            // 옵티미스틱 user 메시지의 createdAt 은 FE clock 으로 생성돼 서버 DB clock 과
+                            // 미세하게 어긋난다. 위 createdAt 기반 dedup 으로는 잡히지 않아 같은 user
+                            // 메시지가 [local optimistic + server] 둘 다 화면에 남는 버그가 있었다.
+                            // 서버 응답에 동일 텍스트 user 메시지가 있고 local 의 createdAt 이 서버에 없으면
+                            // 그 local 은 옵티미스틱이라고 판정하고 제거한다.
+                            val serverCreatedAts = response.content.map { it.createdAt }.toSet()
+                            val fetchedUserTexts =
+                                response.content
+                                    .asSequence()
+                                    .filter { it.sender == "user" }
+                                    .mapNotNull { it.message }
+                                    .toSet()
+                            val raw =
+                                _messages.value
+                                    .filterNot { it is ChatMessage.DateSeparator }
+                                    .filterNot { msg ->
+                                        msg is ChatMessage.UserMessage &&
+                                            msg.text in fetchedUserTexts &&
+                                            msg.createdAt !in serverCreatedAts
+                                    }
                             _messages.value = withDateSeparators(newMessages + raw)
                             // 음성 응답 자동 발화는 제거 — FcmService 가 푸시 도착 시 TTS 로 본문을 읽어준다 (중복 방지).
                         }
@@ -356,14 +378,22 @@ class KikiChatViewModel
          * 결과 확보 시 자동으로 [sendVoiceQuery] 로 흘려보낸다.
          */
         fun startVoiceQuery(onError: (VoiceQueryManager.FailureReason) -> Unit) {
+            wakeWordManager.enterListeningStateForExternalStt()
             voiceQueryManager.startOnce(
-                onResult = { transcript -> sendVoiceQuery(transcript) },
-                onError = onError,
+                onResult = { transcript ->
+                    wakeWordManager.enterThinkingStateForExternalStt(transcript)
+                    sendVoiceQuery(transcript)
+                },
+                onError = { reason ->
+                    wakeWordManager.enterIdleStateForExternalStt()
+                    onError(reason)
+                },
             )
         }
 
         fun cancelVoiceQuery() {
             voiceQueryManager.cancel()
+            wakeWordManager.enterIdleStateForExternalStt()
         }
 
         private fun dispatchRecommendCommand(userQuery: String?) {
@@ -510,6 +540,7 @@ fun KikiChatScreen(
     onBack: () -> Unit,
     onItemClick: (NotificationItem) -> Unit = {},
     onReplySent: () -> Unit = {},
+    onCompareClick: (String, String) -> Unit = { _, _ -> },
     viewModel: KikiChatViewModel = hiltViewModel(),
 ) {
     val messages by viewModel.messages.collectAsStateWithLifecycle()
@@ -678,6 +709,7 @@ fun KikiChatScreen(
                                         if (replyText != null) onReplySent()
                                     },
                                     onClick = { onItemClick(message.item) },
+                                    onCompareClick = onCompareClick,
                                 )
                             is ChatMessage.UserMessage ->
                                 UserChatBubble(message = message, fontSize = fontSize)
@@ -999,6 +1031,7 @@ private fun KikiChatBubble(
     showReplyButtons: Boolean = false,
     onReply: (replyText: String?, displayLabel: String) -> Unit = { _, _ -> },
     onClick: () -> Unit = {},
+    onCompareClick: (String, String) -> Unit = { _, _ -> },
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
@@ -1042,6 +1075,15 @@ private fun KikiChatBubble(
             if (showReplyButtons) {
                 Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
                 ChatReplyButtons(onReply = onReply)
+            }
+            // A/B 비교 결과가 있으면 비교 화면으로 이동하는 버튼 표시
+            item.payload?.comparison?.let { comparison ->
+                Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+                CompareButton(
+                    foodAName = comparison.foodA.name,
+                    foodBName = comparison.foodB.name,
+                    onClick = { onCompareClick(comparison.foodA.name, comparison.foodB.name) },
+                )
             }
         }
     }
@@ -1088,6 +1130,30 @@ private fun ChatReplyButton(
             color = Color.White,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+private fun CompareButton(
+    foodAName: String,
+    foodBName: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(GlucoachColors.PrimaryLight)
+                .border(1.5.dp, GlucoachColors.PrimaryDark, RoundedCornerShape(20.dp))
+                .clickable(onClick = onClick)
+                .padding(horizontal = GlucoachSpacing.md, vertical = 8.dp),
+    ) {
+        Text(
+            text = "A/B 비교: $foodAName vs $foodBName →",
+            color = GlucoachColors.PrimaryDark,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
         )
     }
 }

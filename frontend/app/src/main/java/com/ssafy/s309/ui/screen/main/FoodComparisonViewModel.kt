@@ -7,6 +7,7 @@ import com.ssafy.s309.data.model.GlucoseCompareRequest
 import com.ssafy.s309.data.model.GlucoseCompareResponse
 import com.ssafy.s309.data.model.GlucoseRange
 import com.ssafy.s309.data.model.MealCreateRequest
+import com.ssafy.s309.data.repository.FoodRepository
 import com.ssafy.s309.data.repository.HealthRepository
 import com.ssafy.s309.data.repository.PredictRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,6 +27,8 @@ data class FoodComparisonUiState(
     val mealRecorded: Boolean = false,
     val mealError: String? = null,
     val glucoseRange: GlucoseRange = GlucoseRange(minMgDl = 90, maxMgDl = 170),
+    val autoFoodA: FoodItem? = null,
+    val autoFoodB: FoodItem? = null,
 )
 
 @HiltViewModel
@@ -34,6 +37,7 @@ class FoodComparisonViewModel
     constructor(
         private val predictRepository: PredictRepository,
         private val healthRepository: HealthRepository,
+        private val foodRepository: FoodRepository,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(FoodComparisonUiState())
         val uiState: StateFlow<FoodComparisonUiState> = _uiState.asStateFlow()
@@ -94,6 +98,25 @@ class FoodComparisonViewModel
                     .onFailure { e ->
                         _uiState.update { it.copy(isLoading = false, mealError = e.message ?: "식사 기록 실패") }
                     }
+            }
+        }
+
+        fun autoSearchAndCompare(
+            aName: String,
+            bName: String,
+        ) {
+            viewModelScope.launch {
+                _uiState.update { it.copy(isLoading = true, error = null) }
+                val itemA = foodRepository.searchFoods(aName).getOrNull()?.firstOrNull()
+                val itemB = foodRepository.searchFoods(bName).getOrNull()?.firstOrNull()
+                if (itemA == null || itemB == null) {
+                    _uiState.update { it.copy(isLoading = false, error = "음식을 찾을 수 없어요") }
+                    return@launch
+                }
+                val foodA = itemA.toFoodItem()
+                val foodB = itemB.toFoodItem()
+                _uiState.update { it.copy(autoFoodA = foodA, autoFoodB = foodB) }
+                compareGlucose(foodA, foodB)
             }
         }
 

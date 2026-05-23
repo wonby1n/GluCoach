@@ -7,11 +7,17 @@ import com.ssafy.s309.domain.meal.dto.MealRecordCreateRequest;
 import com.ssafy.s309.domain.meal.dto.MealRecordCreateResponse;
 import com.ssafy.s309.domain.meal.dto.MealRecordResponse;
 import com.ssafy.s309.domain.meal.entity.MealRecord;
+import com.ssafy.s309.domain.meal.repository.MealGlucoseResponseRepository;
+import com.ssafy.s309.domain.meal.repository.MealGlucoseResponseRepository.MealPeakProjection;
 import com.ssafy.s309.domain.meal.repository.MealRecordRepository;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +31,7 @@ public class MealRecordService {
 
   private final MealRecordRepository mealRecordRepository;
   private final AgentPendingTriggerRepository triggerRepository;
+  private final MealGlucoseResponseRepository mealGlucoseResponseRepository;
   private final S3Service s3Service;
 
   @Transactional
@@ -65,34 +72,57 @@ public class MealRecordService {
     return new MealRecordCreateResponse(meal.getId());
   }
 
+  /** 캘린더 점 표시용 — 해당 월에 식사 기록이 있는 day-of-month 목록. */
+  @Transactional(readOnly = true)
+  public List<Integer> getDaysWithMealsInMonth(Integer userId, int year, int month) {
+    YearMonth ym = YearMonth.of(year, month);
+    LocalDateTime from = ym.atDay(1).atStartOfDay();
+    LocalDateTime to = ym.plusMonths(1).atDay(1).atStartOfDay();
+    return mealRecordRepository.findDistinctDaysInRange(userId, from, to);
+  }
+
   @Transactional(readOnly = true)
   public List<MealRecordResponse> getByDate(Integer userId, LocalDate date) {
     LocalDateTime from = date.atStartOfDay();
     LocalDateTime to = date.atTime(LocalTime.MAX);
 
-    return mealRecordRepository.findWithFoodByUserIdAndRecordedAtBetween(userId, from, to).stream()
+    List<MealRecord> meals =
+        mealRecordRepository.findWithFoodByUserIdAndRecordedAtBetween(userId, from, to);
+    Map<Integer, BigDecimal> peakMap = loadPeakMap(meals);
+
+    return meals.stream()
         .map(
             meal -> {
               String imageUrl =
                   meal.getImageStorageKey() != null
                       ? s3Service.getPresignedDownloadUrl(meal.getImageStorageKey())
                       : null;
-              return MealRecordResponse.from(meal, imageUrl);
+              return MealRecordResponse.from(meal, imageUrl, peakMap.get(meal.getId()));
             })
         .toList();
   }
 
   @Transactional(readOnly = true)
   public List<MealRecordResponse> getByFoodId(Integer userId, Integer foodId) {
-    return mealRecordRepository.findWithFoodByUserIdAndFoodId(userId, foodId).stream()
+    List<MealRecord> meals = mealRecordRepository.findWithFoodByUserIdAndFoodId(userId, foodId);
+    Map<Integer, BigDecimal> peakMap = loadPeakMap(meals);
+
+    return meals.stream()
         .map(
             meal -> {
               String imageUrl =
                   meal.getImageStorageKey() != null
                       ? s3Service.getPresignedDownloadUrl(meal.getImageStorageKey())
                       : null;
-              return MealRecordResponse.from(meal, imageUrl);
+              return MealRecordResponse.from(meal, imageUrl, peakMap.get(meal.getId()));
             })
         .toList();
+  }
+
+  private Map<Integer, BigDecimal> loadPeakMap(List<MealRecord> meals) {
+    if (meals.isEmpty()) return Map.of();
+    List<Integer> mealIds = meals.stream().map(MealRecord::getId).toList();
+    return mealGlucoseResponseRepository.findPeaksByMealIds(mealIds).stream()
+        .collect(Collectors.toMap(MealPeakProjection::getMealId, MealPeakProjection::getPeakValue));
   }
 }

@@ -1,5 +1,6 @@
 package com.ssafy.s309.ui.component
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -11,6 +12,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
@@ -45,10 +48,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ssafy.s309.R
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.voice.WakeWordManager
 
@@ -79,10 +85,36 @@ fun KikiVoiceOverlay(
     val response by wakeWordManager.responseText.collectAsStateWithLifecycle()
     val thinkingHint by wakeWordManager.thinkingHint.collectAsStateWithLifecycle()
 
+    // 오버레이가 활성 상태일 때 뒤로가기 → TTS/SR 전부 중단하고 IDLE 복귀
+    BackHandler(enabled = uiState != WakeWordManager.UiState.IDLE) {
+        wakeWordManager.abort()
+    }
+
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.BottomCenter,
     ) {
+        // 레이어 1: 반투명 배경 dim
+        AnimatedVisibility(
+            visible = uiState != WakeWordManager.UiState.IDLE,
+            enter = fadeIn(tween(220)),
+            exit = fadeOut(tween(180)),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
+        }
+
+        // 레이어 2: 상단 키키 얼굴
+        AnimatedVisibility(
+            visible = uiState != WakeWordManager.UiState.IDLE,
+            enter = fadeIn(tween(280)) + slideInVertically(tween(300)) { -it / 2 },
+            exit = fadeOut(tween(180)) + slideOutVertically(tween(220)) { -it / 2 },
+            modifier = Modifier.align(Alignment.TopCenter),
+        ) {
+            KikiTopFace()
+        }
+
+        // 레이어 3: 하단 상태 캡슐 + 응답 카드 (기존과 동일)
         AnimatedVisibility(
             visible = uiState != WakeWordManager.UiState.IDLE,
             enter = fadeIn(tween(220)) + slideInVertically(tween(260)) { it / 2 },
@@ -95,7 +127,6 @@ fun KikiVoiceOverlay(
                         .fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // 응답 카드 (SHOWING_RESPONSE 상태 메인 UI). 본문 탭 → 채팅 이동, X → 닫기.
                 if (uiState == WakeWordManager.UiState.SHOWING_RESPONSE && response.isNotBlank()) {
                     ResponseCard(
                         text = response,
@@ -104,7 +135,6 @@ fun KikiVoiceOverlay(
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                 }
-                // LISTENING / THINKING 직후의 transcript 표시 (사용자 발화 확인용).
                 if (
                     (uiState == WakeWordManager.UiState.LISTENING || uiState == WakeWordManager.UiState.THINKING) &&
                     partial.isNotBlank()
@@ -112,9 +142,7 @@ fun KikiVoiceOverlay(
                     PartialTranscriptBubble(text = partial)
                     Spacer(modifier = Modifier.height(10.dp))
                 }
-                // SHOWING_RESPONSE 일 땐 status capsule 안 띄움 — 카드가 메인.
                 if (uiState != WakeWordManager.UiState.SHOWING_RESPONSE) {
-                    // THINKING 일 때만 dynamic hint 로 capsule label 덮어씀.
                     val overrideLabel =
                         if (uiState == WakeWordManager.UiState.THINKING && thinkingHint.isNotBlank()) {
                             thinkingHint
@@ -124,6 +152,37 @@ fun KikiVoiceOverlay(
                     StatusCapsule(state = uiState, customLabel = overrideLabel)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun KikiTopFace() {
+    Box(
+        modifier =
+            Modifier
+                .statusBarsPadding()
+                .padding(top = 56.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE8F6F9))
+                    .border(2.dp, GlucoachColors.Primary.copy(alpha = 0.4f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.kiki_main),
+                contentDescription = "키키",
+                modifier =
+                    Modifier
+                        .size(102.dp)
+                        .clip(CircleShape),
+                contentScale = ContentScale.Crop,
+            )
         }
     }
 }
@@ -227,7 +286,8 @@ private fun ResponseCard(
                 .padding(horizontal = 18.dp, vertical = 14.dp),
     ) {
         Column(
-            modifier = Modifier.padding(end = 32.dp), // X 버튼 자리 확보
+            // X 버튼 자리 확보
+            modifier = Modifier.padding(end = 32.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(

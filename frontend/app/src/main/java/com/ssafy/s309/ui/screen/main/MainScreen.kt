@@ -48,10 +48,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -83,6 +85,7 @@ import com.ssafy.s309.ui.component.SummaryStatCard
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
+import kotlinx.coroutines.delay
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -110,6 +113,9 @@ fun MainScreen(
     onTabHandled: () -> Unit = {},
     targetFoodName: String? = null,
     onTargetFoodHandled: () -> Unit = {},
+    targetFoodA: String? = null,
+    targetFoodB: String? = null,
+    onTargetFoodABHandled: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -143,6 +149,9 @@ fun MainScreen(
         onTabHandled = onTabHandled,
         targetFoodName = targetFoodName,
         onTargetFoodHandled = onTargetFoodHandled,
+        targetFoodA = targetFoodA,
+        targetFoodB = targetFoodB,
+        onTargetFoodABHandled = onTargetFoodABHandled,
         // [DEBUG_KIKI_TEST]
     )
 }
@@ -174,12 +183,18 @@ fun MainScreenContent(
     onTabHandled: () -> Unit = {},
     targetFoodName: String? = null,
     onTargetFoodHandled: () -> Unit = {},
+    targetFoodA: String? = null,
+    targetFoodB: String? = null,
+    onTargetFoodABHandled: () -> Unit = {},
 ) {
     var selectedTab by rememberSaveable { mutableStateOf("home") }
     var mealLogTargetDate by remember { mutableStateOf<String?>(null) }
     var showReportSheet by remember { mutableStateOf(false) }
+    var showAddMenuSheet by remember { mutableStateOf(false) }
     var showCameraPanel by remember { mutableStateOf(false) }
     var isAbMode by remember { mutableStateOf(false) }
+    var initialFoodA by remember { mutableStateOf<String?>(null) }
+    var initialFoodB by remember { mutableStateOf<String?>(null) }
     var keyboardPredictFoodName by remember { mutableStateOf<String?>(null) }
     var cumulativeDrag by remember { mutableFloatStateOf(0f) }
 
@@ -192,6 +207,9 @@ fun MainScreenContent(
                     isAbMode = false
                 }
                 "food-comparison" -> {
+                    initialFoodA = targetFoodA
+                    initialFoodB = targetFoodB
+                    onTargetFoodABHandled()
                     showCameraPanel = true
                     isAbMode = true
                 }
@@ -295,8 +313,8 @@ fun MainScreenContent(
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
                                 TodayConditionHeader(
                                     onAddClick = {
-                                        showCameraPanel = true
-                                        isAbMode = false
+                                        showReportSheet = false
+                                        showAddMenuSheet = !showAddMenuSheet
                                     },
                                     onBellClick = onBellClick,
                                     hasUnread = state.notifications.any { it.isUnread },
@@ -310,6 +328,17 @@ fun MainScreenContent(
                                         trendRateMgDlPerMin = state.trendRateMgDlPerMin,
                                         diabetesType = state.diabetesType,
                                     )
+                                var displayedKiki by remember { mutableIntStateOf(kikiDrawable) }
+                                var kikiSwitchTime by remember { mutableLongStateOf(0L) }
+                                LaunchedEffect(kikiDrawable) {
+                                    if (displayedKiki == kikiDrawable) return@LaunchedEffect
+                                    val elapsed = System.currentTimeMillis() - kikiSwitchTime
+                                    val remaining = kikiCycleDuration(displayedKiki) - elapsed
+                                    if (remaining > 0) delay(remaining)
+                                    displayedKiki = kikiDrawable
+                                    kikiSwitchTime = System.currentTimeMillis()
+                                }
+
                                 KikiSuggestionCard(
                                     notifications = state.notifications,
                                     isNewUser = state.isNewUser,
@@ -324,7 +353,7 @@ fun MainScreenContent(
                                     glucoseRange = state.glucoseRange,
                                     mascotSlot = {
                                         KikiImage(
-                                            drawableRes = kikiDrawable,
+                                            drawableRes = displayedKiki,
                                             modifier = Modifier.fillMaxSize(),
                                         )
                                     },
@@ -400,7 +429,50 @@ fun MainScreenContent(
                             showReportSheet = false
                             selectedTab = "food-report"
                         },
+                        onFoodComparison = {
+                            showReportSheet = false
+                            showCameraPanel = true
+                            isAbMode = true
+                        },
                         onClose = { showReportSheet = false },
+                    )
+                }
+
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showAddMenuSheet,
+                    enter = fadeIn(animationSpec = tween(durationMillis = 280)),
+                    exit = fadeOut(animationSpec = tween(durationMillis = 240)),
+                ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.3f))
+                                .clickable { showAddMenuSheet = false },
+                    )
+                }
+
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showAddMenuSheet,
+                    enter =
+                        expandVertically(
+                            expandFrom = Alignment.Bottom,
+                            animationSpec = tween(durationMillis = 280),
+                        ),
+                    exit =
+                        shrinkVertically(
+                            shrinkTowards = Alignment.Bottom,
+                            animationSpec = tween(durationMillis = 240),
+                        ),
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                ) {
+                    AddMenuSheet(
+                        onFoodScan = {
+                            showAddMenuSheet = false
+                            showCameraPanel = true
+                            isAbMode = false
+                        },
+                        onClose = { showAddMenuSheet = false },
                     )
                 }
             }
@@ -413,13 +485,16 @@ fun MainScreenContent(
                     when (item.id) {
                         "kiki" -> {
                             showReportSheet = false
+                            showAddMenuSheet = false
                             onKikiChatClick()
                         }
                         "report" -> {
+                            showAddMenuSheet = false
                             showReportSheet = !showReportSheet
                         }
                         else -> {
                             showReportSheet = false
+                            showAddMenuSheet = false
                             selectedTab = item.id
                         }
                     }
@@ -436,14 +511,28 @@ fun MainScreenContent(
             InstagramCameraPanel(
                 isAbMode = isAbMode,
                 onModeChange = { isAbMode = it },
-                onClose = { showCameraPanel = false },
+                onClose = {
+                    showCameraPanel = false
+                    initialFoodA = null
+                    initialFoodB = null
+                },
                 onMealSaved = {
                     showCameraPanel = false
+                    initialFoodA = null
+                    initialFoodB = null
                     mealLogTargetDate =
                         java.time.LocalDate.now()
                             .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
                     selectedTab = "meallog"
                 },
+                onNavigateHome = {
+                    showCameraPanel = false
+                    initialFoodA = null
+                    initialFoodB = null
+                    selectedTab = "home"
+                },
+                initialFoodA = initialFoodA,
+                initialFoodB = initialFoodB,
             )
         }
 
@@ -773,6 +862,7 @@ internal fun defaultBottomNavItems(hasUnreadKiki: Boolean = false): List<BottomN
 internal fun ReportMenuSheet(
     onAIReport: () -> Unit,
     onFoodReport: () -> Unit,
+    onFoodComparison: () -> Unit,
     onClose: () -> Unit,
 ) {
     Column(
@@ -852,6 +942,92 @@ internal fun ReportMenuSheet(
             )
         }
 
+        HorizontalDivider(color = GlucoachColors.Border)
+
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onFoodComparison() }
+                    .padding(vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Description,
+                contentDescription = null,
+                tint = GlucoachColors.TextPrimary,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "A/B 비교",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 16.sp,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+    }
+}
+
+@Composable
+internal fun AddMenuSheet(
+    onFoodScan: () -> Unit,
+    onClose: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .shadow(8.dp, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .background(GlucoachColors.Surface)
+                .padding(horizontal = 22.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+        ) {
+            IconButton(
+                onClick = onClose,
+                modifier =
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .size(32.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "닫기",
+                    tint = GlucoachColors.TextSecondary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onFoodScan() }
+                    .padding(vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Search,
+                contentDescription = null,
+                tint = GlucoachColors.TextPrimary,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "음식 인식",
+                color = GlucoachColors.TextPrimary,
+                fontSize = 16.sp,
+            )
+        }
+
         Spacer(modifier = Modifier.height(8.dp))
     }
 }
@@ -862,6 +1038,9 @@ private fun InstagramCameraPanel(
     onModeChange: (Boolean) -> Unit,
     onClose: () -> Unit,
     onMealSaved: () -> Unit,
+    onNavigateHome: () -> Unit,
+    initialFoodA: String? = null,
+    initialFoodB: String? = null,
 ) {
     var capturedFile by remember { mutableStateOf<File?>(null) }
     var sessionId by remember { mutableIntStateOf(0) }
@@ -891,7 +1070,12 @@ private fun InstagramCameraPanel(
                             .statusBarsPadding()
                             .padding(bottom = 72.dp),
                 ) {
-                    FoodComparisonContent(onMealSaved = onMealSaved)
+                    FoodComparisonContent(
+                        onMealSaved = onMealSaved,
+                        onNavigateHome = onNavigateHome,
+                        initialFoodAName = initialFoodA,
+                        initialFoodBName = initialFoodB,
+                    )
                 }
                 Box(
                     modifier =
@@ -994,3 +1178,11 @@ private fun CameraModeChip(
         )
     }
 }
+
+private fun kikiCycleDuration(drawableRes: Int): Long =
+    when (drawableRes) {
+        R.drawable.kiki_hello -> 5_760L
+        R.drawable.kiki_fell_off -> 15_500L
+        R.drawable.kiki_dehydrated_high -> 3_300L
+        else -> 3_000L
+    }

@@ -178,7 +178,7 @@ def get_user_profile() -> dict:
     }
 
 
-def get_unseen_food_candidates(limit: int = 20) -> dict:
+def get_unseen_food_candidates(limit: int = 5) -> dict:
     """사용자가 아직 안 먹어본 음식 후보 (foods 테이블, search_count desc).
 
     신규 음식 추천에만 사용. items[].food_id를 채우기 위해 반드시 이 도구의 결과에서만 신규 음식을 고른다.
@@ -295,7 +295,6 @@ def predict_glucose_for_food(food_id: int) -> dict:
         "current_mg_dl": raw.get("currentMgdl"),
         "peak_mg_dl": raw.get("peakMgdl"),
         "peak_minute": raw.get("peakMinute"),
-        "delta_mg_dl": raw.get("deltaMgdl"),
         "risk_level": raw.get("riskLevel"),
     }
 
@@ -304,7 +303,7 @@ def predict_glucose_for_food(food_id: int) -> dict:
 
 
 def send_command_response(
-    message: str, display_trace: dict, payload: dict | None = None
+    message: str, display_trace: dict | None = None, payload: dict | None = None
 ) -> dict:
     """사용자 command에 대한 agent 응답 발송. parent_id로 user 메시지를 참조한다.
 
@@ -317,8 +316,14 @@ def send_command_response(
     backend_url = os.getenv("BACKEND_API_URL", "")
     agent_api_key = os.getenv("AGENT_API_KEY", "dev-agent-key-change-in-prod")
 
-    if not isinstance(display_trace, dict):
-        return {"status": "error", "error": "display_trace must be an object"}
+    if display_trace is None:
+        display_trace = {}
+    elif not isinstance(display_trace, dict):
+        display_trace = {}
+
+    display_trace.setdefault("summary", "")
+    display_trace.setdefault("cards", [])
+    display_trace.setdefault("decision", {"reason": ""})
     if payload is not None and not isinstance(payload, dict):
         return {"status": "error", "error": "payload must be an object or null"}
 
@@ -403,7 +408,7 @@ FOOD_RECOMMEND_TOOL_SCHEMAS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "limit": {"type": "integer", "default": 20, "description": "최대 N개 (1~50)"}
+                "limit": {"type": "integer", "default": 5, "description": "최대 N개 (1~50)"}
             },
         },
     },
@@ -425,7 +430,7 @@ FOOD_RECOMMEND_TOOL_SCHEMAS = [
     {
         "name": "predict_glucose_for_food",
         "description": (
-            "자유 발화 모드 전용 — food_id 로 혈당 예측. 응답에 peak_mg_dl / peak_minute / delta_mg_dl / risk_level 포함. "
+            "자유 발화 모드 전용 — food_id 로 혈당 예측. 응답에 peak_mg_dl / peak_minute / risk_level 포함. "
             "risk_level: 'high'(>=200), 'elevated'(>=180), 'normal'(<180), 'unknown'. "
             "이 결과로 응답 톤 결정: high→권유 X / elevated→양 조절·시간 권고 / normal→가볍게 OK."
         ),
@@ -494,8 +499,37 @@ FOOD_RECOMMEND_TOOL_SCHEMAS = [
                 },
                 "payload": {
                     "type": "object",
-                    "description": "구조화된 응답 콘텐츠. items 배열만 사용.",
+                    "description": "구조화된 응답 콘텐츠. 일반 추천 시 items, A/B 비교 시 comparison 사용.",
                     "properties": {
+                        "comparison": {
+                            "type": "object",
+                            "description": "A/B 음식 비교 결과. 비교 질문 응답 시에만 채운다. 일반 추천 시 생략.",
+                            "properties": {
+                                "food_a": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "peak_mg_dl": {"type": "number", "description": "예측 최고 혈당 (mg/dL)"},
+                                        "risk_level": {"type": "string", "description": "normal / elevated / high / unknown"},
+                                    },
+                                    "required": ["name", "peak_mg_dl", "risk_level"],
+                                },
+                                "food_b": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "peak_mg_dl": {"type": "number"},
+                                        "risk_level": {"type": "string"},
+                                    },
+                                    "required": ["name", "peak_mg_dl", "risk_level"],
+                                },
+                                "winner": {
+                                    "type": "string",
+                                    "description": "'food_a', 'food_b', 'tie' 중 하나.",
+                                },
+                            },
+                            "required": ["food_a", "food_b", "winner"],
+                        },
                         "items": {
                             "type": "array",
                             "description": "추천 음식 카드. 목표 3개 (데이터 부족 시 1~2개 허용, 위험 영역이면 0개).",
@@ -514,7 +548,7 @@ FOOD_RECOMMEND_TOOL_SCHEMAS = [
                     },
                 },
             },
-            "required": ["message", "display_trace"],
+            "required": ["message"],
         },
     },
 ]
