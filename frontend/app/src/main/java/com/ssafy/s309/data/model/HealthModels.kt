@@ -91,6 +91,18 @@ data class NotificationItem(
     val payload: AgentPayload? = null,
 )
 
+/** 안드로이드 캘린더 일정 항목 */
+@Serializable
+data class CalendarEvent(
+    val id: Long,
+    val title: String,
+    val startMillis: Long,
+    val endMillis: Long,
+    val allDay: Boolean = false,
+    val description: String? = null,
+    val calendarName: String? = null,
+)
+
 // ── 백엔드 응답 DTO ─────────────────────────────────────────────────
 
 /** GET /api/glucose-records 응답 항목 */

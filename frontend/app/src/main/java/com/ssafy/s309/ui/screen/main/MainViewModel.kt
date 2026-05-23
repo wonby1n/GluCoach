@@ -41,6 +41,7 @@ class MainViewModel
             registerPendingFcmToken()
             GlucoseSimulator.start(context)
             observeSimulatorStream()
+            checkCalendarAndNotify()
         }
 
         fun loadDashboard() {
@@ -244,6 +245,12 @@ class MainViewModel
             NotificationManagerCompat.from(context).cancelAll()
             viewModelScope.launch {
                 healthRepository.markAllAlertsRead()
+            }
+        }
+
+        fun checkCalendarAndNotify() {
+            viewModelScope.launch {
+                healthRepository.sendCalendarReminderCommand()
             }
         }
 

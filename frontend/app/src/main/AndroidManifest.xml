@@ -22,6 +22,9 @@
         android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
+    <!-- 캘린더 일정 읽기 -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+
     <!-- Wake word 감지 (WakeWordManager) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
