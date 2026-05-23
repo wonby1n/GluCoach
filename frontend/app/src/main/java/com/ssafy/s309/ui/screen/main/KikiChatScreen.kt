@@ -590,10 +590,20 @@ fun KikiChatScreen(
     DisposableEffect(lifecycleOwner) {
         val observer =
             LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
+                when (event) {
+                    Lifecycle.Event.ON_RESUME -> {
+                        ChatScreenStateHolder.isActive = true
+                        viewModel.refresh()
+                    }
+                    Lifecycle.Event.ON_PAUSE -> ChatScreenStateHolder.isActive = false
+                    else -> {}
+                }
             }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose {
+            ChatScreenStateHolder.isActive = false
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     // 새 메시지 도착 시 맨 아래로 스크롤 (reverseLayout=true 기준 index 0)
