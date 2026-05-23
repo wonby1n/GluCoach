@@ -110,6 +110,14 @@ public class PredictionService {
 
   private GlucosePredictRequest buildAiRequest(
       User user, PredictRequest request, Optional<Food> foodOpt) {
+    // foods 테이블 영양소는 100g 기준 저장 → 1인분(servingSize g) 기준으로 환산.
+    double servingScale =
+        foodOpt
+            .map(Food::getServingSize)
+            .filter(s -> s != null && s.compareTo(BigDecimal.ZERO) > 0)
+            .map(s -> s.doubleValue() / 100.0)
+            .orElse(1.0);
+
     // foodId가 있으면 DB 값 우선. foods.carbs_g 가 NULL/0이면 클라이언트 값으로 fallback.
     // AI 모델이 macro 4개(carbs/protein/fat/fiber)로 곡선 계산하므로 NULL은 0.0 으로 치환해야
     // 예측 그래프가 정상 반환된다 (NULL 시 AI 단에서 계산 실패).
@@ -117,29 +125,29 @@ public class PredictionService {
         foodOpt
             .map(Food::getCarbsG)
             .filter(v -> v != null && v.compareTo(BigDecimal.ZERO) > 0)
-            .map(BigDecimal::doubleValue)
+            .map(v -> v.doubleValue() * servingScale)
             .orElseGet(() -> request.carbsG() != null ? request.carbsG().doubleValue() : 0.0);
 
-    // macro: foodId 있으면 DB 값, 없으면 클라이언트 요청값, 둘 다 없으면 0.0 fallback.
+    // macro: foodId 있으면 DB 값(1인분 환산), 없으면 클라이언트 요청값, 둘 다 없으면 0.0 fallback.
     Double proteinG =
         foodOpt
             .map(Food::getProteinG)
-            .map(BigDecimal::doubleValue)
+            .map(v -> v.doubleValue() * servingScale)
             .orElseGet(() -> request.proteinG() != null ? request.proteinG().doubleValue() : 0.0);
     Double fatG =
         foodOpt
             .map(Food::getFatG)
-            .map(BigDecimal::doubleValue)
+            .map(v -> v.doubleValue() * servingScale)
             .orElseGet(() -> request.fatG() != null ? request.fatG().doubleValue() : 0.0);
     Double fiberG =
         foodOpt
             .map(Food::getFiberG)
-            .map(BigDecimal::doubleValue)
+            .map(v -> v.doubleValue() * servingScale)
             .orElseGet(() -> request.fiberG() != null ? request.fiberG().doubleValue() : 0.0);
     Double kcal =
         foodOpt
             .map(Food::getKcal)
-            .map(BigDecimal::doubleValue)
+            .map(v -> v.doubleValue() * servingScale)
             .orElseGet(() -> request.kcal() != null ? request.kcal().doubleValue() : 0.0);
 
     MealInfo meal =

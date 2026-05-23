@@ -87,11 +87,9 @@ def run_calendar_reminder_agent(user_id: int, parent_chat_message_id: int, paylo
                 "role": "user",
                 "content": (
                     "당신은 혈당 관리 AI 코치 '키키'입니다.\n"
-                    f"사용자의 오늘/내일 캘린더 일정: {event_text}\n\n"
-                    "이 일정이 식사/음식(점심 약속, 회식, 카페, 저녁 모임 등)과 관련 있으면 "
-                    "반드시 '[FOOD]'만 출력하세요.\n"
-                    "식사와 관련 없으면 혈당 관리 관점의 친근한 행동 추천 메시지를 작성하세요. "
-                    "60자 이내, 이모지 1개, 구체적 일정 이름 언급.\n"
+                    f"캘린더 일정: {event_text}\n\n"
+                    "위 일정이 식사/음식 관련(점심 약속, 회식, 카페, 저녁 모임 등)이면 '[FOOD]'만 출력.\n"
+                    "식사와 무관하면 혈당 관리 행동 추천 메시지만 출력 (60자 이내, 이모지 1개).\n"
                     "예시: '오늘 헬스장 가는 날이에요! 운동 전 혈당 꼭 체크해요 💪'"
                 ),
             }
@@ -104,7 +102,7 @@ def run_calendar_reminder_agent(user_id: int, parent_chat_message_id: int, paylo
 
     result_text = classify_response.content[0].text.strip()
 
-    if result_text != "[FOOD]":
+    if result_text.upper() != "[FOOD]":
         log.info("calendar_reminder: 행동 추천 완료 userId=%s msg=%s", user_id, result_text)
         return _post_notification(user_id, result_text, event_list)
 
