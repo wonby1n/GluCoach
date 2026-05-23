@@ -72,10 +72,19 @@ class FcmService : FirebaseMessagingService() {
         // alertType별 전용 silent 채널 (사운드 없음 — TTS로 본문을 발화)
         val channelId = ensureChannelForAlertType(alertType)
 
-        if (alertType?.startsWith(ALERT_TYPE_MEAL_FOLLOWUP) == true) {
-            showMealFollowupNotification(title, body, channelId)
-        } else {
-            showNotification(title, body, channelId)
+        val isReactiveResponse =
+            alertType == "AGENT_FOOD_RECOMMEND" ||
+                alertType?.startsWith("AGENT_MEAL_REPLY") == true
+        val suppressNotification =
+            isReactiveResponse &&
+                com.ssafy.s309.ui.screen.main.ChatScreenStateHolder.isActive
+
+        if (!suppressNotification) {
+            if (alertType?.startsWith(ALERT_TYPE_MEAL_FOLLOWUP) == true) {
+                showMealFollowupNotification(title, body, channelId)
+            } else {
+                showNotification(title, body, channelId)
+            }
         }
 
         // 키키 메시지를 TTS로 발화 (현재 off — wake TTS만 사용)
