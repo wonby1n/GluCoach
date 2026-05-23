@@ -296,10 +296,14 @@ class HealthRepository
                 Log.w(TAG, "캘린더 권한 없음 — 요청 스킵")
                 return
             }
-            val events = calendarDataSource.getTodayAndTomorrowEvents()
-            Log.d(TAG, "캘린더 일정 조회: ${events.size}개 — ${events.map { it.title }}")
-            if (events.isEmpty()) return
-            val titles = events.take(3).joinToString(",") { it.title }
+            val now = System.currentTimeMillis()
+            val event =
+                calendarDataSource.getTodayAndTomorrowEvents()
+                    .filter { it.startMillis > now }
+                    .minByOrNull { it.startMillis }
+            Log.d(TAG, "다음 일정: ${event?.title} at ${event?.startMillis}")
+            if (event == null) return
+            val titles = event.title
             Log.d(TAG, "캘린더 알림 전송: $titles")
             runCatching {
                 healthApi.sendChatCommand(
