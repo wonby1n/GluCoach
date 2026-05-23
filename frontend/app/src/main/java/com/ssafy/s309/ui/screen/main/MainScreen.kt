@@ -756,6 +756,7 @@ private fun resolveBannerText(
                 type.startsWith("AGENT_MEAL_FOLLOWUP") -> "키키가 식후 활동을 제안했어요!"
                 type.startsWith("AGENT_MEAL_REPLY") -> "키키가 답변을 보냈어요!"
                 type.startsWith("AGENT_MEAL_RETRY") -> "키키가 다시 확인하고 있어요!"
+                type.startsWith("AGENT_CALENDAR_REMINDER") -> "키키가 오늘 일정을 확인했어요!"
                 type == "WEEKLY_REPORT" -> "이번 주 건강 리포트가 도착했어요!"
                 else -> "키키가 오늘 컨디션을 보고 있어요"
             }
