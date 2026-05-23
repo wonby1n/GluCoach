@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.s309.R
 import com.ssafy.s309.ui.component.KikiImage
+import com.ssafy.s309.ui.component.MarkdownText
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
@@ -257,11 +258,10 @@ private fun SpeechBubble(
                     .padding(horizontal = 22.dp, vertical = 22.dp),
         ) {
             lines.forEach { line ->
-                Text(
+                MarkdownText(
                     text = line,
                     color = GlucoachColors.TextPrimary,
                     fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
                     lineHeight = 22.sp,
                 )
             }
