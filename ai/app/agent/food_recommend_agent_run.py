@@ -4,12 +4,10 @@
 사용자 command 발화 → BE webhook → 이 agent 실행 → BE INSERT(parent_id 채워서) → FCM
 """
 
-import contextvars
 import json
 import os
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from dotenv import load_dotenv
 import anthropic
@@ -133,17 +131,10 @@ def run_food_recommend_agent(
         tool_results_map: dict[str, str] = {}
         should_exit = False
 
-        _tool_ctx = contextvars.copy_context()
-
-        def _run_block(b):
+        for b in tool_use_blocks:
             t = time.perf_counter()
-            res = _tool_ctx.run(_execute, b.name, b.input)
+            tool_results_map[b.id] = _execute(b.name, b.input)
             print(f"[FoodRecommend tool] {b.name} → {time.perf_counter() - t:.2f}s")
-            return b.id, res
-
-        with ThreadPoolExecutor(max_workers=len(tool_use_blocks) or 1) as ex:
-            for bid, res in ex.map(_run_block, tool_use_blocks):
-                tool_results_map[bid] = res
 
         tool_results = []
         for block in tool_use_blocks:
