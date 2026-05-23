@@ -66,6 +66,7 @@ import androidx.lifecycle.viewModelScope
 import com.ssafy.s309.R
 import com.ssafy.s309.data.model.NotificationItem
 import com.ssafy.s309.data.repository.HealthRepository
+import com.ssafy.s309.ui.component.MarkdownText
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
 import com.ssafy.s309.voice.VoiceQueryManager
@@ -1056,7 +1057,7 @@ private fun KikiChatBubble(
                             .background(GlucoachColors.PrimaryLight)
                             .padding(horizontal = GlucoachSpacing.md, vertical = GlucoachSpacing.sm),
                 ) {
-                    Text(
+                    MarkdownText(
                         text = item.message,
                         color = GlucoachColors.TextPrimary,
                         fontSize = fontSize.sp,
