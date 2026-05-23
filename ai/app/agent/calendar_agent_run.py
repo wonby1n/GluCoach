@@ -80,7 +80,7 @@ def run_calendar_reminder_agent(user_id: int, parent_chat_message_id: int, paylo
             headers={"X-Agent-Api-Key": agent_api_key},
             json={
                 "userId": user_id,
-                "alertType": "CALENDAR_REMINDER",
+                "alertType": "AGENT_CALENDAR_REMINDER",
                 "message": message,
                 "displayTrace": display_trace,
             },
