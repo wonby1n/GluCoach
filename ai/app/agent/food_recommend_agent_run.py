@@ -60,6 +60,7 @@ def run_food_recommend_agent(
     parent_chat_message_id: int,
     payload: dict | None = None,
     alert_type: str = "AGENT_FOOD_RECOMMEND",
+    message_prefix: str = "",
 ) -> dict:
     """음식 추천 agent 실행.
 
@@ -69,6 +70,7 @@ def run_food_recommend_agent(
         user_id=user_id,
         parent_chat_message_id=parent_chat_message_id,
         alert_type=alert_type,
+        message_prefix=message_prefix,
     )
     client = anthropic.Anthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),

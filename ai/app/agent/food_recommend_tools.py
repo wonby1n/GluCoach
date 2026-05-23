@@ -41,14 +41,19 @@ _parent_chat_message_id_var: ContextVar[int | None] = ContextVar(
 _alert_type_var: ContextVar[str] = ContextVar(
     "food_alert_type", default="AGENT_FOOD_RECOMMEND"
 )
+_message_prefix_var: ContextVar[str] = ContextVar("food_message_prefix", default="")
 
 
 def set_food_agent_context(
-    user_id: int, parent_chat_message_id: int, alert_type: str = "AGENT_FOOD_RECOMMEND"
+    user_id: int,
+    parent_chat_message_id: int,
+    alert_type: str = "AGENT_FOOD_RECOMMEND",
+    message_prefix: str = "",
 ) -> None:
     _user_id_var.set(user_id)
     _parent_chat_message_id_var.set(parent_chat_message_id)
     _alert_type_var.set(alert_type)
+    _message_prefix_var.set(message_prefix)
 
 
 def _ctx_user_id() -> int | None:
@@ -61,6 +66,10 @@ def _ctx_parent_chat_message_id() -> int | None:
 
 def _ctx_alert_type() -> str:
     return _alert_type_var.get()
+
+
+def _ctx_message_prefix() -> str:
+    return _message_prefix_var.get()
 
 
 _BE_URL_WARNED = False
@@ -313,6 +322,9 @@ def send_command_response(
     user_id = _ctx_user_id()
     parent_id = _ctx_parent_chat_message_id()
     alert_type = _ctx_alert_type()
+    prefix = _ctx_message_prefix()
+    if prefix:
+        message = f"{prefix}{message}"
     backend_url = os.getenv("BACKEND_API_URL", "")
     agent_api_key = os.getenv("AGENT_API_KEY", "dev-agent-key-change-in-prod")
 
