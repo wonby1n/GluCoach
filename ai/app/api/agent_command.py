@@ -10,6 +10,7 @@ from fastapi import APIRouter
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
+from app.agent.calendar_agent_run import run_calendar_reminder_agent
 from app.agent.food_recommend_agent_run import run_food_recommend_agent
 from app.agent.postmeal_agent_run import run_postmeal_agent
 
@@ -96,6 +97,28 @@ async def dispatch_command(req: AgentCommandRequest) -> AgentCommandResponse:
             command_type=req.command_type,
             message=result.get("message"),
             turns=result.get("turns"),
+            error=result.get("error"),
+        )
+
+    if req.command_type == "calendar_reminder":
+        try:
+            result = await run_in_threadpool(
+                run_calendar_reminder_agent,
+                user_id=req.user_id,
+                parent_chat_message_id=req.chat_message_id,
+                payload=req.payload,
+            )
+        except Exception as e:
+            log.exception("calendar reminder agent failed")
+            return AgentCommandResponse(
+                status="error",
+                command_type=req.command_type,
+                error=f"agent_execution_failed: {type(e).__name__}",
+            )
+        return AgentCommandResponse(
+            status=result.get("status", "success"),
+            command_type=req.command_type,
+            message=result.get("message"),
             error=result.get("error"),
         )
 

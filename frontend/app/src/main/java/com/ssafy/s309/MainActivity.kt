@@ -120,12 +120,20 @@ class MainActivity : ComponentActivity() {
             Log.d("VoiceQuery", "RECORD_AUDIO 권한: $granted")
         }
 
+    private val calendarPermissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { granted ->
+            Log.d("Calendar", "READ_CALENDAR 권한: $granted")
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         samsungHealthHolder.attach(this)
         startSamsungHealthPolling()
         requestNotificationPermission()
         requestRecordAudioPermission()
+        requestCalendarPermission()
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (!task.isSuccessful) {
                 Log.w("FCM", "토큰 발급 실패", task.exception)
@@ -313,6 +321,14 @@ class MainActivity : ComponentActivity() {
             != PackageManager.PERMISSION_GRANTED
         ) {
             recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun requestCalendarPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALENDAR)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            calendarPermissionLauncher.launch(Manifest.permission.READ_CALENDAR)
         }
     }
 
