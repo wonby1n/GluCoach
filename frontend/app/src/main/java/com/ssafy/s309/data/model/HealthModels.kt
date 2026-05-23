@@ -168,6 +168,7 @@ data class ChatMessageItemResponse(
     val sender: String,
     val message: String? = null,
     val messageType: String? = null,
+    val commandType: String? = null,
     val displayTrace: DisplayTrace? = null,
     val payload: AgentPayload? = null,
     val isRead: Boolean,

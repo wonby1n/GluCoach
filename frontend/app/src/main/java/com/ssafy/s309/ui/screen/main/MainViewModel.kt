@@ -41,7 +41,6 @@ class MainViewModel
             registerPendingFcmToken()
             GlucoseSimulator.start(context)
             observeSimulatorStream()
-            checkCalendarAndNotify()
         }
 
         fun loadDashboard() {

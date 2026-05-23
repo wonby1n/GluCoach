@@ -205,6 +205,7 @@ class KikiChatViewModel
                     val newMessages: List<ChatMessage> =
                         response.content
                             .sortedByDescending { it.id }
+                            .filter { !(it.sender == "user" && it.commandType == "calendar_reminder") }
                             .map { m ->
                                 if (m.sender == "user") {
                                     ChatMessage.UserMessage(
@@ -251,6 +252,7 @@ class KikiChatViewModel
                         val fresh: List<ChatMessage> =
                             response.content
                                 .sortedByDescending { it.id }
+                                .filter { !(it.sender == "user" && it.commandType == "calendar_reminder") }
                                 .map { m ->
                                     if (m.sender == "user") {
                                         ChatMessage.UserMessage(
