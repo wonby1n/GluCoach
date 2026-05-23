@@ -200,6 +200,43 @@ fun AppNavigation(
     val authViewModel: AuthViewModel = hiltViewModel()
     val authState by authViewModel.uiState.collectAsState()
 
+    // 외부 진입 네비게이션 (백그라운드 앱 복귀 케이스)
+    // Main이 백스택에 있을 때만 동작. 앱 최초 실행(로그인 전)은 Main 내부 LaunchedEffect가 처리.
+    LaunchedEffect(pendingNavTarget, pendingFoodName) {
+        val isMainInStack =
+            try {
+                navController.getBackStackEntry(Screen.Main.route)
+                true
+            } catch (e: IllegalArgumentException) {
+                false
+            }
+        if (!isMainInStack) return@LaunchedEffect
+
+        when (pendingNavTarget) {
+            com.ssafy.s309.MainActivity.NAV_KIKI_ALARM_DETAIL -> {
+                navController.navigate(Screen.KikiAlarmDetail.route) { launchSingleTop = true }
+                onNavTargetConsumed()
+            }
+            com.ssafy.s309.MainActivity.NAV_GLUCOSE_PREDICT,
+            com.ssafy.s309.MainActivity.NAV_FOOD_REPORT,
+            -> {
+                navController.popBackStack(Screen.Main.route, inclusive = false)
+                val mainEntry = navController.getBackStackEntry(Screen.Main.route)
+                mainEntry.savedStateHandle["requestedTab"] =
+                    if (pendingNavTarget == com.ssafy.s309.MainActivity.NAV_GLUCOSE_PREDICT) {
+                        "glucose-predict"
+                    } else {
+                        "food-report"
+                    }
+                if (pendingFoodName != null) {
+                    mainEntry.savedStateHandle["targetFoodName"] = pendingFoodName
+                    onFoodNameConsumed()
+                }
+                onNavTargetConsumed()
+            }
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = Screen.Landing.route,
