@@ -78,33 +78,50 @@ def run_calendar_reminder_agent(user_id: int, parent_chat_message_id: int, paylo
     client = anthropic.Anthropic()
 
     # Step 1: 식사 관련 여부 분류 — 식사 관련이면 [FOOD], 아니면 행동 추천 메시지 직접 생성
+    # Step 1: 식사 관련 여부만 분류 (max_tokens 최소화로 프롬프트 누출 방지)
     classify_response = call_llm_with_retry(
         client,
         model=MODEL,
-        max_tokens=MAX_TOKENS,
+        max_tokens=10,
         messages=[
             {
                 "role": "user",
                 "content": (
-                    "당신은 혈당 관리 AI 코치 '키키'입니다.\n"
                     f"캘린더 일정: {event_text}\n\n"
-                    "위 일정이 식사/음식 관련(점심 약속, 회식, 카페, 저녁 모임 등)이면 '[FOOD]'만 출력.\n"
-                    "식사와 무관하면 혈당 관리 행동 추천 메시지만 출력 (60자 이내, 이모지 1개).\n"
-                    "예시: '오늘 헬스장 가는 날이에요! 운동 전 혈당 꼭 체크해요 💪'"
+                    "식사/음식 관련(점심 약속, 회식, 카페, 저녁 모임 등)이면 [FOOD], 아니면 [ACTION] 출력."
                 ),
             }
         ],
     )
 
-    if classify_response is None:
-        log.warning("calendar_reminder: LLM 실패, fallback 사용 userId=%s", user_id)
-        return _post_notification(user_id, FALLBACK_MESSAGE, event_list)
+    is_food = classify_response is not None and "[FOOD]" in classify_response.content[0].text.upper()
 
-    result_text = classify_response.content[0].text.strip()
-
-    if result_text.upper() != "[FOOD]":
-        log.info("calendar_reminder: 행동 추천 완료 userId=%s msg=%s", user_id, result_text)
-        return _post_notification(user_id, result_text, event_list)
+    if not is_food:
+        # Step 1b: 행동 추천 메시지 생성 (분리된 호출)
+        action_response = call_llm_with_retry(
+            client,
+            model=MODEL,
+            max_tokens=MAX_TOKENS,
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        "당신은 혈당 관리 AI 코치 '키키'입니다.\n"
+                        f"사용자의 캘린더 일정: {event_text}\n\n"
+                        "이 일정과 관련된 혈당 관리 행동 추천 메시지를 60자 이내로 작성하세요. "
+                        "이모지 1개 포함. 메시지 본문만 출력하세요.\n"
+                        "예시: 오늘 헬스장 가는 날이에요! 운동 전 혈당 꼭 체크해요 💪"
+                    ),
+                }
+            ],
+        )
+        if action_response is None:
+            body = FALLBACK_MESSAGE
+        else:
+            body = action_response.content[0].text.strip()
+        message = f"일정 : {event_list[0]}\n\n{body}"
+        log.info("calendar_reminder: 행동 추천 완료 userId=%s msg=%s", user_id, message)
+        return _post_notification(user_id, message, event_list)
 
     # Step 2: 식사 관련 → 음식 성적표 조회 후 음식 추천 생성
     log.info("calendar_reminder: 식사 관련 일정 감지 — 음식 추천 생성 userId=%s", user_id)
@@ -141,9 +158,9 @@ def run_calendar_reminder_agent(user_id: int, parent_chat_message_id: int, paylo
                     "당신은 혈당 관리 AI 코치 '키키'입니다.\n"
                     f"사용자의 일정: {event_text}\n"
                     f"사용자 음식 성적표: {food_context}\n"
-                    "일정과 음식 성적표를 바탕으로 외식 시 혈당 관리 음식 추천을 해주세요. "
-                    "70자 이내, 이모지 1개, 구체적 일정 이름과 추천/주의 음식 언급.\n"
-                    "예시: '지민이랑 점심이네요! 혈당 올리는 라면보다 비빔밥이 어때요? 🍚'"
+                    "외식 시 혈당 관리 음식 추천 메시지를 70자 이내로 작성하세요. "
+                    "이모지 1개 포함. 추천/주의 음식을 언급하세요. 메시지 본문만 출력하세요.\n"
+                    "예시: 혈당 올리는 라면보다 비빔밥이 어때요? 밥 양을 절반으로 줄이면 더 좋아요 🍚"
                 ),
             }
         ],
@@ -153,6 +170,7 @@ def run_calendar_reminder_agent(user_id: int, parent_chat_message_id: int, paylo
         log.warning("calendar_reminder: 음식 추천 LLM 실패, fallback 사용 userId=%s", user_id)
         return _post_notification(user_id, FALLBACK_MESSAGE, event_list)
 
-    message = food_response.content[0].text.strip()
+    body = food_response.content[0].text.strip()
+    message = f"일정 : {event_list[0]}\n\n{body}"
     log.info("calendar_reminder: 음식 추천 완료 userId=%s", user_id)
     return _post_notification(user_id, message, event_list)
