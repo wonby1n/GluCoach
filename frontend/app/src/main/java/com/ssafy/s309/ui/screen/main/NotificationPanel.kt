@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.s309.data.model.NotificationItem
+import com.ssafy.s309.ui.component.MarkdownText
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
 
@@ -179,7 +180,7 @@ private fun NotificationRow(
                     fontSize = 10.sp,
                 )
             }
-            Text(
+            MarkdownText(
                 text = item.message,
                 color = textColor,
                 fontSize = 12.sp,
@@ -230,7 +231,7 @@ fun NotificationDetailOverlay(
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
-            Text(
+            MarkdownText(
                 text = notification.message,
                 color = GlucoachColors.TextPrimary,
                 fontSize = 14.sp,

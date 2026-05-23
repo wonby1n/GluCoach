@@ -66,6 +66,7 @@ import androidx.lifecycle.viewModelScope
 import com.ssafy.s309.R
 import com.ssafy.s309.data.model.NotificationItem
 import com.ssafy.s309.data.repository.HealthRepository
+import com.ssafy.s309.ui.component.MarkdownText
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
 import com.ssafy.s309.voice.VoiceQueryManager
@@ -589,10 +590,20 @@ fun KikiChatScreen(
     DisposableEffect(lifecycleOwner) {
         val observer =
             LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
+                when (event) {
+                    Lifecycle.Event.ON_RESUME -> {
+                        ChatScreenStateHolder.isActive = true
+                        viewModel.refresh()
+                    }
+                    Lifecycle.Event.ON_PAUSE -> ChatScreenStateHolder.isActive = false
+                    else -> {}
+                }
             }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose {
+            ChatScreenStateHolder.isActive = false
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     // 새 메시지 도착 시 맨 아래로 스크롤 (reverseLayout=true 기준 index 0)
@@ -1056,7 +1067,7 @@ private fun KikiChatBubble(
                             .background(GlucoachColors.PrimaryLight)
                             .padding(horizontal = GlucoachSpacing.md, vertical = GlucoachSpacing.sm),
                 ) {
-                    Text(
+                    MarkdownText(
                         text = item.message,
                         color = GlucoachColors.TextPrimary,
                         fontSize = fontSize.sp,
