@@ -144,7 +144,6 @@ fun MainScreen(
         onAccountClick = onAccountClick,
         onKikiChatClick = onKikiChatClick,
         onKikiAlarmClick = onKikiAlarmClick,
-        onCalendarReminderClick = viewModel::checkCalendarAndNotify,
         userEmail = userEmail,
         requestedTab = requestedTab,
         onTabHandled = onTabHandled,
@@ -179,7 +178,6 @@ fun MainScreenContent(
     onAccountClick: () -> Unit = {},
     onKikiChatClick: () -> Unit = {},
     onKikiAlarmClick: () -> Unit = {},
-    onCalendarReminderClick: () -> Unit = {},
     userEmail: String = "",
     requestedTab: String? = null,
     onTabHandled: () -> Unit = {},
@@ -390,17 +388,6 @@ fun MainScreenContent(
                                     sleepMinutes = state.summary.sleepMinutes,
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xxl))
-                                // [DEMO] 캘린더 알림 수동 트리거
-                                androidx.compose.material3.TextButton(
-                                    onClick = onCalendarReminderClick,
-                                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                                ) {
-                                    Text(
-                                        text = "📅",
-                                        fontSize = 18.sp,
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(GlucoachSpacing.md))
                             }
                     }
                 }
