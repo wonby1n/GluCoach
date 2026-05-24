@@ -316,14 +316,24 @@ class HealthRepository
             }.onFailure { Log.w(TAG, "캘린더 알림 전송 실패", it) }
         }
 
-        /** 앱 실행 3초 후 자동 음식 추천 데모. 캘린더 권한/일정 불필요. */
+        /** 앱 실행 3초 후 자동 음식 추천 데모. 캘린더 권한/일정 없으면 "일정" fallback. */
         suspend fun sendDemoFoodRecommend() {
+            val eventTitle =
+                if (calendarDataSource.hasPermission()) {
+                    val now = System.currentTimeMillis()
+                    calendarDataSource.getTodayAndTomorrowEvents()
+                        .filter { it.startMillis > now }
+                        .minByOrNull { it.startMillis }
+                        ?.title ?: "일정"
+                } else {
+                    "일정"
+                }
             runCatching {
                 healthApi.sendChatCommand(
                     ChatCommandRequest(
                         commandType = "calendar_reminder",
                         message = "오늘 일정을 확인했어요",
-                        payload = mapOf("events" to "일정"),
+                        payload = mapOf("events" to eventTitle),
                     ),
                 )
             }.onFailure { Log.w(TAG, "데모 음식 추천 전송 실패", it) }
