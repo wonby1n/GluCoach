@@ -111,7 +111,7 @@ def run_calendar_reminder_agent(user_id: int, parent_chat_message_id: int, paylo
             ],
         )
         body = action_response.content[0].text.strip() if action_response else FALLBACK_MESSAGE
-        message = f"일정 : {event_text}\n\n{body}"
+        message = f"일정 : **{event_text}**\n\n{body}"
         log.info("calendar_reminder: 행동 추천 완료 userId=%s msg=%s", user_id, message)
         return _post_notification(user_id, message, event_list)
 
@@ -122,5 +122,5 @@ def run_calendar_reminder_agent(user_id: int, parent_chat_message_id: int, paylo
         parent_chat_message_id=parent_chat_message_id,
         payload={},
         alert_type="AGENT_CALENDAR_REMINDER",
-        message_prefix=f"일정 : {event_text}\n\n",
+        message_prefix=f"일정 : **{event_text}**\n\n",
     )
