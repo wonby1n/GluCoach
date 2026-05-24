@@ -316,6 +316,19 @@ class HealthRepository
             }.onFailure { Log.w(TAG, "캘린더 알림 전송 실패", it) }
         }
 
+        /** 앱 실행 3초 후 자동 음식 추천 데모. 캘린더 권한/일정 불필요. */
+        suspend fun sendDemoFoodRecommend() {
+            runCatching {
+                healthApi.sendChatCommand(
+                    ChatCommandRequest(
+                        commandType = "calendar_reminder",
+                        message = "오늘 일정을 확인했어요",
+                        payload = mapOf("events" to "일정"),
+                    ),
+                )
+            }.onFailure { Log.w(TAG, "데모 음식 추천 전송 실패", it) }
+        }
+
         /** 안 읽음 수 조회. 배지 갱신용. */
         suspend fun getUnreadCount(): Long =
             runCatching { healthApi.getUnreadCount().unreadCount }
