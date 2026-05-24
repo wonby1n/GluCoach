@@ -7,6 +7,7 @@ import com.ssafy.s309.domain.chat.dto.ChatMessageItem;
 import com.ssafy.s309.domain.chat.dto.ChatMessageListResponse;
 import com.ssafy.s309.domain.chat.dto.ChatReplyRequest;
 import com.ssafy.s309.domain.chat.entity.ChatMessage;
+import com.ssafy.s309.domain.chat.service.ChatFcmDispatcher;
 import com.ssafy.s309.domain.chat.service.ChatMessageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -35,6 +36,7 @@ public class ChatMessageController {
 
   private final ChatMessageService chatMessageService;
   private final AiAgentCommandClient aiAgentCommandClient;
+  private final ChatFcmDispatcher chatFcmDispatcher;
 
   @Operation(
       summary = "본인 채팅 메시지 페이징 조회",
@@ -92,9 +94,42 @@ public class ChatMessageController {
     ChatMessage saved =
         chatMessageService.insertUserCommand(
             principal.userId(), req.commandType(), req.message(), req.payload());
-    aiAgentCommandClient.dispatchAsync(
-        principal.userId(), saved.getId(), req.commandType(), req.payload());
+    if ("calendar_reminder".equals(req.commandType())) {
+      String eventTitle =
+          req.payload() != null ? String.valueOf(req.payload().getOrDefault("events", "일정")) : "일정";
+      String hardcoded = buildCalendarHardcodedMessage(eventTitle);
+      ChatMessage agentMsg =
+          chatMessageService.insertAgentResponse(
+              principal.userId(),
+              saved.getId(),
+              "AGENT_FOOD_RECOMMEND",
+              hardcoded,
+              null,
+              null,
+              null);
+      chatFcmDispatcher.dispatch(
+          principal.userId(), "AGENT_FOOD_RECOMMEND", hardcoded, agentMsg.getId());
+    } else {
+      aiAgentCommandClient.dispatchAsync(
+          principal.userId(), saved.getId(), req.commandType(), req.payload());
+    }
     return ResponseEntity.status(HttpStatus.CREATED).body(ChatMessageItem.from(saved));
+  }
+
+  private String buildCalendarHardcodedMessage(String eventTitle) {
+    return "일정 : "
+        + eventTitle
+        + "\n\n"
+        + "☀️ 점심 메뉴 추천드려요.\n\n"
+        + "지금 혈당이 목표 범위보다 조금 높은 편이라, 오늘 점심은 혈당을 안정적으로 유지할 수 있는 메뉴로 준비했어요.\n\n"
+        + "🐟 연어구이 (S등급)\n"
+        + "드신 기록 기준으로 혈당 반응이 가장 안정적인 음식이에요. 단백질이 풍부해 든든하게 드실 수 있어요.\n\n"
+        + "🥚 달걀찜 (S등급)\n"
+        + "이것도 드신 기록상 혈당이 안정적으로 반응해요. 소화가 잘 되고 가벼워서 좋아요.\n\n"
+        + "🍤 새우볶음 (새로운 메뉴)\n"
+        + "아직 드신 기록이 없는 메뉴예요. 단백질이 높고 탄수화물이 적어서 혈당 부담이 낮아요.\n\n"
+        + "💡 지금 혈당이 조금 높은 상태니까, 이렇게 단백질 중심으로 드신 후 가벼운 산책을 해보세요. "
+        + "식후 활동이 혈당을 내리는 데 도움이 될 거예요.";
   }
 
   @Operation(summary = "메시지 읽음 처리", description = "본인 메시지가 아니면 403.")

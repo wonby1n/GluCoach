@@ -290,7 +290,7 @@ class HealthRepository
                 ),
             )
 
-        /** 오늘/내일 캘린더 일정을 AI에 전달해 키키 메시지를 생성한다. 권한 없거나 일정 없으면 no-op. */
+        /** 오늘/내일 캘린더 일정을 BE에 전달해 키키 메시지를 생성한다. 권한 없거나 일정 없으면 no-op. */
         suspend fun sendCalendarReminderCommand() {
             if (!calendarDataSource.hasPermission()) {
                 Log.w(TAG, "캘린더 권한 없음 — 요청 스킵")
