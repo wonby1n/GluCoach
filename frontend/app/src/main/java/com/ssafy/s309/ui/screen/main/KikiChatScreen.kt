@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBackIosNew
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Stop
@@ -1037,6 +1038,26 @@ private fun FontSizeControl(
 
 // ── 말풍선 ────────────────────────────────────────────────────────────
 
+internal val CALENDAR_TITLE_REGEX = Regex("""^일정\s*:\s*(.+)$""")
+
+internal data class CalendarReminder(val eventTitle: String, val body: String)
+
+internal fun parseCalendarReminder(message: String): CalendarReminder? {
+    val splitIdx = message.indexOf("\n\n")
+    if (splitIdx < 0) return null
+    val firstLine = message.substring(0, splitIdx).trim()
+    val body = message.substring(splitIdx + 2).trim()
+    val titleMatch = CALENDAR_TITLE_REGEX.find(firstLine) ?: return null
+    val title =
+        titleMatch.groupValues[1]
+            .trim()
+            .removePrefix("**")
+            .removeSuffix("**")
+            .trim()
+    if (title.isEmpty() || body.isEmpty()) return null
+    return CalendarReminder(title, body)
+}
+
 @Composable
 private fun KikiChatBubble(
     item: NotificationItem,
@@ -1046,6 +1067,9 @@ private fun KikiChatBubble(
     onClick: () -> Unit = {},
     onCompareClick: (String, String) -> Unit = { _, _ -> },
 ) {
+    val reminder = remember(item.message) { parseCalendarReminder(item.message) }
+    val bubbleText = reminder?.body ?: item.message
+
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         verticalAlignment = Alignment.Top,
@@ -1060,6 +1084,10 @@ private fun KikiChatBubble(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
+            if (reminder != null) {
+                CalendarReminderCard(eventTitle = reminder.eventTitle, fontSize = fontSize)
+                Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+            }
             Row(verticalAlignment = Alignment.Bottom) {
                 Box(
                     modifier =
@@ -1070,7 +1098,7 @@ private fun KikiChatBubble(
                             .padding(horizontal = GlucoachSpacing.md, vertical = GlucoachSpacing.sm),
                 ) {
                     MarkdownText(
-                        text = item.message,
+                        text = bubbleText,
                         color = GlucoachColors.TextPrimary,
                         fontSize = fontSize.sp,
                         lineHeight = (fontSize * 1.5f).sp,
@@ -1144,6 +1172,48 @@ private fun ChatReplyButton(
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )
+    }
+}
+
+@Composable
+private fun CalendarReminderCard(
+    eventTitle: String,
+    fontSize: Float,
+) {
+    Box(
+        modifier =
+            Modifier
+                .widthIn(max = 260.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(GlucoachColors.CalendarBg)
+                .border(1.dp, GlucoachColors.CalendarBorder, RoundedCornerShape(12.dp))
+                .padding(horizontal = GlucoachSpacing.md, vertical = GlucoachSpacing.sm),
+    ) {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Outlined.CalendarMonth,
+                    contentDescription = null,
+                    tint = GlucoachColors.CalendarAccent,
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "오늘의 일정",
+                    color = GlucoachColors.CalendarAccent,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = eventTitle,
+                color = GlucoachColors.TextPrimary,
+                fontSize = fontSize.sp,
+                fontWeight = FontWeight.SemiBold,
+                lineHeight = (fontSize * 1.4f).sp,
+            )
+        }
     }
 }
 
