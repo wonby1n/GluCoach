@@ -449,9 +449,9 @@ class KikiChatViewModel
         companion object {
             private const val TAG = "KikiChatVM"
             const val PAGE_SIZE = 20L
-            private const val FONT_SIZE_DEFAULT = 14f
+            private const val FONT_SIZE_DEFAULT = 20f
             private const val FONT_SIZE_MIN = 11f
-            private const val FONT_SIZE_MAX = 20f
+            private const val FONT_SIZE_MAX = 26f
             private const val AGENT_TIMEOUT_MS = 30_000L
         }
     }
