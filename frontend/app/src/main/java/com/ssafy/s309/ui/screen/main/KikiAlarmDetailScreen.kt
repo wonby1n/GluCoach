@@ -3,14 +3,13 @@ package com.ssafy.s309.ui.screen.main
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -99,7 +98,10 @@ fun KikiAlarmDetailScreen(
             if (selectedOption == "OKAY" || selectedOption == "BUSY" || rawMessage == null) {
                 null
             } else {
-                parseCalendarReminder(rawMessage)
+                val result = parseCalendarReminder(rawMessage)
+                android.util.Log.d("KikiAlarm", "rawMessage=[$rawMessage]")
+                android.util.Log.d("KikiAlarm", "calendarReminder=$result")
+                result
             }
         }
     val parsedBody =
@@ -196,8 +198,6 @@ fun KikiAlarmDetailScreen(
             if (calendarReminder != null) {
                 CalendarReminderDetailCard(eventTitle = calendarReminder.eventTitle)
                 Spacer(modifier = Modifier.height(GlucoachSpacing.md))
-                RecommendHeaderCard()
-                Spacer(modifier = Modifier.height(GlucoachSpacing.md))
             }
 
             if (!hasMenuCards) {
@@ -205,13 +205,24 @@ fun KikiAlarmDetailScreen(
             }
 
             if (hasMenuCards) {
-                parsedBody!!.menus.forEachIndexed { index, menu ->
-                    if (index > 0) Spacer(modifier = Modifier.height(GlucoachSpacing.md))
-                    MenuItemCard(menu)
-                }
-                parsedBody.outro?.let { outroText ->
-                    Spacer(modifier = Modifier.height(GlucoachSpacing.md))
-                    OutroTipCard(text = outroText)
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, GlucoachColors.Border, RoundedCornerShape(GlucoachCorner.card))
+                            .clip(RoundedCornerShape(GlucoachCorner.card))
+                            .background(GlucoachColors.Surface),
+                ) {
+                    RecommendHeaderCard()
+                    HorizontalDivider(color = GlucoachColors.Border)
+                    parsedBody!!.menus.forEachIndexed { index, menu ->
+                        if (index > 0) HorizontalDivider(color = GlucoachColors.Border)
+                        MenuItemCard(menu)
+                    }
+                    parsedBody.outro?.let { outroText ->
+                        HorizontalDivider(color = GlucoachColors.Border)
+                        OutroTipCard(text = outroText)
+                    }
                 }
             }
 
@@ -273,22 +284,22 @@ fun KikiAlarmDetailScreen(
     }
 }
 
-private data class RecommendMenu(
+internal data class RecommendMenu(
     val emoji: String,
     val name: String,
     val grade: String,
     val description: String,
 )
 
-private data class ParsedRecommendBody(
+internal data class ParsedRecommendBody(
     val intro: String?,
     val menus: List<RecommendMenu>,
     val outro: String?,
 )
 
-private val MENU_LINE_REGEX = Regex("""^(.+?)\s*\(\s*(.+?)\s*\)\s*$""")
+internal val MENU_LINE_REGEX = Regex("""^(.+?)\s*\(\s*(.+?)\s*\)\s*$""")
 
-private fun parseRecommendBody(body: String): ParsedRecommendBody {
+internal fun parseRecommendBody(body: String): ParsedRecommendBody {
     val paragraphs = body.split("\n\n").map { it.trim() }.filter { it.isNotEmpty() }
     val intro = StringBuilder()
     val outro = StringBuilder()
@@ -296,7 +307,13 @@ private fun parseRecommendBody(body: String): ParsedRecommendBody {
     var sawMenu = false
     for (paragraph in paragraphs) {
         val firstBreak = paragraph.indexOf('\n')
-        val firstLine = if (firstBreak > 0) paragraph.substring(0, firstBreak).trim() else paragraph.trim()
+        val firstLineRaw = if (firstBreak > 0) paragraph.substring(0, firstBreak).trim() else paragraph.trim()
+        val firstLine =
+            firstLineRaw
+                .trimStart('#').trim()
+                .removePrefix("**").removeSuffix("**")
+                .removePrefix("*").removeSuffix("*")
+                .trim()
         val rest = if (firstBreak > 0) paragraph.substring(firstBreak + 1).trim() else ""
         val match = MENU_LINE_REGEX.find(firstLine)
         val gradeText = match?.groupValues?.get(2)?.trim().orEmpty()
@@ -325,66 +342,29 @@ private fun parseRecommendBody(body: String): ParsedRecommendBody {
     )
 }
 
-private fun gradeColors(grade: String): Pair<Color, Color> =
-    when {
-        grade.startsWith("S") -> GlucoachColors.GradeS to GlucoachColors.GradeSBg
-        grade.startsWith("A") -> GlucoachColors.GradeA to GlucoachColors.GradeABg
-        grade.startsWith("B") -> GlucoachColors.GradeB to GlucoachColors.GradeBBg
-        grade.startsWith("C") -> GlucoachColors.GradeC to GlucoachColors.GradeCBg
-        grade.startsWith("D") -> GlucoachColors.GradeD to GlucoachColors.GradeDBg
-        grade.startsWith("F") -> GlucoachColors.GradeF to GlucoachColors.GradeFBg
-        else -> GlucoachColors.PrimaryDark to GlucoachColors.SelectBadgeBg
-    }
-
 @Composable
 private fun RecommendHeaderCard(modifier: Modifier = Modifier) {
     Row(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(IntrinsicSize.Min)
-                .shadow(6.dp, RoundedCornerShape(GlucoachCorner.card))
-                .clip(RoundedCornerShape(GlucoachCorner.card))
-                .background(
-                    brush =
-                        Brush.linearGradient(
-                            colors =
-                                listOf(
-                                    GlucoachColors.Primary,
-                                    GlucoachColors.PrimaryDark,
-                                ),
-                        ),
-                ),
+                .background(GlucoachColors.PrimaryLight)
+                .padding(horizontal = 18.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .width(6.dp)
-                    .fillMaxHeight()
-                    .background(Color.White.copy(alpha = 0.55f)),
+        Icon(
+            imageVector = Icons.Outlined.RestaurantMenu,
+            contentDescription = null,
+            tint = GlucoachColors.PrimaryDark,
+            modifier = Modifier.size(22.dp),
         )
-        Row(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .padding(horizontal = 22.dp, vertical = 18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.RestaurantMenu,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(26.dp),
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = "오늘의 메뉴 추천",
-                color = Color.White,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.ExtraBold,
-            )
-        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = "오늘의 메뉴 추천",
+            color = GlucoachColors.PrimaryDark,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
@@ -393,65 +373,58 @@ private fun MenuItemCard(
     menu: RecommendMenu,
     modifier: Modifier = Modifier,
 ) {
-    val (badgeFg, badgeBg) = gradeColors(menu.grade)
-    Row(
+    val (badgeBg, badgeText) =
+        when (menu.grade.firstOrNull()?.uppercaseChar()) {
+            'S' -> GlucoachColors.GradeSBg to GlucoachColors.GradeS
+            'A' -> GlucoachColors.GradeABg to GlucoachColors.GradeA
+            'B' -> GlucoachColors.GradeBBg to GlucoachColors.GradeB
+            'C' -> GlucoachColors.GradeCBg to GlucoachColors.GradeC
+            'D' -> GlucoachColors.GradeDBg to GlucoachColors.GradeD
+            'F' -> GlucoachColors.GradeFBg to GlucoachColors.GradeF
+            else -> GlucoachColors.Background to GlucoachColors.TextSecondary
+        }
+    Column(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(IntrinsicSize.Min)
-                .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
-                .clip(RoundedCornerShape(GlucoachCorner.card))
-                .background(GlucoachColors.Surface),
+                .background(GlucoachColors.Surface)
+                .padding(horizontal = 18.dp, vertical = 16.dp),
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .width(6.dp)
-                    .fillMaxHeight()
-                    .background(badgeFg),
-        )
-        Column(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .padding(horizontal = 18.dp, vertical = 16.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (menu.emoji.isNotEmpty()) {
-                    Text(text = menu.emoji, fontSize = 22.sp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                Text(
-                    text = menu.name,
-                    color = GlucoachColors.TextPrimary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (menu.emoji.isNotEmpty()) {
+                Text(text = menu.emoji, fontSize = 20.sp)
                 Spacer(modifier = Modifier.width(8.dp))
-                Box(
-                    modifier =
-                        Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(badgeBg)
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
-                ) {
-                    Text(
-                        text = menu.grade,
-                        color = badgeFg,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            MarkdownText(
-                text = menu.description,
-                color = GlucoachColors.TextSecondary,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
+            Text(
+                text = menu.name,
+                color = GlucoachColors.TextPrimary,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
             )
+            Spacer(modifier = Modifier.width(8.dp))
+            Box(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(badgeBg)
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+            ) {
+                Text(
+                    text = menu.grade,
+                    color = badgeText,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
+        Spacer(modifier = Modifier.height(8.dp))
+        MarkdownText(
+            text = menu.description,
+            color = GlucoachColors.TextSecondary,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+        )
     }
 }
 
@@ -464,14 +437,12 @@ private fun OutroTipCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
-                .clip(RoundedCornerShape(GlucoachCorner.card))
                 .background(GlucoachColors.TipBg)
                 .padding(horizontal = 22.dp, vertical = 18.dp),
     ) {
         MarkdownText(
             text = text,
-            color = GlucoachColors.TextPrimary,
+            color = GlucoachColors.TextSecondary,
             fontSize = 15.sp,
             lineHeight = 22.sp,
         )
@@ -487,33 +458,40 @@ private fun CalendarReminderDetailCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
+                .border(1.dp, GlucoachColors.Border, RoundedCornerShape(GlucoachCorner.card))
                 .clip(RoundedCornerShape(GlucoachCorner.card))
-                .background(GlucoachColors.CalendarBg)
-                .padding(horizontal = 22.dp, vertical = 18.dp),
+                .background(GlucoachColors.Surface),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(GlucoachColors.SelectBadgeBg)
+                    .padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Icon(
                 imageVector = Icons.Outlined.CalendarMonth,
                 contentDescription = null,
-                tint = GlucoachColors.CalendarAccent,
-                modifier = Modifier.size(24.dp),
+                tint = GlucoachColors.PrimaryDark,
+                modifier = Modifier.size(22.dp),
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(10.dp))
             Text(
                 text = "오늘의 일정",
-                color = GlucoachColors.CalendarAccent,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.ExtraBold,
+                color = GlucoachColors.PrimaryDark,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
             )
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        HorizontalDivider(color = GlucoachColors.Border)
         Text(
             text = eventTitle,
             color = GlucoachColors.TextPrimary,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            lineHeight = 28.sp,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.SemiBold,
+            lineHeight = 26.sp,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
         )
     }
 }

@@ -1045,14 +1045,19 @@ internal data class CalendarReminder(val eventTitle: String, val body: String)
 internal fun parseCalendarReminder(message: String): CalendarReminder? {
     val splitIdx = message.indexOf("\n\n")
     if (splitIdx < 0) return null
-    val firstLine = message.substring(0, splitIdx).trim()
+    val firstLine =
+        message.substring(0, splitIdx)
+            .trim()
+            .trimStart('#').trim()
+            .removePrefix("**").removeSuffix("**")
+            .removePrefix("*").removeSuffix("*")
+            .trim()
     val body = message.substring(splitIdx + 2).trim()
     val titleMatch = CALENDAR_TITLE_REGEX.find(firstLine) ?: return null
     val title =
         titleMatch.groupValues[1]
             .trim()
-            .removePrefix("**")
-            .removeSuffix("**")
+            .removePrefix("**").removeSuffix("**")
             .trim()
     if (title.isEmpty() || body.isEmpty()) return null
     return CalendarReminder(title, body)
@@ -1067,8 +1072,18 @@ private fun KikiChatBubble(
     onClick: () -> Unit = {},
     onCompareClick: (String, String) -> Unit = { _, _ -> },
 ) {
-    val reminder = remember(item.message) { parseCalendarReminder(item.message) }
-    val bubbleText = reminder?.body ?: item.message
+    // # / ## / ### 헤딩 앞의 이모지/특수문자 제거
+    val sharpPattern = Regex("""^(#{1,3} )[^\p{L}\p{N}]+""", RegexOption.MULTILINE)
+    val bubbleText =
+        item.message
+            .replace(sharpPattern, "$1")
+            .replace("🔍 ", "")
+            .replace("🔍", "")
+    val sharpHeaderRe = Regex("""^#{1,3} """)
+    val hasSections =
+        bubbleText.lines().any { line ->
+            sharpHeaderRe.containsMatchIn(line) || (line.startsWith("**") && line.endsWith("**") && line.length > 4)
+        }
 
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
@@ -1084,24 +1099,23 @@ private fun KikiChatBubble(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
-            if (reminder != null) {
-                CalendarReminderCard(eventTitle = reminder.eventTitle, fontSize = fontSize)
-                Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
-            }
             Row(verticalAlignment = Alignment.Bottom) {
                 Box(
                     modifier =
                         Modifier
                             .widthIn(max = 260.dp)
                             .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 14.dp, bottomStart = 14.dp, bottomEnd = 14.dp))
-                            .background(GlucoachColors.PrimaryLight)
-                            .padding(horizontal = GlucoachSpacing.md, vertical = GlucoachSpacing.sm),
+                            .background(if (hasSections) GlucoachColors.Surface else GlucoachColors.PrimaryLight),
                 ) {
                     MarkdownText(
                         text = bubbleText,
                         color = GlucoachColors.TextPrimary,
                         fontSize = fontSize.sp,
                         lineHeight = (fontSize * 1.5f).sp,
+                        headerBackground = if (hasSections) GlucoachColors.PrimaryLight else null,
+                        bodyBackground = if (hasSections) GlucoachColors.Surface else null,
+                        sectionPaddingHorizontal = GlucoachSpacing.md,
+                        sectionPaddingVertical = GlucoachSpacing.sm,
                     )
                 }
                 Spacer(modifier = Modifier.width(6.dp))
@@ -1180,40 +1194,45 @@ private fun CalendarReminderCard(
     eventTitle: String,
     fontSize: Float,
 ) {
-    Box(
+    Column(
         modifier =
             Modifier
                 .widthIn(max = 260.dp)
+                .border(1.dp, GlucoachColors.Border, RoundedCornerShape(12.dp))
                 .clip(RoundedCornerShape(12.dp))
-                .background(GlucoachColors.CalendarBg)
-                .border(1.dp, GlucoachColors.CalendarBorder, RoundedCornerShape(12.dp))
-                .padding(horizontal = GlucoachSpacing.md, vertical = GlucoachSpacing.sm),
+                .background(GlucoachColors.Surface),
     ) {
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Outlined.CalendarMonth,
-                    contentDescription = null,
-                    tint = GlucoachColors.CalendarAccent,
-                    modifier = Modifier.size(14.dp),
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "오늘의 일정",
-                    color = GlucoachColors.CalendarAccent,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            Spacer(modifier = Modifier.height(2.dp))
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(GlucoachColors.SelectBadgeBg)
+                    .padding(horizontal = GlucoachSpacing.md, vertical = GlucoachSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.CalendarMonth,
+                contentDescription = null,
+                tint = GlucoachColors.PrimaryDark,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(modifier = Modifier.width(4.dp))
             Text(
-                text = eventTitle,
-                color = GlucoachColors.TextPrimary,
-                fontSize = fontSize.sp,
+                text = "오늘의 일정",
+                color = GlucoachColors.PrimaryDark,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
-                lineHeight = (fontSize * 1.4f).sp,
             )
         }
+        HorizontalDivider(color = GlucoachColors.Border)
+        Text(
+            text = eventTitle,
+            color = GlucoachColors.TextPrimary,
+            fontSize = fontSize.sp,
+            fontWeight = FontWeight.SemiBold,
+            lineHeight = (fontSize * 1.4f).sp,
+            modifier = Modifier.padding(horizontal = GlucoachSpacing.md, vertical = GlucoachSpacing.sm),
+        )
     }
 }
 
