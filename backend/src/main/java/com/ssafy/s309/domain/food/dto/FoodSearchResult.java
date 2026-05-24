@@ -2,6 +2,8 @@ package com.ssafy.s309.domain.food.dto;
 
 import com.ssafy.s309.domain.food.entity.Food;
 import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
 
 public record FoodSearchResult(
     Integer id,
@@ -25,7 +27,12 @@ public record FoodSearchResult(
   private static final BigDecimal DEMO_EXAGGERATION_MULT = BigDecimal.valueOf(5);
 
   public static FoodSearchResult from(Food food) {
-    BigDecimal mult = isDemoExaggerated(food) ? DEMO_EXAGGERATION_MULT : BigDecimal.ONE;
+    BigDecimal demoMult = isDemoExaggerated(food) ? DEMO_EXAGGERATION_MULT : BigDecimal.ONE;
+    BigDecimal servingMult =
+        food.getServingSize() != null
+            ? food.getServingSize().divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP)
+            : BigDecimal.ONE;
+    BigDecimal mult = demoMult.multiply(servingMult, MathContext.DECIMAL64);
     return new FoodSearchResult(
         food.getId(),
         food.getName(),

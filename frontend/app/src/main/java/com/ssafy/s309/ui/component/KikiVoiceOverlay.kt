@@ -322,7 +322,7 @@ private fun ResponseCard(
                     fontSize = 11.sp,
                 )
             }
-            Text(
+            MarkdownText(
                 text = text,
                 color = GlucoachColors.TextPrimary,
                 fontSize = 15.sp,

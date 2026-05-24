@@ -59,6 +59,8 @@ def run_food_recommend_agent(
     user_id: int,
     parent_chat_message_id: int,
     payload: dict | None = None,
+    alert_type: str = "AGENT_FOOD_RECOMMEND",
+    message_prefix: str = "",
 ) -> dict:
     """음식 추천 agent 실행.
 
@@ -67,7 +69,8 @@ def run_food_recommend_agent(
     set_food_agent_context(
         user_id=user_id,
         parent_chat_message_id=parent_chat_message_id,
-        alert_type="AGENT_FOOD_RECOMMEND",
+        alert_type=alert_type,
+        message_prefix=message_prefix,
     )
     client = anthropic.Anthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
@@ -125,12 +128,17 @@ def run_food_recommend_agent(
             break
 
         messages.append({"role": "assistant", "content": response.content})
-        tool_results = []
+        tool_results_map: dict[str, str] = {}
         should_exit = False
+
+        for b in tool_use_blocks:
+            t = time.perf_counter()
+            tool_results_map[b.id] = _execute(b.name, b.input)
+            print(f"[FoodRecommend tool] {b.name} → {time.perf_counter() - t:.2f}s")
+
+        tool_results = []
         for block in tool_use_blocks:
-            tool_start = time.perf_counter()
-            result = _execute(block.name, block.input)
-            print(f"[FoodRecommend tool] {block.name} → {time.perf_counter() - tool_start:.2f}s")
+            result = tool_results_map[block.id]
             result_dict = json.loads(result)
             tool_call_details.append(
                 {"name": block.name, "input": block.input, "result": result_dict}

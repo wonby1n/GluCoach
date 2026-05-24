@@ -22,12 +22,14 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.compose.rememberNavController
 import com.google.firebase.messaging.FirebaseMessaging
 import com.ssafy.s309.data.local.TokenManager
 import com.ssafy.s309.data.repository.HealthRepository
 import com.ssafy.s309.data.repository.UserRepository
 import com.ssafy.s309.data.repository.source.SamsungHealthHolder
 import com.ssafy.s309.navigation.AppNavigation
+import com.ssafy.s309.navigation.Screen
 import com.ssafy.s309.ui.component.KikiVoiceOverlay
 import com.ssafy.s309.ui.theme.S309Theme
 import com.ssafy.s309.voice.WakeWordManager
@@ -120,12 +122,20 @@ class MainActivity : ComponentActivity() {
             Log.d("VoiceQuery", "RECORD_AUDIO 권한: $granted")
         }
 
+    private val calendarPermissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { granted ->
+            Log.d("Calendar", "READ_CALENDAR 권한: $granted")
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         samsungHealthHolder.attach(this)
         startSamsungHealthPolling()
         requestNotificationPermission()
         requestRecordAudioPermission()
+        requestCalendarPermission()
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (!task.isSuccessful) {
                 Log.w("FCM", "토큰 발급 실패", task.exception)
@@ -149,8 +159,7 @@ class MainActivity : ComponentActivity() {
         // enableEdgeToEdge()
         setContent {
             S309Theme {
-                // 앱 전역 기본값: edge-to-edge 로 그려지는 상태바와 컨텐츠가 겹치지 않도록
-                // 회원가입 온보딩과 동일하게 statusBarsPadding() 을 루트에 적용한다.
+                val navController = rememberNavController()
                 Box(
                     modifier =
                         Modifier
@@ -159,18 +168,16 @@ class MainActivity : ComponentActivity() {
                             .statusBarsPadding(),
                 ) {
                     AppNavigation(
+                        navController = navController,
                         pendingNavTarget = pendingNavTarget,
                         onNavTargetConsumed = { pendingNavTarget = null },
                         pendingFoodName = pendingFoodName,
                         onFoodNameConsumed = { pendingFoodName = null },
                     )
-                    // 빅스비 스타일 음성 오버레이 — wake 감지/명령 수집 동안 화면 하단에 floating
                     KikiVoiceOverlay(
                         wakeWordManager = wakeWordManager,
                         onResponseTapped = {
-                            // 응답 카드 본문 탭 시 채팅 화면으로 이동 + 모달 dismiss.
-                            // pendingNavTarget 으로 AppNavigation 의 LaunchedEffect 가 라우팅 처리.
-                            pendingNavTarget = NAV_KIKI_CHAT
+                            navController.navigate(Screen.KikiChat.route) { launchSingleTop = true }
                             wakeWordManager.dismissResponse()
                         },
                     )
@@ -316,11 +323,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun requestCalendarPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALENDAR)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            calendarPermissionLauncher.launch(Manifest.permission.READ_CALENDAR)
+        }
+    }
+
     companion object {
         const val EXTRA_NAVIGATE_TO = "navigate_to"
         const val EXTRA_FOOD_NAME = "food_name"
         const val NAV_KIKI_ALARM_DETAIL = "kiki_alarm_detail"
-        const val NAV_KIKI_CHAT = "kiki_chat"
         const val NAV_FOOD_REPORT = "food_report"
         const val NAV_FOOD_SCAN = "food_scan"
         const val NAV_GLUCOSE_PREDICT = "glucose_predict"

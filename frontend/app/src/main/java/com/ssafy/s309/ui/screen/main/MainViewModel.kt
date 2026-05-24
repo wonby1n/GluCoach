@@ -12,6 +12,7 @@ import com.ssafy.s309.data.repository.UserRepository
 import com.ssafy.s309.feature.glucofit.glucose.GlucoseSimulator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,6 +42,10 @@ class MainViewModel
             registerPendingFcmToken()
             GlucoseSimulator.start(context)
             observeSimulatorStream()
+            viewModelScope.launch {
+                delay(3_000L)
+                healthRepository.sendDemoFoodRecommend()
+            }
         }
 
         fun loadDashboard() {
