@@ -217,7 +217,7 @@ class GlucoseKeyboard : InputMethodService() {
 
         val message =
             TextView(this).apply {
-                textSize = 14f
+                textSize = 22f
                 typeface = Typeface.DEFAULT_BOLD
                 setTextColor(Color.parseColor("#1A1A1A"))
                 layoutParams = LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f)
@@ -270,7 +270,7 @@ class GlucoseKeyboard : InputMethodService() {
         val predictButton =
             TextView(this).apply {
                 text = "혈당 예측을 확인해보시겠어요? ›"
-                textSize = 13f
+                textSize = 22f
                 setTextColor(Color.parseColor("#4EA8BC"))
                 typeface = Typeface.DEFAULT_BOLD
                 gravity = Gravity.CENTER

@@ -153,12 +153,9 @@ class KikiChatViewModel
                     onFcmReceived()
                 }
             }
-            // "하이 키키" 음성 호출 이벤트 — 채팅 화면이 살아있을 때만 로컬 말풍선 prepend.
-            // 백엔드 거치지 않으므로 refresh()/페이지 재조회 시엔 사라짐 (의도된 동작).
+            // "하이 키키" 감지 이벤트 — 채팅 노출 없이 소비만 함
             viewModelScope.launch {
-                wakeWordManager.wakeCallEvents.collect { timestamp ->
-                    prependWakeCallMessages(timestamp)
-                }
+                wakeWordManager.wakeCallEvents.collect { }
             }
         }
 

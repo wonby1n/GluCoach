@@ -99,7 +99,7 @@ class OverlayBannerManager(private val context: Context) {
         container.addView(
             TextView(context).apply {
                 text = message
-                textSize = 14f
+                textSize = 18f
                 setTextColor(textColor)
                 typeface = Typeface.DEFAULT_BOLD
                 layoutParams =
