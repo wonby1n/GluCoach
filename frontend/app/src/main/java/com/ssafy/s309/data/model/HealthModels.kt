@@ -59,8 +59,8 @@ data class DisplayTrace(
 @Serializable
 data class AgentComparisonFood(
     val name: String,
-    @SerialName("peak_mg_dl") val peakMgDl: Double,
-    @SerialName("risk_level") val riskLevel: String,
+    @SerialName("peak_mg_dl") val peakMgDl: Double? = null,
+    @SerialName("risk_level") val riskLevel: String = "",
 )
 
 /** Agent A/B 비교 결과 */

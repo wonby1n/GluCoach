@@ -91,14 +91,16 @@ class MainViewModel
                     }
                     // BE에서 재조회 → displayTrace + 정확한 alertType(messageType) 획득
                     val refreshed = healthRepository.getNotifications()
-                    // 로컬에서 이미 읽음 처리한 알림은 서버 응답으로 덮어쓰지 않음 (race condition 방지)
                     val locallyReadIds =
                         _uiState.value.notifications
                             .filter { !it.isUnread }.map { it.id }.toSet()
+                    // refreshed에 방금 받은 알림이 없으면(BE 저장 race) 로컬 알림을 앞에 유지
+                    val refreshedIds = refreshed.map { it.id }.toSet()
+                    val merged = if (alert.id !in refreshedIds) listOf(alert) + refreshed else refreshed
                     _uiState.update {
                         it.copy(
                             notifications =
-                                refreshed.map { n ->
+                                merged.map { n ->
                                     if (n.id in locallyReadIds) n.copy(isUnread = false) else n
                                 },
                         )
