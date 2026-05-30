@@ -35,6 +35,9 @@ temp/
 .claude
 .omc/
 
+# oh-my-claudecode (로컬 세션/상태 캐시)
+.omc/
+
 # tldr
 .tldr
 .tldrignore
