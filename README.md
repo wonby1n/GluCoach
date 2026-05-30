@@ -33,7 +33,36 @@ AI 에이전트 **Kiki**가 식사·운동·수면 맥락을 종합해 개인 �
 
 ## 👥 팀원
 
-<!-- 팀원 사진 자리 -->
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/assets/hawon.png" width="120" height="120"/><br/>
+      <b>조하원</b><br/>팀장 · FE · BE · AI · Infra
+    </td>
+    <td align="center">
+      <img src="docs/assets/dohyun.png" width="120" height="120"/><br/>
+      <b>이도현</b><br/>BE · AI
+    </td>
+    <td align="center">
+      <img src="docs/assets/junghoon.png" width="120" height="120"/><br/>
+      <b>김정훈</b><br/>BE · AI
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/assets/yoonju.png" width="120" height="120"/><br/>
+      <b>남윤주</b><br/>BE · AI
+    </td>
+    <td align="center">
+      <img src="docs/assets/miyeong.png" width="120" height="120"/><br/>
+      <b>박미영</b><br/>FE · AI
+    </td>
+    <td align="center">
+      <img src="docs/assets/hyoji.png" width="120" height="120"/><br/>
+      <b>손효지</b><br/>FE · AI
+    </td>
+  </tr>
+</table>
 
 
 
