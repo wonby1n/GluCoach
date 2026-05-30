@@ -5,6 +5,7 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.servers.Server;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -17,6 +18,8 @@ public class OpenApiConfig {
   @Bean
   public OpenAPI openAPI() {
     return new OpenAPI()
+        .addServersItem(new Server().url("https://k14s309.p.ssafy.io").description("운영 서버"))
+        .addServersItem(new Server().url("http://localhost:8080").description("로컬 서버"))
         .info(new Info().title("GlucoCoach API").version("v1"))
         // 두 스키마 모두 글로벌로 등록 — Swagger UI Authorize 패널에서 둘 다 입력 가능.
         // 실제 어떤 스키마를 쓰는지는 컨트롤러별 @SecurityRequirement로 분기 가능하나,
