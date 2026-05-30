@@ -43,4 +43,8 @@ object GlucoachColors {
     val GradeDBg = Color(0xFFFBE9E7)
     val GradeF = Color(0xFFE57373)
     val GradeFBg = Color(0xFFFFEBEE)
+
+    val CalendarBg = Color(0xFFFFF4E0)
+    val CalendarBorder = Color(0xFFF6CF8A)
+    val CalendarAccent = Color(0xFFB87216)
 }

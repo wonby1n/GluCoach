@@ -22,13 +22,17 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.compose.rememberNavController
 import com.google.firebase.messaging.FirebaseMessaging
 import com.ssafy.s309.data.local.TokenManager
 import com.ssafy.s309.data.repository.HealthRepository
 import com.ssafy.s309.data.repository.UserRepository
 import com.ssafy.s309.data.repository.source.SamsungHealthHolder
 import com.ssafy.s309.navigation.AppNavigation
+import com.ssafy.s309.navigation.Screen
+import com.ssafy.s309.ui.component.KikiVoiceOverlay
 import com.ssafy.s309.ui.theme.S309Theme
+import com.ssafy.s309.voice.WakeWordManager
 import com.ssafy.s309.wear.WearDataSender
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -59,6 +63,8 @@ class MainActivity : ComponentActivity() {
         fun tokenManager(): TokenManager
 
         fun userRepository(): UserRepository
+
+        fun wakeWordManager(): WakeWordManager
     }
 
     private val samsungHealthHolder: SamsungHealthHolder by lazy {
@@ -85,6 +91,12 @@ class MainActivity : ComponentActivity() {
             .userRepository()
     }
 
+    private val wakeWordManager: WakeWordManager by lazy {
+        EntryPointAccessors
+            .fromApplication(applicationContext, MainActivityEntryPoint::class.java)
+            .wakeWordManager()
+    }
+
     // Samsung Health 권한 자동 요청은 Activity 라이프타임당 1회만. onResume 마다 다시 띄우면
     // 사용자가 한 번 거부 후 짜증나므로 가드. SDK 표준 동작상 이미 부여된 권한이면 다이얼로그
     // 자체가 안 뜨므로 추가 체크 불필요.
@@ -103,11 +115,27 @@ class MainActivity : ComponentActivity() {
             Log.d("FCM", "알림 권한: $granted")
         }
 
+    private val recordAudioPermissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { granted ->
+            Log.d("VoiceQuery", "RECORD_AUDIO 권한: $granted")
+        }
+
+    private val calendarPermissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { granted ->
+            Log.d("Calendar", "READ_CALENDAR 권한: $granted")
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         samsungHealthHolder.attach(this)
         startSamsungHealthPolling()
         requestNotificationPermission()
+        requestRecordAudioPermission()
+        requestCalendarPermission()
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (!task.isSuccessful) {
                 Log.w("FCM", "토큰 발급 실패", task.exception)
@@ -131,8 +159,7 @@ class MainActivity : ComponentActivity() {
         // enableEdgeToEdge()
         setContent {
             S309Theme {
-                // 앱 전역 기본값: edge-to-edge 로 그려지는 상태바와 컨텐츠가 겹치지 않도록
-                // 회원가입 온보딩과 동일하게 statusBarsPadding() 을 루트에 적용한다.
+                val navController = rememberNavController()
                 Box(
                     modifier =
                         Modifier
@@ -141,10 +168,18 @@ class MainActivity : ComponentActivity() {
                             .statusBarsPadding(),
                 ) {
                     AppNavigation(
+                        navController = navController,
                         pendingNavTarget = pendingNavTarget,
                         onNavTargetConsumed = { pendingNavTarget = null },
                         pendingFoodName = pendingFoodName,
                         onFoodNameConsumed = { pendingFoodName = null },
+                    )
+                    KikiVoiceOverlay(
+                        wakeWordManager = wakeWordManager,
+                        onResponseTapped = {
+                            navController.navigate(Screen.KikiChat.route) { launchSingleTop = true }
+                            wakeWordManager.dismissResponse()
+                        },
                     )
                 }
             }
@@ -161,6 +196,17 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         maybeRequestSamsungHealthAtLaunch()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // "하이 키키" wake word 듣기 시작. 권한/엔진 미비 시 내부에서 no-op.
+        wakeWordManager.start()
+    }
+
+    override fun onStop() {
+        wakeWordManager.stop()
+        super.onStop()
     }
 
     override fun onDestroy() {
@@ -269,12 +315,29 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun requestRecordAudioPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun requestCalendarPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALENDAR)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            calendarPermissionLauncher.launch(Manifest.permission.READ_CALENDAR)
+        }
+    }
+
     companion object {
         const val EXTRA_NAVIGATE_TO = "navigate_to"
         const val EXTRA_FOOD_NAME = "food_name"
         const val NAV_KIKI_ALARM_DETAIL = "kiki_alarm_detail"
         const val NAV_FOOD_REPORT = "food_report"
         const val NAV_FOOD_SCAN = "food_scan"
+        const val NAV_GLUCOSE_PREDICT = "glucose_predict"
         private const val POLL_TAG = "SHPoller"
     }
 }

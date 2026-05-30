@@ -139,11 +139,14 @@ def get_notification_history(hours: int) -> dict:
 # ── 행동 함수 2개 ──────────────────────────────────────────
 
 
-def send_notification(message: str, options: list, display_trace: dict) -> dict:
+def send_notification(message: str, options: list = None, display_trace: dict = None) -> dict:
     """사용자에게 알림 메시지 + 응답 선택지 3개 + AI 추론 카드를 발송한다.
 
     options: [{"id": str, "label": str}, ...] 정확히 3개
     display_trace: {"summary": str, "cards": [...], "decision": {"reason": str}}
+
+    NOTE: options/display_trace 는 스키마상 required 지만 LLM 이 가끔 빠뜨려
+    TypeError 로 background task 가 죽는 사고가 있어 default=None 으로 방어.
     """
     user_id = _agent_context.get("user_id")
     alert_type = _agent_context.get("alert_type", "AGENT_GENERIC")
@@ -151,6 +154,10 @@ def send_notification(message: str, options: list, display_trace: dict) -> dict:
     agent_api_key = os.getenv("AGENT_API_KEY", "dev-agent-key-change-in-prod")
 
     # ── 입력 검증 ──────────────────────────────────────
+    if options is None:
+        options = []
+    if display_trace is None:
+        display_trace = {}
     if not isinstance(options, list):
         options = []
     if len(options) > 0 and len(options) != 3:
@@ -193,7 +200,9 @@ def send_notification(message: str, options: list, display_trace: dict) -> dict:
 
 def schedule_followup(delay_minutes: int, reason: str) -> dict:
     """지정한 시간 후에 agent를 다시 호출하도록 예약한다. BACKEND_API_URL 설정 시 실제 BE API 호출."""
-    delay_minutes = 1  # 시연 모드: 항상 1분 후 재호출
+    # 시연 모드: LLM 인자(30분 등)를 무시하고 1분 뒤 재호출.
+    # prompts.py 의 ack/retry 톤도 이 짧은 간격에 모순되지 않도록 timing-neutral 하게 정렬돼 있음.
+    delay_minutes = 1
     user_id = _agent_context.get("user_id")
     backend_url = os.getenv("BACKEND_API_URL", "")
     agent_api_key = os.getenv("AGENT_API_KEY", "dev-agent-key-change-in-prod")

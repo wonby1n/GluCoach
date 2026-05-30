@@ -172,7 +172,7 @@ class FromImagePredictionServiceTest {
   }
 
   @Test
-  void 임계값_경계_정확히_0_6은_OK_경로_진입() {
+  void 임계값_경계_정확히_0_5은_OK_경로_진입() {
     FoodDetection top = detection("비빔밥", FromImagePredictionService.CONFIDENCE_THRESHOLD);
     Food food = foodWithCarbs(40, "비빔밥");
     given(foodDetectClient.detect(IMAGE)).willReturn(new FoodDetectResponse(1, List.of(top)));

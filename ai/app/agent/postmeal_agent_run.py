@@ -17,7 +17,15 @@ import time
 from dotenv import load_dotenv
 import anthropic
 
-from app.agent.tools import TOOL_SCHEMAS, TOOL_MAP, set_agent_context
+from app.agent.tools import (
+    TOOL_SCHEMAS,
+    TOOL_MAP,
+    set_agent_context,
+    get_meals,
+    get_glucose,
+    get_steps,
+    get_notification_history,
+)
 from app.agent.prompts import build_postmeal_prompt
 from app.agent.trace_writer import save_trace
 from app.agent.fallback import call_llm_with_retry, get_fallback_message
@@ -31,21 +39,76 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 # GMS 프록시 주소
 BASE_URL = "https://api.anthropic.com"
-MODEL = "claude-sonnet-4-5-20250929"
-MAX_TOKENS = 4096
+MODEL = "claude-sonnet-4-6"
+# 푸시 본문은 짧지만 tool_use JSON 자체(display_trace 의 cards 등)가 한도에 잡혀
+# 끝부분 필드가 절단되는 사례가 있어 2048 로 상향. 응답 시간 영향은 미미.
+MAX_TOKENS = 2048
 MAX_TURNS = 10
 
 
 # ── 도구 실행 ─────────────────────────────────────────────
 
 def execute_tool(name: str, tool_input: dict) -> str:
-    """TOOL_MAP에서 함수를 찾아 실행하고 JSON 문자열로 반환한다."""
+    """TOOL_MAP에서 함수를 찾아 실행하고 JSON 문자열로 반환한다.
+
+    LLM 이 required 인자를 빠뜨려도 background task 가 죽지 않도록
+    TypeError / 일반 예외를 tool_result 로 돌려보내 LLM 이 재시도할 수 있게 한다.
+    """
     func = TOOL_MAP.get(name)
     if not func:
         return json.dumps({"error": f"Unknown tool: {name}"}, ensure_ascii=False)
 
-    result = func(**tool_input)
+    try:
+        result = func(**tool_input)
+    except TypeError as e:
+        return json.dumps(
+            {"status": "error", "error": f"invalid_arguments: {e}", "tool": name},
+            ensure_ascii=False,
+        )
+    except Exception as e:
+        return json.dumps(
+            {"status": "error", "error": f"{type(e).__name__}: {e}", "tool": name},
+            ensure_ascii=False,
+        )
     return json.dumps(result, ensure_ascii=False)
+
+
+# ── 사전 조회 ─────────────────────────────────────────────
+
+def _prefetch_postmeal_context(reason: str) -> dict:
+    """meal_recorded / schedule_followup 경로에서 LLM 이 어차피 부를 데이터 4개를
+    Python 에서 미리 호출해 prompt 에 박아넣는다. turn 수를 줄여 응답 시간 단축.
+
+    user_response 경로는 LLM 이 사용자 응답 텍스트만 보면 되므로 prefetch 안 함."""
+    if reason == "user_response":
+        return {}
+
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    now = datetime.now(ZoneInfo("Asia/Seoul"))
+    today = now.strftime("%Y-%m-%d")
+    two_hours_ago = (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S")
+    now_iso = now.strftime("%Y-%m-%dT%H:%M:%S")
+
+    prefetched = {}
+    try:
+        prefetched["meals"] = get_meals(today)
+    except Exception as e:
+        print(f"[prefetch] get_meals 실패: {e}")
+    try:
+        prefetched["glucose"] = get_glucose(two_hours_ago, now_iso)
+    except Exception as e:
+        print(f"[prefetch] get_glucose 실패: {e}")
+    try:
+        prefetched["steps"] = get_steps(two_hours_ago, now_iso)
+    except Exception as e:
+        print(f"[prefetch] get_steps 실패: {e}")
+    try:
+        prefetched["notification_history"] = get_notification_history(hours=24)
+    except Exception as e:
+        print(f"[prefetch] get_notification_history 실패: {e}")
+    return prefetched
 
 
 # ── Agentic Loop ──────────────────────────────────────────
@@ -66,6 +129,9 @@ def run_postmeal_agent(trigger: dict, user_id: int = None, alert_type: str = "AG
         base_url=BASE_URL,
     )
 
+    # 데이터 조회 도구를 미리 호출해 prompt 에 박아 turn 절약
+    prefetched = _prefetch_postmeal_context(trigger.get("reason", "meal_recorded"))
+
     messages = [
         {"role": "user", "content": "식후 활동 체크해줘."}
     ]
@@ -85,7 +151,7 @@ def run_postmeal_agent(trigger: dict, user_id: int = None, alert_type: str = "AG
             client,
             model=MODEL,
             max_tokens=MAX_TOKENS,
-            system=build_postmeal_prompt(trigger),
+            system=build_postmeal_prompt(trigger, prefetched=prefetched),
             tools=TOOL_SCHEMAS,
             messages=messages,
         )
@@ -94,6 +160,7 @@ def run_postmeal_agent(trigger: dict, user_id: int = None, alert_type: str = "AG
         if response is None:
             fallback_msg = get_fallback_message("postmeal")
             print(f"\n[fallback] LLM 호출 실패 → 폴백 메시지: {fallback_msg}")
+            execute_tool("send_notification", {"message": fallback_msg, "options": [], "display_trace": {}})
             return {
                 "message":           fallback_msg,
                 "turns":             turn,

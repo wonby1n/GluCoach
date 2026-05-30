@@ -15,6 +15,26 @@ def _now_kst_str() -> str:
     return datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M KST")
 
 
+def _render_prefetch_section(prefetched: dict | None) -> str:
+    """build_postmeal_prompt 에서 사전 조회 데이터를 prompt 에 박는 헬퍼.
+
+    비어있으면 빈 문자열 반환 (user_response 경로 등)."""
+    if not prefetched:
+        return ""
+    import json as _json
+    lines = ["[사전 조회 데이터]", "아래 데이터는 이미 조회되어 있다. 같은 도구를 다시 호출하지 말 것."]
+    label_map = {
+        "meals": "오늘 식사 기록 (get_meals 결과)",
+        "glucose": "최근 2시간 혈당 (get_glucose 결과)",
+        "steps": "최근 2시간 걸음수 (get_steps 결과)",
+        "notification_history": "최근 24시간 알림 이력 (get_notification_history 결과)",
+    }
+    for key, label in label_map.items():
+        if key in prefetched:
+            lines.append(f"- {label}: {_json.dumps(prefetched[key], ensure_ascii=False)}")
+    return "\n".join(lines)
+
+
 _NOTIFICATION_PAYLOAD_RULES = """[선택지 생성 규칙 — send_notification options]
 - 정확히 3개 항목, 각 항목은 {"id": snake_case 식별자, "label": 한국어 라벨 8자 이내}
 - 컨텍스트에 맞게 매번 새로 생성 (고정값 아님). 메시지 내용과 자연스럽게 이어질 것.
@@ -118,8 +138,13 @@ def build_morning_prompt() -> str:
 모든 결정 과정은 reasoning에 남겨."""
 
 
-def build_postmeal_prompt(trigger: dict) -> str:
-    """식후 활동 유도 agent 시스템 프롬프트를 생성한다."""
+def build_postmeal_prompt(trigger: dict, prefetched: dict | None = None) -> str:
+    """식후 활동 유도 agent 시스템 프롬프트를 생성한다.
+
+    prefetched: meal_recorded / schedule_followup 경로에서 Python 이 미리 조회한
+    데이터 (get_meals/get_glucose/get_steps/get_notification_history 결과).
+    프롬프트에 박아넣어 LLM 이 같은 도구를 다시 부르지 않도록 한다 → turn 절약.
+    """
     t = GLUCOSE_THRESHOLD
     reason = trigger.get("reason", "meal_recorded")
     meal_time = trigger.get("meal_time", DEMO_DATE["today"] + " 12:00")
@@ -139,13 +164,19 @@ def build_postmeal_prompt(trigger: dict) -> str:
 사용자 응답 내용을 파악하고 적절히 처리하세요."""
 
         extra_section = """
+[병렬 도구 호출 — turn 절약]
+- 데이터 조회 도구 (get_meals/get_glucose/get_steps/get_notification_history) 는 호출하지 마라. 사용자 응답 텍스트만 보면 분류 가능하다.
+- schedule_followup 과 send_notification 은 의존성이 없으니 같은 turn 안에 병렬로 함께 호출하라. 직렬로 부르면 turn 이 두 배가 된다.
+
 [사용자 응답 처리 지침]
 응답을 아래 3가지 유형으로 분류하고, 해당 유형에 맞게 처리하세요.
 
 1) 지금 불가 (예: "회의 중", "바빠요", "잠깐만", "이따가", "나중에")
-   → schedule_followup(delay_minutes=30) 호출
-   → send_notification으로 재확인 예약 메시지 발송 (options는 빈 배열 [] 로 전달할 것)
+   → schedule_followup(delay_minutes=30) 와 send_notification 을 같은 turn 안에 병렬 호출
+   → send_notification 으로 재확인 예약 메시지 발송 (options는 빈 배열 [] 로 전달할 것)
    → 톤: 사용자 상황을 존중하는 가벼운 표현
+   → [금지] "회의 끝나면", "30분 후", "1시간 뒤" 등 구체 시간을 약속하는 표현 — 재시도 타이밍이 환경에 따라 다르므로 모순될 수 있음
+   → [권장 예시] "알겠어요, 이따 다시 확인해볼게요 🙂", "네, 좀 있다 다시 살펴볼게요", "괜찮아요, 잠시 후 다시 들를게요 😊"
 
 2) 수락 (예: "알겠어요", "나갔다 올게요", "산책 갈게요", "ㅇㅋ")
    → 출발 격려 메시지만 발송 (1문장, 20자 이내, options는 빈 배열 [] 로 전달할 것)
@@ -176,9 +207,12 @@ def build_postmeal_prompt(trigger: dict) -> str:
 
         extra_section = """
 [재시도 지침]
-- 반드시 get_glucose, get_steps를 다시 호출해 현재 상태를 확인할 것
+- 현재 상태 데이터는 [사전 조회 데이터] 섹션에 이미 제공되어 있다. get_glucose / get_steps / get_meals / get_notification_history 를 다시 호출하지 마라 — 같은 데이터를 두 번 받는 헛수고가 된다.
+- send_notification 만 호출하면 된다.
 - 이전 알림과 다른 앵글로 접근할 것 (예: 걷기 → 스트레칭, 산책 → 물 마시러 가기)
-- 이전 사용자 응답 맥락을 자연스럽게 이어갈 것 (예: "회의 끝나셨나요?")
+- 이전 사용자 응답 맥락을 가볍게 인지하되, 상황이 끝났다고 단정하지 말 것
+  → [금지] "회의 끝나셨나요?", "끝나고 잠깐", "이제 좀 한가하시죠?" 같이 상태 종료를 전제로 한 표현
+  → [권장] "잠깐 짬 나실 때", "여유 되시면", "지금 가능하시면" 처럼 가능 여부를 사용자에게 맡기는 표현
 - schedule_followup을 다시 호출하지 말 것 (재예약 금지, 이번이 마지막 시도)
 - 이번에도 활동을 거부하면 조용히 종료
 - send_notification 호출 시 options는 반드시 빈 배열 []로 전달할 것 (버튼 없음)
@@ -192,12 +226,10 @@ def build_postmeal_prompt(trigger: dict) -> str:
 식사 기록 후 약 60분에 실행되는 agent입니다.
 식후 혈당 흐름과 활동량을 확인하고, 가벼운 활동을 권유하는 알림 1개를 보내세요.
 
-[권장 확인 흐름]
-- 오늘 식사 기록을 확인한다. 필요 시 get_meals(date)를 사용한다.
-- 식후 혈당 흐름을 확인한다. 필요 시 get_glucose(start_time, end_time)를 사용한다.
-- 최근 활동량을 확인한다. 필요 시 get_steps(start_time, end_time)를 사용한다.
-- 최근 알림 이력을 확인한다. 필요 시 get_notification_history(hours=24)를 사용한다.
-- 위 신호를 종합해 알림 발송 또는 종료를 판단한다."""
+[확인 흐름]
+- 식사 / 혈당 / 걸음수 / 최근 알림 이력은 모두 [사전 조회 데이터] 섹션에 이미 제공되어 있다.
+- 데이터 조회 도구 (get_meals/get_glucose/get_steps/get_notification_history) 를 호출하지 마라 — 같은 데이터를 받는 헛 turn 이 된다.
+- 사전 조회 데이터로 발송 여부를 판단한 뒤 send_notification 만 호출하면 된다."""
 
         extra_section = """
 [활동 알림 발송 조건]
@@ -223,6 +255,7 @@ def build_postmeal_prompt(trigger: dict) -> str:
 
 {trigger_section}
 
+{_render_prefetch_section(prefetched)}
 {role_section}
 {extra_section}
 

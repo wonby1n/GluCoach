@@ -42,6 +42,7 @@ ai-service:
   connect-timeout-ms: ${AI_CONNECT_TIMEOUT:3000}
   read-timeout-ms: ${AI_READ_TIMEOUT:5000}
   report-read-timeout-ms: ${AI_REPORT_READ_TIMEOUT:180000}
+  personalize-read-timeout-ms: ${AI_PERSONALIZE_READ_TIMEOUT:600000}
 
 food-api:
   base-url: ${FOOD_API_URL:https://apis.data.go.kr/1471000}

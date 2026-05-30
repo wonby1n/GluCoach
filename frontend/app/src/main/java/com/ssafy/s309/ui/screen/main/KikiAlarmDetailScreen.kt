@@ -3,6 +3,7 @@ package com.ssafy.s309.ui.screen.main
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,12 +23,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBackIosNew
 import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Restaurant
+import androidx.compose.material.icons.outlined.RestaurantMenu
 import androidx.compose.material.icons.outlined.ShowChart
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -56,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.s309.R
 import com.ssafy.s309.ui.component.KikiImage
+import com.ssafy.s309.ui.component.MarkdownText
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachCorner
 import com.ssafy.s309.ui.theme.GlucoachSpacing
@@ -88,12 +92,30 @@ fun KikiAlarmDetailScreen(
         } else {
             listOf("키키가 오늘 컨디션을 보고 있어요.")
         }
+    val rawMessage = notification?.message
+    val calendarReminder =
+        remember(rawMessage, selectedOption) {
+            if (selectedOption == "OKAY" || selectedOption == "BUSY" || rawMessage == null) {
+                null
+            } else {
+                val result = parseCalendarReminder(rawMessage)
+                android.util.Log.d("KikiAlarm", "rawMessage=[$rawMessage]")
+                android.util.Log.d("KikiAlarm", "calendarReminder=$result")
+                result
+            }
+        }
+    val parsedBody =
+        remember(calendarReminder?.body) {
+            calendarReminder?.body?.let { parseRecommendBody(it) }
+        }
+    val speechSource =
+        parsedBody?.intro ?: calendarReminder?.body ?: rawMessage
     val speechLines =
         when (selectedOption) {
             "OKAY" -> listOf("좋아요! 지금 바로 움직여봐요.", "조금만 움직여도 혈당 조절에 도움이 돼요.")
             "BUSY" -> listOf("알겠어요!", "회의 끝나고 30분 뒤에 다시 알려드릴게요.")
-            "DECLINE" -> notification?.message?.split("\n") ?: emptyStateLines
-            else -> notification?.message?.split("\n") ?: emptyStateLines
+            "DECLINE" -> speechSource?.split("\n") ?: emptyStateLines
+            else -> speechSource?.split("\n") ?: emptyStateLines
         }
 
     Column(
@@ -171,7 +193,38 @@ fun KikiAlarmDetailScreen(
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.md))
 
-            SpeechBubble(lines = speechLines)
+            val hasMenuCards = parsedBody != null && parsedBody.menus.isNotEmpty()
+
+            if (calendarReminder != null) {
+                CalendarReminderDetailCard(eventTitle = calendarReminder.eventTitle)
+                Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+            }
+
+            if (!hasMenuCards) {
+                SpeechBubble(lines = speechLines)
+            }
+
+            if (hasMenuCards) {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, GlucoachColors.Border, RoundedCornerShape(GlucoachCorner.card))
+                            .clip(RoundedCornerShape(GlucoachCorner.card))
+                            .background(GlucoachColors.Surface),
+                ) {
+                    RecommendHeaderCard()
+                    HorizontalDivider(color = GlucoachColors.Border)
+                    parsedBody!!.menus.forEachIndexed { index, menu ->
+                        if (index > 0) HorizontalDivider(color = GlucoachColors.Border)
+                        MenuItemCard(menu)
+                    }
+                    parsedBody.outro?.let { outroText ->
+                        HorizontalDivider(color = GlucoachColors.Border)
+                        OutroTipCard(text = outroText)
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
 
@@ -231,6 +284,218 @@ fun KikiAlarmDetailScreen(
     }
 }
 
+internal data class RecommendMenu(
+    val emoji: String,
+    val name: String,
+    val grade: String,
+    val description: String,
+)
+
+internal data class ParsedRecommendBody(
+    val intro: String?,
+    val menus: List<RecommendMenu>,
+    val outro: String?,
+)
+
+internal val MENU_LINE_REGEX = Regex("""^(.+?)\s*\(\s*(.+?)\s*\)\s*$""")
+
+internal fun parseRecommendBody(body: String): ParsedRecommendBody {
+    val paragraphs = body.split("\n\n").map { it.trim() }.filter { it.isNotEmpty() }
+    val intro = StringBuilder()
+    val outro = StringBuilder()
+    val menus = mutableListOf<RecommendMenu>()
+    var sawMenu = false
+    for (paragraph in paragraphs) {
+        val firstBreak = paragraph.indexOf('\n')
+        val firstLineRaw = if (firstBreak > 0) paragraph.substring(0, firstBreak).trim() else paragraph.trim()
+        val firstLine =
+            firstLineRaw
+                .trimStart('#').trim()
+                .removePrefix("**").removeSuffix("**")
+                .removePrefix("*").removeSuffix("*")
+                .trim()
+        val rest = if (firstBreak > 0) paragraph.substring(firstBreak + 1).trim() else ""
+        val match = MENU_LINE_REGEX.find(firstLine)
+        val gradeText = match?.groupValues?.get(2)?.trim().orEmpty()
+        val isMenu =
+            match != null && rest.isNotEmpty() &&
+                (gradeText.endsWith("등급") || gradeText.contains("메뉴"))
+        if (isMenu) {
+            val nameWithEmoji = match!!.groupValues[1].trim()
+            val spaceIdx = nameWithEmoji.indexOf(' ')
+            val emoji =
+                if (spaceIdx > 0) nameWithEmoji.substring(0, spaceIdx).trim() else ""
+            val name =
+                if (spaceIdx > 0) nameWithEmoji.substring(spaceIdx + 1).trim() else nameWithEmoji
+            menus.add(RecommendMenu(emoji = emoji, name = name, grade = gradeText, description = rest))
+            sawMenu = true
+        } else {
+            val target = if (sawMenu) outro else intro
+            if (target.isNotEmpty()) target.append("\n\n")
+            target.append(paragraph)
+        }
+    }
+    return ParsedRecommendBody(
+        intro = intro.toString().trim().ifBlank { null },
+        menus = menus,
+        outro = outro.toString().trim().ifBlank { null },
+    )
+}
+
+@Composable
+private fun RecommendHeaderCard(modifier: Modifier = Modifier) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(GlucoachColors.PrimaryLight)
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.RestaurantMenu,
+            contentDescription = null,
+            tint = GlucoachColors.PrimaryDark,
+            modifier = Modifier.size(22.dp),
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = "오늘의 메뉴 추천",
+            color = GlucoachColors.PrimaryDark,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+@Composable
+private fun MenuItemCard(
+    menu: RecommendMenu,
+    modifier: Modifier = Modifier,
+) {
+    val (badgeBg, badgeText) =
+        when (menu.grade.firstOrNull()?.uppercaseChar()) {
+            'S' -> GlucoachColors.GradeSBg to GlucoachColors.GradeS
+            'A' -> GlucoachColors.GradeABg to GlucoachColors.GradeA
+            'B' -> GlucoachColors.GradeBBg to GlucoachColors.GradeB
+            'C' -> GlucoachColors.GradeCBg to GlucoachColors.GradeC
+            'D' -> GlucoachColors.GradeDBg to GlucoachColors.GradeD
+            'F' -> GlucoachColors.GradeFBg to GlucoachColors.GradeF
+            else -> GlucoachColors.Background to GlucoachColors.TextSecondary
+        }
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(GlucoachColors.Surface)
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (menu.emoji.isNotEmpty()) {
+                Text(text = menu.emoji, fontSize = 20.sp)
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Text(
+                text = menu.name,
+                color = GlucoachColors.TextPrimary,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Box(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(badgeBg)
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+            ) {
+                Text(
+                    text = menu.grade,
+                    color = badgeText,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        MarkdownText(
+            text = menu.description,
+            color = GlucoachColors.TextSecondary,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+        )
+    }
+}
+
+@Composable
+private fun OutroTipCard(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(GlucoachColors.TipBg)
+                .padding(horizontal = 22.dp, vertical = 18.dp),
+    ) {
+        MarkdownText(
+            text = text,
+            color = GlucoachColors.TextSecondary,
+            fontSize = 15.sp,
+            lineHeight = 22.sp,
+        )
+    }
+}
+
+@Composable
+private fun CalendarReminderDetailCard(
+    eventTitle: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .border(1.dp, GlucoachColors.Border, RoundedCornerShape(GlucoachCorner.card))
+                .clip(RoundedCornerShape(GlucoachCorner.card))
+                .background(GlucoachColors.Surface),
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(GlucoachColors.SelectBadgeBg)
+                    .padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.CalendarMonth,
+                contentDescription = null,
+                tint = GlucoachColors.PrimaryDark,
+                modifier = Modifier.size(22.dp),
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = "오늘의 일정",
+                color = GlucoachColors.PrimaryDark,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        HorizontalDivider(color = GlucoachColors.Border)
+        Text(
+            text = eventTitle,
+            color = GlucoachColors.TextPrimary,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.SemiBold,
+            lineHeight = 26.sp,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+        )
+    }
+}
+
 @Composable
 private fun SpeechBubble(
     lines: List<String>,
@@ -257,11 +522,10 @@ private fun SpeechBubble(
                     .padding(horizontal = 22.dp, vertical = 22.dp),
         ) {
             lines.forEach { line ->
-                Text(
+                MarkdownText(
                     text = line,
                     color = GlucoachColors.TextPrimary,
                     fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
                     lineHeight = 22.sp,
                 )
             }

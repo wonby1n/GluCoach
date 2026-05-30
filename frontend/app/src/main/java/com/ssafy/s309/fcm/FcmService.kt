@@ -4,8 +4,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
-import android.media.AudioAttributes
-import android.net.Uri
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -17,6 +15,7 @@ import com.ssafy.s309.data.repository.HealthRepository
 import com.ssafy.s309.data.repository.UserRepository
 import com.ssafy.s309.notification.GlucoseAlertManager
 import com.ssafy.s309.notification.TtsManager
+import com.ssafy.s309.voice.WakeWordManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +34,8 @@ class FcmService : FirebaseMessagingService() {
     @Inject lateinit var glucoseAlertManager: GlucoseAlertManager
 
     @Inject lateinit var healthRepository: HealthRepository
+
+    @Inject lateinit var wakeWordManager: WakeWordManager
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -68,14 +69,26 @@ class FcmService : FirebaseMessagingService() {
             message.data["alertType"]
                 ?: if (title == MEAL_FOLLOWUP_TITLE) ALERT_TYPE_MEAL_FOLLOWUP else null
 
-        // alertType별 전용 채널 (각 채널에 mp3가 사운드로 등록되어 있어 OS가 자동 재생)
+        // alertType별 전용 silent 채널 (사운드 없음 — TTS로 본문을 발화)
         val channelId = ensureChannelForAlertType(alertType)
 
-        if (alertType?.startsWith(ALERT_TYPE_MEAL_FOLLOWUP) == true) {
-            showMealFollowupNotification(title, body, channelId)
-        } else {
-            showNotification(title, body, channelId)
+        val isReactiveResponse =
+            alertType == "AGENT_FOOD_RECOMMEND" ||
+                alertType?.startsWith("AGENT_MEAL_REPLY") == true
+        val suppressNotification =
+            isReactiveResponse &&
+                com.ssafy.s309.ui.screen.main.ChatScreenStateHolder.isActive
+
+        if (!suppressNotification) {
+            if (alertType?.startsWith(ALERT_TYPE_MEAL_FOLLOWUP) == true) {
+                showMealFollowupNotification(title, body, channelId)
+            } else {
+                showNotification(title, body, channelId)
+            }
         }
+
+        // 키키 메시지를 TTS로 발화 (현재 off — wake TTS만 사용)
+        // ttsManager.speak(body)
 
         // 홈 대시보드(KikiSuggestionCard + 뱃지)용 — 모든 알림을 alertStream에 emit
         glucoseAlertManager.emitFcmAlert(title, body, alertType ?: "")
@@ -84,27 +97,38 @@ class FcmService : FirebaseMessagingService() {
         if (message.data["chatMessageId"] != null) {
             healthRepository.emitChatFcmEvent()
         }
+
+        // wake-activated flow 진행 중이면 Siri/Bixby 스타일 모달에 응답 띄움.
+        // WakeWordManager.showResponse 내부에서 state==THINKING/SHOWING_RESPONSE 일 때만
+        // 실제로 띄우므로, 일반 채팅/알림 흐름은 그대로 (모달 띄움 skip).
+        wakeWordManager.showResponse(body)
     }
 
-    /** alertType에 해당하는 채널을 (없으면) 생성하고 채널 ID를 반환. */
+    /**
+     * alertType 별 silent 채널을 (없으면) 생성하고 채널 ID를 반환.
+     * 채널 사운드는 [TtsManager] 의 본문 발화로 대체했으므로 [NotificationChannel.setSound] 를 사용하지 않는다.
+     *
+     * 채널 ID 승격 히스토리:
+     *  v2 — mp3 가 setSound 로 박혀 있던 구버전
+     *  v3 — silent 로 전환했으나 BE 가 notification payload 를 함께 보내 onMessageReceived 가 스킵돼
+     *       단말 캐시 채널이 그대로 살아있는 사례가 발견됨
+     *  v4 — BE 를 data-only payload 로 전환한 시점에 fresh 채널을 강제 생성하기 위한 승격
+     */
     private fun ensureChannelForAlertType(alertType: String?): String {
         val channelId = channelIdForAlertType(alertType)
         val channelName = channelNameForAlertType(alertType)
-        val soundResId = resIdForAlertType(alertType)
 
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        // 잔존하는 legacy (v2: mp3 사운드 / v3: silent지만 onMessageReceived 미경유) 채널 정리.
+        LEGACY_CHANNEL_IDS.forEach { manager.deleteNotificationChannel(it) }
+
         if (manager.getNotificationChannel(channelId) == null) {
-            val soundUri = Uri.parse("android.resource://$packageName/$soundResId")
-            val audioAttrs =
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build()
             val channel =
                 NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_HIGH)
                     .apply {
                         description = channelName
-                        setSound(soundUri, audioAttrs)
+                        setSound(null, null)
+                        enableVibration(true)
                     }
             manager.createNotificationChannel(channel)
         }
@@ -221,29 +245,33 @@ class FcmService : FirebaseMessagingService() {
         )
     }
 
-    @androidx.annotation.RawRes
-    private fun resIdForAlertType(alertType: String?): Int =
-        when {
-            alertType == null -> R.raw.kiki_morning
-            alertType.startsWith("AGENT_WAKE_UP") -> R.raw.kiki_morning
-            alertType.startsWith("AGENT_MEAL_FOLLOWUP") -> R.raw.kiki_walk
-            alertType.startsWith("AGENT_MEAL_REPLY") -> R.raw.kiki_wait
-            alertType.startsWith("AGENT_MEAL_RETRY") -> R.raw.kiki_stretch
-            alertType.startsWith("AGENT_SLEEP_INSIGHT") -> R.raw.kiki_daily_done
-            else -> R.raw.kiki_morning
-        }
-
     companion object {
         private const val TAG = "FcmService"
 
-        // alertType별 전용 채널. 기존 채널(glucose_coaching)은 사운드 변경이 불가능하므로
-        // 새 ID 5종으로 분리해 각각 mp3를 사운드로 등록한다.
-        private const val CHANNEL_DEFAULT = "kiki_default_v2"
-        private const val CHANNEL_WAKE_UP = "kiki_wake_up_v2"
-        private const val CHANNEL_MEAL_FOLLOWUP = "kiki_meal_followup_v2"
-        private const val CHANNEL_MEAL_REPLY = "kiki_meal_reply_v2"
-        private const val CHANNEL_MEAL_RETRY = "kiki_meal_retry_v2"
-        private const val CHANNEL_SLEEP_INSIGHT = "kiki_sleep_insight_v2"
+        // BE 를 data-only payload 로 전환하면서 *_v4 (silent) 로 한 단계 더 승격.
+        private const val CHANNEL_DEFAULT = "kiki_default_v4"
+        private const val CHANNEL_WAKE_UP = "kiki_wake_up_v4"
+        private const val CHANNEL_MEAL_FOLLOWUP = "kiki_meal_followup_v4"
+        private const val CHANNEL_MEAL_REPLY = "kiki_meal_reply_v4"
+        private const val CHANNEL_MEAL_RETRY = "kiki_meal_retry_v4"
+        private const val CHANNEL_SLEEP_INSIGHT = "kiki_sleep_insight_v4"
+
+        // v2 (mp3 사운드) / v3 (silent 였지만 BE notification payload 경유로 단말 캐시가 살아남은 케이스) — 모두 정리.
+        private val LEGACY_CHANNEL_IDS =
+            listOf(
+                "kiki_default_v2",
+                "kiki_wake_up_v2",
+                "kiki_meal_followup_v2",
+                "kiki_meal_reply_v2",
+                "kiki_meal_retry_v2",
+                "kiki_sleep_insight_v2",
+                "kiki_default_v3",
+                "kiki_wake_up_v3",
+                "kiki_meal_followup_v3",
+                "kiki_meal_reply_v3",
+                "kiki_meal_retry_v3",
+                "kiki_sleep_insight_v3",
+            )
 
         private const val ALERT_TYPE_MEAL_FOLLOWUP = "AGENT_MEAL_FOLLOWUP"
         private const val MEAL_FOLLOWUP_TITLE = "식후 컨디션"

@@ -24,6 +24,10 @@ data class FoodScanCandidate(
     val carbsG: Double?,
     val proteinG: Double?,
     val fatG: Double?,
+    val sugarG: Double?,
+    val fiberG: Double?,
+    val saturatedFatG: Double?,
+    val sodiumMg: Double?,
     val confidence: Float,
 )
 
@@ -109,6 +113,10 @@ class FoodScanViewModel
                                 carbsG = foodItem.carbsG,
                                 proteinG = foodItem.proteinG,
                                 fatG = foodItem.fatG,
+                                sugarG = foodItem.sugarG,
+                                fiberG = foodItem.fiberG,
+                                saturatedFatG = foodItem.saturatedFatG,
+                                sodiumMg = foodItem.sodiumMg,
                                 confidence = topConfidence,
                             ),
                         )
@@ -123,6 +131,10 @@ class FoodScanViewModel
                                 carbsG = null,
                                 proteinG = null,
                                 fatG = null,
+                                sugarG = null,
+                                fiberG = null,
+                                saturatedFatG = null,
+                                sodiumMg = null,
                                 confidence = topConfidence,
                             ),
                         )
@@ -149,6 +161,10 @@ class FoodScanViewModel
                             carbsG = foodItem.carbsG,
                             proteinG = foodItem.proteinG,
                             fatG = foodItem.fatG,
+                            sugarG = foodItem.sugarG,
+                            fiberG = foodItem.fiberG,
+                            saturatedFatG = foodItem.saturatedFatG,
+                            sodiumMg = foodItem.sodiumMg,
                             confidence = detection.confidence,
                         ),
                     )
@@ -224,4 +240,8 @@ class FoodScanViewModel
             _state.value = FoodScanState.Idle
             _manualPrediction.value = null
         }
+
+        suspend fun searchFoodsDirect(query: String): List<FoodSearchItem> = foodRepository.searchFoods(query).getOrNull().orEmpty()
+
+        suspend fun predictByFoodDirect(item: FoodSearchItem): GlucosePrediction? = foodRepository.predictByFood(item).getOrNull()
     }

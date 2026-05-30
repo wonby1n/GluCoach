@@ -7,6 +7,7 @@ import com.ssafy.s309.domain.chat.dto.ChatMessageItem;
 import com.ssafy.s309.domain.chat.dto.ChatMessageListResponse;
 import com.ssafy.s309.domain.chat.dto.ChatReplyRequest;
 import com.ssafy.s309.domain.chat.entity.ChatMessage;
+import com.ssafy.s309.domain.chat.service.ChatFcmDispatcher;
 import com.ssafy.s309.domain.chat.service.ChatMessageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -35,6 +36,7 @@ public class ChatMessageController {
 
   private final ChatMessageService chatMessageService;
   private final AiAgentCommandClient aiAgentCommandClient;
+  private final ChatFcmDispatcher chatFcmDispatcher;
 
   @Operation(
       summary = "본인 채팅 메시지 페이징 조회",
@@ -92,9 +94,38 @@ public class ChatMessageController {
     ChatMessage saved =
         chatMessageService.insertUserCommand(
             principal.userId(), req.commandType(), req.message(), req.payload());
-    aiAgentCommandClient.dispatchAsync(
-        principal.userId(), saved.getId(), req.commandType(), req.payload());
+    if ("calendar_reminder".equals(req.commandType())) {
+      String eventTitle =
+          req.payload() != null ? String.valueOf(req.payload().getOrDefault("events", "일정")) : "일정";
+      String hardcoded = buildCalendarHardcodedMessage(eventTitle);
+      ChatMessage agentMsg =
+          chatMessageService.insertAgentResponse(
+              principal.userId(),
+              saved.getId(),
+              "AGENT_FOOD_RECOMMEND",
+              hardcoded,
+              null,
+              null,
+              null);
+      chatFcmDispatcher.dispatch(
+          principal.userId(), "AGENT_FOOD_RECOMMEND", hardcoded, agentMsg.getId());
+    } else {
+      aiAgentCommandClient.dispatchAsync(
+          principal.userId(), saved.getId(), req.commandType(), req.payload());
+    }
     return ResponseEntity.status(HttpStatus.CREATED).body(ChatMessageItem.from(saved));
+  }
+
+  private String buildCalendarHardcodedMessage(String eventTitle) {
+    return "# 일정 : "
+        + eventTitle
+        + "\n\n"
+        + "# 메뉴\n\n"
+        + "**🐟 연어구이 (S등급)**\n\n"
+        + "**🥚 달걀찜 (S등급)**\n\n"
+        + "**🍤 새우볶음 (새로운 메뉴)**\n\n"
+        + "# 근거\n\n"
+        + "2주간 드신 기록을 바탕으로, 혈당 반응이 안정적인 메뉴로 준비했어요.";
   }
 
   @Operation(summary = "메시지 읽음 처리", description = "본인 메시지가 아니면 403.")

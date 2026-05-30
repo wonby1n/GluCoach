@@ -21,6 +21,7 @@ import com.ssafy.s309.data.model.MealEvent
 import com.ssafy.s309.data.model.MealRecordResponse
 import com.ssafy.s309.data.model.NotificationItem
 import com.ssafy.s309.data.model.SleepSessionCreateRequest
+import com.ssafy.s309.data.repository.source.CalendarDataSource
 import com.ssafy.s309.data.repository.source.HealthConnectDataSource
 import com.ssafy.s309.data.repository.source.HealthDataSource
 import com.ssafy.s309.data.repository.source.MockHealthDataSource
@@ -58,6 +59,7 @@ class HealthRepository
         healthConnectDataSource: HealthConnectDataSource,
         private val bleManager: BleManager,
         private val glucoseAlertManager: GlucoseAlertManager,
+        private val calendarDataSource: CalendarDataSource,
     ) {
         private val primarySources: List<HealthDataSource> =
             listOf(samsungDataSource, healthConnectDataSource)
@@ -204,6 +206,12 @@ class HealthRepository
         /** 날짜별 식사 기록 조회 */
         suspend fun getMealsByDate(date: String): Result<List<MealRecordResponse>> = runCatching { healthApi.getMeals(date = date) }
 
+        /** 월별 식사 기록 있는 날짜 (캘린더 dot 표시용) */
+        suspend fun getMealCalendarDays(
+            year: Int,
+            month: Int,
+        ): Result<List<Int>> = runCatching { healthApi.getMealCalendar(year = year, month = month) }
+
         /** 기간별 CGM 혈당 기록 조회 */
         suspend fun getGlucoseRecords(
             from: String,
@@ -264,15 +272,72 @@ class HealthRepository
                 .onFailure { Log.w(TAG, "전체 읽음 처리 실패", it) }
         }
 
-        /** 음식 추천 명령 발화. commandType/message/payload 고정값. */
-        suspend fun sendFoodRecommendCommand() =
+        /**
+         * 음식 추천 명령 발화. userQuery 가 비어있지 않으면 자유 발화 질문으로 간주하고
+         * payload["query"] 에 실어 보낸다 (AI 프롬프트가 [자유 발화 모드] 로 분기).
+         * 마이크 STT 입력("마라탕 먹어도 돼?" 등)을 그대로 흘려 보내기 위한 통로.
+         */
+        suspend fun sendFoodRecommendCommand(userQuery: String? = null) =
             healthApi.sendChatCommand(
                 ChatCommandRequest(
                     commandType = "recommend_food",
-                    message = "음식 추천해줘",
-                    payload = emptyMap(),
+                    message = userQuery?.takeIf { it.isNotBlank() } ?: "음식 추천해줘",
+                    payload =
+                        userQuery
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { mapOf("query" to it) }
+                            ?: emptyMap(),
                 ),
             )
+
+        /** 오늘/내일 캘린더 일정을 BE에 전달해 키키 메시지를 생성한다. 권한 없거나 일정 없으면 no-op. */
+        suspend fun sendCalendarReminderCommand() {
+            if (!calendarDataSource.hasPermission()) {
+                Log.w(TAG, "캘린더 권한 없음 — 요청 스킵")
+                return
+            }
+            val now = System.currentTimeMillis()
+            val event =
+                calendarDataSource.getTodayAndTomorrowEvents()
+                    .filter { it.startMillis > now }
+                    .minByOrNull { it.startMillis }
+            Log.d(TAG, "다음 일정: ${event?.title} at ${event?.startMillis}")
+            if (event == null) return
+            val titles = event.title
+            Log.d(TAG, "캘린더 알림 전송: $titles")
+            runCatching {
+                healthApi.sendChatCommand(
+                    ChatCommandRequest(
+                        commandType = "calendar_reminder",
+                        message = "오늘 일정을 확인했어요",
+                        payload = mapOf("events" to titles),
+                    ),
+                )
+            }.onFailure { Log.w(TAG, "캘린더 알림 전송 실패", it) }
+        }
+
+        /** 앱 실행 3초 후 자동 음식 추천 데모. 캘린더 권한/일정 없으면 "일정" fallback. */
+        suspend fun sendDemoFoodRecommend() {
+            val eventTitle =
+                if (calendarDataSource.hasPermission()) {
+                    val now = System.currentTimeMillis()
+                    calendarDataSource.getTodayAndTomorrowEvents()
+                        .filter { it.startMillis > now }
+                        .minByOrNull { it.startMillis }
+                        ?.title ?: "일정"
+                } else {
+                    "일정"
+                }
+            runCatching {
+                healthApi.sendChatCommand(
+                    ChatCommandRequest(
+                        commandType = "calendar_reminder",
+                        message = "오늘 일정을 확인했어요",
+                        payload = mapOf("events" to eventTitle),
+                    ),
+                )
+            }.onFailure { Log.w(TAG, "데모 음식 추천 전송 실패", it) }
+        }
 
         /** 안 읽음 수 조회. 배지 갱신용. */
         suspend fun getUnreadCount(): Long =

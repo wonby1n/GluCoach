@@ -1,7 +1,12 @@
 
 package com.ssafy.s309.ui.screen.main
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.util.Log
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,7 +30,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBackIosNew
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Restaurant
+import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -43,10 +51,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -57,8 +67,11 @@ import androidx.lifecycle.viewModelScope
 import com.ssafy.s309.R
 import com.ssafy.s309.data.model.NotificationItem
 import com.ssafy.s309.data.repository.HealthRepository
+import com.ssafy.s309.ui.component.MarkdownText
 import com.ssafy.s309.ui.theme.GlucoachColors
 import com.ssafy.s309.ui.theme.GlucoachSpacing
+import com.ssafy.s309.voice.VoiceQueryManager
+import com.ssafy.s309.voice.WakeWordManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -98,6 +111,8 @@ class KikiChatViewModel
     @Inject
     constructor(
         private val healthRepository: HealthRepository,
+        private val voiceQueryManager: VoiceQueryManager,
+        private val wakeWordManager: WakeWordManager,
     ) : ViewModel() {
         private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
         val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
@@ -113,6 +128,10 @@ class KikiChatViewModel
 
         private val _isWaitingForAgent = MutableStateFlow(false)
         val isWaitingForAgent: StateFlow<Boolean> = _isWaitingForAgent.asStateFlow()
+
+        // 음성 입력 상태 그대로 노출 (Composable이 마이크 버튼 외형 결정에 사용)
+        val voiceState: StateFlow<VoiceQueryManager.State> = voiceQueryManager.state
+        val voicePartial: StateFlow<String> = voiceQueryManager.partial
 
         private var timeoutJob: Job? = null
         private var currentPage = -1
@@ -134,6 +153,44 @@ class KikiChatViewModel
                     onFcmReceived()
                 }
             }
+            // "하이 키키" 감지 이벤트 — 채팅 노출 없이 소비만 함
+            viewModelScope.launch {
+                wakeWordManager.wakeCallEvents.collect { }
+            }
+        }
+
+        /**
+         * Wake 감지 시 채팅에 두 줄을 즉시 추가한다:
+         *  1. "하이 키키" — 사용자 말풍선
+         *  2. "네, 부르셨어요?" — 키키 말풍선
+         *
+         * 백엔드에 저장되지 않으므로, 채팅 새로고침/페이지 재조회 시엔 사라진다.
+         * 데모 시 wake 호출이 화면에 바로 보이게 하기 위한 로컬 UI 트릭.
+         */
+        private fun prependWakeCallMessages(timestamp: Long) {
+            val nowIso = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+            val userMsg =
+                ChatMessage.UserMessage(
+                    text = "하이 키키",
+                    timestamp = timestamp,
+                    createdAt = nowIso,
+                )
+            val kikiMsg =
+                ChatMessage.KikiMessage(
+                    NotificationItem(
+                        // 백엔드 ID 와 충돌하지 않도록 음수 + ms 타임스탬프 사용
+                        id = -timestamp,
+                        title = "키키",
+                        message = "네, 부르셨어요?",
+                        timeAgoText = "방금",
+                        isUnread = false,
+                        alertType = "LOCAL_WAKE_CALL",
+                        createdAt = nowIso,
+                        displayTrace = null,
+                    ),
+                )
+            val raw = _messages.value.filterNot { it is ChatMessage.DateSeparator }
+            _messages.value = withDateSeparators(listOf(kikiMsg, userMsg) + raw)
         }
 
         fun loadNextPage() {
@@ -146,6 +203,7 @@ class KikiChatViewModel
                     val newMessages: List<ChatMessage> =
                         response.content
                             .sortedByDescending { it.id }
+                            .filter { !(it.sender == "user" && it.commandType == "calendar_reminder") }
                             .map { m ->
                                 if (m.sender == "user") {
                                     ChatMessage.UserMessage(
@@ -164,6 +222,7 @@ class KikiChatViewModel
                                             alertType = m.messageType ?: "",
                                             createdAt = m.createdAt,
                                             displayTrace = m.displayTrace,
+                                            payload = m.payload,
                                         ),
                                     )
                                 }
@@ -191,6 +250,7 @@ class KikiChatViewModel
                         val fresh: List<ChatMessage> =
                             response.content
                                 .sortedByDescending { it.id }
+                                .filter { !(it.sender == "user" && it.commandType == "calendar_reminder") }
                                 .map { m ->
                                     if (m.sender == "user") {
                                         ChatMessage.UserMessage(
@@ -209,6 +269,7 @@ class KikiChatViewModel
                                                 alertType = m.messageType ?: "",
                                                 createdAt = m.createdAt,
                                                 displayTrace = m.displayTrace,
+                                                payload = m.payload,
                                             ),
                                         )
                                     }
@@ -261,13 +322,34 @@ class KikiChatViewModel
                                                 alertType = m.messageType ?: "",
                                                 createdAt = m.createdAt,
                                                 displayTrace = m.displayTrace,
+                                                payload = m.payload,
                                             ),
                                         )
                                     }
                                 }
                         if (newMessages.isNotEmpty()) {
-                            val raw = _messages.value.filterNot { it is ChatMessage.DateSeparator }
+                            // 옵티미스틱 user 메시지의 createdAt 은 FE clock 으로 생성돼 서버 DB clock 과
+                            // 미세하게 어긋난다. 위 createdAt 기반 dedup 으로는 잡히지 않아 같은 user
+                            // 메시지가 [local optimistic + server] 둘 다 화면에 남는 버그가 있었다.
+                            // 서버 응답에 동일 텍스트 user 메시지가 있고 local 의 createdAt 이 서버에 없으면
+                            // 그 local 은 옵티미스틱이라고 판정하고 제거한다.
+                            val serverCreatedAts = response.content.map { it.createdAt }.toSet()
+                            val fetchedUserTexts =
+                                response.content
+                                    .asSequence()
+                                    .filter { it.sender == "user" }
+                                    .mapNotNull { it.message }
+                                    .toSet()
+                            val raw =
+                                _messages.value
+                                    .filterNot { it is ChatMessage.DateSeparator }
+                                    .filterNot { msg ->
+                                        msg is ChatMessage.UserMessage &&
+                                            msg.text in fetchedUserTexts &&
+                                            msg.createdAt !in serverCreatedAts
+                                    }
                             _messages.value = withDateSeparators(newMessages + raw)
+                            // 음성 응답 자동 발화는 제거 — FcmService 가 푸시 도착 시 TTS 로 본문을 읽어준다 (중복 방지).
                         }
                     }
                     .onFailure { Log.w(TAG, "FCM 후 메시지 재조회 실패", it) }
@@ -275,9 +357,50 @@ class KikiChatViewModel
         }
 
         fun sendFoodRecommendCommand() {
+            dispatchRecommendCommand(userQuery = null)
+        }
+
+        /**
+         * 마이크 STT 결과를 그대로 recommend_food 경로로 흘려보낸다.
+         * AI 프롬프트가 payload["query"] 존재 시 [자유 발화 모드] 로 분기한다.
+         *
+         * user 말풍선은 BE 저장 후 onFcmReceived 의 page=0 재조회에서 함께 가져온다 (로컬 prepend
+         * 하면 클라이언트/BE createdAt 차이로 dedupe가 깨져 중복 표시됨).
+         * 음성 응답 TTS 는 FcmService 가 푸시 도착 시 본문을 읽어주므로 여기서는 별도 처리하지 않는다.
+         */
+        fun sendVoiceQuery(transcript: String) {
+            val trimmed = transcript.trim()
+            if (trimmed.isEmpty()) return
+            dispatchRecommendCommand(userQuery = trimmed)
+        }
+
+        /**
+         * 마이크 버튼 탭. STT 한 세션 시작. 권한/엔진 미비 또는 발화 미감지 시 [onError] 호출.
+         * 결과 확보 시 자동으로 [sendVoiceQuery] 로 흘려보낸다.
+         */
+        fun startVoiceQuery(onError: (VoiceQueryManager.FailureReason) -> Unit) {
+            wakeWordManager.enterListeningStateForExternalStt()
+            voiceQueryManager.startOnce(
+                onResult = { transcript ->
+                    wakeWordManager.enterThinkingStateForExternalStt(transcript)
+                    sendVoiceQuery(transcript)
+                },
+                onError = { reason ->
+                    wakeWordManager.enterIdleStateForExternalStt()
+                    onError(reason)
+                },
+            )
+        }
+
+        fun cancelVoiceQuery() {
+            voiceQueryManager.cancel()
+            wakeWordManager.enterIdleStateForExternalStt()
+        }
+
+        private fun dispatchRecommendCommand(userQuery: String?) {
             if (_isWaitingForAgent.value) return
             viewModelScope.launch {
-                runCatching { healthRepository.sendFoodRecommendCommand() }
+                runCatching { healthRepository.sendFoodRecommendCommand(userQuery) }
                     .onSuccess {
                         _isWaitingForAgent.value = true
                         timeoutJob?.cancel()
@@ -323,9 +446,9 @@ class KikiChatViewModel
         companion object {
             private const val TAG = "KikiChatVM"
             const val PAGE_SIZE = 20L
-            private const val FONT_SIZE_DEFAULT = 14f
+            private const val FONT_SIZE_DEFAULT = 20f
             private const val FONT_SIZE_MIN = 11f
-            private const val FONT_SIZE_MAX = 20f
+            private const val FONT_SIZE_MAX = 26f
             private const val AGENT_TIMEOUT_MS = 30_000L
         }
     }
@@ -418,6 +541,7 @@ fun KikiChatScreen(
     onBack: () -> Unit,
     onItemClick: (NotificationItem) -> Unit = {},
     onReplySent: () -> Unit = {},
+    onCompareClick: (String, String) -> Unit = { _, _ -> },
     viewModel: KikiChatViewModel = hiltViewModel(),
 ) {
     val messages by viewModel.messages.collectAsStateWithLifecycle()
@@ -425,17 +549,61 @@ fun KikiChatScreen(
     val hasMore by viewModel.hasMore.collectAsStateWithLifecycle()
     val fontSize by viewModel.fontSize.collectAsStateWithLifecycle()
     val isWaitingForAgent by viewModel.isWaitingForAgent.collectAsStateWithLifecycle()
+    val voiceState by viewModel.voiceState.collectAsStateWithLifecycle()
+    val voicePartial by viewModel.voicePartial.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+    val context = LocalContext.current
+
+    // STT 트리거 — 권한 있으면 즉시 시작, 없으면 launcher 로 요청.
+    val recordAudioLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                viewModel.startVoiceQuery { reason ->
+                    Toast.makeText(context, voiceErrorMessage(reason), Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                Toast.makeText(context, "마이크 권한이 필요해요", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+    val onMicClick: () -> Unit = {
+        when (voiceState) {
+            VoiceQueryManager.State.LISTENING, VoiceQueryManager.State.PROCESSING ->
+                viewModel.cancelVoiceQuery()
+            VoiceQueryManager.State.IDLE -> {
+                val hasPermission =
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                        PackageManager.PERMISSION_GRANTED
+                if (hasPermission) {
+                    viewModel.startVoiceQuery { reason ->
+                        Toast.makeText(context, voiceErrorMessage(reason), Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    recordAudioLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }
+            }
+        }
+    }
 
     // 화면 진입/포그라운드 복귀 시 page=0 재조회 — FCM 미수신 단말에서도 최신 메시지 보장
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer =
             LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
+                when (event) {
+                    Lifecycle.Event.ON_RESUME -> {
+                        ChatScreenStateHolder.isActive = true
+                        viewModel.refresh()
+                    }
+                    Lifecycle.Event.ON_PAUSE -> ChatScreenStateHolder.isActive = false
+                    else -> {}
+                }
             }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose {
+            ChatScreenStateHolder.isActive = false
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     // 새 메시지 도착 시 맨 아래로 스크롤 (reverseLayout=true 기준 index 0)
@@ -552,6 +720,7 @@ fun KikiChatScreen(
                                         if (replyText != null) onReplySent()
                                     },
                                     onClick = { onItemClick(message.item) },
+                                    onCompareClick = onCompareClick,
                                 )
                             is ChatMessage.UserMessage ->
                                 UserChatBubble(message = message, fontSize = fontSize)
@@ -583,65 +752,191 @@ fun KikiChatScreen(
                 }
             }
 
-            // ── 음식 추천 버튼 / 대기 인디케이터 (floating) ──────────
-            if (isWaitingForAgent) {
-                Row(
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = GlucoachSpacing.lg),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        color = GlucoachColors.PrimaryDark,
-                        strokeWidth = 2.dp,
-                    )
-                    Spacer(modifier = Modifier.width(GlucoachSpacing.sm))
-                    Text(
-                        text = "키키가 분석 중...",
-                        color = GlucoachColors.TextSecondary,
-                        fontSize = 14.sp,
-                    )
-                }
-            } else {
-                Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = GlucoachSpacing.lg)
-                            .shadow(
-                                elevation = 6.dp,
-                                shape = RoundedCornerShape(20.dp),
-                            )
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(GlucoachColors.Surface)
-                            .border(1.5.dp, GlucoachColors.PrimaryDark, RoundedCornerShape(20.dp))
-                            .clickable { viewModel.sendFoodRecommendCommand() }
-                            .padding(horizontal = GlucoachSpacing.lg, vertical = GlucoachSpacing.sm),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Restaurant,
-                            contentDescription = null,
-                            tint = GlucoachColors.PrimaryDark,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Text(
-                            text = "음식 추천",
-                            color = GlucoachColors.PrimaryDark,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
-                }
+            // ── 음식 추천 / 마이크 / STT 상태 (floating) ──────────
+            FloatingChatControls(
+                modifier = Modifier.align(Alignment.BottomCenter),
+                isWaitingForAgent = isWaitingForAgent,
+                voiceState = voiceState,
+                voicePartial = voicePartial,
+                onMicClick = onMicClick,
+                onRecommendClick = { viewModel.sendFoodRecommendCommand() },
+            )
+        }
+    }
+}
+
+@Composable
+private fun FloatingChatControls(
+    modifier: Modifier,
+    isWaitingForAgent: Boolean,
+    voiceState: VoiceQueryManager.State,
+    voicePartial: String,
+    onMicClick: () -> Unit,
+    onRecommendClick: () -> Unit,
+) {
+    val isListening = voiceState == VoiceQueryManager.State.LISTENING
+    val isProcessingStt = voiceState == VoiceQueryManager.State.PROCESSING
+
+    Column(
+        modifier = modifier.padding(bottom = GlucoachSpacing.lg),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        // 음성 발화 partial transcript 미니 표시
+        if (isListening && voicePartial.isNotBlank()) {
+            Box(
+                modifier =
+                    Modifier
+                        .padding(bottom = GlucoachSpacing.sm)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(GlucoachColors.Surface)
+                        .border(1.dp, GlucoachColors.Border, RoundedCornerShape(14.dp))
+                        .padding(horizontal = GlucoachSpacing.md, vertical = 6.dp),
+            ) {
+                Text(
+                    text = voicePartial,
+                    color = GlucoachColors.TextPrimary,
+                    fontSize = 13.sp,
+                )
+            }
+        }
+
+        if (isWaitingForAgent) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    color = GlucoachColors.PrimaryDark,
+                    strokeWidth = 2.dp,
+                )
+                Spacer(modifier = Modifier.width(GlucoachSpacing.sm))
+                Text(
+                    text = "키키가 분석 중...",
+                    color = GlucoachColors.TextSecondary,
+                    fontSize = 14.sp,
+                )
+            }
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(GlucoachSpacing.sm),
+            ) {
+                MicButton(
+                    isListening = isListening,
+                    isProcessing = isProcessingStt,
+                    onClick = onMicClick,
+                )
+                RecommendChip(onClick = onRecommendClick)
             }
         }
     }
 }
+
+@Composable
+private fun MicButton(
+    isListening: Boolean,
+    isProcessing: Boolean,
+    onClick: () -> Unit,
+) {
+    val (bgColor, iconTint, icon, label) =
+        when {
+            isListening ->
+                MicVisual(
+                    bg = GlucoachColors.PrimaryDark,
+                    tint = Color.White,
+                    icon = Icons.Outlined.Stop,
+                    label = "듣고 있어요",
+                )
+            isProcessing ->
+                MicVisual(
+                    bg = GlucoachColors.PrimaryLight,
+                    tint = GlucoachColors.PrimaryDark,
+                    icon = Icons.Outlined.Mic,
+                    label = "인식 중",
+                )
+            else ->
+                MicVisual(
+                    bg = GlucoachColors.Surface,
+                    tint = GlucoachColors.PrimaryDark,
+                    icon = Icons.Outlined.Mic,
+                    label = "음성으로 물어보기",
+                )
+        }
+    Box(
+        modifier =
+            Modifier
+                .shadow(elevation = 6.dp, shape = RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(20.dp))
+                .background(bgColor)
+                .border(1.5.dp, GlucoachColors.PrimaryDark, RoundedCornerShape(20.dp))
+                .clickable(onClick = onClick)
+                .padding(horizontal = GlucoachSpacing.lg, vertical = GlucoachSpacing.sm),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = iconTint,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                text = label,
+                color = iconTint,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
+}
+
+private data class MicVisual(
+    val bg: Color,
+    val tint: Color,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val label: String,
+)
+
+@Composable
+private fun RecommendChip(onClick: () -> Unit) {
+    Box(
+        modifier =
+            Modifier
+                .shadow(elevation = 6.dp, shape = RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(20.dp))
+                .background(GlucoachColors.Surface)
+                .border(1.5.dp, GlucoachColors.PrimaryDark, RoundedCornerShape(20.dp))
+                .clickable(onClick = onClick)
+                .padding(horizontal = GlucoachSpacing.lg, vertical = GlucoachSpacing.sm),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Restaurant,
+                contentDescription = null,
+                tint = GlucoachColors.PrimaryDark,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                text = "음식 추천",
+                color = GlucoachColors.PrimaryDark,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
+}
+
+private fun voiceErrorMessage(reason: VoiceQueryManager.FailureReason): String =
+    when (reason) {
+        VoiceQueryManager.FailureReason.NO_PERMISSION -> "마이크 권한이 필요해요"
+        VoiceQueryManager.FailureReason.NO_ENGINE -> "음성 인식을 사용할 수 없어요"
+        VoiceQueryManager.FailureReason.NO_SPEECH -> "잘 못 들었어요, 다시 한 번 말씀해주세요"
+        VoiceQueryManager.FailureReason.START_FAILED -> "마이크를 시작할 수 없어요"
+        VoiceQueryManager.FailureReason.RECOGNIZER_ERROR -> "음성 인식 중 오류가 났어요"
+    }
 
 // ── TopBar ───────────────────────────────────────────────────────────
 
@@ -740,6 +1035,31 @@ private fun FontSizeControl(
 
 // ── 말풍선 ────────────────────────────────────────────────────────────
 
+internal val CALENDAR_TITLE_REGEX = Regex("""^일정\s*:\s*(.+)$""")
+
+internal data class CalendarReminder(val eventTitle: String, val body: String)
+
+internal fun parseCalendarReminder(message: String): CalendarReminder? {
+    val splitIdx = message.indexOf("\n\n")
+    if (splitIdx < 0) return null
+    val firstLine =
+        message.substring(0, splitIdx)
+            .trim()
+            .trimStart('#').trim()
+            .removePrefix("**").removeSuffix("**")
+            .removePrefix("*").removeSuffix("*")
+            .trim()
+    val body = message.substring(splitIdx + 2).trim()
+    val titleMatch = CALENDAR_TITLE_REGEX.find(firstLine) ?: return null
+    val title =
+        titleMatch.groupValues[1]
+            .trim()
+            .removePrefix("**").removeSuffix("**")
+            .trim()
+    if (title.isEmpty() || body.isEmpty()) return null
+    return CalendarReminder(title, body)
+}
+
 @Composable
 private fun KikiChatBubble(
     item: NotificationItem,
@@ -747,7 +1067,21 @@ private fun KikiChatBubble(
     showReplyButtons: Boolean = false,
     onReply: (replyText: String?, displayLabel: String) -> Unit = { _, _ -> },
     onClick: () -> Unit = {},
+    onCompareClick: (String, String) -> Unit = { _, _ -> },
 ) {
+    // # / ## / ### 헤딩 앞의 이모지/특수문자 제거
+    val sharpPattern = Regex("""^(#{1,3} )[^\p{L}\p{N}]+""", RegexOption.MULTILINE)
+    val bubbleText =
+        item.message
+            .replace(sharpPattern, "$1")
+            .replace("🔍 ", "")
+            .replace("🔍", "")
+    val sharpHeaderRe = Regex("""^#{1,3} """)
+    val hasSections =
+        bubbleText.lines().any { line ->
+            sharpHeaderRe.containsMatchIn(line) || (line.startsWith("**") && line.endsWith("**") && line.length > 4)
+        }
+
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         verticalAlignment = Alignment.Top,
@@ -768,14 +1102,17 @@ private fun KikiChatBubble(
                         Modifier
                             .widthIn(max = 260.dp)
                             .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 14.dp, bottomStart = 14.dp, bottomEnd = 14.dp))
-                            .background(GlucoachColors.PrimaryLight)
-                            .padding(horizontal = GlucoachSpacing.md, vertical = GlucoachSpacing.sm),
+                            .background(if (hasSections) GlucoachColors.Surface else GlucoachColors.PrimaryLight),
                 ) {
-                    Text(
-                        text = item.message,
+                    MarkdownText(
+                        text = bubbleText,
                         color = GlucoachColors.TextPrimary,
                         fontSize = fontSize.sp,
                         lineHeight = (fontSize * 1.5f).sp,
+                        headerBackground = if (hasSections) GlucoachColors.PrimaryLight else null,
+                        bodyBackground = if (hasSections) GlucoachColors.Surface else null,
+                        sectionPaddingHorizontal = GlucoachSpacing.md,
+                        sectionPaddingVertical = GlucoachSpacing.sm,
                     )
                 }
                 Spacer(modifier = Modifier.width(6.dp))
@@ -790,6 +1127,15 @@ private fun KikiChatBubble(
             if (showReplyButtons) {
                 Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
                 ChatReplyButtons(onReply = onReply)
+            }
+            // A/B 비교 결과가 있으면 비교 화면으로 이동하는 버튼 표시
+            item.payload?.comparison?.let { comparison ->
+                Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+                CompareButton(
+                    foodAName = comparison.foodA.name,
+                    foodBName = comparison.foodB.name,
+                    onClick = { onCompareClick(comparison.foodA.name, comparison.foodB.name) },
+                )
             }
         }
     }
@@ -836,6 +1182,77 @@ private fun ChatReplyButton(
             color = Color.White,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+private fun CalendarReminderCard(
+    eventTitle: String,
+    fontSize: Float,
+) {
+    Column(
+        modifier =
+            Modifier
+                .widthIn(max = 260.dp)
+                .border(1.dp, GlucoachColors.Border, RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .background(GlucoachColors.Surface),
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(GlucoachColors.SelectBadgeBg)
+                    .padding(horizontal = GlucoachSpacing.md, vertical = GlucoachSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.CalendarMonth,
+                contentDescription = null,
+                tint = GlucoachColors.PrimaryDark,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = "오늘의 일정",
+                color = GlucoachColors.PrimaryDark,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        HorizontalDivider(color = GlucoachColors.Border)
+        Text(
+            text = eventTitle,
+            color = GlucoachColors.TextPrimary,
+            fontSize = fontSize.sp,
+            fontWeight = FontWeight.SemiBold,
+            lineHeight = (fontSize * 1.4f).sp,
+            modifier = Modifier.padding(horizontal = GlucoachSpacing.md, vertical = GlucoachSpacing.sm),
+        )
+    }
+}
+
+@Composable
+private fun CompareButton(
+    foodAName: String,
+    foodBName: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(GlucoachColors.PrimaryLight)
+                .border(1.5.dp, GlucoachColors.PrimaryDark, RoundedCornerShape(20.dp))
+                .clickable(onClick = onClick)
+                .padding(horizontal = GlucoachSpacing.md, vertical = 8.dp),
+    ) {
+        Text(
+            text = "A/B 비교: $foodAName vs $foodBName →",
+            color = GlucoachColors.PrimaryDark,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
         )
     }
 }

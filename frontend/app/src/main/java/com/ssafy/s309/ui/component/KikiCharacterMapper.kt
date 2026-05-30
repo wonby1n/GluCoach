@@ -8,13 +8,13 @@ enum class KikiSymptom { THIRST, TIRED, BLUR }
 object KikiCharacterMapper {
     private const val LOW_THRESHOLD = 70
 
-    private data class Thresholds(val ok: Int, val mild: Int, val moderate: Int)
+    private data class Thresholds(val high: Int, val severe: Int)
 
     private val THRESHOLDS =
         mapOf(
-            "NORMAL" to Thresholds(ok = 140, mild = 180, moderate = 250),
-            "T1D" to Thresholds(ok = 150, mild = 180, moderate = 250),
-            "T2D" to Thresholds(ok = 140, mild = 180, moderate = 250),
+            "NORMAL" to Thresholds(high = 180, severe = 250),
+            "T1D" to Thresholds(high = 180, severe = 250),
+            "T2D" to Thresholds(high = 180, severe = 250),
         )
 
     @DrawableRes
@@ -23,40 +23,22 @@ object KikiCharacterMapper {
         trendRateMgDlPerMin: Float,
         diabetesType: String = "NORMAL",
     ): Int {
-        val glucose = glucoseMgDl ?: return R.drawable.kiki_main_anim
-
-        val adjusted = applyTrend(glucose, trendRateMgDlPerMin)
+        val glucose = glucoseMgDl ?: return R.drawable.kiki_hello
         val thresholds = THRESHOLDS[diabetesType] ?: THRESHOLDS.getValue("NORMAL")
 
-        if (adjusted < LOW_THRESHOLD) return R.drawable.kiki_fell_off
-        val severity = classifySeverity(adjusted, thresholds) ?: return R.drawable.kiki_main_anim
+        if (glucose < LOW_THRESHOLD) return R.drawable.kiki_fell_off
+        val severity = classifySeverity(glucose, thresholds) ?: return R.drawable.kiki_hello
         val symptom = classifySymptom(trendRateMgDlPerMin)
         return drawableFor(severity, symptom)
     }
 
-    private fun applyTrend(
-        glucose: Int,
-        rate: Float,
-    ): Int {
-        val offset =
-            when {
-                rate > 3f -> 30
-                rate > 1f -> 15
-                rate >= -1f -> 0
-                rate >= -3f -> -10
-                else -> -25
-            }
-        return (glucose + offset).coerceIn(40, 400)
-    }
-
     private fun classifySeverity(
-        adjusted: Int,
+        glucose: Int,
         t: Thresholds,
     ): String? =
         when {
-            adjusted < t.ok -> null
-            adjusted < t.mild -> "mild"
-            adjusted < t.moderate -> "moderate"
+            glucose < t.high -> null
+            glucose < t.severe -> "moderate"
             else -> "severe"
         }
 
@@ -73,7 +55,6 @@ object KikiCharacterMapper {
         symptom: KikiSymptom,
     ): Int =
         when (severity) {
-            "mild" -> R.drawable.kiki_dehydrated_high
             "moderate" ->
                 when (symptom) {
                     KikiSymptom.THIRST -> R.drawable.kiki_moderate_thirst

@@ -188,7 +188,7 @@ Content-Type: application/json
 | 기능명 | Method | 엔드포인트 | 상세 설명 | 구현 | 우선순위 |
 |--------|--------|-----------|-----------|------|---------|
 | 음식 사진 인식 + 공공데이터 자동 연동 | POST | `/ai/food/recognize-and-fetch` | 사진 → CV 모델 인식 → 식품안전처 API 자동 조회 → 영양 정보 반환 (원스텝). **사용 시나리오: 식사 *기록* 흐름** (예측 곡선 불필요) | ⬜ | 🔴 Highest |
-| 음식 사진 인식 (CV만) | POST | `/ai/food/recognize` | Camera2 API 촬영 → FastAPI CV 모델. confidence 0.6 미만 시 확인 UI. 실패 시 텍스트 입력 fallback | ⬜ | 🔴 Highest |
+| 음식 사진 인식 (CV만) | POST | `/ai/food/recognize` | Camera2 API 촬영 → FastAPI CV 모델. confidence 0.5 미만 시 확인 UI. 실패 시 텍스트 입력 fallback | ⬜ | 🔴 Highest |
 | 음식명으로 영양 정보 조회 | GET | `/api/food/search?q={keyword}` | **공공데이터포털 식품영양성분 API(`FoodNtrCpntDbInfo02`)** 호출 후 `foods` 캐싱 (30일 TTL). 캐시 우선 조회. 응답: 영양표시 9대 항목 + 식이섬유 + category(food_lv3_nm) | 🟩 | 🔴 Highest |
 
 > **§7 `/api/predict/glucose/from-image` 와의 책임 구분**: from-image 는 **식전 시뮬레이션** 용 통합 엔드포인트로 CV 인식 + foods 조회 + 예측 모델까지 단일 호출에서 처리. 위 `/ai/food/recognize-and-fetch` 는 **식사 기록** 흐름에서 예측 없이 영양 정보만 필요할 때 사용 (POST `/api/meals` 직전). 두 엔드포인트는 ① CV ② foods 조회 단계의 내부 구현을 공유하지만 호출 시나리오가 다르다.
@@ -252,11 +252,11 @@ Content-Type: application/json
 
 | Status | 트리거 조건 | FE 처리 |
 |---|---|---|
-| `OK` | 인식 confidence ≥ 0.6 + foods 영양정보 확보 (DB 캐시 hit 또는 식약처 API fetch) | `prediction.curve` 표시 |
-| `LOW_CONFIDENCE` | `detections` 비어있음 / top confidence < 0.6 / top `name_ko` blank | `detected[]` 노출, 사용자 선택·텍스트 입력 fallback. `requireConfirmation=true` |
+| `OK` | 인식 confidence ≥ 0.5 + foods 영양정보 확보 (DB 캐시 hit 또는 식약처 API fetch) | `prediction.curve` 표시 |
+| `LOW_CONFIDENCE` | `detections` 비어있음 / top confidence < 0.5 / top `name_ko` blank | `detected[]` 노출, 사용자 선택·텍스트 입력 fallback. `requireConfirmation=true` |
 | `PENDING_NUTRITION` | 인식 OK 지만 foods·식약처 API 모두 미스 → `customized=true` row 신규 저장. 영양정보 결측 | "탄수화물 직접 입력" UI. 입력 시 `POST /api/predict/glucose` 재호출, 미입력 시 빈 prediction 그대로 표시 |
 
-> 임계값 `CONFIDENCE_THRESHOLD = 0.6` 은 `FromImagePredictionService` 상수. 변경 시 BE 코드 + 본 스펙 동시 갱신 필요.
+> 임계값 `CONFIDENCE_THRESHOLD = 0.5` 은 `FromImagePredictionService` 상수. 변경 시 BE 코드 + 본 스펙 동시 갱신 필요.
 
 **FE 4단계 진행 애니메이션 매핑**
 
@@ -279,7 +279,7 @@ FE                     PredictionController         FromImagePredictionService
  ├──────────────────────►│ 검증(image/* + non-empty)   │
  │                      ├────────────────────────────►│ predict(userId, image)
  │                      │                            │  ├─ FoodDetectClient.detect       (① CV)
- │                      │                            │  │    confidence < 0.6 / blank ko
+ │                      │                            │  │    confidence < 0.5 / blank ko
  │                      │                            │  │    └─ return LOW_CONFIDENCE
  │                      │                            │  ├─ FoodResolutionService.resolve (② foods)
  │                      │                            │  │    PENDING_NUTRITION 분기
@@ -399,4 +399,42 @@ FE                     PredictionController         FromImagePredictionService
 | `sodiumMg` | `nat` |
 | `category` | `foodLv3Nm` (식품 대분류) |
 
-영양성분은 모두 100g(또는 100ml) 기준 (`nutConSrtrQua` 100 고정).
+### 영양성분 1인분 기준 환산 정책
+
+식약처 API 원본값은 **100g(또는 100ml) 기준** (`nutConSrtrQua` 100 고정)이지만, API 응답(`FoodSearchResult.from()`)에서 `servingSize` 기준으로 환산해 **1인분 기준**으로 반환한다.
+
+**환산 수식**
+
+```
+반환값 = DB 저장값(100g 기준) × (servingSize / 100)
+```
+
+- `servingSize`가 null이면 100을 기본값으로 사용 → 비율 1.0, 값 변화 없음
+- 결과값은 소수점 2자리 반올림 (`RoundingMode.HALF_UP`)
+
+**servingSize 출처**
+
+| 데이터 유형 | servingSize 값 |
+|---|---|
+| 식약처 API 캐시 | API `SERVING_SIZE` 필드 파싱. 파싱 실패 시 100 기본값 |
+| 사용자 커스텀 음식 | 사용자 입력값 |
+
+**환산 예시**
+
+| 음식 | DB 저장값(100g) | servingSize | 반환값(1인분) |
+|---|---|---|---|
+| 현미밥 | kcal=143, carbs=31.5g | 210g | kcal=300.3, carbs=66.15g |
+| 닭가슴살 | kcal=110, protein=23g | 100g | kcal=110, protein=23g (동일) |
+| 아메리카노 | kcal=8, carbs=1.5g | 350ml | kcal=28, carbs=5.25g |
+
+**DB 저장 방식은 그대로**
+
+`foods` 테이블의 영양값 컬럼은 계속 **100g 기준**으로 저장. 환산은 응답 레이어(`FoodSearchResult.from()`)에서만 수행하므로 DB 스키마 변경 없음.
+
+**하위 흐름 영향 범위**
+
+| 흐름 | 영향 |
+|---|---|
+| `POST /api/predict/glucose` (`PredictRequest`) | food search 결과를 그대로 채워 전송하면 1인분 기준 예측 |
+| `POST /api/meals` | 식사 기록 시 food search 결과의 영양값이 1인분 기준으로 저장 |
+| Agent 음식 검색 (`AgentFoodSearchItem`) | `kcal`, `carbsG`만 포함하므로 동일하게 1인분 기준 |

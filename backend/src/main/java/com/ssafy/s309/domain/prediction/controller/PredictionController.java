@@ -1,6 +1,9 @@
 package com.ssafy.s309.domain.prediction.controller;
 
 import com.ssafy.s309.domain.auth.principal.CustomUserPrincipal;
+import com.ssafy.s309.domain.prediction.client.GlucosePersonalizeClient;
+import com.ssafy.s309.domain.prediction.client.dto.PersonalizeRequest;
+import com.ssafy.s309.domain.prediction.client.dto.PersonalizeResponse;
 import com.ssafy.s309.domain.prediction.dto.AbPredictRequest;
 import com.ssafy.s309.domain.prediction.dto.AbPredictResponse;
 import com.ssafy.s309.domain.prediction.dto.FromImagePredictResponse;
@@ -30,6 +33,7 @@ public class PredictionController {
 
   private final PredictionService predictionService;
   private final FromImagePredictionService fromImagePredictionService;
+  private final GlucosePersonalizeClient glucosePersonalizeClient;
 
   @Operation(summary = "단일 음식 식전 혈당 예측")
   @PostMapping("/glucose")
@@ -60,5 +64,20 @@ public class PredictionController {
       throw new IllegalArgumentException("이미지 파일이 필요합니다");
     }
     return ResponseEntity.ok(fromImagePredictionService.predict(principal.userId(), image));
+  }
+
+  @Operation(
+      summary = "혈당 예측 모델 개인화 fine-tune",
+      description =
+          "사용자 실측 식사+혈당 이력으로 LSTM 모델을 fine-tune. AI 서버로 forward. "
+              + "응답 시간이 길 수 있음(최대 10분). 데모/시연용.")
+  @PostMapping("/glucose/personalize")
+  public ResponseEntity<PersonalizeResponse> personalize(
+      @AuthenticationPrincipal CustomUserPrincipal principal,
+      @RequestBody @Valid PersonalizeRequest request) {
+    PersonalizeRequest forwarded =
+        new PersonalizeRequest(
+            String.valueOf(principal.userId()), request.userProfile(), request.history());
+    return ResponseEntity.ok(glucosePersonalizeClient.personalize(forwarded));
   }
 }

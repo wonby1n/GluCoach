@@ -1,5 +1,6 @@
 package com.ssafy.s309.data.model
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /** 실시간 혈당 측정 값 (BLE 패치 / UI 표시용) */
@@ -54,6 +55,28 @@ data class DisplayTrace(
     val decision: DisplayTraceDecision = DisplayTraceDecision(),
 )
 
+/** Agent A/B 비교 결과 — 음식 단일 항목 */
+@Serializable
+data class AgentComparisonFood(
+    val name: String,
+    @SerialName("peak_mg_dl") val peakMgDl: Double? = null,
+    @SerialName("risk_level") val riskLevel: String = "",
+)
+
+/** Agent A/B 비교 결과 */
+@Serializable
+data class AgentComparison(
+    @SerialName("food_a") val foodA: AgentComparisonFood,
+    @SerialName("food_b") val foodB: AgentComparisonFood,
+    val winner: String,
+)
+
+/** Agent 응답 payload */
+@Serializable
+data class AgentPayload(
+    val comparison: AgentComparison? = null,
+)
+
 /** 알림 패널 항목 */
 @Serializable
 data class NotificationItem(
@@ -65,6 +88,19 @@ data class NotificationItem(
     val alertType: String = "",
     val createdAt: String = "",
     val displayTrace: DisplayTrace? = null,
+    val payload: AgentPayload? = null,
+)
+
+/** 안드로이드 캘린더 일정 항목 */
+@Serializable
+data class CalendarEvent(
+    val id: Long,
+    val title: String,
+    val startMillis: Long,
+    val endMillis: Long,
+    val allDay: Boolean = false,
+    val description: String? = null,
+    val calendarName: String? = null,
 )
 
 // ── 백엔드 응답 DTO ─────────────────────────────────────────────────
@@ -101,6 +137,13 @@ data class MealRecordResponse(
     val imageUrl: String? = null,
     // BE 가 채워주면 사용자 노출용. 없으면 foodName fallback.
     val foodDisplayName: String? = null,
+    // foods 테이블 join 결과. 호환성 위해 nullable.
+    val kcal: Double? = null,
+    val carbsG: Double? = null,
+    val proteinG: Double? = null,
+    val fatG: Double? = null,
+    // 스케줄러가 계산한 식후 최고 혈당. 데이터 부족이면 null.
+    val peakGlucose: Double? = null,
 )
 
 /** POST /api/meals 요청 (multipart "request" 파트) */
@@ -125,7 +168,9 @@ data class ChatMessageItemResponse(
     val sender: String,
     val message: String? = null,
     val messageType: String? = null,
+    val commandType: String? = null,
     val displayTrace: DisplayTrace? = null,
+    val payload: AgentPayload? = null,
     val isRead: Boolean,
     val createdAt: String,
 )

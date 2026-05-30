@@ -66,8 +66,6 @@ async def personalize_user(req: PersonalizeRequest) -> PersonalizeResponse:
         )
     save_path = Path(config.MODELS_DIR) / f"lstm_meal_personalized_{req.user_id}.pt"
 
-    personalize.cleanup_old_personalized_models()
-
     loop = asyncio.get_event_loop()
     try:
         result = await loop.run_in_executor(

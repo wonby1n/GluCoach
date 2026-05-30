@@ -18,6 +18,11 @@ Desktop.ini
 .env.local
 .env.*.local
 
+# 자격증명 / 키 — 절대 커밋 금지
+*.pem
+*.key
+test_*.json
+
 # 로그
 *.log
 logs/
@@ -28,6 +33,7 @@ temp/
 
 # Claude 설정 파일
 .claude
+.omc/
 
 # oh-my-claudecode (로컬 세션/상태 캐시)
 .omc/

@@ -9,9 +9,18 @@ object FoodCategoryImageMapper {
         category: String?,
         foodName: String = "",
     ): Int {
+        exactNameMap[foodName]?.let { return it }
         categoryMap[category]?.let { return it }
         return matchByName(foodName)
     }
+
+    private val exactNameMap =
+        mapOf(
+            "연어구이" to R.drawable.food_salmon_grill,
+            "달걀찜" to R.drawable.food_steamed_egg,
+            "토마토소스스파게티" to R.drawable.food_tomato_spaghetti,
+            "스파게티" to R.drawable.food_tomato_spaghetti,
+        )
 
     private val categoryMap =
         mapOf(

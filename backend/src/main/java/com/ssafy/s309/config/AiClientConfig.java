@@ -28,4 +28,13 @@ public class AiClientConfig {
 
     return RestClient.builder().baseUrl(properties.baseUrl()).requestFactory(factory).build();
   }
+
+  @Bean("aiPersonalizeRestClient")
+  public RestClient aiPersonalizeRestClient(AiServiceProperties properties) {
+    SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+    factory.setConnectTimeout(Duration.ofMillis(properties.connectTimeoutMs()));
+    factory.setReadTimeout(Duration.ofMillis(properties.personalizeReadTimeoutMs()));
+
+    return RestClient.builder().baseUrl(properties.baseUrl()).requestFactory(factory).build();
+  }
 }
