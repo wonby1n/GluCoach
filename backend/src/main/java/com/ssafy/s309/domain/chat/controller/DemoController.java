@@ -22,11 +22,15 @@ public class DemoController {
   private final ChatFcmDispatcher chatFcmDispatcher;
 
   private static final String POSTMEAL_MESSAGE =
-      "하원님, 돼지국밥을 먹은 지 30분이 지났어요. 지금 혈당 추세로 보아 30분 후에는 200에 도달할 것으로 예상돼요. "
-          + "하원님은 육류를 드셨을 때 고혈당이 오래 지속되시는 편이라, 산책으로 관리해보시는 건 어떨까요?";
+      "# 🍖 식후 혈당 알림\n\n"
+          + "하원님, 돼지국밥을 드신 지 30분이 지났어요.\n\n"
+          + "# 예측\n\n"
+          + "지금 혈당 추세로 보아 30분 후 **200**에 도달할 것으로 예상돼요.\n\n"
+          + "# 추천\n\n"
+          + "육류 드셨을 때 고혈당이 오래 지속되시는 편이라, 산책으로 관리해보시는 건 어떨까요? 🚶";
 
   private static final String WALKING_FEEDBACK_MESSAGE =
-      "하원님, 빠르게 걷고 계시네요! 그 패턴으로 계속 걸어보세요. 혈당이 훨씬 빨리 안정될 거예요 💪";
+      "# 🚶 활동 감지\n\n" + "하원님, 빠르게 걷고 계시네요!\n\n" + "그 패턴으로 계속 걸어보세요. 혈당이 훨씬 빨리 안정될 거예요 💪";
 
   @Operation(summary = "식후 알림 즉시 발송 (시연용)", description = "지정한 userId에게 하드코딩된 식후 혈당 알림을 즉시 발송한다.")
   @PostMapping("/postmeal-alert")
