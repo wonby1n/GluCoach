@@ -241,25 +241,20 @@ def _build_food_compare_prompt(req: FoodCompareRequest) -> str:
         target_info = f"혈당 목표: {profile.target_low:.0f}~{profile.target_high:.0f} mg/dL\n"
 
     a, b = req.food_a, req.food_b
-    return f"""아래 사용자 프로파일과 두 음식의 혈당 예측 데이터를 보고, {name_prefix}에게 어느 음식이 더 나은지 아래 형식으로 한국어로 답변해주세요.
+    peak_diff = abs(a.peak_mgdl - b.peak_mgdl)
+    better = a if a.peak_mgdl <= b.peak_mgdl else b
+    worse = b if better is a else a
+    return f"""두 음식의 혈당 예측 데이터를 보고 아래 형식으로만 답변하세요.
 
-[사용자 프로파일]
-{name_prefix} / {persona_str}
-{target_info}
-[음식 A: {a.name}]
-예측 피크: {a.peak_mgdl:.0f} mg/dL (식후 {a.peak_minute}분) / 상승 속도: {a.slope:.2f} mg/dL/min
+[사용자] {name_prefix} / {persona_str}{(' / ' + target_info.strip()) if target_info.strip() else ''}
+[{a.name}] 피크 {a.peak_mgdl:.0f} mg/dL (식후 {a.peak_minute}분) / 상승 {a.slope:.2f} mg/dL/min
+[{b.name}] 피크 {b.peak_mgdl:.0f} mg/dL (식후 {b.peak_minute}분) / 상승 {b.slope:.2f} mg/dL/min
 
-[음식 B: {b.name}]
-예측 피크: {b.peak_mgdl:.0f} mg/dL (식후 {b.peak_minute}분) / 상승 속도: {b.slope:.2f} mg/dL/min
+출력 형식:
+추천 음식 : {better.name}
+이유 : [피크 차이({peak_diff:.0f} mg/dL)와 상승 속도 차이를 수치로 포함해 한 문장. 해요체. 30자 이내.]
 
-출력 형식 (반드시 이 형식 그대로):
-추천 음식 : [더 나은 음식 이름]
-이유 : [사용자의 구체적 특성(당뇨 유형·BMI·투약 여부 중 1~2가지)을 언급하며 피크 수치 차이와 상승 속도를 숫자로 근거 제시. 2문장 이내.]
-
-규칙:
-- 이모지 없음, 친근한 존댓말
-- 음식 이름 반드시 명시
-- 형식 외 다른 텍스트 출력 금지"""
+규칙: 이모지 없음 / 형식 외 텍스트 금지"""
 
 
 @router.post("/food-compare", response_model=FoodCompareResponse)
