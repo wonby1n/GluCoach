@@ -30,7 +30,8 @@ public class OpenApiConfig {
                 new Tag().name("식사").description("음식 검색·식사 기록·음식 등급"),
                 new Tag().name("건강 데이터").description("수면·걸음수·Health Connect 동기화"),
                 new Tag().name("사용자").description("사용자 설정·보호자·FCM·SOS"),
-                new Tag().name("코칭").description("Kiki 채팅·주간 리포트"),
+                new Tag().name("채팅").description("Kiki 채팅 메시지"),
+                new Tag().name("리포트").description("주간 혈당 보고서"),
                 new Tag().name("Agent API").description("AI Agent 전용 내부 API (X-Agent-Api-Key)"),
                 new Tag().name("Demo").description("시연용 엔드포인트 — JWT 인증 불필요")))
         // 두 스키마 모두 글로벌로 등록 — Swagger UI Authorize 패널에서 둘 다 입력 가능.

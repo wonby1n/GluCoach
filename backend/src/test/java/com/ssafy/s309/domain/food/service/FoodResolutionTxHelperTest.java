@@ -87,8 +87,7 @@ class FoodResolutionTxHelperTest {
 
     assertThat(result).contains(exact);
     verify(foodRepository, never())
-        .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
-            anyString(), any(LocalDateTime.class));
+        .findTop20ByNameContainingWithExactMatchFirst(anyString(), any(LocalDateTime.class));
   }
 
   @Test
@@ -96,9 +95,8 @@ class FoodResolutionTxHelperTest {
     Food partial = foodWithNutrition(101, "비빔밥_돼지머리", 50);
     given(foodRepository.findByNameIgnoreCaseOrderBySearchCountDesc("비빔밥")).willReturn(List.of());
     given(
-            foodRepository
-                .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
-                    eq("비빔밥"), any(LocalDateTime.class)))
+            foodRepository.findTop20ByNameContainingWithExactMatchFirst(
+                eq("비빔밥"), any(LocalDateTime.class)))
         .willReturn(List.of(partial));
 
     Optional<Food> result = tx.findAndMarkCacheHit("비빔밥");
@@ -113,9 +111,8 @@ class FoodResolutionTxHelperTest {
     given(foodRepository.findByNameIgnoreCaseOrderBySearchCountDesc("비빔밥"))
         .willReturn(List.of(exactNoCarbs));
     given(
-            foodRepository
-                .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
-                    eq("비빔밥"), any(LocalDateTime.class)))
+            foodRepository.findTop20ByNameContainingWithExactMatchFirst(
+                eq("비빔밥"), any(LocalDateTime.class)))
         .willReturn(List.of(partial));
 
     Optional<Food> result = tx.findAndMarkCacheHit("비빔밥");
@@ -128,9 +125,8 @@ class FoodResolutionTxHelperTest {
     given(foodRepository.findByNameIgnoreCaseOrderBySearchCountDesc(anyString()))
         .willReturn(List.of());
     given(
-            foodRepository
-                .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
-                    anyString(), any(LocalDateTime.class)))
+            foodRepository.findTop20ByNameContainingWithExactMatchFirst(
+                anyString(), any(LocalDateTime.class)))
         .willReturn(List.of());
 
     Optional<Food> result = tx.findAndMarkCacheHit("미지의음식");

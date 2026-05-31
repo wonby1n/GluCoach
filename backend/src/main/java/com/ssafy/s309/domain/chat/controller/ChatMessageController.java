@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/chat/messages")
 @RequiredArgsConstructor
-@Tag(name = "코칭", description = "사용자 채팅 메시지 (agent/system 발신 + user 응답)")
+@Tag(name = "채팅", description = "사용자 채팅 메시지 (agent/system 발신 + user 응답)")
 public class ChatMessageController {
 
   private final ChatMessageService chatMessageService;
