@@ -15,6 +15,19 @@ AI 에이전트 **Kiki**가 식사·운동·수면 맥락을 종합해 개인 �
 
 ---
 
+## 목차
+
+- [📌 서비스 소개](#📌-서비스-소개)
+- [👥 팀원](#👥-팀원)
+- [✨ 주요 기능](#✨-주요-기능)
+- [🛠️ 기술 스택](#🛠️-기술-스택)
+- [🏗️ 시스템 아키텍처](#🏗️-시스템-아키텍처)
+- [🗄️ ERD](#🗄️-erd)
+- [📋 API 명세](#📋-api-명세)
+- [🔬 핵심 기술 상세](#🔬-핵심-기술-상세)
+
+---
+
 ## 📌 서비스 소개
 
 **GluCoach**는 단순 기록 앱이 아니라 **AI가 먼저 말을 거는 능동형 혈당 코칭 서비스**입니다.
@@ -37,40 +50,43 @@ AI 에이전트 **Kiki**가 식사·운동·수면 맥락을 종합해 개인 �
     <td align="center">
       <img src="docs/assets/hawon.jpeg" width="120" height="160"/><br/>
       <b>조하원</b><br/>
+      <sub>팀장 · FE · BE · AI · Infra</sub><br/>
+      <sub>@godhw1018</sub>
     </td>
     <td align="center">
       <img src="docs/assets/dohyun.jpg" width="120" height="160"/><br/>
       <b>이도현</b><br/>
+      <sub>BE · AI</sub><br/>
+      <sub>@ehtm01</sub>
     </td>
     <td align="center">
       <img src="docs/assets/junghoon.jpg" width="120" height="160"/><br/>
       <b>김정훈</b><br/>
+      <sub>BE · AI</sub><br/>
+      <sub>@kik1232198</sub>
     </td>
   </tr>
   <tr>
     <td align="center">
       <img src="docs/assets/yoonju.jpg" width="120" height="160"/><br/>
       <b>남윤주</b><br/>
+      <sub>BE · AI</sub><br/>
+      <sub>@skadbsnwk</sub>
     </td>
     <td align="center">
       <img src="docs/assets/miyeong.jpg" width="120" height="160"/><br/>
       <b>박미영</b><br/>
+      <sub>FE · AI</sub><br/>
+      <sub>@a29279</sub>
     </td>
     <td align="center">
       <img src="docs/assets/hyoji.jpg" width="120" height="160"/><br/>
       <b>손효지</b><br/>
+      <sub>FE · AI</sub><br/>
+      <sub>@hyoji0284</sub>
     </td>
   </tr>
 </table>
-
-| 이름   | 역할 | 담당 파트            | GitLab/Mattermost |
-| ------ | ---- | -------------------- | ----------------- |
-| 조하원 | 팀장 | FE · BE · AI · Infra | @godhw1018        |
-| 이도현 | 팀원 | BE · AI              | @ehtm01           |
-| 김정훈 | 팀원 | BE · AI              | @kik1232198       |
-| 남윤주 | 팀원 | BE · AI              | @skadbsnwk        |
-| 박미영 | 팀원 | FE · AI              | @a29279           |
-| 손효지 | 팀원 | FE · AI              | @hyoji0284        |
 
 ---
 
@@ -147,6 +163,16 @@ AI 에이전트 **Kiki**가 식사·운동·수면 맥락을 종합해 개인 �
       개인 맞춤 PDF 건강 리포트를 생성합니다.
     </td>
   </tr>
+  <tr>
+    <td width="55%" valign="middle">
+      <b>⌚ Wear OS 워치 앱</b><br/><br/>
+      워치 타일·컴플리케이션으로 혈당을 손목에서 바로 확인합니다.<br/>
+      Wear OS와 연동해 실시간 혈당 수치를 항상 볼 수 있습니다.
+    </td>
+    <td width="45%" align="center">
+      <img src="docs/assets/glucoach_watch.png" width="260"/>
+    </td>
+  </tr>
 </table>
 
 <br>
@@ -157,7 +183,6 @@ AI 에이전트 **Kiki**가 식사·운동·수면 맥락을 종합해 개인 �
 | 📈 **AI 혈당 예측**         | LSTM 모델로 식후·현재 시점 기준 향후 120분 혈당 곡선을 개인화 예측         |
 | 💬 **Kiki 채팅**            | 에이전트와의 대화형 인터페이스, 명령 버튼(음식 추천 / 혈당 체크 / 운동 팁) |
 | 🔔 **푸시 알림 + 음성**     | FCM 고·저혈당 경고 및 코칭 알림, TTS 음성 안내                             |
-| ⌚ **Wear OS 워치 앱**      | 워치 타일·컴플리케이션으로 혈당 표시                                       |
 | 😴 **건강 데이터 연동**     | Health Connect로 수면·걸음수를 수집해 코칭 맥락에 반영                     |
 | 🧭 **온보딩**               | 당뇨 유형 선택, 목표 혈당 범위·기본 건강 정보 설정                         |
 
@@ -219,6 +244,8 @@ AI 에이전트 **Kiki**가 식사·운동·수면 맥락을 종합해 개인 �
 - 신규 음식은 prototype 벡터만 추가하면 **재학습 없이** 인식 가능
 
 ### AI 코칭 에이전트 Kiki (LLM Tool-calling)
+
+![agent_architecture](docs/assets/agent_architecture.png)
 
 - morning / post-meal / 식후 follow-up 시나리오별 능동 코칭
 - 사용자 명령(음식 추천 / 혈당 체크 / 운동 팁)에 대한 응답 생성
