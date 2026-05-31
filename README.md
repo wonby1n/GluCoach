@@ -184,6 +184,27 @@ AI 에이전트 **Kiki**가 식사·운동·수면 맥락을 종합해 개인 �
 
 ---
 
+## 🗄️ ERD
+
+![ERD](docs/assets/erd.png)
+
+---
+
+## 📋 API 명세
+
+<details>
+<summary><b>Swagger UI 스크린샷 펼치기</b></summary>
+
+![swagger_1](docs/assets/swagger_1.png)
+![swagger_2](docs/assets/swagger_2.png)
+![swagger_3](docs/assets/swagger_3.png)
+![swagger_4](docs/assets/swagger_4.png)
+![swagger_5](docs/assets/swagger_5.png)
+
+</details>
+
+---
+
 ## 🔬 핵심 기술 상세
 
 ### AI 혈당 예측 (LSTM)
