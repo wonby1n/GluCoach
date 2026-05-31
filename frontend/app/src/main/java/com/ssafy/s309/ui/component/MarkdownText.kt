@@ -121,10 +121,7 @@ fun MarkdownText(
                     Spacer(modifier = Modifier.height(6.dp))
                 }
 
-                // bold 헤더: 항상 배경색 / sharp 헤더: 다음이 헤더일 때만
-                val applyHeaderBg =
-                    block.isHeader &&
-                        (block.isBold || nextBlock == null || nextBlock.isHeader)
+                val applyHeaderBg = block.isHeader
                 val bg =
                     when {
                         applyHeaderBg -> headerBackground
