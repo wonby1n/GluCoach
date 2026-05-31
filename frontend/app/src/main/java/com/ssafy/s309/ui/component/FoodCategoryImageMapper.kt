@@ -20,6 +20,8 @@ object FoodCategoryImageMapper {
             "달걀찜" to R.drawable.food_steamed_egg,
             "토마토소스스파게티" to R.drawable.food_tomato_spaghetti,
             "스파게티" to R.drawable.food_tomato_spaghetti,
+            "짬뽕" to R.drawable.jjambbong,
+            "짜장면" to R.drawable.jjajangmyeon,
         )
 
     private val categoryMap =
