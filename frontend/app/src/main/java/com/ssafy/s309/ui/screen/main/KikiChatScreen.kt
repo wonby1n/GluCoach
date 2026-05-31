@@ -307,6 +307,7 @@ class KikiChatViewModel
                                 .sortedByDescending { it.id }
                                 // 이미 로컬에 있는 createdAt은 dedupe. 다른 단말이 보낸 user 메시지는 받기 위해 sender 필터 제거.
                                 .filter { it.createdAt !in existingCreatedAts }
+                                .filter { !(it.sender == "user" && it.commandType == "calendar_reminder") }
                                 .map { m ->
                                     if (m.sender == "user") {
                                         ChatMessage.UserMessage(
