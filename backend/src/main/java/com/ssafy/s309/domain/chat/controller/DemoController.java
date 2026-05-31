@@ -22,12 +22,12 @@ public class DemoController {
   private final ChatFcmDispatcher chatFcmDispatcher;
 
   private static final String POSTMEAL_MESSAGE =
-      "# 🍖 식후 혈당 알림\n\n"
-          + "하원님, 돼지국밥을 드신 지 30분이 지났어요.\n\n"
+      "# 식후 혈당 알림\n\n"
+          + "하원님, 점심 식사의 영향이 지금부터 본격적으로 나타날 것 같아요.\n\n"
           + "# 예측\n\n"
-          + "지금 혈당 추세로 보아 30분 후 **200**에 도달할 것으로 예상돼요.\n\n"
+          + "현재 혈당 추세로 보아 30분 후 **200**에 도달할 것으로 예상돼요.\n\n"
           + "# 추천\n\n"
-          + "육류 드셨을 때 고혈당이 오래 지속되시는 편이라, 산책으로 관리해보시는 건 어떨까요? 🚶";
+          + "국물 요리 드셨을 때 혈당이 오래 지속되시는 편이라, 지금 활동량을 조금만 높여보시는 건 어떨까요?";
 
   private static final String WALKING_FEEDBACK_MESSAGE =
       "# 🚶 활동 감지\n\n" + "하원님, 빠르게 걷고 계시네요!\n\n" + "그 패턴으로 계속 걸어보세요. 혈당이 훨씬 빨리 안정될 거예요 💪";
