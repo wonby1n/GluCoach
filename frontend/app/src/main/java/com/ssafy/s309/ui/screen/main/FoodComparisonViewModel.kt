@@ -67,7 +67,7 @@ class FoodComparisonViewModel
                 predictRepository.compareGlucose(request)
                     .onSuccess { response ->
                         _uiState.update {
-                            it.copy(isLoading = false, result = response)
+                            it.copy(isLoading = false, result = response, isExplainLoading = true)
                         }
                         fetchExplain(foodA, foodB, response)
                     }

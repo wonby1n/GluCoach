@@ -179,7 +179,7 @@ fun FoodComparisonContent(
         }
     }
 
-    if (uiState.result != null && foodA != null && foodB != null) {
+    if (uiState.result != null && !uiState.isExplainLoading && foodA != null && foodB != null) {
         FoodComparisonResultContent(
             foodA = foodA!!,
             foodB = foodB!!,
