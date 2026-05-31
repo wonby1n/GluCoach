@@ -341,6 +341,11 @@ fun MainScreenContent(
                                 var kikiSwitchTime by remember { mutableLongStateOf(0L) }
                                 LaunchedEffect(kikiTarget) {
                                     if (displayedKiki == kikiTarget) return@LaunchedEffect
+                                    if (kikiTarget == R.drawable.kiki_run) {
+                                        displayedKiki = kikiTarget
+                                        kikiSwitchTime = System.currentTimeMillis()
+                                        return@LaunchedEffect
+                                    }
                                     val elapsed = System.currentTimeMillis() - kikiSwitchTime
                                     val remaining = kikiCycleDuration(displayedKiki) - elapsed
                                     if (remaining > 0) delay(remaining)
