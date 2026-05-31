@@ -1,5 +1,7 @@
 package com.ssafy.s309.data.api
 
+import com.ssafy.s309.data.model.CompareExplainRequest
+import com.ssafy.s309.data.model.CompareExplainResponse
 import com.ssafy.s309.data.model.FromImagePredictResponse
 import com.ssafy.s309.data.model.GlucoseCompareRequest
 import com.ssafy.s309.data.model.GlucoseCompareResponse
@@ -21,6 +23,11 @@ interface PredictApi {
     suspend fun compareGlucose(
         @Body request: GlucoseCompareRequest,
     ): GlucoseCompareResponse
+
+    @POST("api/predict/compare/explain")
+    suspend fun explainCompare(
+        @Body request: CompareExplainRequest,
+    ): CompareExplainResponse
 
     /**
      * 사진 한 장 → CV 인식 + foods 영양정보 매칭 + 식전 혈당 예측까지 단일 호출.

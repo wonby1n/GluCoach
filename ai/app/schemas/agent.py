@@ -4,6 +4,7 @@
 - POST /agent/morning
 - POST /agent/post-meal
 - POST /trigger
+- POST /agent/food-compare
 """
 
 from __future__ import annotations
@@ -44,6 +45,36 @@ class PostMealTrigger(BaseModel):
 class PostMealRequest(BaseModel):
     user_id: str = Field(..., description="사용자 ID")
     trigger: PostMealTrigger
+
+
+class FoodSummary(BaseModel):
+    name: str = Field(..., description="음식 이름")
+    peak_mgdl: float = Field(..., description="예측 최고 혈당 (mg/dL)")
+    peak_minute: int = Field(..., description="최고 혈당 도달 시간 (분)")
+    slope: float = Field(..., description="분당 혈당 상승 속도 (mg/dL/min)")
+
+
+class FoodCompareUserProfile(BaseModel):
+    diabetes_type: str = Field("Normal", description="당뇨 유형 (Normal|T1D|T2D)")
+    target_low: Optional[float] = Field(None, description="혈당 목표 하한 (mg/dL)")
+    target_high: Optional[float] = Field(None, description="혈당 목표 상한 (mg/dL)")
+    age: Optional[int] = Field(None, description="나이")
+    bmi: Optional[float] = Field(None, description="BMI (체중/신장² 계산값)")
+    gender: Optional[str] = Field(None, description="성별 (M|F)")
+    is_medicated: Optional[bool] = Field(None, description="혈당 조절 투약 여부")
+
+
+class FoodCompareRequest(BaseModel):
+    user_id: str = Field(..., description="사용자 ID")
+    user_name: Optional[str] = Field(None, description="사용자 이름 (개인화용)")
+    food_a: FoodSummary
+    food_b: FoodSummary
+    user_profile: FoodCompareUserProfile
+
+
+class FoodCompareResponse(BaseModel):
+    message: str = Field(..., description="개인화된 비교 설명 문구")
+    status: Literal["success", "fallback"]
 
 
 # ── 응답 ─────────────────────────────────────────────────

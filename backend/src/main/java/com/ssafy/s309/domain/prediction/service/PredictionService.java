@@ -2,13 +2,19 @@ package com.ssafy.s309.domain.prediction.service;
 
 import com.ssafy.s309.domain.food.entity.Food;
 import com.ssafy.s309.domain.food.repository.FoodRepository;
+import com.ssafy.s309.domain.prediction.client.FoodCompareExplainClient;
 import com.ssafy.s309.domain.prediction.client.GlucosePredictClient;
+import com.ssafy.s309.domain.prediction.client.dto.FoodCompareAiRequest;
+import com.ssafy.s309.domain.prediction.client.dto.FoodCompareAiRequest.FoodSummary;
+import com.ssafy.s309.domain.prediction.client.dto.FoodCompareAiRequest.UserProfileSummary;
 import com.ssafy.s309.domain.prediction.client.dto.GlucosePredictRequest;
 import com.ssafy.s309.domain.prediction.client.dto.GlucosePredictResponse;
 import com.ssafy.s309.domain.prediction.client.dto.MealInfo;
 import com.ssafy.s309.domain.prediction.client.dto.UserProfileWithPattern;
 import com.ssafy.s309.domain.prediction.dto.AbPredictRequest;
 import com.ssafy.s309.domain.prediction.dto.AbPredictResponse;
+import com.ssafy.s309.domain.prediction.dto.CompareExplainRequest;
+import com.ssafy.s309.domain.prediction.dto.CompareExplainResponse;
 import com.ssafy.s309.domain.prediction.dto.CurvePoint;
 import com.ssafy.s309.domain.prediction.dto.PredictRequest;
 import com.ssafy.s309.domain.prediction.dto.PredictResponse;
@@ -45,6 +51,7 @@ public class PredictionService {
   private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
   private final GlucosePredictClient glucosePredictClient;
+  private final FoodCompareExplainClient foodCompareExplainClient;
   private final PredictionTxHelper tx;
   private final FoodRepository foodRepository;
   private final Executor asyncExecutor;
@@ -77,6 +84,44 @@ public class PredictionService {
         glucosePredictClient.predict(buildAiRequest(user, request, Optional.of(food)));
     GlucosePrediction saved = tx.savePrediction(userId, request, aiResponse);
     return toResponse(saved.getId(), aiResponse);
+  }
+
+  public CompareExplainResponse compareExplain(Integer userId, CompareExplainRequest request) {
+    User user = tx.findUser(userId);
+    String diabetesType = mapDiabetesType(user.getDiabetesType());
+    Double targetLow = user.getTargetLow() != null ? user.getTargetLow().doubleValue() : null;
+    Double targetHigh = user.getTargetHigh() != null ? user.getTargetHigh().doubleValue() : null;
+
+    Double bmi = null;
+    if (user.getHeight() != null && user.getWeight() != null) {
+      double hM = user.getHeight().doubleValue() / 100.0;
+      bmi = Math.round(user.getWeight().doubleValue() / (hM * hM) * 10.0) / 10.0;
+    }
+
+    FoodCompareAiRequest aiRequest =
+        new FoodCompareAiRequest(
+            String.valueOf(userId),
+            user.getName(),
+            new FoodSummary(
+                request.foodAName(),
+                request.foodAPeakMgdl(),
+                request.foodAPeakMinute(),
+                request.foodASlope()),
+            new FoodSummary(
+                request.foodBName(),
+                request.foodBPeakMgdl(),
+                request.foodBPeakMinute(),
+                request.foodBSlope()),
+            new UserProfileSummary(
+                diabetesType,
+                targetLow,
+                targetHigh,
+                user.getAge() != null ? (int) user.getAge() : null,
+                bmi,
+                user.getGender(),
+                user.getIsMedicated()));
+
+    return new CompareExplainResponse(foodCompareExplainClient.explain(aiRequest).message());
   }
 
   public AbPredictResponse comparePredict(Integer userId, AbPredictRequest request) {

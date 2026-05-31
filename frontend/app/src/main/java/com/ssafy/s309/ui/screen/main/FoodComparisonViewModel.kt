@@ -2,9 +2,11 @@ package com.ssafy.s309.ui.screen.main
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ssafy.s309.data.model.CompareExplainRequest
 import com.ssafy.s309.data.model.FoodCompareItem
 import com.ssafy.s309.data.model.GlucoseCompareRequest
 import com.ssafy.s309.data.model.GlucoseCompareResponse
+import com.ssafy.s309.data.model.GlucosePrediction
 import com.ssafy.s309.data.model.GlucoseRange
 import com.ssafy.s309.data.model.MealCreateRequest
 import com.ssafy.s309.data.repository.FoodRepository
@@ -29,6 +31,8 @@ data class FoodComparisonUiState(
     val glucoseRange: GlucoseRange = GlucoseRange(minMgDl = 90, maxMgDl = 170),
     val autoFoodA: FoodItem? = null,
     val autoFoodB: FoodItem? = null,
+    val explainMessage: String? = null,
+    val isExplainLoading: Boolean = false,
 )
 
 @HiltViewModel
@@ -65,6 +69,7 @@ class FoodComparisonViewModel
                         _uiState.update {
                             it.copy(isLoading = false, result = response)
                         }
+                        fetchExplain(foodA, foodB, response)
                     }
                     .onFailure { e ->
                         _uiState.update {
@@ -118,6 +123,41 @@ class FoodComparisonViewModel
                 _uiState.update { it.copy(autoFoodA = foodA, autoFoodB = foodB) }
                 compareGlucose(foodA, foodB)
             }
+        }
+
+        private fun fetchExplain(
+            foodA: FoodItem,
+            foodB: FoodItem,
+            result: GlucoseCompareResponse,
+        ) {
+            viewModelScope.launch {
+                _uiState.update { it.copy(isExplainLoading = true, explainMessage = null) }
+                val request =
+                    CompareExplainRequest(
+                        foodAName = foodA.name,
+                        foodBName = foodB.name,
+                        foodAPeakMgdl = result.foodA.peakMgdl,
+                        foodAPeakMinute = result.foodA.peakMinute,
+                        foodASlope = slopeOf(result.foodA),
+                        foodBPeakMgdl = result.foodB.peakMgdl,
+                        foodBPeakMinute = result.foodB.peakMinute,
+                        foodBSlope = slopeOf(result.foodB),
+                    )
+                predictRepository
+                    .explainCompare(request)
+                    .onSuccess { res ->
+                        _uiState.update { it.copy(isExplainLoading = false, explainMessage = res.message) }
+                    }
+                    .onFailure {
+                        _uiState.update { it.copy(isExplainLoading = false) }
+                    }
+            }
+        }
+
+        private fun slopeOf(pred: GlucosePrediction): Float {
+            val baseline = pred.curve.firstOrNull()?.glucoseMgdl ?: pred.peakMgdl
+            val minutes = pred.peakMinute.takeIf { it > 0 } ?: 1
+            return (pred.peakMgdl - baseline) / minutes
         }
 
         fun resetResult() {

@@ -3,24 +3,33 @@
 - POST /agent/morning    : 오늘의 혈당 전략 agent 실행
 - POST /agent/post-meal  : 식후 활동 유도 agent 실행
 - POST /trigger          : 백엔드 스케줄러가 호출하는 트리거 디스패처
+- POST /agent/food-compare : 두 음식 혈당 비교 개인화 설명 (동기)
 """
 
 import logging
+import os
 from datetime import datetime
 
+import anthropic
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.concurrency import run_in_threadpool
 
 from app.schemas.agent import (
     AgentResponse,
+    FoodCompareRequest,
+    FoodCompareResponse,
     MorningRequest,
     PostMealRequest,
     TriggerRequest,
 )
 from app.agent.morning_agent_run import run_agent
 from app.agent.postmeal_agent_run import run_postmeal_agent
+from app.agent.fallback import call_llm_with_retry
 
 log = logging.getLogger(__name__)
+
+_FOOD_COMPARE_MODEL = "claude-haiku-4-5-20251001"
+_FOOD_COMPARE_MAX_TOKENS = 300
 
 router = APIRouter(prefix="/agent", tags=["Agent"])
 
@@ -198,3 +207,80 @@ async def dispatch_trigger(req: TriggerRequest, background_tasks: BackgroundTask
         reasoning_trace=[],
         error=f"unknown_trigger_type: {req.triggerType}",
     )
+
+
+def _build_food_compare_prompt(req: FoodCompareRequest) -> str:
+    name_prefix = f"{req.user_name}님" if req.user_name else "사용자"
+    profile = req.user_profile
+
+    diabetes_label = {"T1D": "1형 당뇨", "T2D": "2형 당뇨"}.get(profile.diabetes_type, "정상 혈당")
+
+    bmi_label = ""
+    if profile.bmi:
+        bmi_val = profile.bmi
+        if bmi_val < 18.5:
+            bmi_cat = "저체중"
+        elif bmi_val < 23.0:
+            bmi_cat = "정상 체중"
+        elif bmi_val < 25.0:
+            bmi_cat = "과체중"
+        elif bmi_val < 30.0:
+            bmi_cat = "비만"
+        else:
+            bmi_cat = "고도비만"
+        bmi_label = f"BMI {bmi_val:.1f}({bmi_cat})"
+
+    age_label = f"{profile.age}세" if profile.age else ""
+    med_label = "혈당 조절 투약 중" if profile.is_medicated else ""
+
+    persona_parts = [p for p in [diabetes_label, bmi_label, age_label, med_label] if p]
+    persona_str = " / ".join(persona_parts)
+
+    target_info = ""
+    if profile.target_low and profile.target_high:
+        target_info = f"혈당 목표: {profile.target_low:.0f}~{profile.target_high:.0f} mg/dL\n"
+
+    a, b = req.food_a, req.food_b
+    return f"""아래 사용자 프로파일과 두 음식의 혈당 예측 데이터를 보고, {name_prefix}에게 어느 음식이 더 나은지 한국어 2문장으로 설명해주세요.
+
+[사용자 프로파일]
+{name_prefix} / {persona_str}
+{target_info}
+[음식 A: {a.name}]
+예측 피크: {a.peak_mgdl:.0f} mg/dL (식후 {a.peak_minute}분) / 상승 속도: {a.slope:.2f} mg/dL/min
+
+[음식 B: {b.name}]
+예측 피크: {b.peak_mgdl:.0f} mg/dL (식후 {b.peak_minute}분) / 상승 속도: {b.slope:.2f} mg/dL/min
+
+작성 규칙:
+- 첫 문장: 사용자의 구체적 특성(당뇨 유형, BMI 범주, 투약 여부 중 가장 관련 있는 1~2가지)을 명시하며 어느 음식이 더 나은지 이유 설명
+  예시: "2형 당뇨이시고 BMI 26(과체중) 범위에 계신 [이름]님은 인슐린 저항성이 높아 [음식]이 더 안전한 선택이에요."
+- 둘째 문장: 피크 수치 차이와 상승 속도를 구체적 숫자로 근거 제시
+  예시: "[음식]이 피크가 [X]mg/dL 낮고 상승 속도도 [Y배] 더 완만해요."
+- 이모지 없음, 친근한 존댓말, 음식 이름 반드시 명시"""
+
+
+@router.post("/food-compare", response_model=FoodCompareResponse)
+async def food_compare(req: FoodCompareRequest):
+    """두 음식의 혈당 예측 수치를 비교해 개인화된 설명을 동기 반환한다."""
+    prompt = _build_food_compare_prompt(req)
+    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+    response = await run_in_threadpool(
+        call_llm_with_retry,
+        client,
+        model=_FOOD_COMPARE_MODEL,
+        max_tokens=_FOOD_COMPARE_MAX_TOKENS,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    if response is None:
+        a, b = req.food_a, req.food_b
+        better = a.name if a.slope <= b.slope else b.name
+        fallback_msg = f"{better}이(가) 혈당 상승 속도가 더 완만해 더 나은 선택이에요."
+        log.warning("food_compare LLM 실패, fallback 반환: user_id=%s", req.user_id)
+        return FoodCompareResponse(message=fallback_msg, status="fallback")
+
+    message = response.content[0].text.strip()
+    log.info("food_compare 완료: user_id=%s chars=%d", req.user_id, len(message))
+    return FoodCompareResponse(message=message, status="success")

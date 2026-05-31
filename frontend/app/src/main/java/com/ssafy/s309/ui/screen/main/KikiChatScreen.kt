@@ -1072,13 +1072,14 @@ private fun KikiChatBubble(
     onClick: () -> Unit = {},
     onCompareClick: (String, String) -> Unit = { _, _ -> },
 ) {
-    // # / ## / ### 헤딩 앞의 이모지/특수문자 제거
     val sharpPattern = Regex("""^(#{1,3} )[^\p{L}\p{N}]+""", RegexOption.MULTILINE)
+    val emojiPattern = Regex("""[\uD83C-\uDBFF][\uDC00-\uDFFF]|\p{So}""")
     val bubbleText =
         item.message
             .replace(sharpPattern, "$1")
-            .replace("🔍 ", "")
-            .replace("🔍", "")
+            .replace(emojiPattern, "")
+            .replace(Regex(""" {2,}"""), " ")
+            .replace(Regex("""^ """, RegexOption.MULTILINE), "")
     val sharpHeaderRe = Regex("""^#{1,3} """)
     val hasSections =
         bubbleText.lines().any { line ->

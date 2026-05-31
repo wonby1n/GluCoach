@@ -80,3 +80,20 @@ data class GlucoseCurvePoint(
     val minuteOffset: Int,
     val glucoseMgdl: Float,
 )
+
+@Serializable
+data class CompareExplainRequest(
+    val foodAName: String,
+    val foodBName: String,
+    val foodAPeakMgdl: Float,
+    val foodAPeakMinute: Int,
+    val foodASlope: Float,
+    val foodBPeakMgdl: Float,
+    val foodBPeakMinute: Int,
+    val foodBSlope: Float,
+)
+
+@Serializable
+data class CompareExplainResponse(
+    val message: String,
+)
