@@ -2,7 +2,10 @@
 package com.ssafy.s309.ui.screen.main
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.CalendarContract
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -1137,6 +1140,24 @@ private fun KikiChatBubble(
                     onClick = { onCompareClick(comparison.foodA.name, comparison.foodB.name) },
                 )
             }
+            // 캘린더 알림 메시지에 캘린더 바로가기 버튼 표시
+            if (parseCalendarReminder(item.message) != null) {
+                val context = LocalContext.current
+                Spacer(modifier = Modifier.height(GlucoachSpacing.sm))
+                CalendarShortcutButton(
+                    onClick = {
+                        val intent =
+                            Intent(Intent.ACTION_VIEW).apply {
+                                data =
+                                    Uri.withAppendedPath(
+                                        CalendarContract.CONTENT_URI,
+                                        "time/${System.currentTimeMillis()}",
+                                    )
+                            }
+                        context.startActivity(intent)
+                    },
+                )
+            }
         }
     }
 }
@@ -1254,6 +1275,35 @@ private fun CompareButton(
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
         )
+    }
+}
+
+@Composable
+private fun CalendarShortcutButton(onClick: () -> Unit) {
+    Box(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(GlucoachColors.PrimaryLight)
+                .border(1.5.dp, GlucoachColors.PrimaryDark, RoundedCornerShape(20.dp))
+                .clickable(onClick = onClick)
+                .padding(horizontal = GlucoachSpacing.md, vertical = 8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Outlined.CalendarMonth,
+                contentDescription = null,
+                tint = GlucoachColors.PrimaryDark,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = "캘린더 바로가기 →",
+                color = GlucoachColors.PrimaryDark,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
     }
 }
 

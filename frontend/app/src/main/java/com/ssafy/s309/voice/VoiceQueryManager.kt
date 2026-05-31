@@ -71,9 +71,11 @@ class VoiceQueryManager
 
             // 시스템 STT 서비스는 destroy 후 즉시 정리되지 않아 곧바로 새 SR을 만들면
             // ERROR_SERVER_DISCONNECTED(11) 가 떨어질 수 있어 짧게 지연 후 createSpeechRecognizer 호출.
+            // Vosk AudioRecord 해제 경쟁도 있어 WAKE_RELEASE_DELAY_MS 동안 마이크 완전 해제 대기.
             _partial.value = ""
             _state.value = State.LISTENING
 
+            Log.i(TAG, "SR 세션 시작 — ${WAKE_RELEASE_DELAY_MS}ms 후 startListening")
             scheduleStart(onResult, onError, attempt = 0)
         }
 
@@ -123,9 +125,13 @@ class VoiceQueryManager
             attempt: Int,
         ): RecognitionListener =
             object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) {}
+                override fun onReadyForSpeech(params: Bundle?) {
+                    Log.i(TAG, "onReadyForSpeech — 마이크 준비 완료")
+                }
 
-                override fun onBeginningOfSpeech() {}
+                override fun onBeginningOfSpeech() {
+                    Log.i(TAG, "onBeginningOfSpeech — 음성 감지")
+                }
 
                 override fun onRmsChanged(rmsdB: Float) {}
 
@@ -144,7 +150,8 @@ class VoiceQueryManager
                         (
                             error == SpeechRecognizer.ERROR_SERVER_DISCONNECTED ||
                                 error == SpeechRecognizer.ERROR_CLIENT ||
-                                error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
+                                error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ||
+                                error == SpeechRecognizer.ERROR_AUDIO
                         )
                     ) {
                         Log.i(TAG, "재시도 — wake SR 정리 대기 후 startListening")
@@ -218,9 +225,9 @@ class VoiceQueryManager
         private companion object {
             const val TAG = "VoiceQueryManager"
 
-            // wake SR.destroy() 후 system service 가 unbind 되기까지 약간의 시간 필요.
-            // 300ms 면 대부분 충분. 짧으면 ERROR_SERVER_DISCONNECTED(11) 가 즉시 떨어진다.
-            const val WAKE_RELEASE_DELAY_MS = 300L
-            const val WAKE_RELEASE_RETRY_DELAY_MS = 600L
+            // Vosk AudioRecord 해제 + system STT service unbind 완료 대기.
+            // Samsung 일부 기기는 AudioRecord 독점 해제에 500ms 이상 소요되므로 넉넉히 설정.
+            const val WAKE_RELEASE_DELAY_MS = 500L
+            const val WAKE_RELEASE_RETRY_DELAY_MS = 800L
         }
     }

@@ -36,29 +36,29 @@ AI 에이전트 **Kiki**가 식사·운동·수면 맥락을 종합해 개인 �
 <table>
   <tr>
     <td align="center">
-      <img src="docs/assets/hawon.png" width="120" height="120"/><br/>
+      <img src="docs/assets/hawon.jpeg" width="120" height="160"/><br/>
       <b>조하원</b><br/>
     </td>
     <td align="center">
-      <img src="docs/assets/dohyun.png" width="120" height="120"/><br/>
+      <img src="docs/assets/dohyun.jpg" width="120" height="160"/><br/>
       <b>이도현</b><br/>
     </td>
     <td align="center">
-      <img src="docs/assets/junghoon.png" width="120" height="120"/><br/>
+      <img src="docs/assets/junghoon.jpg" width="120" height="160"/><br/>
       <b>김정훈</b><br/>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/assets/yoonju.png" width="120" height="120"/><br/>
+      <img src="docs/assets/yoonju.jpg" width="120" height="160"/><br/>
       <b>남윤주</b><br/>
     </td>
     <td align="center">
-      <img src="docs/assets/miyeong.png" width="120" height="120"/><br/>
+      <img src="docs/assets/miyeong.jpg" width="120" height="160"/><br/>
       <b>박미영</b><br/>
     </td>
     <td align="center">
-      <img src="docs/assets/hyoji.png" width="120" height="120"/><br/>
+      <img src="docs/assets/hyoji.jpg" width="120" height="160"/><br/>
       <b>손효지</b><br/>
     </td>
   </tr>
