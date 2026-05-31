@@ -243,7 +243,6 @@ def _build_food_compare_prompt(req: FoodCompareRequest) -> str:
     a, b = req.food_a, req.food_b
     peak_diff = abs(a.peak_mgdl - b.peak_mgdl)
     better = a if a.peak_mgdl <= b.peak_mgdl else b
-    worse = b if better is a else a
     return f"""두 음식의 혈당 예측 데이터를 보고 아래 형식으로만 답변하세요.
 
 [사용자] {name_prefix} / {persona_str}{(' / ' + target_info.strip()) if target_info.strip() else ''}
@@ -252,9 +251,9 @@ def _build_food_compare_prompt(req: FoodCompareRequest) -> str:
 
 출력 형식:
 추천 음식 : {better.name}
-이유 : [피크 차이({peak_diff:.0f} mg/dL)와 상승 속도 차이를 수치로 포함해 한 문장. 해요체. 30자 이내.]
+이유 : [문장1: 사용자 특성(당뇨유형·BMI·투약 중 가장 관련 있는 1가지)을 한 문장으로. 예) "정상 혈당에 저체중이신 {name_prefix}은 급격한 혈당 상승에 더 취약해요." / 문장2: {better.name}의 피크가 {peak_diff:.0f}mg/dL 낮고 상승 속도가 얼마나 더 완만한지 수치로만. 예) "피크가 {peak_diff:.0f}mg/dL 낮고 상승 속도도 더 완만해요."]
 
-규칙: 이모지 없음 / 형식 외 텍스트 금지"""
+규칙: 두 문장 모두 해요체 / 이모지 없음 / 형식 외 텍스트 금지"""
 
 
 @router.post("/food-compare", response_model=FoodCompareResponse)
