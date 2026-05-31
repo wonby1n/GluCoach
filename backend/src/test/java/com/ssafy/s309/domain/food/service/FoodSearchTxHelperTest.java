@@ -45,17 +45,15 @@ class FoodSearchTxHelperTest {
   @Test
   void tryFreshCache_30일_TTL_threshold_적용() {
     given(
-            foodRepository
-                .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
-                    anyString(), any(LocalDateTime.class)))
+            foodRepository.findTop20ByNameContainingWithExactMatchFirst(
+                anyString(), any(LocalDateTime.class)))
         .willReturn(List.of());
 
     tx.tryFreshCache("사과");
 
     ArgumentCaptor<LocalDateTime> thresholdCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
     verify(foodRepository)
-        .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
-            anyString(), thresholdCaptor.capture());
+        .findTop20ByNameContainingWithExactMatchFirst(anyString(), thresholdCaptor.capture());
     LocalDateTime expected = LocalDateTime.now().minusDays(FoodService.CACHE_TTL_DAYS);
     assertThat(thresholdCaptor.getValue())
         .isBetween(expected.minusSeconds(5), expected.plusSeconds(5));
@@ -65,9 +63,8 @@ class FoodSearchTxHelperTest {
   void tryFreshCache_hit_시_searchCount_증가() {
     Food cached = food(1, "밥, 흰쌀", 5, LocalDateTime.now().minusDays(3));
     given(
-            foodRepository
-                .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
-                    anyString(), any(LocalDateTime.class)))
+            foodRepository.findTop20ByNameContainingWithExactMatchFirst(
+                anyString(), any(LocalDateTime.class)))
         .willReturn(List.of(cached));
 
     List<FoodSearchResult> results = tx.tryFreshCache("밥");
@@ -79,9 +76,8 @@ class FoodSearchTxHelperTest {
   @Test
   void tryFreshCache_miss_시_빈_리스트() {
     given(
-            foodRepository
-                .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
-                    anyString(), any(LocalDateTime.class)))
+            foodRepository.findTop20ByNameContainingWithExactMatchFirst(
+                anyString(), any(LocalDateTime.class)))
         .willReturn(List.of());
 
     List<FoodSearchResult> results = tx.tryFreshCache("없는음식");
@@ -104,9 +100,8 @@ class FoodSearchTxHelperTest {
   void fallbackToStale_TTL_무시하고_조회() {
     Food stale = food(3, "잡곡밥", 1, LocalDateTime.now().minusDays(60));
     given(
-            foodRepository
-                .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
-                    anyString(), any(LocalDateTime.class)))
+            foodRepository.findTop20ByNameContainingWithExactMatchFirst(
+                anyString(), any(LocalDateTime.class)))
         .willReturn(List.of(stale));
 
     List<FoodSearchResult> results = tx.fallbackToStale("잡곡밥");
@@ -116,8 +111,7 @@ class FoodSearchTxHelperTest {
     // EPOCH 하한이라 cached_at 만료 여부 무관 — threshold 가 2000-01-01 인지 확인
     ArgumentCaptor<LocalDateTime> captor = ArgumentCaptor.forClass(LocalDateTime.class);
     verify(foodRepository)
-        .findTop20ByNameContainingIgnoreCaseAndCachedAtAfterOrderBySearchCountDesc(
-            anyString(), captor.capture());
+        .findTop20ByNameContainingWithExactMatchFirst(anyString(), captor.capture());
     assertThat(captor.getValue()).isEqualTo(LocalDateTime.of(2000, 1, 1, 0, 0));
   }
 }
