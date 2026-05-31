@@ -31,6 +31,7 @@ import com.ssafy.s309.data.repository.source.SamsungHealthHolder
 import com.ssafy.s309.navigation.AppNavigation
 import com.ssafy.s309.navigation.Screen
 import com.ssafy.s309.ui.component.KikiVoiceOverlay
+import com.ssafy.s309.ui.component.SystemOverlayManager
 import com.ssafy.s309.ui.theme.S309Theme
 import com.ssafy.s309.voice.WakeWordManager
 import com.ssafy.s309.wear.WearDataSender
@@ -65,6 +66,8 @@ class MainActivity : ComponentActivity() {
         fun userRepository(): UserRepository
 
         fun wakeWordManager(): WakeWordManager
+
+        fun systemOverlayManager(): SystemOverlayManager
     }
 
     private val samsungHealthHolder: SamsungHealthHolder by lazy {
@@ -95,6 +98,12 @@ class MainActivity : ComponentActivity() {
         EntryPointAccessors
             .fromApplication(applicationContext, MainActivityEntryPoint::class.java)
             .wakeWordManager()
+    }
+
+    private val systemOverlayManager: SystemOverlayManager by lazy {
+        EntryPointAccessors
+            .fromApplication(applicationContext, MainActivityEntryPoint::class.java)
+            .systemOverlayManager()
     }
 
     // Samsung Health 권한 자동 요청은 Activity 라이프타임당 1회만. onResume 마다 다시 띄우면
@@ -136,6 +145,7 @@ class MainActivity : ComponentActivity() {
         requestNotificationPermission()
         requestRecordAudioPermission()
         requestCalendarPermission()
+        systemOverlayManager.attach()
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (!task.isSuccessful) {
                 Log.w("FCM", "토큰 발급 실패", task.exception)
@@ -200,12 +210,19 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        // "하이 키키" wake word 듣기 시작. 권한/엔진 미비 시 내부에서 no-op.
+        systemOverlayManager.onAppForeground()
         wakeWordManager.start()
+        // IME 백그라운드 경로(카톡+키보드) SR 세션 종료 시 카톡으로 즉시 복귀.
+        lifecycleScope.launch {
+            wakeWordManager.returnToBackground.collect {
+                moveTaskToBack(true)
+            }
+        }
     }
 
     override fun onStop() {
         wakeWordManager.stop()
+        systemOverlayManager.onAppBackground()
         super.onStop()
     }
 
@@ -328,6 +345,12 @@ class MainActivity : ComponentActivity() {
             != PackageManager.PERMISSION_GRANTED
         ) {
             calendarPermissionLauncher.launch(Manifest.permission.READ_CALENDAR)
+        }
+    }
+
+    private fun requestOverlayPermission() {
+        if (!systemOverlayManager.canDrawOverlays()) {
+            systemOverlayManager.requestOverlayPermission()
         }
     }
 

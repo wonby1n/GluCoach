@@ -1,7 +1,10 @@
 package com.ssafy.s309.voice
 
 import android.Manifest
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.media.ToneGenerator
@@ -79,6 +82,47 @@ class WakeWordManager
         private val shouldKeepListening = AtomicBoolean(false)
         private val isTtsSpeaking = AtomicBoolean(false)
 
+        // IME(GlucoseKeyboard)가 start()를 호출했는지 추적. IME 해제 시 stop() 여부 결정에 사용.
+        private val imeStartedVosk = AtomicBoolean(false)
+
+        // IME dismiss 후 SR을 시작해야 할 때 true. ACTION_IME_HIDDEN 수신 시 SR 트리거.
+        private val imeDismissPendingSr = AtomicBoolean(false)
+
+        // IME 백그라운드 경로로 SR을 시작했을 때 true. 세션 종료 시 앱을 다시 백그라운드로 내려야 함.
+        private val srStartedFromIme = AtomicBoolean(false)
+
+        // SR 세션이 끝난 뒤 MainActivity가 구독해 moveTaskToBack(true)을 호출하도록 신호.
+        private val _returnToBackground = MutableSharedFlow<Unit>(replay = 0, extraBufferCapacity = 1)
+        val returnToBackground: SharedFlow<Unit> = _returnToBackground.asSharedFlow()
+
+        // IME_HIDDEN이 일정 시간 내 오지 않을 경우 강제로 SR을 시작하는 안전망 Runnable.
+        @Volatile private var imeSrSafetyRunnable: Runnable? = null
+        private val imeReceiver =
+            object : BroadcastReceiver() {
+                override fun onReceive(
+                    ctx: Context,
+                    intent: Intent,
+                ) {
+                    when (intent.action) {
+                        ACTION_IME_SHOWN -> onImeShown()
+                        ACTION_IME_HIDDEN -> onImeHidden()
+                    }
+                }
+            }
+
+        init {
+            val filter =
+                IntentFilter(ACTION_IME_SHOWN).apply {
+                    addAction(ACTION_IME_HIDDEN)
+                }
+            ContextCompat.registerReceiver(
+                context,
+                imeReceiver,
+                filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED,
+            )
+        }
+
         // 외부(예: [com.ssafy.s309.notification.TtsManager] 의 AI 응답 발화) TTS 가 스피커로
         // 흘러나오는 동안 Vosk 가 자기 음향을 wake 로 잘못 잡지 않도록 차단하는 플래그.
         // [setExternalTtsActive] 로 토글. 종료 시 [EXTERNAL_TTS_TAIL_GUARD_MS] 잔향 보호.
@@ -128,6 +172,7 @@ class WakeWordManager
         @Volatile private var speechService: SpeechService? = null
 
         fun start() {
+            imeStartedVosk.set(false) // 앱 lifecycle이 인계 — IME 시작 플래그 해제
             if (shouldKeepListening.getAndSet(true)) return // 이미 동작 중
 
             if (!hasRecordAudioPermission()) {
@@ -231,6 +276,10 @@ class WakeWordManager
 
         private fun teardownVosk() {
             // 진행 중인 SR 명령 세션도 함께 정리.
+            imeSrSafetyRunnable?.let { mainHandler.removeCallbacks(it) }
+            imeSrSafetyRunnable = null
+            imeDismissPendingSr.set(false)
+            srStartedFromIme.set(false)
             runCatching { voiceQueryManager.cancel() }
             partialCollectJob?.cancel()
             partialCollectJob = null
@@ -363,6 +412,13 @@ class WakeWordManager
          * VoiceQueryManager 내부에 이미 300ms WAKE_RELEASE_DELAY_MS 가 있어 race 완충.
          */
         private fun handoffToSpeechRecognizer() {
+            // IME 활성 상태에서 SpeechRecognizer를 시작하면 InputConnection이 살아있는 동안
+            // 오디오가 간섭받는다. 키보드 dismiss 브로드캐스트를 보내고 onFinishInputView()
+            // 완료(ACTION_IME_HIDDEN) 이후 SR을 시작해 InputConnection이 완전히 끊긴 상태를 보장.
+            context.sendBroadcast(
+                Intent(ACTION_VOICE_LISTENING_START).apply { setPackage(context.packageName) },
+            )
+
             pauseVoskKeepingModel()
 
             _partialTranscript.value = ""
@@ -379,6 +435,49 @@ class WakeWordManager
                     }
                 }
 
+            if (imeStartedVosk.get()) {
+                // IME 활성 경로: onFinishInputView 완료(ACTION_IME_HIDDEN) 시 SR 시작.
+                // 안전망: 1초 내 IME_HIDDEN 미수신 시 강제 시작.
+                Log.i(TAG, "IME 활성 — IME_HIDDEN 대기 후 SR 시작")
+                imeDismissPendingSr.set(true)
+                val safety =
+                    Runnable {
+                        imeSrSafetyRunnable = null
+                        if (imeDismissPendingSr.getAndSet(false)) {
+                            Log.w(TAG, "IME_HIDDEN 미수신 — 안전망으로 SR 강제 시작")
+                            startSrNow()
+                        }
+                    }
+                imeSrSafetyRunnable = safety
+                mainHandler.postDelayed(safety, IME_SR_SAFETY_TIMEOUT_MS)
+            } else {
+                startSrNow()
+            }
+        }
+
+        private fun startSrNow() {
+            Log.i(TAG, "SR startOnce 호출")
+            if (imeStartedVosk.get()) {
+                // 백그라운드 상태에서는 Samsung audio HAL이 마이크에 공격적인 노이즈 캔슬링을
+                // 적용해 SR의 VAD가 음성을 감지하지 못한다(ERROR_NO_MATCH).
+                // MainActivity를 포그라운드로 올려 오디오 스택을 foreground 모드로 전환.
+                Log.i(TAG, "IME 백그라운드 — MainActivity 포그라운드 전환 후 SR 시작")
+                srStartedFromIme.set(true)
+                runCatching {
+                    context.startActivity(
+                        Intent().apply {
+                            setClassName(context.packageName, "${context.packageName}.MainActivity")
+                            flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NEW_TASK
+                        },
+                    )
+                }.onFailure { Log.w(TAG, "포그라운드 전환 실패 — SR 계속 진행", it) }
+                mainHandler.postDelayed({ doStartSr() }, FOREGROUND_TRANSITION_DELAY_MS)
+            } else {
+                doStartSr()
+            }
+        }
+
+        private fun doStartSr() {
             voiceQueryManager.startOnce(
                 onResult = { text ->
                     Log.i(TAG, "SR 명령 결과: \"$text\"")
@@ -410,6 +509,12 @@ class WakeWordManager
                 partialCollectJob = null
 
                 val finalText = text?.takeIf { it.isNotBlank() }
+
+                // IME 백그라운드 경로였으면 SR 결과 수신 즉시 카톡으로 복귀.
+                // 오버레이(THINKING/SHOWING_RESPONSE)는 TYPE_APPLICATION_OVERLAY라 카톡 위에도 뜬다.
+                if (srStartedFromIme.getAndSet(false)) {
+                    _returnToBackground.tryEmit(Unit)
+                }
 
                 if (finalText != null) {
                     // 사용자가 자기 발화 완성형을 화면에서 확인할 수 있도록 final 을 잠깐 더 표시.
@@ -629,9 +734,41 @@ class WakeWordManager
             val trimmed = transcript.trim()
             if (trimmed.isEmpty()) return
             scope.launch {
-                runCatching { healthRepository.sendFoodRecommendCommand(trimmed) }
-                    .onFailure { Log.w(TAG, "채팅 명령 전송 실패", it) }
+                if (CALENDAR_KEYWORDS.any { trimmed.contains(it) }) {
+                    runCatching { healthRepository.sendCalendarReminderCommand() }
+                        .onFailure { Log.w(TAG, "캘린더 명령 전송 실패", it) }
+                } else {
+                    runCatching { healthRepository.sendFoodRecommendCommand(trimmed) }
+                        .onFailure { Log.w(TAG, "채팅 명령 전송 실패", it) }
+                }
             }
+        }
+
+        private fun onImeShown() {
+            if (shouldKeepListening.get()) return // 앱이 포그라운드에서 이미 관리 중
+            Log.i(TAG, "IME 활성 — 백그라운드에서 Vosk 재가동")
+            start()
+            // start() 내부에서 imeStartedVosk.set(false)가 실행되므로 start() 이후에 재설정.
+            imeStartedVosk.set(true)
+        }
+
+        private fun onImeHidden() {
+            // SR 대기 중이었으면 안전망 취소 후 추가 대기 후 SR 시작.
+            // onFinishInputView 이후에도 Samsung AudioRecord 독점 해제가 더딜 수 있어
+            // IME_SR_EXTRA_DELAY_MS 를 추가해 마이크 완전 해제를 보장한다.
+            if (imeDismissPendingSr.getAndSet(false)) {
+                Log.i(TAG, "IME 종료 확인 — ${IME_SR_EXTRA_DELAY_MS}ms 후 SR 시작")
+                imeSrSafetyRunnable?.let { mainHandler.removeCallbacks(it) }
+                imeSrSafetyRunnable = null
+                mainHandler.postDelayed({ startSrNow() }, IME_SR_EXTRA_DELAY_MS)
+                return
+            }
+            if (!imeStartedVosk.get()) return // 앱 lifecycle이 관리 중 — 건드리지 않음
+            // wake 처리 중(오버레이 표시 등)에는 IME가 잠깐 내려가도 Vosk 유지
+            if (_uiState.value != UiState.IDLE) return
+            imeStartedVosk.set(false)
+            Log.i(TAG, "IME 해제 — IME가 시작한 Vosk 정지")
+            stop()
         }
 
         private fun hasRecordAudioPermission(): Boolean =
@@ -640,6 +777,8 @@ class WakeWordManager
 
         private companion object {
             const val TAG = "WakeWordManager"
+            const val ACTION_IME_SHOWN = "com.ssafy.s309.IME_KEYBOARD_SHOWN"
+            const val ACTION_IME_HIDDEN = "com.ssafy.s309.IME_KEYBOARD_HIDDEN"
             const val SAMPLE_RATE = 16000.0f
             const val COOLDOWN_MS = 3_000L
             const val TTS_TAIL_GUARD_MS = 300L
@@ -714,5 +853,20 @@ class WakeWordManager
             // 매칭은 matchesWakeWord() 가 공백/구두점 제거 후 substring 으로 처리.
             const val WAKE_GRAMMAR_JSON =
                 """["hi kiki", "hi key key", "hi key", "hey kiki", "hey key", "high kiki", "high key", "[unk]"]"""
+
+            val CALENDAR_KEYWORDS = listOf("일정", "스케줄", "약속")
+
+            const val ACTION_VOICE_LISTENING_START = "com.ssafy.s309.VOICE_LISTENING_START"
+
+            // IME dismiss 후 ACTION_IME_HIDDEN이 오지 않을 경우 SR을 강제 시작하는 안전망 타임아웃.
+            const val IME_SR_SAFETY_TIMEOUT_MS = 1_000L
+
+            // IME_HIDDEN 수신 후 SR 시작까지 추가 대기. Samsung AudioRecord 독점 해제 시간 확보.
+            // VoiceQueryManager 내부 500ms + 이 값 = 실질 SR 시작 지연.
+            const val IME_SR_EXTRA_DELAY_MS = 300L
+
+            // MainActivity 포그라운드 전환 후 Activity.onStart()가 완료될 때까지의 대기 시간.
+            // onStart() 완료 후 Android audio 스택이 foreground 모드로 전환되어 SR 정상 동작.
+            const val FOREGROUND_TRANSITION_DELAY_MS = 400L
         }
     }

@@ -1,7 +1,10 @@
 package com.ssafy.s309.feature.glucofit.keyboard
 
 import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.graphics.Color
 import android.graphics.Typeface
@@ -25,6 +28,7 @@ import android.widget.LinearLayout.LayoutParams.MATCH_PARENT
 import android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
 import android.widget.PopupWindow
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.ssafy.s309.feature.glucofit.data.KeyboardFoodCache
@@ -79,6 +83,18 @@ class GlucoseKeyboard : InputMethodService() {
     /** 배너에 현재 표시 중인 매칭 음식. 배너 클릭 시 앱으로 전달. null이면 매칭 없음. */
     private var currentMatchedFood: com.ssafy.s309.feature.glucofit.data.KeyboardFoodItem? = null
 
+    // 하이키키 음성 명령 수신 시 키보드 자동 닫기 — SR과 IME 오디오 충돌 방지
+    private var voiceListenerRegistered = false
+    private val voiceListeningReceiver =
+        object : BroadcastReceiver() {
+            override fun onReceive(
+                ctx: Context,
+                intent: Intent,
+            ) {
+                requestHideSelf(0)
+            }
+        }
+
     // ── Caps Lock & 더블-탭 Shift ──────────────────────────────────────────
     private var isCapsLock = false
     private val doubleTapHandler = Handler(Looper.getMainLooper())
@@ -129,6 +145,23 @@ class GlucoseKeyboard : InputMethodService() {
         super.onStartInput(attribute, restarting)
         currentEditorInfo = attribute
         KeyboardFoodCache.load(applicationContext)
+    }
+
+    override fun onStartInputView(
+        info: EditorInfo,
+        restarting: Boolean,
+    ) {
+        super.onStartInputView(info, restarting)
+        sendBroadcast(Intent(ACTION_IME_SHOWN).apply { setPackage(packageName) })
+        if (!voiceListenerRegistered) {
+            ContextCompat.registerReceiver(
+                this,
+                voiceListeningReceiver,
+                IntentFilter("com.ssafy.s309.VOICE_LISTENING_START"),
+                ContextCompat.RECEIVER_NOT_EXPORTED,
+            )
+            voiceListenerRegistered = true
+        }
     }
 
     private val KO_ROW1 = listOf("ㅂ", "ㅈ", "ㄷ", "ㄱ", "ㅅ", "ㅛ", "ㅕ", "ㅑ", "ㅐ", "ㅔ")
@@ -984,10 +1017,17 @@ class GlucoseKeyboard : InputMethodService() {
 
     companion object {
         private const val TAG = "GlucoseKeyboard"
+        const val ACTION_IME_SHOWN = "com.ssafy.s309.IME_KEYBOARD_SHOWN"
+        const val ACTION_IME_HIDDEN = "com.ssafy.s309.IME_KEYBOARD_HIDDEN"
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
+        sendBroadcast(Intent(ACTION_IME_HIDDEN).apply { setPackage(packageName) })
+        if (voiceListenerRegistered) {
+            runCatching { unregisterReceiver(voiceListeningReceiver) }
+            voiceListenerRegistered = false
+        }
         prefs.edit()
             .putString("mode", mode.name)
             .putString("prevLangMode", prevLangMode.name)

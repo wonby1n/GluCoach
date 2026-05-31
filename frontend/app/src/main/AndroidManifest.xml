@@ -28,6 +28,9 @@
     <!-- Wake word 감지 (WakeWordManager) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- 다른 앱 위에 Kiki 오버레이 표시 (SystemOverlayManager) -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
