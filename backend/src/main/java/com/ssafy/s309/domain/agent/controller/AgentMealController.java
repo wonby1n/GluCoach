@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/agent/meals")
 @RequiredArgsConstructor
-@Tag(name = "AgentMeals", description = "AI Agent 전용: 일별 식사 + 영양 정보 (X-Agent-Api-Key 인증)")
+@Tag(name = "Agent API", description = "AI Agent 전용: 일별 식사 + 영양 정보 (X-Agent-Api-Key 인증)")
 public class AgentMealController {
 
   private final AgentMealService service;

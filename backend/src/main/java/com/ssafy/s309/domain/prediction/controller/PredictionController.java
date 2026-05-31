@@ -28,7 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/predict")
 @RequiredArgsConstructor
-@Tag(name = "Prediction", description = "식전 혈당 예측 API")
+@Tag(name = "혈당", description = "식전 혈당 예측 API")
 public class PredictionController {
 
   private final PredictionService predictionService;

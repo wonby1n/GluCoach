@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/alerts")
 @RequiredArgsConstructor
-@Tag(name = "Alert", description = "사용자 알림 CRUD")
+@Tag(name = "사용자", description = "사용자 알림 CRUD")
 public class SosController {
 
   private final SosService sosService;

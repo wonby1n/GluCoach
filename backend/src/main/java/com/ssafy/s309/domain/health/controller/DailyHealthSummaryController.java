@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/health/daily-summary")
 @RequiredArgsConstructor
-@Tag(name = "DailyHealthSummary", description = "삼성 헬스 일별 요약 (대시보드 + Agent)")
+@Tag(name = "건강 데이터", description = "삼성 헬스 일별 요약 (대시보드 + Agent)")
 public class DailyHealthSummaryController {
 
   private final DailyHealthSummaryService service;

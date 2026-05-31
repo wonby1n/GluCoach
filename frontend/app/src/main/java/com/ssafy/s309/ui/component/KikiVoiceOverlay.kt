@@ -90,6 +90,31 @@ fun KikiVoiceOverlay(
         wakeWordManager.abort()
     }
 
+    KikiVoiceOverlayContent(
+        uiState = uiState,
+        partial = partial,
+        response = response,
+        thinkingHint = thinkingHint,
+        onResponseTapped = onResponseTapped,
+        onClose = { wakeWordManager.dismissResponse() },
+        modifier = modifier,
+    )
+}
+
+/**
+ * 순수 UI 컴포넌트 — 시스템 오버레이(WindowManager)와 인앱 오버레이 양쪽에서 재사용.
+ * 상태를 직접 받아 렌더링하므로 LifecycleOwner / BackHandler 의존 없음.
+ */
+@Composable
+internal fun KikiVoiceOverlayContent(
+    uiState: WakeWordManager.UiState,
+    partial: String,
+    response: String,
+    thinkingHint: String,
+    onResponseTapped: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.BottomCenter,
@@ -114,7 +139,7 @@ fun KikiVoiceOverlay(
             KikiTopFace()
         }
 
-        // 레이어 3: 하단 상태 캡슐 + 응답 카드 (기존과 동일)
+        // 레이어 3: 하단 상태 캡슐 + 응답 카드
         AnimatedVisibility(
             visible = uiState != WakeWordManager.UiState.IDLE,
             enter = fadeIn(tween(220)) + slideInVertically(tween(260)) { it / 2 },
@@ -131,7 +156,7 @@ fun KikiVoiceOverlay(
                     ResponseCard(
                         text = response,
                         onBodyTap = onResponseTapped,
-                        onClose = { wakeWordManager.dismissResponse() },
+                        onClose = onClose,
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                 }

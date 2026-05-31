@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/timeline")
 @RequiredArgsConstructor
-@Tag(name = "Timeline", description = "타임라인 통합 조회 API (혈당 + 식사/운동/수면 이벤트)")
+@Tag(name = "혈당", description = "타임라인 통합 조회 API (혈당 + 식사/운동/수면 이벤트)")
 public class TimelineController {
 
   private final TimelineService timelineService;

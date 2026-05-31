@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/weekly-reports")
 @RequiredArgsConstructor
-@Tag(name = "WeeklyReport", description = "주간 혈당 보고서")
+@Tag(name = "코칭", description = "주간 혈당 보고서")
 public class WeeklyReportController {
 
   private final WeeklyReportService weeklyReportService;

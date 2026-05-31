@@ -17,6 +17,32 @@ import kotlinx.coroutines.tasks.await
  */
 object WearDataSender {
     const val GLUCOSE_PATH = "/glucose"
+    const val NOTIFICATION_PATH = "/notification"
+
+    suspend fun sendNotification(
+        context: Context,
+        title: String,
+        body: String,
+    ): Boolean {
+        return try {
+            val nodes = Wearable.getNodeClient(context).connectedNodes.await()
+            if (nodes.isEmpty()) return false
+            val payload =
+                org.json.JSONObject().apply {
+                    put("title", title)
+                    put("body", body)
+                }.toString().toByteArray(Charsets.UTF_8)
+            nodes.forEach { node ->
+                Wearable.getMessageClient(context)
+                    .sendMessage(node.id, NOTIFICATION_PATH, payload)
+                    .await()
+            }
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "알림 전송 실패", e)
+            false
+        }
+    }
 
     suspend fun send(
         context: Context,
