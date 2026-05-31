@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -77,7 +78,9 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -182,6 +185,8 @@ fun FoodComparisonContent(
             foodB = foodB!!,
             compareResult = uiState.result!!,
             glucoseRange = uiState.glucoseRange,
+            explainMessage = uiState.explainMessage,
+            isExplainLoading = uiState.isExplainLoading,
             isSaving = uiState.isLoading,
             onResetSelection = {
                 foodA = null
@@ -944,6 +949,8 @@ private fun FoodComparisonResultContent(
     foodB: FoodItem,
     compareResult: GlucoseCompareResponse,
     glucoseRange: GlucoseRange,
+    explainMessage: String?,
+    isExplainLoading: Boolean,
     isSaving: Boolean,
     onResetSelection: () -> Unit,
     onFoodARemoved: () -> Unit,
@@ -1022,9 +1029,55 @@ private fun FoodComparisonResultContent(
                 predictionA = compareResult.foodA,
                 predictionB = compareResult.foodB,
                 glucoseRange = glucoseRange,
+                selectedFoodIndex = selectedFoodIndex,
             )
 
-            Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
+            Spacer(modifier = Modifier.height(GlucoachSpacing.md))
+
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .shadow(2.dp, RoundedCornerShape(GlucoachCorner.card))
+                        .clip(RoundedCornerShape(GlucoachCorner.card))
+                        .background(Color.White)
+                        .border(1.5.dp, GlucoachColors.Primary, RoundedCornerShape(GlucoachCorner.card))
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(text = "💡", fontSize = 20.sp)
+                if (isExplainLoading || explainMessage == null) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth(0.75f)
+                                    .height(14.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(GlucoachColors.Surface),
+                        )
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth(0.55f)
+                                    .height(11.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(GlucoachColors.Surface),
+                        )
+                    }
+                } else {
+                    Text(
+                        text = explainMessage,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.Black,
+                        lineHeight = 19.sp,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(GlucoachSpacing.md))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1642,6 +1695,7 @@ private fun GlucoseComparisonChart(
     predictionA: GlucosePrediction,
     predictionB: GlucosePrediction,
     glucoseRange: GlucoseRange,
+    selectedFoodIndex: Int,
 ) {
     val rangeHigh = glucoseRange.maxMgDl.toFloat()
     val rangeLow = glucoseRange.minMgDl.toFloat()
@@ -1654,13 +1708,21 @@ private fun GlucoseComparisonChart(
     val maxVal = dataMax + padding
     val minVal = dataMin - padding
 
+    val goodColor = Color(0xFF43A047)
+    val badColor = Color(0xFFE53935)
+    val colorA = if (predictionA.peakMgdl <= predictionB.peakMgdl) goodColor else badColor
+    val colorB = if (predictionB.peakMgdl < predictionA.peakMgdl) goodColor else badColor
+    val alphaA = if (selectedFoodIndex == 0) 1f else 0.45f
+    val alphaB = if (selectedFoodIndex == 1) 1f else 0.45f
+
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .shadow(3.dp, RoundedCornerShape(GlucoachCorner.card))
+                .shadow(4.dp, RoundedCornerShape(GlucoachCorner.card))
                 .clip(RoundedCornerShape(GlucoachCorner.card))
                 .background(GlucoachColors.Surface)
+                .border(2.dp, GlucoachColors.Primary, RoundedCornerShape(GlucoachCorner.card))
                 .padding(GlucoachSpacing.xl),
     ) {
         Row(
@@ -1675,16 +1737,19 @@ private fun GlucoseComparisonChart(
                 fontWeight = FontWeight.Bold,
             )
             Column(horizontalAlignment = Alignment.End) {
-                LegendDot(color = GlucoachColors.ChartLineInactive, label = foodA.name)
+                LegendDot(color = colorA, label = foodA.name)
                 Spacer(modifier = Modifier.height(4.dp))
-                LegendDot(color = GlucoachColors.Primary, label = foodB.name)
+                LegendDot(color = colorB, label = foodB.name)
             }
         }
 
         Spacer(modifier = Modifier.height(GlucoachSpacing.lg))
 
-        val chartHeight = 160.dp
+        val chartHeight = 220.dp
         val gridColor = GlucoachColors.ChartGrid
+        var chartWidthPx by remember { mutableIntStateOf(0) }
+        var chartHeightPx by remember { mutableIntStateOf(0) }
+        val density = LocalDensity.current
 
         Box(
             modifier =
@@ -1692,7 +1757,13 @@ private fun GlucoseComparisonChart(
                     .fillMaxWidth()
                     .height(chartHeight),
         ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
+            Canvas(
+                modifier =
+                    Modifier.fillMaxSize().onSizeChanged {
+                        chartWidthPx = it.width
+                        chartHeightPx = it.height
+                    },
+            ) {
                 val w = size.width
                 val h = size.height
                 val rangeVal = maxVal - minVal
@@ -1736,14 +1807,16 @@ private fun GlucoseComparisonChart(
                     }
                 drawPath(shadePath, shadeBrush)
 
-                fun drawCurve(
+                fun drawCurveWithFill(
                     points: List<Float>,
                     color: Color,
+                    curveAlpha: Float = 1f,
                 ) {
                     if (points.size < 2) return
                     val step = w / (points.size - 1)
                     val pts = points.mapIndexed { i, v -> Offset(i * step, yFor(v)) }
-                    val path =
+
+                    val linePath =
                         Path().apply {
                             moveTo(pts[0].x, pts[0].y)
                             for (i in 1 until pts.size) {
@@ -1761,15 +1834,165 @@ private fun GlucoseComparisonChart(
                                 )
                             }
                         }
+
+                    val fillPath =
+                        Path().apply {
+                            moveTo(pts[0].x, h)
+                            lineTo(pts[0].x, pts[0].y)
+                            for (i in 1 until pts.size) {
+                                val p0 = pts[maxOf(i - 2, 0)]
+                                val p1 = pts[i - 1]
+                                val p2 = pts[i]
+                                val p3 = pts[minOf(i + 1, pts.lastIndex)]
+                                cubicTo(
+                                    p1.x + (p2.x - p0.x) / 6f,
+                                    p1.y + (p2.y - p0.y) / 6f,
+                                    p2.x - (p3.x - p1.x) / 6f,
+                                    p2.y - (p3.y - p1.y) / 6f,
+                                    p2.x,
+                                    p2.y,
+                                )
+                            }
+                            lineTo(pts.last().x, h)
+                            close()
+                        }
+
                     drawPath(
-                        path = path,
-                        color = color,
-                        style = Stroke(width = 3f, cap = StrokeCap.Round),
+                        path = fillPath,
+                        brush =
+                            Brush.verticalGradient(
+                                colors = listOf(color.copy(alpha = 0.22f * curveAlpha), color.copy(alpha = 0.0f)),
+                                startY = 0f,
+                                endY = h,
+                            ),
                     )
+                    drawPath(
+                        path = linePath,
+                        color = color.copy(alpha = 0.2f * curveAlpha),
+                        style = Stroke(width = 20f, cap = StrokeCap.Round),
+                    )
+                    drawPath(
+                        path = linePath,
+                        color = color.copy(alpha = curveAlpha),
+                        style = Stroke(width = 8f, cap = StrokeCap.Round),
+                    )
+
+                    val peakIdx = points.indices.maxByOrNull { points[it] } ?: return
+                    val peakPt = pts[peakIdx]
+                    drawCircle(color = color.copy(alpha = 0.25f * curveAlpha), radius = 14f, center = peakPt)
+                    drawCircle(color = color.copy(alpha = curveAlpha), radius = 7f, center = peakPt)
+                    drawCircle(color = Color.White.copy(alpha = curveAlpha), radius = 3.5f, center = peakPt)
                 }
 
-                drawCurve(curveA, GlucoachColors.ChartLineInactive)
-                drawCurve(curveB, GlucoachColors.Primary)
+                drawCurveWithFill(curveA, colorA, alphaA)
+                drawCurveWithFill(curveB, colorB, alphaB)
+
+                if (chartWidthPx > 0) {
+                    val selCurve = if (selectedFoodIndex == 0) curveA else curveB
+                    val selColor = if (selectedFoodIndex == 0) colorA else colorB
+                    val pkIdx = selCurve.indices.maxByOrNull { selCurve[it] } ?: 0
+                    val pkFracX =
+                        if (selCurve.size > 1) pkIdx.toFloat() / (selCurve.size - 1) else 0.5f
+                    val pkFracY =
+                        (maxVal - (selCurve.getOrElse(pkIdx) { maxVal })) / rangeVal
+                    val pkX = w * pkFracX
+                    val pkY = h * pkFracY
+                    val cardBottomY = pkY - with(density) { 10.dp.toPx() }
+                    val dotHaloTop = pkY - 14f
+                    if (cardBottomY < dotHaloTop) {
+                        drawLine(
+                            color = selColor.copy(alpha = 0.6f),
+                            start = Offset(pkX, cardBottomY),
+                            end = Offset(pkX, dotHaloTop),
+                            strokeWidth = 1.5f,
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 4f)),
+                        )
+                    }
+                }
+            }
+
+            // 피크 수치 라벨 오버레이 (각 곡선 피크 옆)
+            if (chartWidthPx > 0 && chartHeightPx > 0) {
+                val rangeVal = maxVal - minVal
+                listOf(
+                    Triple(curveA, colorA, alphaA),
+                    Triple(curveB, colorB, alphaB),
+                ).forEach { (curve, color, alpha) ->
+                    if (curve.size < 2) return@forEach
+                    val pkIdx = curve.indices.maxByOrNull { curve[it] } ?: return@forEach
+                    val pkFracX = pkIdx.toFloat() / (curve.size - 1)
+                    val pkFracY = (maxVal - curve[pkIdx]) / rangeVal
+                    val pkXDp = with(density) { (chartWidthPx * pkFracX).toDp() }
+                    val pkYDp = with(density) { (chartHeightPx * pkFracY).toDp() }
+                    val offsetX = if (pkFracX < 0.55f) pkXDp + 18.dp else pkXDp - 58.dp
+                    Text(
+                        text = "${curve[pkIdx].toInt()} mg/dL",
+                        color = color.copy(alpha = alpha),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.offset(x = offsetX.coerceAtLeast(0.dp), y = pkYDp - 10.dp),
+                    )
+                }
+            }
+
+            if (chartWidthPx > 0 && chartHeightPx > 0) {
+                val selectedCurve = if (selectedFoodIndex == 0) curveA else curveB
+                val selectedFood = if (selectedFoodIndex == 0) foodA else foodB
+                val selectedColor = if (selectedFoodIndex == 0) colorA else colorB
+                val peakIdx = selectedCurve.indices.maxByOrNull { selectedCurve[it] } ?: 0
+                val peakFractionX =
+                    if (selectedCurve.size > 1) peakIdx.toFloat() / (selectedCurve.size - 1) else 0.5f
+                val peakFractionY =
+                    (maxVal - (selectedCurve.getOrElse(peakIdx) { maxVal })) / (maxVal - minVal)
+                val peakXDp = with(density) { (chartWidthPx * peakFractionX).toDp() }
+                val peakYDp = with(density) { (chartHeightPx * peakFractionY).toDp() }
+                val imageSize = 28.dp
+                val cardOffsetY = peakYDp - imageSize - 18.dp
+
+                Row(
+                    modifier =
+                        Modifier
+                            .offset(
+                                x = (peakXDp - imageSize / 2 - 4.dp).coerceAtLeast(0.dp),
+                                y = cardOffsetY.coerceAtLeast(0.dp),
+                            )
+                            .shadow(3.dp, RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(GlucoachColors.Surface)
+                            .border(1.dp, selectedColor, RoundedCornerShape(20.dp))
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Image(
+                        painter = painterResource(id = selectedFood.imageResId),
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier =
+                            Modifier
+                                .size(imageSize)
+                                .clip(CircleShape)
+                                .background(GlucoachColors.Background, CircleShape),
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Column {
+                        Text(
+                            text = selectedFood.name,
+                            color = GlucoachColors.TextPrimary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 72.dp),
+                        )
+                        val selectedPeak = if (selectedFoodIndex == 0) predictionA.peakMgdl else predictionB.peakMgdl
+                        Text(
+                            text = "${selectedPeak.toInt()} mg/dL",
+                            color = selectedColor,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
             }
 
             val rangeTotal = maxVal - minVal

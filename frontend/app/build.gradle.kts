@@ -34,6 +34,10 @@ android {
             )
             buildConfigField("String", "BASE_URL", "\"https://k14s309.p.ssafy.io/\"")
         }
+        create("local") {
+            initWith(getByName("debug"))
+            buildConfigField("String", "BASE_URL", "\"http://172.30.1.54:8080/\"")
+        }
     }
 
     compileOptions {
