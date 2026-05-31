@@ -78,36 +78,88 @@ AI 에이전트 **Kiki**가 식사·운동·수면 맥락을 종합해 개인 �
 
 <table>
   <tr>
-    <td align="center"><img src="docs/assets/agent_alarm.gif" width="200"/><br/><b>AI 코칭 에이전트 Kiki</b></td>
-    <td align="center"><img src="docs/assets/food_cognition.gif" width="200"/><br/><b>AI 음식 인식</b></td>
-    <td align="center"><img src="docs/assets/ab_sim.gif" width="200"/><br/><b>A/B 비교 시뮬레이션</b></td>
+    <td width="45%" align="center">
+      <img src="docs/assets/agent_alarm.gif" width="260"/>
+    </td>
+    <td width="55%" valign="middle">
+      <b>🤖 AI 코칭 에이전트 Kiki</b><br/><br/>
+      기상 후·식후·고저혈당 상황에서 Kiki가 먼저 코칭을 시작합니다.<br/>
+      음식 추천·운동 팁·혈당 요약을 LLM Tool-calling으로 생성하며, 30분 중복 방지로 알림 피로도를 관리합니다.
+    </td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/assets/transcript.gif" width="200"/><br/><b>음식 성적표</b></td>
-    <td align="center"><img src="docs/assets/keyboard.gif" width="200"/><br/><b>GluCoach 키보드</b></td>
-    <td align="center"><img src="docs/assets/low_glucose.gif" width="200"/><br/><b>디지털 트윈</b></td>
+    <td width="55%" valign="middle">
+      <b>📷 AI 음식 인식</b><br/><br/>
+      음식 사진 한 장으로 음식명·영양정보(탄·단·지·칼로리)를 자동 기록합니다.<br/>
+      임베딩 기반 prototype 검색으로 재학습 없이 신규 음식을 인식합니다.
+    </td>
+    <td width="45%" align="center">
+      <img src="docs/assets/food_cognition.gif" width="260"/>
+    </td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/assets/weekly_report.gif" width="200"/><br/><b>주간 리포트</b></td>
-    <td></td>
-    <td></td>
+    <td width="45%" align="center">
+      <img src="docs/assets/ab_sim.gif" width="260"/>
+    </td>
+    <td width="55%" valign="middle">
+      <b>🔬 A/B 비교 시뮬레이션</b><br/><br/>
+      CGM 시뮬레이터로 다양한 혈당 시나리오를 재현합니다.<br/>
+      어떤 음식이 내게 잘 맞는지 미리 확인할 수 있습니다.
+    </td>
+  </tr>
+  <tr>
+    <td width="55%" valign="middle">
+      <b>🍽️ 음식 성적표</b><br/><br/>
+      식사 로그와 음식 등급(Food Grade)으로 식단을 평가하고,<br/>
+      식전·식후 혈당 변화를 한눈에 비교합니다.
+    </td>
+    <td width="45%" align="center">
+      <img src="docs/assets/transcript.gif" width="260"/>
+    </td>
+  </tr>
+  <tr>
+    <td width="45%" align="center">
+      <img src="docs/assets/keyboard.gif" width="260"/>
+    </td>
+    <td width="55%" valign="middle">
+      <b>⌨️ GluCoach 키보드</b><br/><br/>
+      커스텀 Android IME로, 어떤 앱에서든 키보드로 음식을 검색·기록합니다.<br/>
+      19,600개 음식 DB와 개인화 등급을 탑재해 앱을 열지 않고도 빠르게 기록할 수 있습니다.
+    </td>
+  </tr>
+  <tr>
+    <td width="55%" valign="middle">
+      <b>💡 디지털 트윈</b><br/><br/>
+      CGM 데이터에 맞춰 키키가 반응합니다.<br/>
+      나의 현재 상태를 캐릭터로 쉽게 볼 수 있습니다.
+    </td>
+    <td width="45%" align="center">
+      <img src="docs/assets/low_glucose.gif" width="260"/>
+    </td>
+  </tr>
+  <tr>
+    <td width="45%" align="center">
+      <img src="docs/assets/weekly_report.gif" width="260"/>
+    </td>
+    <td width="55%" valign="middle">
+      <b>📄 주간 리포트</b><br/><br/>
+      LLM이 한 주의 혈당·식사·수면·운동 데이터를 분석해<br/>
+      개인 맞춤 PDF 건강 리포트를 생성합니다.
+    </td>
   </tr>
 </table>
 
-| 기능                         | 설명                                                                                                 |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------- |
-| 🩸 **실시간 혈당 모니터링**  | BLE로 CGM 센서를 연결해 실시간 혈당 그래프 제공 (시뮬레이터 데이터 내장)                             |
-| 📈 **AI 혈당 예측**          | LSTM 모델로 식후·현재 시점 기준 향후 120분 혈당 곡선을 개인화 예측                                   |
-| 📷 **AI 음식 인식**          | 음식 사진 촬영 → 임베딩 검색으로 음식명·영양정보(탄·단·지·칼로리) 자동 기록                          |
-| 🤖 **AI 코칭 에이전트 Kiki** | 기상 후·식후·고저혈당 능동 코칭, 음식 추천·운동 팁·혈당 요약 (LLM Tool-calling)                      |
-| 💬 **Kiki 채팅**             | 에이전트와의 대화형 인터페이스, 명령 버튼(음식 추천 / 혈당 체크 / 운동 팁)                           |
-| 🔔 **푸시 알림 + 음성**      | FCM 고·저혈당 경고 및 코칭 알림, TTS 음성 안내                                                       |
-| 🍽️ **식사 기록·리포트**      | 식사 로그, 음식 등급(Food Grade), 식전·식후 혈당 비교                                                |
-| ⌨️ **GluCoach 키보드**       | 커스텀 Android IME — 어떤 앱에서든 키보드로 음식 검색·기록 가능, 19,600개 음식 DB + 개인화 등급 탑재 |
-| 📄 **주간 리포트**           | LLM이 생성하는 PDF 주간 건강 리포트                                                                  |
-| ⌚ **Wear OS 워치 앱**       | 워치 타일·컴플리케이션으로 혈당 표시                                                                 |
-| 😴 **건강 데이터 연동**      | Health Connect로 수면·걸음수를 수집해 코칭 맥락에 반영                                               |
-| 🧭 **온보딩**                | 당뇨 유형 선택, 목표 혈당 범위·기본 건강 정보 설정                                                   |
+<br>
+
+| 기능                        | 설명                                                                       |
+| --------------------------- | -------------------------------------------------------------------------- |
+| 🩸 **실시간 혈당 모니터링** | BLE로 CGM 센서를 연결해 실시간 혈당 그래프 제공 (시뮬레이터 데이터 내장)   |
+| 📈 **AI 혈당 예측**         | LSTM 모델로 식후·현재 시점 기준 향후 120분 혈당 곡선을 개인화 예측         |
+| 💬 **Kiki 채팅**            | 에이전트와의 대화형 인터페이스, 명령 버튼(음식 추천 / 혈당 체크 / 운동 팁) |
+| 🔔 **푸시 알림 + 음성**     | FCM 고·저혈당 경고 및 코칭 알림, TTS 음성 안내                             |
+| ⌚ **Wear OS 워치 앱**      | 워치 타일·컴플리케이션으로 혈당 표시                                       |
+| 😴 **건강 데이터 연동**     | Health Connect로 수면·걸음수를 수집해 코칭 맥락에 반영                     |
+| 🧭 **온보딩**               | 당뇨 유형 선택, 목표 혈당 범위·기본 건강 정보 설정                         |
 
 ---
 
