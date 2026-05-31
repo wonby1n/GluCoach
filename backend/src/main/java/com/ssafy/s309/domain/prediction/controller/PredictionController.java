@@ -6,6 +6,8 @@ import com.ssafy.s309.domain.prediction.client.dto.PersonalizeRequest;
 import com.ssafy.s309.domain.prediction.client.dto.PersonalizeResponse;
 import com.ssafy.s309.domain.prediction.dto.AbPredictRequest;
 import com.ssafy.s309.domain.prediction.dto.AbPredictResponse;
+import com.ssafy.s309.domain.prediction.dto.CompareExplainRequest;
+import com.ssafy.s309.domain.prediction.dto.CompareExplainResponse;
 import com.ssafy.s309.domain.prediction.dto.FromImagePredictResponse;
 import com.ssafy.s309.domain.prediction.dto.PredictRequest;
 import com.ssafy.s309.domain.prediction.dto.PredictResponse;
@@ -64,6 +66,14 @@ public class PredictionController {
       throw new IllegalArgumentException("이미지 파일이 필요합니다");
     }
     return ResponseEntity.ok(fromImagePredictionService.predict(principal.userId(), image));
+  }
+
+  @Operation(summary = "A/B 음식 비교 개인화 LLM 설명 생성")
+  @PostMapping("/compare/explain")
+  public ResponseEntity<CompareExplainResponse> compareExplain(
+      @AuthenticationPrincipal CustomUserPrincipal principal,
+      @RequestBody @Valid CompareExplainRequest request) {
+    return ResponseEntity.ok(predictionService.compareExplain(principal.userId(), request));
   }
 
   @Operation(
