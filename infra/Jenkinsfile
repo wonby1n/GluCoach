@@ -1,0 +1,111 @@
+pipeline {
+    agent any
+
+    options {
+        disableConcurrentBuilds()
+    }
+
+    environment {
+        EC2_USER = 'ubuntu'
+        EC2_HOST = 'k14s309.p.ssafy.io'
+        DEPLOY_DIR = '/home/ubuntu/S14P31S309'
+        GIT_REPO = 'https://lab.ssafy.com/s14-final/S14P31S309.git'
+        JENKINS_URL_CUSTOM = 'http://13.125.178.132:9090'
+    }
+
+    triggers {
+        gitlab(
+            triggerOnAcceptedMergeRequest: true,
+            branchFilterType: 'NameBasedFilter',
+            includeBranchesSpec: 'release'
+        )
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git(
+                    url: "${GIT_REPO}",
+                    branch: 'release',
+                    credentialsId: 'gitlab-token'    // Jenkins Credentials ID (Username with Password)
+                )
+            }
+        }
+
+        stage('Build Backend') {
+            steps {
+                dir('backend') {
+                    sh 'chmod +x gradlew'
+                    sh './gradlew bootJar -x test'
+                }
+            }
+        }
+
+        stage('Deploy to EC2') {
+            steps {
+                withCredentials([
+                    file(credentialsId: 'firebase-key', variable: 'FIREBASE_KEY'),
+                    string(credentialsId: 'food-api-key', variable: 'FOOD_API_KEY')
+                ]) {
+                    sshagent(credentials: ['ec2-ssh-key']) {    // Jenkins Credentials ID
+                        sh """
+                            scp -o StrictHostKeyChecking=no \$FIREBASE_KEY ${EC2_USER}@${EC2_HOST}:~/firebase-service-account.json
+                            ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "
+                                export FOOD_API_KEY='\$FOOD_API_KEY' &&
+                                cd ${DEPLOY_DIR} &&
+                                git fetch origin release &&
+                                git reset --hard origin/release &&
+                                git clean -fd &&
+                                cp ~/firebase-service-account.json backend/src/main/resources/firebase-service-account.json &&
+                                chmod +x infra/scripts/deploy-bg.sh &&
+                                infra/scripts/deploy-bg.sh
+                            "
+                        """
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            sh """
+                curl -s -X POST 'https://meeting.ssafy.com/hooks/41zy4nefxjbezfet79cbuzs34h' \
+                -H 'Content-Type: application/json' \
+                -d '{
+                    "attachments": [{
+                        "color": "#00c851",
+                        "title": ":white_check_mark: :hawon_note: GluCoach 배포 성공!",
+                        "text": "release 브랜치 배포가 완료되었습니다.",
+                        "fields": [
+                            {"short": true, "title": "브랜치", "value": "release"},
+                            {"short": true, "title": "빌드 번호", "value": "#${env.BUILD_NUMBER}"}
+                        ],
+                        "actions": [{"name": "빌드 로그", "integration": {"url": "${JENKINS_URL_CUSTOM}/job/glucoach/${env.BUILD_NUMBER}/console"}}]
+                    }]
+                }'
+            """
+        }
+        failure {
+            sh """
+                curl -s -X POST 'https://meeting.ssafy.com/hooks/41zy4nefxjbezfet79cbuzs34h' \
+                -H 'Content-Type: application/json' \
+                -d '{
+                    "attachments": [{
+                        "color": "#ff4444",
+                        "title": ":x: :hawon_note: GluCoach 배포 실패!",
+                        "text": "release 브랜치 빌드가 실패했습니다. 로그를 확인해주세요.",
+                        "fields": [
+                            {"short": true, "title": "브랜치", "value": "release"},
+                            {"short": true, "title": "빌드 번호", "value": "#${env.BUILD_NUMBER}"}
+                        ],
+                        "actions": [{"name": "빌드 로그", "integration": {"url": "${JENKINS_URL_CUSTOM}/job/glucoach/${env.BUILD_NUMBER}/console"}}]
+                    }]
+                }'
+            """
+        }
+        always {
+            cleanWs()
+        }
+    }
+}

@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">glucoach</string>
+    <string name="glucose_widget_description">오늘 혈당 추이를 한눈에. 30분마다 자동 갱신.</string>
+</resources>

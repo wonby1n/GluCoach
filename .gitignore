@@ -1,0 +1,50 @@
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+*.swp
+*.swo
+*~
+
+# 환경 변수
+.env
+.env.local
+.env.*.local
+
+# 자격증명 / 키 — 절대 커밋 금지
+*.pem
+*.key
+test_*.json
+
+# 로그
+*.log
+logs/
+
+# 임시 파일
+tmp/
+temp/
+
+# Claude 설정 파일
+.claude
+.omc/
+
+# oh-my-claudecode (로컬 세션/상태 캐시)
+.omc/
+
+# tldr
+.tldr
+.tldrignore
+
+
+# Claude CLI 핸드오프 임시 번들 (커밋 금지)
+_claude-task/
+
+# 기타 찌꺼기
+unzip

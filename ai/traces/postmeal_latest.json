@@ -1,0 +1,168 @@
+{
+  "agent": "postmeal",
+  "triggered_at": "2026-05-11 10:52:04",
+  "message": "하원님, 식사 후 조금 움직여볼까요? 가볍게 스트레칭해보면 좋을 것 같아요 🙂",
+  "display_trace": {
+    "title": "키키가 확인한 내용",
+    "summary": "식사 기록, 식후 혈당 흐름, 활동량을 함께 확인해 활동을 제안했어요.",
+    "cards": [
+      {
+        "type": "glucose",
+        "title": "식후 혈당 흐름",
+        "description": "125 → 145 → 165 mg/dL (식후 +40mg/dL)",
+        "severity": "caution"
+      },
+      {
+        "type": "activity",
+        "title": "식후 활동량",
+        "description": "식후 걸음수 23보",
+        "severity": "caution"
+      }
+    ],
+    "decision": {
+      "action": "send_notification",
+      "reason": "혈당 상승과 활동 부족이 함께 감지되어 가벼운 활동을 제안했어요.",
+      "message_rule": "부담 없는 톤으로 활동 1가지를 제안했어요."
+    },
+    "notification_message": "하원님, 식사 후 조금 움직여볼까요? 가볍게 스트레칭해보면 좋을 것 같아요 🙂"
+  },
+  "turns": 3,
+  "tool_calls": [
+    {
+      "name": "get_meals",
+      "input": {
+        "date": "2026-05-04"
+      },
+      "result": {
+        "date": "2026-05-04",
+        "meals": []
+      }
+    },
+    {
+      "name": "get_glucose",
+      "input": {
+        "start_time": "2026-05-04T11:30:00",
+        "end_time": "2026-05-04T13:00:00"
+      },
+      "result": {
+        "readings": [
+          {
+            "time": "2026-05-04 12:00",
+            "glucose_mg_dl": 125
+          },
+          {
+            "time": "2026-05-04 12:30",
+            "glucose_mg_dl": 145
+          },
+          {
+            "time": "2026-05-04 13:00",
+            "glucose_mg_dl": 165
+          }
+        ],
+        "averages": {
+          "postmeal_peak_avg": 170,
+          "nightly_variation_avg": 50,
+          "fasting_avg": 115
+        }
+      }
+    },
+    {
+      "name": "get_steps",
+      "input": {
+        "start_time": "2026-05-04T12:30:00",
+        "end_time": "2026-05-04T13:00:00"
+      },
+      "result": {
+        "start_time": "2026-05-04 12:30",
+        "end_time": "2026-05-04 13:00",
+        "total_steps": 23,
+        "periods": [
+          {
+            "start": "2026-05-04 12:30",
+            "end": "2026-05-04 13:00",
+            "steps": 23,
+            "period_minutes": 30
+          }
+        ]
+      }
+    },
+    {
+      "name": "get_notification_history",
+      "input": {
+        "hours": 6
+      },
+      "result": {
+        "hours": 6,
+        "today": "2026-05-04",
+        "notifications": []
+      }
+    },
+    {
+      "name": "trigger_projection",
+      "input": {
+        "command": "SHOW"
+      },
+      "result": {
+        "status": "error",
+        "message": "timed out",
+        "command": "SHOW"
+      }
+    },
+    {
+      "name": "send_notification",
+      "input": {
+        "message": "하원님, 식사 후 조금 움직여볼까요? 가볍게 스트레칭해보면 좋을 것 같아요 🙂",
+        "options": [
+          {
+            "id": "stretch_now",
+            "label": "할게요"
+          },
+          {
+            "id": "later_30",
+            "label": "30분 뒤"
+          },
+          {
+            "id": "skip",
+            "label": "패스"
+          }
+        ],
+        "display_trace": {
+          "summary": "식후 60분, 활동량 적음",
+          "cards": [
+            {
+              "type": "glucose",
+              "title": "혈당",
+              "description": "식사 시각 125mg/dL에서 13시 165mg/dL로 상승 추세예요."
+            },
+            {
+              "type": "steps",
+              "title": "활동량",
+              "description": "최근 30분간 걸음 수는 23보로, 활동량이 적은 상태예요."
+            }
+          ],
+          "decision": {
+            "reason": "식후 혈당이 40mg/dL 이상 상승하고 있고, 최근 30분 걸음 수가 100보 미만이라 가벼운 활동을 권유하는 것이 좋겠어요."
+          }
+        }
+      },
+      "result": {
+        "status": "sent",
+        "message": "하원님, 식사 후 조금 움직여볼까요? 가볍게 스트레칭해보면 좋을 것 같아요 🙂",
+        "options": [
+          {
+            "id": "stretch_now",
+            "label": "할게요"
+          },
+          {
+            "id": "later_30",
+            "label": "30분 뒤"
+          },
+          {
+            "id": "skip",
+            "label": "패스"
+          }
+        ]
+      }
+    }
+  ]
+}

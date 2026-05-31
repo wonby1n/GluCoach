@@ -1,0 +1,141 @@
+{
+  "agent": "postmeal_followup",
+  "triggered_at": "2026-05-11 10:53:11",
+  "message": "하원님, 회의 끝나셨나요? 잠깐 스트레칭하며 몸 풀어볼까요?",
+  "display_trace": {
+    "title": "키키가 확인한 내용",
+    "summary": "식사 기록, 식후 혈당 흐름, 활동량을 함께 확인해 활동을 제안했어요.",
+    "cards": [
+      {
+        "type": "glucose",
+        "title": "식후 혈당 흐름",
+        "description": "125 → 145 → 165 → 180 mg/dL (식후 +55mg/dL)",
+        "severity": "caution"
+      },
+      {
+        "type": "activity",
+        "title": "식후 활동량",
+        "description": "식후 걸음수 64보",
+        "severity": "caution"
+      }
+    ],
+    "decision": {
+      "action": "send_notification",
+      "reason": "혈당 상승과 활동 부족이 함께 감지되어 가벼운 활동을 제안했어요.",
+      "message_rule": "부담 없는 톤으로 활동 1가지를 제안했어요."
+    },
+    "notification_message": "하원님, 회의 끝나셨나요? 잠깐 스트레칭하며 몸 풀어볼까요?"
+  },
+  "turns": 3,
+  "tool_calls": [
+    {
+      "name": "get_glucose",
+      "input": {
+        "start_time": "2026-05-04T12:00:00",
+        "end_time": "2026-05-04T13:30:00"
+      },
+      "result": {
+        "readings": [
+          {
+            "time": "2026-05-04 12:00",
+            "glucose_mg_dl": 125
+          },
+          {
+            "time": "2026-05-04 12:30",
+            "glucose_mg_dl": 145
+          },
+          {
+            "time": "2026-05-04 13:00",
+            "glucose_mg_dl": 165
+          },
+          {
+            "time": "2026-05-04 13:30",
+            "glucose_mg_dl": 180
+          }
+        ],
+        "averages": {
+          "postmeal_peak_avg": 170,
+          "nightly_variation_avg": 50,
+          "fasting_avg": 115
+        }
+      }
+    },
+    {
+      "name": "get_steps",
+      "input": {
+        "start_time": "2026-05-04T12:00:00",
+        "end_time": "2026-05-04T13:30:00"
+      },
+      "result": {
+        "start_time": "2026-05-04 12:00",
+        "end_time": "2026-05-04 13:30",
+        "total_steps": 64,
+        "periods": [
+          {
+            "start": "2026-05-04 12:30",
+            "end": "2026-05-04 13:00",
+            "steps": 23,
+            "period_minutes": 30
+          },
+          {
+            "start": "2026-05-04 13:00",
+            "end": "2026-05-04 13:30",
+            "steps": 41,
+            "period_minutes": 30
+          }
+        ]
+      }
+    },
+    {
+      "name": "get_meals",
+      "input": {
+        "date": "2026-05-04"
+      },
+      "result": {
+        "date": "2026-05-04",
+        "meals": []
+      }
+    },
+    {
+      "name": "get_notification_history",
+      "input": {
+        "hours": 2
+      },
+      "result": {
+        "hours": 2,
+        "today": "2026-05-04",
+        "notifications": []
+      }
+    },
+    {
+      "name": "send_notification",
+      "input": {
+        "message": "하원님, 회의 끝나셨나요? 잠깐 스트레칭하며 몸 풀어볼까요?",
+        "options": [],
+        "display_trace": {
+          "summary": "식후 90분, 활동량 적음",
+          "cards": [
+            {
+              "type": "glucose",
+              "title": "혈당",
+              "description": "점심 후 90분 동안 꾸준히 올라 목표 범위에 가까워졌어요."
+            },
+            {
+              "type": "steps",
+              "title": "활동량",
+              "description": "식후 90분간 64보로, 최근 활동량이 적은 상태예요."
+            }
+          ],
+          "decision": {
+            "reason": "회의가 끝났을 타이밍에 실내에서 부담 없이 할 수 있는 스트레칭을 제안했어요."
+          }
+        }
+      },
+      "result": {
+        "status": "sent",
+        "message": "하원님, 회의 끝나셨나요? 잠깐 스트레칭하며 몸 풀어볼까요?",
+        "options": []
+      }
+    }
+  ]
+}

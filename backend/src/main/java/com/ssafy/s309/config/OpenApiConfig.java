@@ -1,0 +1,59 @@
+package com.ssafy.s309.config;
+
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.servers.Server;
+import io.swagger.v3.oas.models.tags.Tag;
+import java.util.List;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class OpenApiConfig {
+
+  private static final String BEARER_SCHEME = "bearerAuth";
+  private static final String AGENT_API_KEY_SCHEME = "agentApiKey";
+
+  @Bean
+  public OpenAPI openAPI() {
+    return new OpenAPI()
+        .addServersItem(new Server().url("https://k14s309.p.ssafy.io").description("운영 서버"))
+        .addServersItem(new Server().url("http://localhost:8080").description("로컬 서버"))
+        .info(new Info().title("GlucoCoach API").version("v1"))
+        .tags(
+            List.of(
+                new Tag().name("Auth").description("회원가입·로그인·토큰 갱신"),
+                new Tag().name("혈당").description("CGM 혈당 수신·예측·타임라인"),
+                new Tag().name("식사").description("음식 검색·식사 기록·음식 등급"),
+                new Tag().name("건강 데이터").description("수면·걸음수·Health Connect 동기화"),
+                new Tag().name("사용자").description("사용자 설정·보호자·FCM·SOS"),
+                new Tag().name("채팅").description("Kiki 채팅 메시지"),
+                new Tag().name("리포트").description("주간 혈당 보고서"),
+                new Tag().name("Agent API").description("AI Agent 전용 내부 API (X-Agent-Api-Key)"),
+                new Tag().name("Demo").description("시연용 엔드포인트 — JWT 인증 불필요")))
+        // 두 스키마 모두 글로벌로 등록 — Swagger UI Authorize 패널에서 둘 다 입력 가능.
+        // 실제 어떤 스키마를 쓰는지는 컨트롤러별 @SecurityRequirement로 분기 가능하나,
+        // 시연 단계에선 Authorize 한 번 후 모든 endpoint 자동 적용으로 충분.
+        .addSecurityItem(new SecurityRequirement().addList(BEARER_SCHEME))
+        .addSecurityItem(new SecurityRequirement().addList(AGENT_API_KEY_SCHEME))
+        .components(
+            new Components()
+                .addSecuritySchemes(
+                    BEARER_SCHEME,
+                    new SecurityScheme()
+                        .name(BEARER_SCHEME)
+                        .type(SecurityScheme.Type.HTTP)
+                        .scheme("bearer")
+                        .bearerFormat("JWT"))
+                .addSecuritySchemes(
+                    AGENT_API_KEY_SCHEME,
+                    new SecurityScheme()
+                        .type(SecurityScheme.Type.APIKEY)
+                        .in(SecurityScheme.In.HEADER)
+                        .name("X-Agent-Api-Key")
+                        .description("Agent API 전용 인증 헤더. 값: agent.api-key 설정값")));
+  }
+}

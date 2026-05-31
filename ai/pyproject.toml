@@ -1,0 +1,40 @@
+[project]
+name = "s309-ai"
+version = "0.1.0"
+description = "S309 AI 서버"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "torch>=2.2.0",
+    "torchvision>=0.17.0",
+    "Pillow>=10.0.0",
+    "requests>=2.33.1",
+    "python-multipart>=0.0.28",
+    "pandas>=3.0.3",
+    "scikit-learn>=1.8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "httpx>=0.28.0",
+]
+train = [
+    "matplotlib>=3.8.0",
+    "scikit-learn>=1.4.0",
+    "tqdm>=4.66.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

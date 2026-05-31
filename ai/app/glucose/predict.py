@@ -1,0 +1,373 @@
+"""실제 추론 로직 (학습된 모델 + scaler 사용).
+
+interface.py 의 dummy 를 대체. 모델/scaler 가 없으면 RuntimeError 발생 →
+interface.py 가 try/except 로 dummy 폴백.
+
+두 Predictor:
+- MealPredictor: Model 1 (식사 시점 → 식후 120분)
+- NowPredictor:  Model 2 (현재 시점 → 향후 120분)
+"""
+
+from __future__ import annotations
+
+import math
+import pickle
+import threading
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import torch
+
+from app.glucose.shanghai_lstm import ShanghaiLSTM, compute_prior_delta_row
+from app.glucose.stage2_model import _glycemic_scale_factor
+
+from app.glucose import config as _cfg
+from app.glucose.constants import (
+    ACTIVITY_MAP,
+    DEFAULT_MODELS_DIR,
+    DEFAULT_SCALER_PATH,
+    DIABETES_TYPE_MAP,
+    LABEL_STEPS,
+    MEAL_PATTERN_MAP,
+    MEAL_SCALE_COLS,
+    SEQ_LEN,
+)
+from app.glucose.data_loader import load_scaler
+from app.glucose.model import (
+    MealLSTMDecoder,
+    MealMLP,
+    MealRidge,
+    NowLSTM,
+    load_torch_model,
+)
+
+_SHANGHAI_DTYPE_MAP = {"T1D": 1, "T2D": 2, "Normal": 0, "T1DM": 1, "T2DM": 2}
+_SHANGHAI_SCALER_NAME = "lstm_t2dm_scaler_coef15.pkl"
+_SHANGHAI_BASE_NAME   = "lstm_meal_t2dm_coef15.pt"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 공통 헬퍼
+# ─────────────────────────────────────────────────────────────────────
+
+
+def _parse_iso_to_hour(time_iso: str) -> float:
+    """ISO 8601 → hour float (8:30 → 8.5). naive datetime 가정 (KST)."""
+    # fromisoformat 은 timezone offset 도 처리
+    dt = datetime.fromisoformat(time_iso.replace("Z", "+00:00"))
+    return dt.hour + dt.minute / 60.0 + dt.second / 3600.0
+
+
+def _meal_time_cyclic(hour: float) -> tuple[float, float]:
+    angle = 2 * math.pi * hour / 24.0
+    return math.sin(angle), math.cos(angle)
+
+
+def _scale_meal_features(
+    carbs: float,
+    current_glucose: float,
+    fasting_bg: float,
+    weight_kg: float,
+    feature_scaler: Any,
+) -> np.ndarray:
+    """4개 컬럼 [carbs, current_glucose, fasting_bg, weight_kg] 정규화."""
+    raw = np.array([[carbs, current_glucose, fasting_bg, weight_kg]], dtype=np.float32)
+    return feature_scaler.transform(raw)[0]  # [4]
+
+
+def _scale_profile(
+    weight_kg: float,
+    fasting_bg: float,
+    profile_scaler: Any,
+) -> np.ndarray:
+    """Model 2 profile 정규화 — weight_kg, fasting_bg 만."""
+    raw = np.array([[weight_kg, fasting_bg]], dtype=np.float32)
+    return profile_scaler.transform(raw)[0]  # [2]
+
+
+def _inverse_bg(y_normalized: np.ndarray, bg_scaler: Any) -> np.ndarray:
+    """[24] 정규화 BG → raw mg/dL."""
+    flat = y_normalized.reshape(-1, 1)
+    return bg_scaler.inverse_transform(flat).flatten()
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Model 1: 식사 시점
+# ─────────────────────────────────────────────────────────────────────
+
+
+class MealPredictor:
+    """Model 1 추론. ridge / mlp / lstm 중 선택.
+
+    lstm 타입: ShanghaiLSTM(coef=1.5) 사용.
+    user_id 가 주어지면 lstm_meal_personalized_{user_id}.pt 를 우선 로드.
+    개인화 파일 없으면 베이스 모델(lstm_meal_t2dm_coef15.pt)로 폴백.
+    """
+
+    def __init__(
+        self,
+        model_type: str = "lstm",
+        models_dir: str | Path = DEFAULT_MODELS_DIR,
+        user_id: str | None = None,
+    ) -> None:
+        self.model_type = model_type
+        self.models_dir = Path(models_dir)
+        self.user_id = user_id
+        self.mode = "base"
+        self.scaler: dict[str, Any] | None = None       # 구 모델용 (ridge/mlp)
+        self._feat_scaler: Any | None = None             # ShanghaiLSTM용
+        self._bg_scaler: Any | None = None
+        self._carb_coef: float = 1.5
+        self._n_features: int = 11
+        self._dtype_idx: int = 8
+        self.model: Any | None = None
+        self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    def _load_shanghai_scaler(self) -> None:
+        scaler_path = self.models_dir / _SHANGHAI_SCALER_NAME
+        if not scaler_path.exists():
+            raise RuntimeError(f"{scaler_path} 없음 — ShanghaiLSTM scaler 필요")
+        with open(scaler_path, "rb") as f:
+            s = pickle.load(f)
+        self._feat_scaler = s["feature"]
+        self._bg_scaler   = s["bg_target"]
+        self._carb_coef   = float(s.get("carb_coef", 1.5))
+        self._n_features  = int(s.get("n_features", 11))
+        self._dtype_idx   = int(s.get("dtype_idx", 8))
+
+    def _ensure_loaded(self) -> None:
+        if self.model_type == "lstm" and self._feat_scaler is None:
+            self._load_shanghai_scaler()
+        elif self.model_type != "lstm" and self.scaler is None:
+            self.scaler = load_scaler()
+
+        if self.model is None:
+            if self.model_type == "ridge":
+                path = self.models_dir / "ridge_meal.pkl"
+                if not path.exists():
+                    raise RuntimeError(f"{path} 없음 — Model 1 학습 필요")
+                self.model = MealRidge.load(path)
+            elif self.model_type == "mlp":
+                path = self.models_dir / "mlp_meal.pt"
+                if not path.exists():
+                    raise RuntimeError(f"{path} 없음 — Model 1 학습 필요")
+                m, _ = load_torch_model(path, MealMLP)
+                self.model = m.to(self._device)
+            elif self.model_type == "lstm":
+                # 개인화 모델 우선 시도
+                if self.user_id:
+                    p_path = self.models_dir / f"lstm_meal_personalized_{self.user_id}.pt"
+                    if p_path.exists():
+                        m = ShanghaiLSTM(n_features=self._n_features, dtype_idx=self._dtype_idx)
+                        m.load_state_dict(
+                            torch.load(p_path, map_location="cpu", weights_only=True)
+                        )
+                        m.eval()
+                        self.model = m.to(self._device)
+                        self.mode = "personalized"
+                        return
+                # 베이스 모델 로드
+                path = self.models_dir / _SHANGHAI_BASE_NAME
+                if not path.exists():
+                    raise RuntimeError(f"{path} 없음 — ShanghaiLSTM 학습 필요")
+                m = ShanghaiLSTM(n_features=self._n_features, dtype_idx=self._dtype_idx)
+                m.load_state_dict(
+                    torch.load(path, map_location="cpu", weights_only=True)
+                )
+                m.eval()
+                self.model = m.to(self._device)
+            else:
+                raise ValueError(f"unknown model_type: {self.model_type}")
+
+    def encode(self, request: dict[str, Any]) -> tuple[np.ndarray, float, float, float, float, float]:
+        """ShanghaiLSTM용 11-feature 인코딩.
+        Returns: (X_scaled[1,11], pre_glucose, carbs, protein, fat, fiber)
+        """
+        self._ensure_loaded()
+        recent: list[float] = request.get("recent_values") or []
+        if not recent:
+            raise ValueError("recent_values is required")
+        pre_glucose = float(recent[-1])
+
+        meal = request["meal"]
+        carbs   = float(meal["carbs"])
+        protein = float(meal.get("protein_g") or 0.0)
+        fat     = float(meal.get("fat_g") or 0.0)
+        fiber   = float(meal.get("fiber_g") or 0.0)
+        kcal    = float(meal["kcal"]) if meal.get("kcal") else carbs * 4 + protein * 4 + fat * 9
+
+        hour = _parse_iso_to_hour(meal["time_iso"])
+        sin_t, cos_t = _meal_time_cyclic(hour)
+
+        profile = request["user_profile"]
+        dtype_int = float(_SHANGHAI_DTYPE_MAP.get(str(profile.get("diabetes_type", "T2D")), 2))
+
+        total       = carbs + protein + fat + 1e-6
+        carb_ratio  = carbs / total
+        protein_fat = protein + fat
+
+        x_raw = np.array([[
+            carbs, protein, fat, fiber, kcal,
+            pre_glucose, sin_t, cos_t,
+            dtype_int, carb_ratio, protein_fat,
+        ]], dtype=np.float32)
+        x_scaled = self._feat_scaler.transform(x_raw).astype(np.float32)
+        return x_scaled, pre_glucose, carbs, protein, fat, fiber
+
+    def predict(self, request: dict[str, Any]) -> list[float]:
+        """요청 dict → 24개 절대 BG (raw mg/dL)."""
+        if self.model_type != "lstm":
+            # ridge/mlp: 기존 로직 유지
+            self._ensure_loaded()
+            recent = request.get("recent_values") or []
+            current_glucose = float(recent[-1])
+            meal = request["meal"]
+            carbs = float(meal["carbs"])
+            hour = _parse_iso_to_hour(meal["time_iso"])
+            sin_t, cos_t = _meal_time_cyclic(hour)
+            profile = request["user_profile"]
+            fasting_bg = float(profile["fasting_bg"])
+            weight_kg  = float(profile["weight_kg"])
+            try:
+                activity     = ACTIVITY_MAP[profile["activity"]]
+                diabetes_type = DIABETES_TYPE_MAP[profile["diabetes_type"]]
+                meal_pattern = MEAL_PATTERN_MAP[profile["meal_pattern"]]
+            except KeyError as e:
+                raise ValueError(f"unknown enum value: {e}") from e
+            scaled4 = _scale_meal_features(carbs, current_glucose, fasting_bg, weight_kg, self.scaler["model1_features"])
+            x_cont = np.array([scaled4[0], sin_t, cos_t, scaled4[1], scaled4[2], scaled4[3]], dtype=np.float32)
+            x_cat  = np.array([activity, diabetes_type, meal_pattern], dtype=np.int64)
+            if self.model_type == "ridge":
+                y_norm = self.model.predict(x_cont[None, :], x_cat[None, :])[0]
+            else:
+                self.model.eval()
+                with torch.no_grad():
+                    xc = torch.from_numpy(x_cont).unsqueeze(0).to(self._device)
+                    xa = torch.from_numpy(x_cat).unsqueeze(0).to(self._device)
+                    y_norm = self.model(xc, xa).cpu().numpy()[0]
+            y_raw = _inverse_bg(y_norm, self.scaler["bg_target"])
+            return [round(float(v), 2) for v in y_raw]
+
+        # ShanghaiLSTM 경로
+        x_scaled, pre_glucose, carbs, protein, fat, fiber = self.encode(request)
+        self.model.eval()
+        with torch.no_grad():
+            y_norm = self.model(torch.from_numpy(x_scaled).to(self._device)).cpu().numpy()[0]
+
+        y_residual  = self._bg_scaler.inverse_transform(y_norm.reshape(-1, 1)).flatten()
+        prior_delta = compute_prior_delta_row(carbs, protein, fat, fiber, pre_glucose, self._carb_coef)
+        carb_scale  = _glycemic_scale_factor(carbs, protein)
+        y_abs       = y_residual * carb_scale + prior_delta + pre_glucose
+        return [round(float(v), 2) for v in y_abs]
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Model 2: 현재 시점
+# ─────────────────────────────────────────────────────────────────────
+
+
+class NowPredictor:
+    def __init__(self, models_dir: str | Path = DEFAULT_MODELS_DIR) -> None:
+        self.models_dir = Path(models_dir)
+        self.scaler: dict[str, Any] | None = None
+        self.model: NowLSTM | None = None
+        self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    def _ensure_loaded(self) -> None:
+        if self.scaler is None:
+            self.scaler = load_scaler()
+        if self.model is None:
+            path = self.models_dir / "lstm_now.pt"
+            if not path.exists():
+                raise RuntimeError(f"{path} 없음 — Model 2 학습 필요")
+            m, _ = load_torch_model(path, NowLSTM)
+            self.model = m.to(self._device)
+
+    def encode(self, request: dict[str, Any]) -> tuple[np.ndarray, np.ndarray]:
+        """요청 dict → (X_seq[12], X_profile[4])."""
+        self._ensure_loaded()
+        recent: list[float] = request.get("recent_values") or []
+        if len(recent) < SEQ_LEN:
+            raise ValueError(f"recent_values must have >= {SEQ_LEN}, got {len(recent)}")
+        last_12 = np.array(recent[-SEQ_LEN:], dtype=np.float32).reshape(-1, 1)
+        x_seq = self.scaler["bg_target"].transform(last_12).flatten()  # [12]
+
+        profile = request["user_profile"]
+        fasting_bg = float(profile["fasting_bg"])
+        weight_kg = float(profile["weight_kg"])
+        try:
+            activity = ACTIVITY_MAP[profile["activity"]]
+            diabetes_type = DIABETES_TYPE_MAP[profile["diabetes_type"]]
+        except KeyError as e:
+            raise ValueError(f"unknown enum value: {e}") from e
+
+        scaled2 = _scale_profile(weight_kg, fasting_bg, self.scaler["profile"])
+        x_profile = np.array(
+            [scaled2[0], scaled2[1], float(activity), float(diabetes_type)],
+            dtype=np.float32,
+        )
+        return x_seq.astype(np.float32), x_profile
+
+    def predict(self, request: dict[str, Any]) -> list[float]:
+        x_seq, x_profile = self.encode(request)
+        self.model.eval()
+        with torch.no_grad():
+            xs = torch.from_numpy(x_seq).unsqueeze(0).to(self._device)
+            xp = torch.from_numpy(x_profile).unsqueeze(0).to(self._device)
+            y_norm = self.model(xs, xp).cpu().numpy()[0]
+        y_raw = _inverse_bg(y_norm, self.scaler["bg_target"])
+        return [round(float(v), 2) for v in y_raw]
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Lazy 싱글톤
+# ─────────────────────────────────────────────────────────────────────
+
+_meal_predictor: MealPredictor | None = None
+_now_predictor: NowPredictor | None = None
+_personalized_predictors: dict[str, MealPredictor] = {}
+_lock = threading.Lock()
+
+
+def get_meal_predictor(model_type: str = _cfg.MEAL_MODEL_TYPE, user_id: str | None = None) -> MealPredictor:
+    """user_id 가 있으면 개인화 모델 캐시에서, 없으면 베이스 싱글톤에서 반환."""
+    global _meal_predictor
+    if user_id:
+        with _lock:
+            if user_id not in _personalized_predictors:
+                p = MealPredictor(model_type=model_type, models_dir=_cfg.MODELS_DIR, user_id=user_id)
+                p._ensure_loaded()
+                _personalized_predictors[user_id] = p
+            return _personalized_predictors[user_id]
+    with _lock:
+        if _meal_predictor is None or _meal_predictor.model_type != model_type:
+            _meal_predictor = MealPredictor(model_type=model_type, models_dir=_cfg.MODELS_DIR)
+            _meal_predictor._ensure_loaded()
+        return _meal_predictor
+
+
+def get_now_predictor() -> NowPredictor:
+    global _now_predictor
+    with _lock:
+        if _now_predictor is None:
+            _now_predictor = NowPredictor(models_dir=_cfg.MODELS_DIR)
+            _now_predictor._ensure_loaded()
+    return _now_predictor
+
+
+def reset_predictors(user_id: str | None = None) -> None:
+    """모델 파일 갱신 후 캐시 초기화.
+
+    user_id 지정 시 해당 사용자 캐시만 제거.
+    None 이면 전체 초기화 (테스트/서버 재시작 용).
+    """
+    global _meal_predictor, _now_predictor, _personalized_predictors
+    with _lock:
+        if user_id is not None:
+            _personalized_predictors.pop(user_id, None)
+        else:
+            _meal_predictor = None
+            _now_predictor = None
+            _personalized_predictors = {}

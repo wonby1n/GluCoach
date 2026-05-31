@@ -1,0 +1,79 @@
+# Python 캐시
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# 가상환경
+.venv/
+venv/
+ENV/
+
+# 환경 변수
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 임시 분석/디버깅 산출물 (커밋 금지)
+.tmp_*
+
+# 테스트 / 커버리지
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 빌드
+dist/
+build/
+*.egg-info/
+
+# ============================================
+# 음식 분류 모델
+# ============================================
+outputs/
+*.pt
+*.pth
+*.onnx
+*.bin
+
+# ============================================
+# 혈당 예측 모듈
+# ============================================
+
+# Shanghai T1DM/T2DM 원본 + 전처리 결과 (대용량 + 라이선스)
+data/glucose_data/
+data/processed/
+data/glucose_sample_data.csv
+data/demo/*.json
+
+# 모델 가중치: 실험용/개인화 파일은 제외, 운영 파일만 추적
+models/*
+!models/scaler.pkl
+!models/lstm_meal.pt
+!models/lstm_now.pt
+!models/lstm_meal_t2dm_coef15.pt
+!models/lstm_t2dm_scaler_coef15.pkl
+!models/stage2_meal/
+models/stage2_meal/*
+!models/stage2_meal/*.pkl
+!models/stage2_meal/meta.json
+!models/food/
+models/food/*
+!models/food/code_to_name.json
+
+# 평가 결과 (발표 자료라 시연 후 별도 관리)
+reports/
+
+# Excel 임시 파일 (~$xxx.xlsx)
+~$*.xls
+~$*.xlsx
+
+# 개인 메모
+NOTES.md
+scratch/
+
+chicken_images/

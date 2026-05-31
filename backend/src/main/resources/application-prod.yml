@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+logging:
+  level:
+    com.ssafy.s309: INFO
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-expiration-ms: ${JWT_ACCESS_EXPIRATION:3600000}
+  refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION:2592000000}
+  issuer: ${JWT_ISSUER:glucofit-backend}

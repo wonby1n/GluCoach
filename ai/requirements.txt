@@ -1,0 +1,39 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0
+python-multipart>=0.0.9
+pydantic>=2.10.0
+pydantic-settings>=2.7.0
+
+# ML / CV
+xgboost>=2.0.0
+torch>=2.2.0
+torchvision>=0.17.0
+Pillow>=10.0.0
+ultralytics>=8.0.0
+
+# 학습 유틸
+matplotlib>=3.8.0
+scikit-learn>=1.4.0
+tqdm>=4.66.0
+
+# 머신러닝 / 딥러닝
+numpy>=1.24
+pandas>=2.0
+
+# Excel 처리 (Shanghai .xls)
+xlrd>=2.0
+openpyxl>=3.1
+
+# LLM
+anthropic>=0.40
+openai>=1.30.0
+
+# 주간 보고서 PDF
+weasyprint>=61.0
+jinja2>=3.1.0
+
+# 유틸
+python-dotenv>=1.0
+loguru>=0.7
+tqdm>=4.65
+requests>=2.31

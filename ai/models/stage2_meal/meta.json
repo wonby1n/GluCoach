@@ -1,0 +1,21 @@
+{
+  "feature_names": [
+    "carbs_g",
+    "protein_g",
+    "fat_g",
+    "fiber_g",
+    "kcal",
+    "pre_meal_glucose",
+    "hour_sin",
+    "hour_cos",
+    "diabetes_type",
+    "carb_ratio",
+    "protein_fat"
+  ],
+  "target_names": [
+    "peak_delta",
+    "time_to_peak",
+    "decay_rate"
+  ],
+  "random_seed": 42
+}
