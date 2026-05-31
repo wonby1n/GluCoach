@@ -34,4 +34,5 @@ data class MainUiState(
     val isNotificationPanelOpen: Boolean = false,
     val selectedNotification: NotificationItem? = null,
     val isNewUser: Boolean = false,
+    val walkingFeedbackUntil: Long = 0L,
 )

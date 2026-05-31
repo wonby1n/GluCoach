@@ -328,14 +328,20 @@ fun MainScreenContent(
                                         trendRateMgDlPerMin = state.trendRateMgDlPerMin,
                                         diabetesType = state.diabetesType,
                                     )
-                                var displayedKiki by remember { mutableIntStateOf(kikiDrawable) }
+                                val kikiTarget =
+                                    if (System.currentTimeMillis() < state.walkingFeedbackUntil) {
+                                        R.drawable.kiki_run
+                                    } else {
+                                        kikiDrawable
+                                    }
+                                var displayedKiki by remember { mutableIntStateOf(kikiTarget) }
                                 var kikiSwitchTime by remember { mutableLongStateOf(0L) }
-                                LaunchedEffect(kikiDrawable) {
-                                    if (displayedKiki == kikiDrawable) return@LaunchedEffect
+                                LaunchedEffect(kikiTarget) {
+                                    if (displayedKiki == kikiTarget) return@LaunchedEffect
                                     val elapsed = System.currentTimeMillis() - kikiSwitchTime
                                     val remaining = kikiCycleDuration(displayedKiki) - elapsed
                                     if (remaining > 0) delay(remaining)
-                                    displayedKiki = kikiDrawable
+                                    displayedKiki = kikiTarget
                                     kikiSwitchTime = System.currentTimeMillis()
                                 }
 
@@ -352,10 +358,27 @@ fun MainScreenContent(
                                     diffFromPrevious = state.diffFromPrevious,
                                     glucoseRange = state.glucoseRange,
                                     mascotSlot = {
-                                        KikiImage(
-                                            drawableRes = displayedKiki,
+                                        Box(
                                             modifier = Modifier.fillMaxSize(),
-                                        )
+                                            contentAlignment =
+                                                if (displayedKiki == R.drawable.kiki_run) {
+                                                    Alignment.Center
+                                                } else {
+                                                    Alignment.BottomEnd
+                                                },
+                                        ) {
+                                            KikiImage(
+                                                drawableRes = displayedKiki,
+                                                modifier =
+                                                    if (displayedKiki == R.drawable.kiki_run) {
+                                                        Modifier.fillMaxSize(
+                                                            0.8f,
+                                                        )
+                                                    } else {
+                                                        Modifier.fillMaxSize()
+                                                    },
+                                            )
+                                        }
                                     },
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
@@ -1182,6 +1205,7 @@ private fun CameraModeChip(
 
 private fun kikiCycleDuration(drawableRes: Int): Long =
     when (drawableRes) {
+        R.drawable.kiki_run -> 5_760L
         R.drawable.kiki_hello -> 5_760L
         R.drawable.kiki_fell_off -> 15_500L
         R.drawable.kiki_dehydrated_high -> 3_300L
