@@ -93,10 +93,6 @@ class FcmService : FirebaseMessagingService() {
         // 키키 메시지를 TTS로 발화 (현재 off — wake TTS만 사용)
         // ttsManager.speak(body)
 
-        if (alertType == "AGENT_WALKING_FEEDBACK") {
-            healthRepository.emitWalkingFeedbackEvent()
-        }
-
         // 홈 대시보드(KikiSuggestionCard + 뱃지)용 — 모든 알림을 alertStream에 emit
         glucoseAlertManager.emitFcmAlert(title, body, alertType ?: "")
 

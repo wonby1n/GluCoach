@@ -262,6 +262,10 @@ class MainViewModel
             }
         }
 
+        fun triggerWalkingFeedback() {
+            healthRepository.emitWalkingFeedbackEvent()
+        }
+
         fun sendMealReply(
             userReply: String,
             displayLabel: String,

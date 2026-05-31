@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -152,6 +153,7 @@ fun MainScreen(
         targetFoodA = targetFoodA,
         targetFoodB = targetFoodB,
         onTargetFoodABHandled = onTargetFoodABHandled,
+        onTriggerWalkingFeedback = viewModel::triggerWalkingFeedback,
         // [DEBUG_KIKI_TEST]
     )
 }
@@ -186,6 +188,7 @@ fun MainScreenContent(
     targetFoodA: String? = null,
     targetFoodB: String? = null,
     onTargetFoodABHandled: () -> Unit = {},
+    onTriggerWalkingFeedback: () -> Unit = {},
 ) {
     var selectedTab by rememberSaveable { mutableStateOf("home") }
     var mealLogTargetDate by remember { mutableStateOf<String?>(null) }
@@ -338,6 +341,11 @@ fun MainScreenContent(
                                 var kikiSwitchTime by remember { mutableLongStateOf(0L) }
                                 LaunchedEffect(kikiTarget) {
                                     if (displayedKiki == kikiTarget) return@LaunchedEffect
+                                    if (kikiTarget == R.drawable.kiki_run) {
+                                        displayedKiki = kikiTarget
+                                        kikiSwitchTime = System.currentTimeMillis()
+                                        return@LaunchedEffect
+                                    }
                                     val elapsed = System.currentTimeMillis() - kikiSwitchTime
                                     val remaining = kikiCycleDuration(displayedKiki) - elapsed
                                     if (remaining > 0) delay(remaining)
@@ -359,7 +367,14 @@ fun MainScreenContent(
                                     glucoseRange = state.glucoseRange,
                                     mascotSlot = {
                                         Box(
-                                            modifier = Modifier.fillMaxSize(),
+                                            modifier =
+                                                Modifier
+                                                    .fillMaxSize()
+                                                    .pointerInput(onTriggerWalkingFeedback) {
+                                                        detectTapGestures(
+                                                            onLongPress = { onTriggerWalkingFeedback() },
+                                                        )
+                                                    },
                                             contentAlignment =
                                                 if (displayedKiki == R.drawable.kiki_run) {
                                                     Alignment.Center
