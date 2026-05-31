@@ -58,6 +58,10 @@ class FoodCompareUserProfile(BaseModel):
     diabetes_type: str = Field("Normal", description="당뇨 유형 (Normal|T1D|T2D)")
     target_low: Optional[float] = Field(None, description="혈당 목표 하한 (mg/dL)")
     target_high: Optional[float] = Field(None, description="혈당 목표 상한 (mg/dL)")
+    age: Optional[int] = Field(None, description="나이")
+    bmi: Optional[float] = Field(None, description="BMI (체중/신장² 계산값)")
+    gender: Optional[str] = Field(None, description="성별 (M|F)")
+    is_medicated: Optional[bool] = Field(None, description="혈당 조절 투약 여부")
 
 
 class FoodCompareRequest(BaseModel):

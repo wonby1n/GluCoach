@@ -212,31 +212,52 @@ async def dispatch_trigger(req: TriggerRequest, background_tasks: BackgroundTask
 def _build_food_compare_prompt(req: FoodCompareRequest) -> str:
     name_prefix = f"{req.user_name}님" if req.user_name else "사용자"
     profile = req.user_profile
-    diabetes_label = {"T1D": "1형 당뇨", "T2D": "2형 당뇨"}.get(profile.diabetes_type, "정상")
+
+    diabetes_label = {"T1D": "1형 당뇨", "T2D": "2형 당뇨"}.get(profile.diabetes_type, "정상 혈당")
+
+    bmi_label = ""
+    if profile.bmi:
+        bmi_val = profile.bmi
+        if bmi_val < 18.5:
+            bmi_cat = "저체중"
+        elif bmi_val < 23.0:
+            bmi_cat = "정상 체중"
+        elif bmi_val < 25.0:
+            bmi_cat = "과체중"
+        elif bmi_val < 30.0:
+            bmi_cat = "비만"
+        else:
+            bmi_cat = "고도비만"
+        bmi_label = f"BMI {bmi_val:.1f}({bmi_cat})"
+
+    age_label = f"{profile.age}세" if profile.age else ""
+    med_label = "혈당 조절 투약 중" if profile.is_medicated else ""
+
+    persona_parts = [p for p in [diabetes_label, bmi_label, age_label, med_label] if p]
+    persona_str = " / ".join(persona_parts)
 
     target_info = ""
     if profile.target_low and profile.target_high:
-        target_info = f"혈당 목표 범위: {profile.target_low:.0f}~{profile.target_high:.0f} mg/dL\n"
+        target_info = f"혈당 목표: {profile.target_low:.0f}~{profile.target_high:.0f} mg/dL\n"
 
     a, b = req.food_a, req.food_b
-    return f"""다음 두 음식의 혈당 예측 데이터를 보고 {name_prefix}에게 어느 음식이 더 나은지 한국어로 2문장 이내로 설명해주세요.
+    return f"""아래 사용자 프로파일과 두 음식의 혈당 예측 데이터를 보고, {name_prefix}에게 어느 음식이 더 나은지 한국어 2문장으로 설명해주세요.
 
-[사용자 정보]
-당뇨 유형: {diabetes_label}
+[사용자 프로파일]
+{name_prefix} / {persona_str}
 {target_info}
 [음식 A: {a.name}]
-예측 최고 혈당: {a.peak_mgdl:.1f} mg/dL (식후 {a.peak_minute}분)
-분당 혈당 상승 속도: {a.slope:.2f} mg/dL/min
+예측 피크: {a.peak_mgdl:.0f} mg/dL (식후 {a.peak_minute}분) / 상승 속도: {a.slope:.2f} mg/dL/min
 
 [음식 B: {b.name}]
-예측 최고 혈당: {b.peak_mgdl:.1f} mg/dL (식후 {b.peak_minute}분)
-분당 혈당 상승 속도: {b.slope:.2f} mg/dL/min
+예측 피크: {b.peak_mgdl:.0f} mg/dL (식후 {b.peak_minute}분) / 상승 속도: {b.slope:.2f} mg/dL/min
 
-요구사항:
-- "{name_prefix}의 혈당 목표/당뇨 유형을 고려했을 때" 같은 개인화 표현 포함
-- 어느 음식이 왜 더 나은지 구체적 수치 근거 포함 (예: "피크가 Xmg/dL 낮아", "상승 속도가 더 완만해")
-- 친근한 존댓말, 이모지 없음, 2문장 이내
-- 음식 이름을 명시할 것"""
+작성 규칙:
+- 첫 문장: 사용자의 구체적 특성(당뇨 유형, BMI 범주, 투약 여부 중 가장 관련 있는 1~2가지)을 명시하며 어느 음식이 더 나은지 이유 설명
+  예시: "2형 당뇨이시고 BMI 26(과체중) 범위에 계신 [이름]님은 인슐린 저항성이 높아 [음식]이 더 안전한 선택이에요."
+- 둘째 문장: 피크 수치 차이와 상승 속도를 구체적 숫자로 근거 제시
+  예시: "[음식]이 피크가 [X]mg/dL 낮고 상승 속도도 [Y배] 더 완만해요."
+- 이모지 없음, 친근한 존댓말, 음식 이름 반드시 명시"""
 
 
 @router.post("/food-compare", response_model=FoodCompareResponse)

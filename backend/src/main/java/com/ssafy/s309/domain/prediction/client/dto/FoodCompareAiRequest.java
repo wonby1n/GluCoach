@@ -18,5 +18,9 @@ public record FoodCompareAiRequest(
   public record UserProfileSummary(
       @JsonProperty("diabetes_type") String diabetesType,
       @JsonProperty("target_low") Double targetLow,
-      @JsonProperty("target_high") Double targetHigh) {}
+      @JsonProperty("target_high") Double targetHigh,
+      @JsonProperty("age") Integer age,
+      @JsonProperty("bmi") Double bmi,
+      @JsonProperty("gender") String gender,
+      @JsonProperty("is_medicated") Boolean isMedicated) {}
 }

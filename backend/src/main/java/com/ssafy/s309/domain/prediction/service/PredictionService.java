@@ -92,6 +92,12 @@ public class PredictionService {
     Double targetLow = user.getTargetLow() != null ? user.getTargetLow().doubleValue() : null;
     Double targetHigh = user.getTargetHigh() != null ? user.getTargetHigh().doubleValue() : null;
 
+    Double bmi = null;
+    if (user.getHeight() != null && user.getWeight() != null) {
+      double hM = user.getHeight().doubleValue() / 100.0;
+      bmi = Math.round(user.getWeight().doubleValue() / (hM * hM) * 10.0) / 10.0;
+    }
+
     FoodCompareAiRequest aiRequest =
         new FoodCompareAiRequest(
             String.valueOf(userId),
@@ -106,7 +112,14 @@ public class PredictionService {
                 request.foodBPeakMgdl(),
                 request.foodBPeakMinute(),
                 request.foodBSlope()),
-            new UserProfileSummary(diabetesType, targetLow, targetHigh));
+            new UserProfileSummary(
+                diabetesType,
+                targetLow,
+                targetHigh,
+                user.getAge() != null ? (int) user.getAge() : null,
+                bmi,
+                user.getGender(),
+                user.getIsMedicated()));
 
     return new CompareExplainResponse(foodCompareExplainClient.explain(aiRequest).message());
   }
