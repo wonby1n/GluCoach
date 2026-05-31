@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/sleep-sessions")
 @RequiredArgsConstructor
 @Tag(
-    name = "SleepSession",
+    name = "건강 데이터",
     description =
         "워치/Health Connect에서 동기화한 개별 수면 세션 저장. 세션 INSERT 시 wake_up 트리거 자동 예약 → Agent 기상 코칭.")
 public class SleepSessionController {

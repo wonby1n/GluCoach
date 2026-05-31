@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/agent/users/{userId}")
 @RequiredArgsConstructor
-@Tag(name = "AgentUserData", description = "AI Agent 전용: 사용자별 음식추천 데이터 (X-Agent-Api-Key 인증)")
+@Tag(name = "Agent API", description = "AI Agent 전용: 사용자별 음식추천 데이터 (X-Agent-Api-Key 인증)")
 public class AgentUserDataController {
 
   private final AgentUserDataService service;

@@ -21,7 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/user")
 @RequiredArgsConstructor
-@Tag(name = "User", description = "사용자 설정 및 보호자 관리 API")
+@Tag(name = "사용자", description = "사용자 설정 및 보호자 관리 API")
 public class UserController {
 
   private final UserService userService;

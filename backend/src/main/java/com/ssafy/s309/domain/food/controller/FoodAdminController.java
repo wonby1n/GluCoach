@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "Food Admin", description = "음식 데이터 관리 API (관리자 전용)")
+@Tag(name = "식사", description = "음식 데이터 관리 API (관리자 전용)")
 @Slf4j
 @RestController
 @RequestMapping("/api/admin/foods")

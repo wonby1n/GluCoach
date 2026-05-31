@@ -23,9 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/agent/notifications")
 @RequiredArgsConstructor
-@Tag(
-    name = "AgentNotifications",
-    description = "AI Agent 전용: 알림 이력 조회(#6) + 알림 발송(#7) (X-Agent-Api-Key 인증)")
+@Tag(name = "Agent API", description = "AI Agent 전용: 알림 이력 조회(#6) + 알림 발송(#7) (X-Agent-Api-Key 인증)")
 public class AgentNotificationController {
 
   private final AgentNotificationService service;

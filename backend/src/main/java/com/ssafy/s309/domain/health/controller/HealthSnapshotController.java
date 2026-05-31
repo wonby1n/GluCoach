@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/health/snapshots")
 @RequiredArgsConstructor
-@Tag(name = "HealthSnapshots", description = "1분 polling 메트릭 시계열 (5분 batch INSERT)")
+@Tag(name = "건강 데이터", description = "1분 polling 메트릭 시계열 (5분 batch INSERT)")
 public class HealthSnapshotController {
 
   private final HealthSnapshotService service;

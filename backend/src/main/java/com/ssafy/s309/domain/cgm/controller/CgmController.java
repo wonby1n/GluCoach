@@ -30,7 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/glucose-records")
 @RequiredArgsConstructor
-@Tag(name = "CGM", description = "혈당 기록 수신 API")
+@Tag(name = "혈당", description = "혈당 기록 수신 API")
 public class CgmController {
 
   private static final Duration MAX_RANGE = Duration.ofDays(90);

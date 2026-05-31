@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "FoodGrade", description = "음식 성적표 API")
+@Tag(name = "식사", description = "음식 성적표 API")
 @RestController
 @RequestMapping("/api/food-grades")
 @RequiredArgsConstructor

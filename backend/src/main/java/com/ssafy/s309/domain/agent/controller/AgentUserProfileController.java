@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/agent/user-profile")
 @RequiredArgsConstructor
 @Tag(
-    name = "AgentUserProfile",
+    name = "Agent API",
     description = "AI Agent 전용: 사용자 프로필(당뇨 유형 + 목표 혈당 범위) 조회 (X-Agent-Api-Key 인증)")
 public class AgentUserProfileController {
 

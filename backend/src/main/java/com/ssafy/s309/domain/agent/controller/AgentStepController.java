@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/agent/steps")
 @RequiredArgsConstructor
-@Tag(name = "AgentSteps", description = "AI Agent 전용: 시간 윈도우 걸음수 조회 (X-Agent-Api-Key 인증)")
+@Tag(name = "Agent API", description = "AI Agent 전용: 시간 윈도우 걸음수 조회 (X-Agent-Api-Key 인증)")
 public class AgentStepController {
 
   private final AgentStepService service;

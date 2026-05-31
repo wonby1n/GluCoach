@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/agent/schedule_followup")
 @RequiredArgsConstructor
 @Tag(
-    name = "AgentScheduleFollowup",
+    name = "Agent API",
     description =
         "Agent #8 — schedule_followup: Agent가 N분 뒤 자기를 다시 깨워달라고 BE에 예약하는 입구."
             + " agent_pending_triggers INSERT만 수행하고, 실제 발화는 기존 1분 폴러가 처리."
