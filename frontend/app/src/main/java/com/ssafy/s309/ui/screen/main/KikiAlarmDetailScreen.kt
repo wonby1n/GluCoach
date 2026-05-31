@@ -525,8 +525,8 @@ private fun SpeechBubble(
                 MarkdownText(
                     text = line,
                     color = GlucoachColors.TextPrimary,
-                    fontSize = 15.sp,
-                    lineHeight = 22.sp,
+                    fontSize = 20.sp,
+                    lineHeight = 29.sp,
                 )
             }
         }

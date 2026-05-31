@@ -43,10 +43,6 @@ class MainViewModel
             registerPendingFcmToken()
             GlucoseSimulator.start(context)
             observeSimulatorStream()
-            viewModelScope.launch {
-                delay(3_000L)
-                healthRepository.sendDemoFoodRecommend()
-            }
         }
 
         fun loadDashboard() {
