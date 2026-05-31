@@ -85,6 +85,9 @@ class FcmService : FirebaseMessagingService() {
             } else {
                 showNotification(title, body, channelId)
             }
+            scope.launch {
+                com.ssafy.s309.wear.WearDataSender.sendNotification(applicationContext, title, body)
+            }
         }
 
         // 키키 메시지를 TTS로 발화 (현재 off — wake TTS만 사용)
