@@ -49,8 +49,9 @@ public class DemoController {
   public ResponseEntity<Void> walkingFeedback(@RequestParam Integer userId) {
     ChatMessage msg =
         chatMessageService.insertAgent(
-            userId, "AGENT_POST_MEAL", WALKING_FEEDBACK_MESSAGE, null, null, null);
-    chatFcmDispatcher.dispatch(userId, "AGENT_POST_MEAL", WALKING_FEEDBACK_MESSAGE, msg.getId());
+            userId, "AGENT_WALKING_FEEDBACK", WALKING_FEEDBACK_MESSAGE, null, null, null);
+    chatFcmDispatcher.dispatch(
+        userId, "AGENT_WALKING_FEEDBACK", WALKING_FEEDBACK_MESSAGE, msg.getId());
     return ResponseEntity.ok().build();
   }
 }
