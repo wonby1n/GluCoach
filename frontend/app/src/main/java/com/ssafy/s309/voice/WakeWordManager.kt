@@ -339,17 +339,8 @@ class WakeWordManager
         private fun buildListener(): RecognitionListener =
             object : RecognitionListener {
                 override fun onPartialResult(hypothesis: String?) {
-                    if (isTtsSpeaking.get() || externalTtsActive.get()) return
-                    val text = parseVoskJson(hypothesis, KEY_PARTIAL)
-                    if (text.isBlank()) return
-                    Log.d(TAG, "[partial] \"$text\"")
-                    if (matchesWakeWord(text)) {
-                        val now = System.currentTimeMillis()
-                        if (now - lastWakeAt < COOLDOWN_MS) return
-                        lastWakeAt = now
-                        Log.i(TAG, "Wake word 감지 (partial): \"$text\"")
-                        triggerKikiResponse()
-                    }
+                    // partial은 confidence 없어 단음절 잡음도 "cheese"로 매핑됨 → 로그만.
+                    Log.d(TAG, "[partial] \"${parseVoskJson(hypothesis, KEY_PARTIAL)}\"")
                 }
 
                 override fun onResult(hypothesis: String?) {
@@ -844,10 +835,10 @@ class WakeWordManager
             // 모두 공백/구두점 제거 후 소문자로 비교.
             // grammar 모드에서는 Vosk 가 WAKE_GRAMMAR_JSON 안의 phrase 만 출력 → 단순 substring 매칭으로 충분.
             // free-form 폴백 시에도 동작하도록 변형 유지.
-            val WAKE_PATTERNS = listOf("cheese")
+            val WAKE_PATTERNS = listOf("truck")
 
-            // Vosk grammar JSON. "cheese" 단일 wake word + "[unk]".
-            const val WAKE_GRAMMAR_JSON = """["cheese", "[unk]"]"""
+            // Vosk grammar JSON. "truck" 단일 wake word + "[unk]".
+            const val WAKE_GRAMMAR_JSON = """["truck", "[unk]"]"""
 
             // 오탐 방지용 Vosk word-level confidence 최솟값. 한국어 발음("치즈") 특성상 0.5로 설정.
             const val WAKE_CONFIDENCE_THRESHOLD = 0.5f
