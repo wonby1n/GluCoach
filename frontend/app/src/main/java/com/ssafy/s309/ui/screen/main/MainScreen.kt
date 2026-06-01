@@ -333,7 +333,7 @@ fun MainScreenContent(
                                     )
                                 val kikiTarget =
                                     if (System.currentTimeMillis() < state.walkingFeedbackUntil) {
-                                        R.drawable.kiki_hello
+                                        R.drawable.kiki_run
                                     } else {
                                         kikiDrawable
                                     }
@@ -341,7 +341,7 @@ fun MainScreenContent(
                                 var kikiSwitchTime by remember { mutableLongStateOf(0L) }
                                 LaunchedEffect(kikiTarget) {
                                     if (displayedKiki == kikiTarget) return@LaunchedEffect
-                                    if (kikiTarget == R.drawable.kiki_hello) {
+                                    if (kikiTarget == R.drawable.kiki_run) {
                                         displayedKiki = kikiTarget
                                         kikiSwitchTime = System.currentTimeMillis()
                                         return@LaunchedEffect
@@ -356,7 +356,7 @@ fun MainScreenContent(
                                 KikiSuggestionCard(
                                     notifications = state.notifications,
                                     isNewUser = state.isNewUser,
-                                    isKikiRunActive = displayedKiki == R.drawable.kiki_hello,
+                                    isKikiRunActive = System.currentTimeMillis() < state.walkingFeedbackUntil,
                                     onAlarmClick = onKikiAlarmClick,
                                     onChatClick = onKikiChatClick,
                                 )
@@ -377,7 +377,7 @@ fun MainScreenContent(
                                                         )
                                                     },
                                             contentAlignment =
-                                                if (displayedKiki == R.drawable.kiki_hello) {
+                                                if (displayedKiki == R.drawable.kiki_run) {
                                                     Alignment.Center
                                                 } else {
                                                     Alignment.BottomEnd
@@ -386,7 +386,7 @@ fun MainScreenContent(
                                             KikiImage(
                                                 drawableRes = displayedKiki,
                                                 modifier =
-                                                    if (displayedKiki == R.drawable.kiki_hello) {
+                                                    if (displayedKiki == R.drawable.kiki_run) {
                                                         Modifier.fillMaxSize(
                                                             0.8f,
                                                         )
@@ -714,7 +714,7 @@ private fun KikiSuggestionCard(
     modifier: Modifier = Modifier,
 ) {
     val unread = notifications.filter { it.isUnread }
-    val bannerText = if (isKikiRunActive) "활동이 감지되었어요" else resolveBannerText(unread, isNewUser)
+    val bannerText = if (isKikiRunActive) "도현님, 운동중이시네요! 식후에 적절한 운동은 아주 좋은 습관입니다. 앞으로도 제가 도와드릴게요!" else resolveBannerText(unread, isNewUser)
     val onClick = if (unread.size >= 2) onChatClick else onAlarmClick
 
     Row(
@@ -1228,7 +1228,7 @@ private fun CameraModeChip(
 
 private fun kikiCycleDuration(drawableRes: Int): Long =
     when (drawableRes) {
-        R.drawable.kiki_hello -> 5_760L
+        R.drawable.kiki_run -> 15_000L
         R.drawable.kiki_fell_off -> 15_500L
         R.drawable.kiki_dehydrated_high -> 3_300L
         else -> 3_000L
