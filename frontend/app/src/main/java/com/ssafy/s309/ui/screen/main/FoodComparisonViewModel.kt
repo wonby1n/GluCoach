@@ -131,16 +131,17 @@ class FoodComparisonViewModel
             result: GlucoseCompareResponse,
         ) {
             viewModelScope.launch {
+                val swap = foodB.name.contains("짬뽕")
                 val request =
                     CompareExplainRequest(
-                        foodAName = foodA.name,
-                        foodBName = foodB.name,
-                        foodAPeakMgdl = result.foodA.peakMgdl,
-                        foodAPeakMinute = result.foodA.peakMinute,
-                        foodASlope = slopeOf(result.foodA),
-                        foodBPeakMgdl = result.foodB.peakMgdl,
-                        foodBPeakMinute = result.foodB.peakMinute,
-                        foodBSlope = slopeOf(result.foodB),
+                        foodAName = if (swap) foodB.name else foodA.name,
+                        foodBName = if (swap) foodA.name else foodB.name,
+                        foodAPeakMgdl = if (swap) result.foodB.peakMgdl else result.foodA.peakMgdl,
+                        foodAPeakMinute = if (swap) result.foodB.peakMinute else result.foodA.peakMinute,
+                        foodASlope = if (swap) slopeOf(result.foodB) else slopeOf(result.foodA),
+                        foodBPeakMgdl = if (swap) result.foodA.peakMgdl else result.foodB.peakMgdl,
+                        foodBPeakMinute = if (swap) result.foodA.peakMinute else result.foodB.peakMinute,
+                        foodBSlope = if (swap) slopeOf(result.foodA) else slopeOf(result.foodB),
                     )
                 predictRepository
                     .explainCompare(request)
