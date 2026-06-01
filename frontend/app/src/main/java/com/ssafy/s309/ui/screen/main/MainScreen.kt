@@ -356,6 +356,7 @@ fun MainScreenContent(
                                 KikiSuggestionCard(
                                     notifications = state.notifications,
                                     isNewUser = state.isNewUser,
+                                    isKikiRunActive = displayedKiki == R.drawable.kiki_run,
                                     onAlarmClick = onKikiAlarmClick,
                                     onChatClick = onKikiChatClick,
                                 )
@@ -707,12 +708,13 @@ private fun TodayConditionHeader(
 private fun KikiSuggestionCard(
     notifications: List<com.ssafy.s309.data.model.NotificationItem>,
     isNewUser: Boolean,
+    isKikiRunActive: Boolean,
     onAlarmClick: () -> Unit,
     onChatClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val unread = notifications.filter { it.isUnread }
-    val bannerText = resolveBannerText(unread, isNewUser)
+    val bannerText = if (isKikiRunActive) "활동이 감지되었어요" else resolveBannerText(unread, isNewUser)
     val onClick = if (unread.size >= 2) onChatClick else onAlarmClick
 
     Row(
@@ -731,37 +733,43 @@ private fun KikiSuggestionCard(
                 .padding(horizontal = 20.dp, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(modifier = Modifier.size(28.dp)) {
-            Icon(
-                imageVector = Icons.Outlined.MailOutline,
-                contentDescription = null,
-                tint = GlucoachColors.PrimaryDark,
-                modifier =
-                    Modifier
-                        .size(24.dp)
-                        .align(Alignment.Center),
-            )
-            if (unread.isNotEmpty()) {
+        Box(modifier = Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+            if (isKikiRunActive) {
                 Box(
                     modifier =
                         Modifier
-                            .align(Alignment.TopEnd)
-                            .size(16.dp)
-                            .background(Color(0xFFE53935), shape = CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "${unread.size}",
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        lineHeight = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        style =
-                            LocalTextStyle.current.merge(
-                                TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false)),
-                            ),
-                    )
+                            .size(14.dp)
+                            .background(Color(0xFF4CAF50), shape = CircleShape),
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.MailOutline,
+                    contentDescription = null,
+                    tint = GlucoachColors.PrimaryDark,
+                    modifier = Modifier.size(24.dp).align(Alignment.Center),
+                )
+                if (unread.isNotEmpty()) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .size(16.dp)
+                                .background(Color(0xFFE53935), shape = CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "${unread.size}",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            lineHeight = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            style =
+                                LocalTextStyle.current.merge(
+                                    TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false)),
+                                ),
+                        )
+                    }
                 }
             }
         }

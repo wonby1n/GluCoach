@@ -253,7 +253,7 @@ def _build_food_compare_prompt(req: FoodCompareRequest) -> str:
 추천 음식 : {better.name}
 이유 : [문장1: 사용자 특성(당뇨유형·BMI·투약 중 가장 관련 있는 1가지)을 한 문장으로. 예) "정상 혈당에 저체중이신 {name_prefix}은 급격한 혈당 상승에 더 취약해요." / 문장2: {better.name}의 피크가 {peak_diff:.0f}mg/dL 낮고 상승 속도가 얼마나 더 완만한지 수치로만. 예) "피크가 {peak_diff:.0f}mg/dL 낮고 상승 속도도 더 완만해요."]
 
-규칙: 두 문장 모두 해요체 / 이모지 없음 / 형식 외 텍스트 금지"""
+규칙: 두 문장 모두 해요체 / 이모지 없음 / 형식 외 텍스트 금지 / 수치·단위(mg/dL, min 등) 외 모든 텍스트는 반드시 한국어로만 작성"""
 
 
 @router.post("/food-compare", response_model=FoodCompareResponse)
