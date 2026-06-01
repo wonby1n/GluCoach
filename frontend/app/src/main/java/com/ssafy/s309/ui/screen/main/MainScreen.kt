@@ -714,7 +714,7 @@ private fun KikiSuggestionCard(
     modifier: Modifier = Modifier,
 ) {
     val unread = notifications.filter { it.isUnread }
-    val bannerText = if (isKikiRunActive) "활동이 감지되었어요" else resolveBannerText(unread, isNewUser)
+    val bannerText = if (isKikiRunActive) "도현님, 빠르게 걷고 계시네요! 그 패턴으로 계속 걸어보세요. 혈당이 훨씬 빨리 안정될거에요" else resolveBannerText(unread, isNewUser)
     val onClick = if (unread.size >= 2) onChatClick else onAlarmClick
 
     Row(
