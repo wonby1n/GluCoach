@@ -150,9 +150,9 @@ VOICE_QUERY_OVERRIDE = """
      - get_user_food_grades에 winner 등급이 있으면 등급 언급 추가 가능. 없으면 예측 결과 기반으로만.
      - 활동량/수면/최근 식사 보정 멘트는 넣지 않는다.
   예)
-  "**추천 메뉴: 짜장면**
+  "**추천 메뉴: 짬뽕**
 
-  🔍 드신 기록을 종합한 결과, **짜장면**이 탄수화물이 낮고 혈당 반응이 가장 안정적이었어요."
+  🔍 드신 기록을 종합한 결과, **짬뽕**이 탄수화물이 낮고 혈당 반응이 가장 안정적이었어요."
 - payload.comparison: food_a / food_b / winner 반드시 채움.
 - payload.items=[].
 - message에 혈당 수치를 언급할 때는 반드시 predict_glucose_for_food 결과의 peak_mg_dl 값을 그대로 쓸 것. 직접 계산하거나 근사치 사용 금지.
