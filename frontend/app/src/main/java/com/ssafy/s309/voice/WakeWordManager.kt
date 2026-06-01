@@ -833,26 +833,10 @@ class WakeWordManager
             // 모두 공백/구두점 제거 후 소문자로 비교.
             // grammar 모드에서는 Vosk 가 WAKE_GRAMMAR_JSON 안의 phrase 만 출력 → 단순 substring 매칭으로 충분.
             // free-form 폴백 시에도 동작하도록 변형 유지.
-            val WAKE_PATTERNS =
-                listOf(
-                    // wake-prefix 가 있는 형태만 (free-form 폴백 시 "kiki"/"key" 단독은 false positive 위험).
-                    "hikiki",
-                    "hikeykey",
-                    "hikey",
-                    "heykiki",
-                    "heykey",
-                    "haikiki",
-                    "haykiki",
-                    "highkiki",
-                    "highkey",
-                    "hekiki",
-                )
+            val WAKE_PATTERNS = listOf("cheese")
 
-            // Vosk grammar JSON. 이 phrase 들 + "[unk]" 만 출력 가능 → 잡음 트리거 차단.
-            // "Hi Kiki" 영어 발음을 Vosk small 영어 모델이 매핑할 가능성이 있는 음성형들.
-            // 매칭은 matchesWakeWord() 가 공백/구두점 제거 후 substring 으로 처리.
-            const val WAKE_GRAMMAR_JSON =
-                """["hi kiki", "hi key key", "hi key", "hey kiki", "hey key", "high kiki", "high key", "[unk]"]"""
+            // Vosk grammar JSON. "cheese" 단일 wake word + "[unk]".
+            const val WAKE_GRAMMAR_JSON = """["cheese", "[unk]"]"""
 
             val CALENDAR_KEYWORDS = listOf("일정", "스케줄", "약속")
 

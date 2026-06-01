@@ -70,9 +70,7 @@ class SystemOverlayManager
             if (!attached.compareAndSet(false, true)) return
             scope.launch {
                 wakeWordManager.uiState.collect { state ->
-                    if (state != WakeWordManager.UiState.IDLE && !isAppForeground.get()) {
-                        showOverlay()
-                    } else {
+                    if (state == WakeWordManager.UiState.IDLE || !isAppForeground.get()) {
                         hideOverlay()
                     }
                 }

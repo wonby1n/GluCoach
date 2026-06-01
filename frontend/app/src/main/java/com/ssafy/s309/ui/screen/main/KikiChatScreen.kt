@@ -174,7 +174,7 @@ class KikiChatViewModel
             val nowIso = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
             val userMsg =
                 ChatMessage.UserMessage(
-                    text = "하이 키키",
+                    text = "치즈",
                     timestamp = timestamp,
                     createdAt = nowIso,
                 )
