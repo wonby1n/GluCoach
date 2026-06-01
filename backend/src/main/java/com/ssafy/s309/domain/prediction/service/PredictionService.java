@@ -333,6 +333,6 @@ public class PredictionService {
 
     List<CurvePoint> curve =
         java.util.Arrays.stream(pts).map(p -> new CurvePoint((int) p[0], p[1])).toList();
-    return new PredictResponse(null, curve, peak, peakMin, 0.95);
+    return new PredictResponse(-1, curve, peak, peakMin, 0.95);
   }
 }
