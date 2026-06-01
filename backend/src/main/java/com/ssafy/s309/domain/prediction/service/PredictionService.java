@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import lombok.RequiredArgsConstructor;
@@ -48,7 +49,7 @@ public class PredictionService {
   private static final String DEFAULT_MEAL_PATTERN = "regular_3";
 
   // 시연용 — 삭제 시 comparePredict if 블록 + buildDemoCompareResponse + buildDemoCurve 도 함께 제거
-  private static final int DEMO_USER_ID = 27;
+  private static final Set<Integer> DEMO_USER_IDS = Set.of(27, 22);
 
   // AI 측 _parse_iso_to_hour 가 naive datetime 을 KST 로 해석하므로 명시적으로 KST 로 생성.
   private static final ZoneId KST = ZoneId.of("Asia/Seoul");
@@ -128,7 +129,7 @@ public class PredictionService {
   }
 
   public AbPredictResponse comparePredict(Integer userId, AbPredictRequest request) {
-    if (userId != null && userId == DEMO_USER_ID) {
+    if (userId != null && DEMO_USER_IDS.contains(userId)) {
       return buildDemoCompareResponse(request);
     }
     User user = tx.findUser(userId);
@@ -255,7 +256,7 @@ public class PredictionService {
     boolean hasJjamppong = nameA.contains("짬뽕") || nameB.contains("짬뽕");
 
     if (!hasJajang || !hasJjamppong) {
-      User user = tx.findUser(DEMO_USER_ID);
+      User user = tx.findUser(27);
       CompletableFuture<PredictResponse> futureA =
           CompletableFuture.supplyAsync(
               () -> predictWithUser(user, request.foodA()), asyncExecutor);
@@ -265,10 +266,11 @@ public class PredictionService {
       return new AbPredictResponse(futureA.join(), futureB.join());
     }
 
-    boolean aIsJajang = nameA.contains("짜장") || nameA.contains("자장");
+    // 짬뽕(peak=152, 낮음=추천) vs 짜장면(peak=178, 높음)
+    boolean aIsJjamppong = nameA.contains("짬뽕");
     PredictResponse low = buildDemoCurve(152.0, 40);
     PredictResponse high = buildDemoCurve(178.0, 30);
-    return aIsJajang ? new AbPredictResponse(low, high) : new AbPredictResponse(high, low);
+    return aIsJjamppong ? new AbPredictResponse(low, high) : new AbPredictResponse(high, low);
   }
 
   private PredictResponse buildDemoCurve(double peak, int peakMin) {

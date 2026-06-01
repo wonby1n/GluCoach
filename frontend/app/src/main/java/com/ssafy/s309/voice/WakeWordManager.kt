@@ -343,12 +343,11 @@ class WakeWordManager
                     val text = parseVoskJson(hypothesis, KEY_PARTIAL)
                     if (text.isBlank()) return
                     Log.d(TAG, "[partial] \"$text\"")
-
                     if (matchesWakeWord(text)) {
                         val now = System.currentTimeMillis()
                         if (now - lastWakeAt < COOLDOWN_MS) return
                         lastWakeAt = now
-                        Log.i(TAG, "Wake word 감지: \"$text\"")
+                        Log.i(TAG, "Wake word 감지 (partial): \"$text\"")
                         triggerKikiResponse()
                     }
                 }
@@ -357,14 +356,14 @@ class WakeWordManager
                     if (isTtsSpeaking.get() || externalTtsActive.get()) return
                     val text = parseVoskJson(hypothesis, KEY_TEXT)
                     if (text.isBlank()) return
-                    Log.d(TAG, "[final] \"$text\"")
+                    val conf = parseVoskConfidence(hypothesis)
+                    Log.d(TAG, "[final] \"$text\" conf=$conf")
 
-                    // partial 단계에서 못 잡았던 wake 가 final 에서 잡히는 경우 보완.
-                    if (matchesWakeWord(text)) {
+                    if (matchesWakeWord(text) && conf >= WAKE_CONFIDENCE_THRESHOLD) {
                         val now = System.currentTimeMillis()
                         if (now - lastWakeAt >= COOLDOWN_MS) {
                             lastWakeAt = now
-                            Log.i(TAG, "Wake word 감지 (final): \"$text\"")
+                            Log.i(TAG, "Wake word 감지 (final): \"$text\" (conf=$conf)")
                             triggerKikiResponse()
                         }
                     }
@@ -730,6 +729,22 @@ class WakeWordManager
             }
         }
 
+        private fun parseVoskConfidence(hypothesis: String?): Float {
+            if (hypothesis.isNullOrBlank()) return 0f
+            return try {
+                val arr = JSONObject(hypothesis).optJSONArray("result") ?: return 1f
+                if (arr.length() == 0) return 0f
+                var min = 1f
+                for (i in 0 until arr.length()) {
+                    val c = arr.getJSONObject(i).optDouble("conf", 0.0).toFloat()
+                    if (c < min) min = c
+                }
+                min
+            } catch (e: Exception) {
+                0f
+            }
+        }
+
         private fun sendCommandToChat(transcript: String) {
             val trimmed = transcript.trim()
             if (trimmed.isEmpty()) return
@@ -745,11 +760,7 @@ class WakeWordManager
         }
 
         private fun onImeShown() {
-            if (shouldKeepListening.get()) return // 앱이 포그라운드에서 이미 관리 중
-            Log.i(TAG, "IME 활성 — 백그라운드에서 Vosk 재가동")
-            start()
-            // start() 내부에서 imeStartedVosk.set(false)가 실행되므로 start() 이후에 재설정.
-            imeStartedVosk.set(true)
+            // 백그라운드(다른 앱)에서는 wake word 미감지. 앱 포그라운드에서만 동작.
         }
 
         private fun onImeHidden() {
@@ -837,6 +848,9 @@ class WakeWordManager
 
             // Vosk grammar JSON. "cheese" 단일 wake word + "[unk]".
             const val WAKE_GRAMMAR_JSON = """["cheese", "[unk]"]"""
+
+            // 오탐 방지용 Vosk word-level confidence 최솟값. 한국어 발음("치즈") 특성상 0.5로 설정.
+            const val WAKE_CONFIDENCE_THRESHOLD = 0.5f
 
             val CALENDAR_KEYWORDS = listOf("일정", "스케줄", "약속")
 
