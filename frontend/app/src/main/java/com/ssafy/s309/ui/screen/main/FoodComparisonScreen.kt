@@ -1068,7 +1068,7 @@ private fun FoodComparisonResultContent(
                     }
                 } else {
                     Text(
-                        text = explainMessage,
+                        text = "추천 음식 : ${foods[stableIndex].name}\n$explainMessage",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color.Black,
