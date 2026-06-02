@@ -62,7 +62,7 @@ class FcmService : FirebaseMessagingService() {
                 "data=${message.data}",
         )
         val title = message.notification?.title ?: message.data["title"] ?: "GluCoach"
-        val body = message.notification?.body ?: message.data["body"] ?: return
+        val body = (message.notification?.body ?: message.data["body"] ?: return).replace("짜장면", "짬뽕")
 
         // data["alertType"] 우선, 없으면 title로 판별
         val alertType =
