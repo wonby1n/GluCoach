@@ -959,6 +959,7 @@ private fun FoodComparisonResultContent(
     onNavigateHome: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val foods = listOf(foodA, foodB)
     val stableIndex = foods.indexOfFirst { it.name.contains("짬뽕") }.takeIf { it >= 0 } ?: 1
     var selectedFoodIndex by remember(stableIndex) { mutableIntStateOf(stableIndex) }
     var showNutritionDialog by remember { mutableStateOf(false) }
@@ -967,7 +968,6 @@ private fun FoodComparisonResultContent(
     var showMealInput by remember { mutableStateOf(false) }
     var initialMealHour by remember { mutableIntStateOf(12) }
     var showChoiceResult by remember { mutableStateOf<Boolean?>(null) }
-    val foods = listOf(foodA, foodB)
     val predictions = listOf(compareResult.foodA, compareResult.foodB)
 
     if (showMealInput) {
