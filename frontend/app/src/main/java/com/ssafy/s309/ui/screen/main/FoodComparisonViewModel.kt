@@ -145,7 +145,8 @@ class FoodComparisonViewModel
                 predictRepository
                     .explainCompare(request)
                     .onSuccess { res ->
-                        _uiState.update { it.copy(isLoading = false, isExplainLoading = false, explainMessage = res.message) }
+                        val message = res.message.replace("짜장면", "짬뽕")
+                        _uiState.update { it.copy(isLoading = false, isExplainLoading = false, explainMessage = message) }
                     }
                     .onFailure {
                         _uiState.update { it.copy(isLoading = false, isExplainLoading = false) }
