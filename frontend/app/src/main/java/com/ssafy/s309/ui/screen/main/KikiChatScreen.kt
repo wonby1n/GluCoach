@@ -219,7 +219,7 @@ class KikiChatViewModel
                                         NotificationItem(
                                             id = m.id,
                                             title = "키키",
-                                            message = m.message ?: "",
+                                            message = (m.message ?: "").replace("짜장면", "짬뽕"),
                                             timeAgoText = healthRepository.formatTimeAgo(m.createdAt),
                                             isUnread = !m.isRead,
                                             alertType = m.messageType ?: "",
@@ -266,7 +266,7 @@ class KikiChatViewModel
                                             NotificationItem(
                                                 id = m.id,
                                                 title = "키키",
-                                                message = m.message ?: "",
+                                                message = (m.message ?: "").replace("짜장면", "짬뽕"),
                                                 timeAgoText = healthRepository.formatTimeAgo(m.createdAt),
                                                 isUnread = !m.isRead,
                                                 alertType = m.messageType ?: "",
@@ -320,7 +320,7 @@ class KikiChatViewModel
                                             NotificationItem(
                                                 id = m.id,
                                                 title = "키키",
-                                                message = m.message ?: "",
+                                                message = (m.message ?: "").replace("짜장면", "짬뽕"),
                                                 timeAgoText = healthRepository.formatTimeAgo(m.createdAt),
                                                 isUnread = !m.isRead,
                                                 alertType = m.messageType ?: "",
