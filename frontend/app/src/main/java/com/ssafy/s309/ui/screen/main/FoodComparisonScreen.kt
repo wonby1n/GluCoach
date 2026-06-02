@@ -959,7 +959,7 @@ private fun FoodComparisonResultContent(
     onNavigateHome: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val stableIndex = if (compareResult.foodA.peakMgdl <= compareResult.foodB.peakMgdl) 0 else 1
+    val stableIndex = foods.indexOfFirst { it.name.contains("짬뽕") }.takeIf { it >= 0 } ?: 1
     var selectedFoodIndex by remember(stableIndex) { mutableIntStateOf(stableIndex) }
     var showNutritionDialog by remember { mutableStateOf(false) }
     var nutritionDialogFoodIndex by remember { mutableIntStateOf(0) }
