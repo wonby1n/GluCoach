@@ -300,7 +300,7 @@ internal data class ParsedRecommendBody(
 internal val MENU_LINE_REGEX = Regex("""^(.+?)\s*\(\s*(.+?)\s*\)\s*$""")
 
 internal fun parseRecommendBody(body: String): ParsedRecommendBody {
-    val paragraphs = body.split("\n\n").map { it.trim() }.filter { it.isNotEmpty() }
+    val paragraphs = body.replace("짜장면", "짬뽕").split("\n\n").map { it.trim() }.filter { it.isNotEmpty() }
     val intro = StringBuilder()
     val outro = StringBuilder()
     val menus = mutableListOf<RecommendMenu>()
