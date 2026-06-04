@@ -51,43 +51,65 @@
 
 <table>
   <tr>
-    <td align="center">
-      <img src="docs/assets/hawon.jpeg" width="120" height="160"/><br/>
+    <td align="center" width="240">
+      <img src="docs/assets/hawon.jpeg" width="180" height="240"/><br/>
       <b>조하원</b><br/>
       <sub>팀장 · FE · BE · AI · Infra</sub><br/>
       <sub>@godhw1018</sub>
     </td>
-    <td align="center">
-      <img src="docs/assets/dohyun.jpg" width="120" height="160"/><br/>
+    <td align="center" width="240">
+      <img src="docs/assets/dohyun.jpg" width="180" height="240"/><br/>
       <b>이도현</b><br/>
       <sub>BE · AI</sub><br/>
       <sub>@ehtm01</sub>
     </td>
-    <td align="center">
-      <img src="docs/assets/junghoon.jpg" width="120" height="160"/><br/>
+    <td align="center" width="240">
+      <img src="docs/assets/junghoon.jpg" width="180" height="240"/><br/>
       <b>김정훈</b><br/>
       <sub>BE · AI</sub><br/>
       <sub>@kik1232198</sub>
     </td>
   </tr>
   <tr>
-    <td align="center">
-      <img src="docs/assets/yoonju.jpg" width="120" height="160"/><br/>
+    <td align="center" valign="top">
+      <sub>하이키키 음성 인터페이스(STT · TTS) · 위젯 구현,<br/>Docker · Nginx 기반 인프라/배포 환경 구축</sub>
+    </td>
+    <td align="center" valign="top">
+      <sub>음식 인식 · 예측 백엔드 API 및 인증(JWT · Redis) 구현,<br/>AI 음식 분류 모델 추론 · 표시명 정제 파이프라인 개발</sub>
+    </td>
+    <td align="center" valign="top">
+      <sub>AI 에이전트 '키키' 기능 및 음식 비교 LLM 개인화,<br/>채팅 · 스마트 키보드 등 AI · BE · FE 전반 개발</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="240">
+      <img src="docs/assets/yoonju.jpg" width="180" height="240"/><br/>
       <b>남윤주</b><br/>
       <sub>BE · AI</sub><br/>
       <sub>@skadbsnwk</sub>
     </td>
-    <td align="center">
-      <img src="docs/assets/miyeong.jpg" width="120" height="160"/><br/>
+    <td align="center" width="240">
+      <img src="docs/assets/miyeong.jpg" width="180" height="240"/><br/>
       <b>박미영</b><br/>
       <sub>FE · AI</sub><br/>
       <sub>@a29279</sub>
     </td>
-    <td align="center">
-      <img src="docs/assets/hyoji.jpg" width="120" height="160"/><br/>
+    <td align="center" width="240">
+      <img src="docs/assets/hyoji.jpg" width="180" height="240"/><br/>
       <b>손효지</b><br/>
       <sub>FE · AI</sub><br/>
       <sub>@hyoji0284</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top">
+      <sub>식사 혈당 예측 모델(LSTM · XGBoost) 개발 및<br/>주간 리포트 백엔드 · 프론트엔드 구현</sub>
+    </td>
+    <td align="center" valign="top">
+      <sub>키키 채팅 · FCM 알림 · 음식 추천 UX 및<br/>스마트 키보드 배너 프론트엔드 구현</sub>
+    </td>
+    <td align="center" valign="top">
+      <sub>음식 촬영 · AI 분석, 비교 시뮬레이션, 성적표 등<br/>핵심 안드로이드 화면 프론트엔드 구현</sub>
     </td>
   </tr>
 </table>
