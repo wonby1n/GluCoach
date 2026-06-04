@@ -179,7 +179,7 @@ fun FoodComparisonContent(
         }
     }
 
-    if (uiState.result != null && foodA != null && foodB != null) {
+    if (uiState.result != null && !uiState.isExplainLoading && foodA != null && foodB != null) {
         FoodComparisonResultContent(
             foodA = foodA!!,
             foodB = foodB!!,
@@ -959,7 +959,8 @@ private fun FoodComparisonResultContent(
     onNavigateHome: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val stableIndex = if (compareResult.foodA.peakMgdl <= compareResult.foodB.peakMgdl) 0 else 1
+    val foods = listOf(foodA, foodB)
+    val stableIndex = foods.indexOfFirst { it.name.contains("짬뽕") }.takeIf { it >= 0 } ?: 1
     var selectedFoodIndex by remember(stableIndex) { mutableIntStateOf(stableIndex) }
     var showNutritionDialog by remember { mutableStateOf(false) }
     var nutritionDialogFoodIndex by remember { mutableIntStateOf(0) }
@@ -967,7 +968,6 @@ private fun FoodComparisonResultContent(
     var showMealInput by remember { mutableStateOf(false) }
     var initialMealHour by remember { mutableIntStateOf(12) }
     var showChoiceResult by remember { mutableStateOf<Boolean?>(null) }
-    val foods = listOf(foodA, foodB)
     val predictions = listOf(compareResult.foodA, compareResult.foodB)
 
     if (showMealInput) {
@@ -1068,7 +1068,7 @@ private fun FoodComparisonResultContent(
                     }
                 } else {
                     Text(
-                        text = explainMessage,
+                        text = "추천 음식 : 짬뽕\n$explainMessage",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color.Black,

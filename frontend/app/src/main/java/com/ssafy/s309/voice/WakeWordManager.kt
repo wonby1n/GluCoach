@@ -339,32 +339,22 @@ class WakeWordManager
         private fun buildListener(): RecognitionListener =
             object : RecognitionListener {
                 override fun onPartialResult(hypothesis: String?) {
-                    if (isTtsSpeaking.get() || externalTtsActive.get()) return
-                    val text = parseVoskJson(hypothesis, KEY_PARTIAL)
-                    if (text.isBlank()) return
-                    Log.d(TAG, "[partial] \"$text\"")
-
-                    if (matchesWakeWord(text)) {
-                        val now = System.currentTimeMillis()
-                        if (now - lastWakeAt < COOLDOWN_MS) return
-                        lastWakeAt = now
-                        Log.i(TAG, "Wake word 감지: \"$text\"")
-                        triggerKikiResponse()
-                    }
+                    // partial은 confidence 없어 단음절 잡음도 "cheese"로 매핑됨 → 로그만.
+                    Log.d(TAG, "[partial] \"${parseVoskJson(hypothesis, KEY_PARTIAL)}\"")
                 }
 
                 override fun onResult(hypothesis: String?) {
                     if (isTtsSpeaking.get() || externalTtsActive.get()) return
                     val text = parseVoskJson(hypothesis, KEY_TEXT)
                     if (text.isBlank()) return
-                    Log.d(TAG, "[final] \"$text\"")
+                    val conf = parseVoskConfidence(hypothesis)
+                    Log.d(TAG, "[final] \"$text\" conf=$conf")
 
-                    // partial 단계에서 못 잡았던 wake 가 final 에서 잡히는 경우 보완.
-                    if (matchesWakeWord(text)) {
+                    if (matchesWakeWord(text) && conf >= WAKE_CONFIDENCE_THRESHOLD) {
                         val now = System.currentTimeMillis()
                         if (now - lastWakeAt >= COOLDOWN_MS) {
                             lastWakeAt = now
-                            Log.i(TAG, "Wake word 감지 (final): \"$text\"")
+                            Log.i(TAG, "Wake word 감지 (final): \"$text\" (conf=$conf)")
                             triggerKikiResponse()
                         }
                     }
@@ -730,6 +720,22 @@ class WakeWordManager
             }
         }
 
+        private fun parseVoskConfidence(hypothesis: String?): Float {
+            if (hypothesis.isNullOrBlank()) return 0f
+            return try {
+                val arr = JSONObject(hypothesis).optJSONArray("result") ?: return 1f
+                if (arr.length() == 0) return 0f
+                var min = 1f
+                for (i in 0 until arr.length()) {
+                    val c = arr.getJSONObject(i).optDouble("conf", 0.0).toFloat()
+                    if (c < min) min = c
+                }
+                min
+            } catch (e: Exception) {
+                0f
+            }
+        }
+
         private fun sendCommandToChat(transcript: String) {
             val trimmed = transcript.trim()
             if (trimmed.isEmpty()) return
@@ -745,11 +751,7 @@ class WakeWordManager
         }
 
         private fun onImeShown() {
-            if (shouldKeepListening.get()) return // 앱이 포그라운드에서 이미 관리 중
-            Log.i(TAG, "IME 활성 — 백그라운드에서 Vosk 재가동")
-            start()
-            // start() 내부에서 imeStartedVosk.set(false)가 실행되므로 start() 이후에 재설정.
-            imeStartedVosk.set(true)
+            // 백그라운드(다른 앱)에서는 wake word 미감지. 앱 포그라운드에서만 동작.
         }
 
         private fun onImeHidden() {
@@ -833,26 +835,13 @@ class WakeWordManager
             // 모두 공백/구두점 제거 후 소문자로 비교.
             // grammar 모드에서는 Vosk 가 WAKE_GRAMMAR_JSON 안의 phrase 만 출력 → 단순 substring 매칭으로 충분.
             // free-form 폴백 시에도 동작하도록 변형 유지.
-            val WAKE_PATTERNS =
-                listOf(
-                    // wake-prefix 가 있는 형태만 (free-form 폴백 시 "kiki"/"key" 단독은 false positive 위험).
-                    "hikiki",
-                    "hikeykey",
-                    "hikey",
-                    "heykiki",
-                    "heykey",
-                    "haikiki",
-                    "haykiki",
-                    "highkiki",
-                    "highkey",
-                    "hekiki",
-                )
+            val WAKE_PATTERNS = listOf("truck")
 
-            // Vosk grammar JSON. 이 phrase 들 + "[unk]" 만 출력 가능 → 잡음 트리거 차단.
-            // "Hi Kiki" 영어 발음을 Vosk small 영어 모델이 매핑할 가능성이 있는 음성형들.
-            // 매칭은 matchesWakeWord() 가 공백/구두점 제거 후 substring 으로 처리.
-            const val WAKE_GRAMMAR_JSON =
-                """["hi kiki", "hi key key", "hi key", "hey kiki", "hey key", "high kiki", "high key", "[unk]"]"""
+            // Vosk grammar JSON. "truck" 단일 wake word + "[unk]".
+            const val WAKE_GRAMMAR_JSON = """["truck", "[unk]"]"""
+
+            // 오탐 방지용 Vosk word-level confidence 최솟값. 한국어 발음("치즈") 특성상 0.5로 설정.
+            const val WAKE_CONFIDENCE_THRESHOLD = 0.5f
 
             val CALENDAR_KEYWORDS = listOf("일정", "스케줄", "약속")
 

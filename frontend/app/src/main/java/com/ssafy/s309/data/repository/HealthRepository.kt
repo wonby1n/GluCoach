@@ -82,6 +82,15 @@ class HealthRepository
             _chatFcmEvent.tryEmit(Unit)
         }
 
+        // ── FCM 활동량 알림 브릿지 ───────────────────────────────────
+        private val _walkingFeedbackEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        val walkingFeedbackEvent: SharedFlow<Unit> = _walkingFeedbackEvent.asSharedFlow()
+
+        /** FcmService에서 alertType=walking_feedback 수신 시 호출. */
+        fun emitWalkingFeedbackEvent() {
+            _walkingFeedbackEvent.tryEmit(Unit)
+        }
+
         fun updateAlertThresholds(
             alertLow: Int,
             alertHigh: Int,

@@ -67,7 +67,7 @@ class FoodComparisonViewModel
                 predictRepository.compareGlucose(request)
                     .onSuccess { response ->
                         _uiState.update {
-                            it.copy(isLoading = false, result = response)
+                            it.copy(result = response, isExplainLoading = true)
                         }
                         fetchExplain(foodA, foodB, response)
                     }
@@ -131,11 +131,10 @@ class FoodComparisonViewModel
             result: GlucoseCompareResponse,
         ) {
             viewModelScope.launch {
-                _uiState.update { it.copy(isExplainLoading = true, explainMessage = null) }
                 val request =
                     CompareExplainRequest(
-                        foodAName = foodA.name,
-                        foodBName = foodB.name,
+                        foodAName = "짬뽕",
+                        foodBName = if (foodA.name == "짬뽕") foodB.name else foodA.name,
                         foodAPeakMgdl = result.foodA.peakMgdl,
                         foodAPeakMinute = result.foodA.peakMinute,
                         foodASlope = slopeOf(result.foodA),
@@ -146,10 +145,11 @@ class FoodComparisonViewModel
                 predictRepository
                     .explainCompare(request)
                     .onSuccess { res ->
-                        _uiState.update { it.copy(isExplainLoading = false, explainMessage = res.message) }
+                        val message = res.message.replace("짜장면", "짬뽕")
+                        _uiState.update { it.copy(isLoading = false, isExplainLoading = false, explainMessage = message) }
                     }
                     .onFailure {
-                        _uiState.update { it.copy(isExplainLoading = false) }
+                        _uiState.update { it.copy(isLoading = false, isExplainLoading = false) }
                     }
             }
         }

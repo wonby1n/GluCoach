@@ -174,7 +174,7 @@ class KikiChatViewModel
             val nowIso = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
             val userMsg =
                 ChatMessage.UserMessage(
-                    text = "하이 키키",
+                    text = "트럭",
                     timestamp = timestamp,
                     createdAt = nowIso,
                 )
@@ -219,7 +219,7 @@ class KikiChatViewModel
                                         NotificationItem(
                                             id = m.id,
                                             title = "키키",
-                                            message = m.message ?: "",
+                                            message = (m.message ?: "").replace("짜장면", "짬뽕"),
                                             timeAgoText = healthRepository.formatTimeAgo(m.createdAt),
                                             isUnread = !m.isRead,
                                             alertType = m.messageType ?: "",
@@ -266,7 +266,7 @@ class KikiChatViewModel
                                             NotificationItem(
                                                 id = m.id,
                                                 title = "키키",
-                                                message = m.message ?: "",
+                                                message = (m.message ?: "").replace("짜장면", "짬뽕"),
                                                 timeAgoText = healthRepository.formatTimeAgo(m.createdAt),
                                                 isUnread = !m.isRead,
                                                 alertType = m.messageType ?: "",
@@ -307,6 +307,7 @@ class KikiChatViewModel
                                 .sortedByDescending { it.id }
                                 // 이미 로컬에 있는 createdAt은 dedupe. 다른 단말이 보낸 user 메시지는 받기 위해 sender 필터 제거.
                                 .filter { it.createdAt !in existingCreatedAts }
+                                .filter { !(it.sender == "user" && it.commandType == "calendar_reminder") }
                                 .map { m ->
                                     if (m.sender == "user") {
                                         ChatMessage.UserMessage(
@@ -319,7 +320,7 @@ class KikiChatViewModel
                                             NotificationItem(
                                                 id = m.id,
                                                 title = "키키",
-                                                message = m.message ?: "",
+                                                message = (m.message ?: "").replace("짜장면", "짬뽕"),
                                                 timeAgoText = healthRepository.formatTimeAgo(m.createdAt),
                                                 isUnread = !m.isRead,
                                                 alertType = m.messageType ?: "",

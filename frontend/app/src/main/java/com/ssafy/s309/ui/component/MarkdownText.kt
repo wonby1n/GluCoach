@@ -107,6 +107,7 @@ fun MarkdownText(
         }
         flush()
 
+        val firstHeaderIdx = blocks.indexOfFirst { it.isHeader }
         Column(modifier = modifier) {
             blocks.forEachIndexed { idx, block ->
                 val prevBlock = blocks.getOrNull(idx - 1)
@@ -121,7 +122,7 @@ fun MarkdownText(
                     Spacer(modifier = Modifier.height(6.dp))
                 }
 
-                val applyHeaderBg = block.isHeader
+                val applyHeaderBg = block.isHeader && idx == firstHeaderIdx
                 val bg =
                     when {
                         applyHeaderBg -> headerBackground

@@ -39,13 +39,10 @@ class MainViewModel
             observeBleConnection()
             observeGlucoseStream()
             observeGlucoseAlerts()
+            observeWalkingFeedback()
             registerPendingFcmToken()
             GlucoseSimulator.start(context)
             observeSimulatorStream()
-            viewModelScope.launch {
-                delay(3_000L)
-                healthRepository.sendDemoFoodRecommend()
-            }
         }
 
         fun loadDashboard() {
@@ -77,6 +74,17 @@ class MainViewModel
                         val high = settings.targetHigh?.toInt() ?: return@onSuccess
                         healthRepository.updateAlertThresholds(low, high)
                     }
+            }
+        }
+
+        private fun observeWalkingFeedback() {
+            viewModelScope.launch {
+                healthRepository.walkingFeedbackEvent.collect {
+                    val until = System.currentTimeMillis() + 15_000L
+                    _uiState.update { it.copy(walkingFeedbackUntil = until) }
+                    delay(15_000L)
+                    _uiState.update { it.copy(walkingFeedbackUntil = 0L) }
+                }
             }
         }
 
@@ -252,6 +260,10 @@ class MainViewModel
             viewModelScope.launch {
                 healthRepository.markAllAlertsRead()
             }
+        }
+
+        fun triggerWalkingFeedback() {
+            healthRepository.emitWalkingFeedbackEvent()
         }
 
         fun sendMealReply(

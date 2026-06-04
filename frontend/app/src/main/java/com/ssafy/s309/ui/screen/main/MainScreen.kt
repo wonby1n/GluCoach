@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -152,6 +153,7 @@ fun MainScreen(
         targetFoodA = targetFoodA,
         targetFoodB = targetFoodB,
         onTargetFoodABHandled = onTargetFoodABHandled,
+        onTriggerWalkingFeedback = viewModel::triggerWalkingFeedback,
         // [DEBUG_KIKI_TEST]
     )
 }
@@ -186,6 +188,7 @@ fun MainScreenContent(
     targetFoodA: String? = null,
     targetFoodB: String? = null,
     onTargetFoodABHandled: () -> Unit = {},
+    onTriggerWalkingFeedback: () -> Unit = {},
 ) {
     var selectedTab by rememberSaveable { mutableStateOf("home") }
     var mealLogTargetDate by remember { mutableStateOf<String?>(null) }
@@ -328,20 +331,32 @@ fun MainScreenContent(
                                         trendRateMgDlPerMin = state.trendRateMgDlPerMin,
                                         diabetesType = state.diabetesType,
                                     )
-                                var displayedKiki by remember { mutableIntStateOf(kikiDrawable) }
+                                val kikiTarget =
+                                    if (System.currentTimeMillis() < state.walkingFeedbackUntil) {
+                                        R.drawable.kiki_run
+                                    } else {
+                                        kikiDrawable
+                                    }
+                                var displayedKiki by remember { mutableIntStateOf(kikiTarget) }
                                 var kikiSwitchTime by remember { mutableLongStateOf(0L) }
-                                LaunchedEffect(kikiDrawable) {
-                                    if (displayedKiki == kikiDrawable) return@LaunchedEffect
+                                LaunchedEffect(kikiTarget) {
+                                    if (displayedKiki == kikiTarget) return@LaunchedEffect
+                                    if (kikiTarget == R.drawable.kiki_run) {
+                                        displayedKiki = kikiTarget
+                                        kikiSwitchTime = System.currentTimeMillis()
+                                        return@LaunchedEffect
+                                    }
                                     val elapsed = System.currentTimeMillis() - kikiSwitchTime
                                     val remaining = kikiCycleDuration(displayedKiki) - elapsed
                                     if (remaining > 0) delay(remaining)
-                                    displayedKiki = kikiDrawable
+                                    displayedKiki = kikiTarget
                                     kikiSwitchTime = System.currentTimeMillis()
                                 }
 
                                 KikiSuggestionCard(
                                     notifications = state.notifications,
                                     isNewUser = state.isNewUser,
+                                    isKikiRunActive = System.currentTimeMillis() < state.walkingFeedbackUntil,
                                     onAlarmClick = onKikiAlarmClick,
                                     onChatClick = onKikiChatClick,
                                 )
@@ -352,10 +367,34 @@ fun MainScreenContent(
                                     diffFromPrevious = state.diffFromPrevious,
                                     glucoseRange = state.glucoseRange,
                                     mascotSlot = {
-                                        KikiImage(
-                                            drawableRes = displayedKiki,
-                                            modifier = Modifier.fillMaxSize(),
-                                        )
+                                        Box(
+                                            modifier =
+                                                Modifier
+                                                    .fillMaxSize()
+                                                    .pointerInput(onTriggerWalkingFeedback) {
+                                                        detectTapGestures(
+                                                            onLongPress = { onTriggerWalkingFeedback() },
+                                                        )
+                                                    },
+                                            contentAlignment =
+                                                if (displayedKiki == R.drawable.kiki_run) {
+                                                    Alignment.Center
+                                                } else {
+                                                    Alignment.BottomEnd
+                                                },
+                                        ) {
+                                            KikiImage(
+                                                drawableRes = displayedKiki,
+                                                modifier =
+                                                    if (displayedKiki == R.drawable.kiki_run) {
+                                                        Modifier.fillMaxSize(
+                                                            0.8f,
+                                                        )
+                                                    } else {
+                                                        Modifier.fillMaxSize()
+                                                    },
+                                            )
+                                        }
                                     },
                                 )
                                 Spacer(modifier = Modifier.height(GlucoachSpacing.xl))
@@ -669,12 +708,13 @@ private fun TodayConditionHeader(
 private fun KikiSuggestionCard(
     notifications: List<com.ssafy.s309.data.model.NotificationItem>,
     isNewUser: Boolean,
+    isKikiRunActive: Boolean,
     onAlarmClick: () -> Unit,
     onChatClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val unread = notifications.filter { it.isUnread }
-    val bannerText = resolveBannerText(unread, isNewUser)
+    val bannerText = if (isKikiRunActive) "활동이 감지되었어요" else resolveBannerText(unread, isNewUser)
     val onClick = if (unread.size >= 2) onChatClick else onAlarmClick
 
     Row(
@@ -693,37 +733,43 @@ private fun KikiSuggestionCard(
                 .padding(horizontal = 20.dp, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(modifier = Modifier.size(28.dp)) {
-            Icon(
-                imageVector = Icons.Outlined.MailOutline,
-                contentDescription = null,
-                tint = GlucoachColors.PrimaryDark,
-                modifier =
-                    Modifier
-                        .size(24.dp)
-                        .align(Alignment.Center),
-            )
-            if (unread.isNotEmpty()) {
+        Box(modifier = Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+            if (isKikiRunActive) {
                 Box(
                     modifier =
                         Modifier
-                            .align(Alignment.TopEnd)
-                            .size(16.dp)
-                            .background(Color(0xFFE53935), shape = CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "${unread.size}",
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        lineHeight = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        style =
-                            LocalTextStyle.current.merge(
-                                TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false)),
-                            ),
-                    )
+                            .size(14.dp)
+                            .background(Color(0xFF4CAF50), shape = CircleShape),
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.MailOutline,
+                    contentDescription = null,
+                    tint = GlucoachColors.PrimaryDark,
+                    modifier = Modifier.size(24.dp).align(Alignment.Center),
+                )
+                if (unread.isNotEmpty()) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .size(16.dp)
+                                .background(Color(0xFFE53935), shape = CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "${unread.size}",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            lineHeight = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            style =
+                                LocalTextStyle.current.merge(
+                                    TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false)),
+                                ),
+                        )
+                    }
                 }
             }
         }
@@ -1182,7 +1228,7 @@ private fun CameraModeChip(
 
 private fun kikiCycleDuration(drawableRes: Int): Long =
     when (drawableRes) {
-        R.drawable.kiki_hello -> 5_760L
+        R.drawable.kiki_run -> 15_000L
         R.drawable.kiki_fell_off -> 15_500L
         R.drawable.kiki_dehydrated_high -> 3_300L
         else -> 3_000L

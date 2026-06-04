@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,9 @@ public class PredictionService {
   private static final double DEFAULT_WEIGHT_KG = 60.0;
   private static final String DEFAULT_ACTIVITY = "medium";
   private static final String DEFAULT_MEAL_PATTERN = "regular_3";
+
+  // 시연용 — 삭제 시 comparePredict if 블록 + buildDemoCompareResponse + buildDemoCurve 도 함께 제거
+  private static final Set<Integer> DEMO_USER_IDS = Set.of(27, 22);
 
   // AI 측 _parse_iso_to_hour 가 naive datetime 을 KST 로 해석하므로 명시적으로 KST 로 생성.
   private static final ZoneId KST = ZoneId.of("Asia/Seoul");
@@ -125,6 +129,9 @@ public class PredictionService {
   }
 
   public AbPredictResponse comparePredict(Integer userId, AbPredictRequest request) {
+    if (userId != null && DEMO_USER_IDS.contains(userId)) {
+      return buildDemoCompareResponse(request);
+    }
     User user = tx.findUser(userId);
 
     // asyncExecutor 사용 — MdcTaskDecorator 가 호출 스레드 MDC(correlationId 포함) 를 워커로 전파.
@@ -235,5 +242,97 @@ public class PredictionService {
         aiResponse.peakMgdl(),
         aiResponse.peakMinute(),
         aiResponse.confidence());
+  }
+
+  private AbPredictResponse buildDemoCompareResponse(AbPredictRequest request) {
+    String nameA = request.foodA().foodName();
+    String nameB = request.foodB().foodName();
+
+    boolean hasJajang =
+        nameA.contains("짜장")
+            || nameB.contains("짜장")
+            || nameA.contains("자장")
+            || nameB.contains("자장");
+    boolean hasJjamppong = nameA.contains("짬뽕") || nameB.contains("짬뽕");
+
+    if (!hasJajang || !hasJjamppong) {
+      User user = tx.findUser(27);
+      CompletableFuture<PredictResponse> futureA =
+          CompletableFuture.supplyAsync(
+              () -> predictWithUser(user, request.foodA()), asyncExecutor);
+      CompletableFuture<PredictResponse> futureB =
+          CompletableFuture.supplyAsync(
+              () -> predictWithUser(user, request.foodB()), asyncExecutor);
+      return new AbPredictResponse(futureA.join(), futureB.join());
+    }
+
+    // 짬뽕(peak=152, 낮음=추천) vs 짜장면(peak=178, 높음)
+    boolean aIsJjamppong = nameA.contains("짬뽕");
+    PredictResponse low = buildDemoCurve(152.0, 40);
+    PredictResponse high = buildDemoCurve(178.0, 30);
+    return aIsJjamppong ? new AbPredictResponse(low, high) : new AbPredictResponse(high, low);
+  }
+
+  private PredictResponse buildDemoCurve(double peak, int peakMin) {
+    double[][] pts =
+        peak < 160
+            ? new double[][] {
+              {0, 100},
+              {5, 105},
+              {10, 112},
+              {15, 122},
+              {20, 132},
+              {25, 141},
+              {30, 148},
+              {35, 151},
+              {40, 152},
+              {45, 151},
+              {50, 148},
+              {55, 144},
+              {60, 140},
+              {65, 136},
+              {70, 132},
+              {75, 128},
+              {80, 125},
+              {85, 122},
+              {90, 119},
+              {95, 117},
+              {100, 115},
+              {105, 113},
+              {110, 112},
+              {115, 111},
+              {120, 110}
+            }
+            : new double[][] {
+              {0, 100},
+              {5, 108},
+              {10, 120},
+              {15, 138},
+              {20, 155},
+              {25, 169},
+              {30, 178},
+              {35, 176},
+              {40, 171},
+              {45, 165},
+              {50, 158},
+              {55, 151},
+              {60, 144},
+              {65, 138},
+              {70, 133},
+              {75, 129},
+              {80, 125},
+              {85, 122},
+              {90, 119},
+              {95, 117},
+              {100, 115},
+              {105, 113},
+              {110, 112},
+              {115, 111},
+              {120, 110}
+            };
+
+    List<CurvePoint> curve =
+        java.util.Arrays.stream(pts).map(p -> new CurvePoint((int) p[0], p[1])).toList();
+    return new PredictResponse(-1, curve, peak, peakMin, 0.95);
   }
 }

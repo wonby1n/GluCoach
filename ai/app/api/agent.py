@@ -241,23 +241,20 @@ def _build_food_compare_prompt(req: FoodCompareRequest) -> str:
         target_info = f"혈당 목표: {profile.target_low:.0f}~{profile.target_high:.0f} mg/dL\n"
 
     a, b = req.food_a, req.food_b
-    return f"""아래 사용자 프로파일과 두 음식의 혈당 예측 데이터를 보고, {name_prefix}에게 어느 음식이 더 나은지 한국어 2문장으로 설명해주세요.
+    peak_diff = abs(a.peak_mgdl - b.peak_mgdl)
+    better = a if a.peak_mgdl <= b.peak_mgdl else b
+    return f"""두 음식의 혈당 예측 데이터를 보고 아래 형식으로만 답변하세요.
 
-[사용자 프로파일]
-{name_prefix} / {persona_str}
-{target_info}
-[음식 A: {a.name}]
-예측 피크: {a.peak_mgdl:.0f} mg/dL (식후 {a.peak_minute}분) / 상승 속도: {a.slope:.2f} mg/dL/min
+[사용자] {name_prefix} / {persona_str}{(' / ' + target_info.strip()) if target_info.strip() else ''}
+[{a.name}] 피크 {a.peak_mgdl:.0f} mg/dL (식후 {a.peak_minute}분) / 상승 {a.slope:.2f} mg/dL/min
+[{b.name}] 피크 {b.peak_mgdl:.0f} mg/dL (식후 {b.peak_minute}분) / 상승 {b.slope:.2f} mg/dL/min
+추천: {better.name}
 
-[음식 B: {b.name}]
-예측 피크: {b.peak_mgdl:.0f} mg/dL (식후 {b.peak_minute}분) / 상승 속도: {b.slope:.2f} mg/dL/min
+출력 형식 (두 문장만, 다른 텍스트 절대 금지):
+문장1: 사용자 특성(당뇨유형·BMI·투약 중 가장 관련 있는 1가지)을 한 문장으로. 예) "정상 혈당에 과체중이신 {name_prefix}은 급격한 혈당 상승을 주의해야 해요."
+문장2: {better.name}의 피크가 {peak_diff:.0f}mg/dL 낮고 상승 속도가 얼마나 더 완만한지 수치로만. 예) "피크가 {peak_diff:.0f}mg/dL 낮고 상승 속도도 더 완만해요."
 
-작성 규칙:
-- 첫 문장: 사용자의 구체적 특성(당뇨 유형, BMI 범주, 투약 여부 중 가장 관련 있는 1~2가지)을 명시하며 어느 음식이 더 나은지 이유 설명
-  예시: "2형 당뇨이시고 BMI 26(과체중) 범위에 계신 [이름]님은 인슐린 저항성이 높아 [음식]이 더 안전한 선택이에요."
-- 둘째 문장: 피크 수치 차이와 상승 속도를 구체적 숫자로 근거 제시
-  예시: "[음식]이 피크가 [X]mg/dL 낮고 상승 속도도 [Y배] 더 완만해요."
-- 이모지 없음, 친근한 존댓말, 음식 이름 반드시 명시"""
+규칙: 두 문장 모두 해요체 / 이모지 없음 / 형식 외 텍스트 금지 / 수치·단위(mg/dL, min 등) 외 모든 텍스트는 반드시 한국어로만 작성"""
 
 
 @router.post("/food-compare", response_model=FoodCompareResponse)
